@@ -8,7 +8,7 @@ import userRepository from '../repositories/user.repository.js';
 import { UnauthorizedError } from '../utils/api-error.js';
 import { serializeBarberProfile } from '../utils/barber-profile.utils.js';
 import { ROLES, TOKEN_TYPE } from '../utils/constants.js';
-import logger from '../utils/logger.js';
+import logger, { maskPhoneNumber } from '../utils/logger.js';
 
 const normalizePhoneNumber = (phoneNumber) => {
     const value = String(phoneNumber ?? '').trim();
@@ -20,11 +20,6 @@ const normalizePhoneNumber = (phoneNumber) => {
     if (value.startsWith('+')) return value;
 
     return value;
-};
-
-const maskPhoneNumber = (phoneNumber) => {
-    if (!phoneNumber) return null;
-    return phoneNumber.slice(-4).padStart(phoneNumber.length, '*');
 };
 
 const assertAccountIsActive = (user) => {

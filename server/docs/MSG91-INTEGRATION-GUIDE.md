@@ -1412,6 +1412,8 @@ In the new design, `authenticate` is used only on routes that require a fully on
 | `scripts/test-tokens.txt` | Generated Firebase tokens (delete if present locally) |
 | `scripts/test-tokens.json` | Generated Firebase tokens (delete if present locally) |
 
+> **Implementation note:** `scripts/firebase-token-gen.js` and `scripts/verify-token.js` may be retained as local helper scripts if they are rewritten for the JWT/onboarding flow. Only the old Firebase-based implementations must be removed.
+
 **File:** `scripts/seed-barber-rating-mock-data.js` — Remove `firebaseUid` from all fixtures and refactor `upsertUser()`:
 
 ```diff
@@ -1642,10 +1644,10 @@ server/
 
 ### Security
 
-- [ ] JWT secrets generated (64+ chars, cryptographically random)
-- [ ] Different secrets for access vs refresh tokens
-- [ ] MSG91 Auth Key in `.env` only
-- [ ] Phone numbers masked in all log output
+- [x] JWT secrets generated (64+ chars, cryptographically random)
+- [x] Different secrets for access vs refresh tokens
+- [x] MSG91 Auth Key in `.env` only
+- [x] Phone numbers masked in all log output
 - [ ] Rate limits configured and tested
 - [ ] CORS origins restricted in production
 - [ ] HTTPS enforced in production

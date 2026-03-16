@@ -19,6 +19,30 @@ const LOG_LEVELS = {
 const CURRENT_LEVEL =
     LOG_LEVELS[process.env.LOG_LEVEL?.toLowerCase()] ?? LOG_LEVELS.debug;
 
+const PHONE_KEY_PATTERN = /(phone|mobile)/i;
+
+export const maskPhoneNumber = (value) => {
+    if (value === null || value === undefined) return value;
+
+    const raw = String(value).trim();
+    if (!raw) return raw;
+
+    const digits = raw.replace(/\D/g, '');
+    if (digits.length <= 4) return raw;
+
+    let visibleDigits = 0;
+    return [...raw]
+        .reverse()
+        .map((char) => {
+            if (!/\d/.test(char)) return char;
+
+            visibleDigits += 1;
+            return visibleDigits <= 4 ? char : '*';
+        })
+        .reverse()
+        .join('');
+};
+
 // ---------------------------------------------------------------------------
 // Sensitive data redaction
 // ---------------------------------------------------------------------------
@@ -32,6 +56,16 @@ const SENSITIVE_PATTERNS = [
     { regex: /mongodb(\+srv)?:\/\/[^\s,'"}\]]+/gi, replacement: 'mongodb://***REDACTED***' },
     // Generic connection strings with credentials (user:pass@host)
     { regex: /\/\/[^:]+:[^@]+@[^\s,'"}\]]+/gi, replacement: '//***REDACTED***' },
+    // Phone-bearing query params in URLs
+    {
+        regex: /([?&](?:mobile|phone(?:number)?)=)([^&\s]+)/gi,
+        replacement: (_match, prefix, phoneValue) => `${prefix}${maskPhoneNumber(phoneValue)}`,
+    },
+    // Inline phone/mobile key-value strings
+    {
+        regex: /((?:phone(?:number)?|mobile)\s*[:=]\s*['"]?)(\+?[0-9][0-9()\s-]{5,}[0-9])/gi,
+        replacement: (_match, prefix, phoneValue) => `${prefix}${maskPhoneNumber(phoneValue)}`,
+    },
     // Bearer tokens
     { regex: /Bearer\s+[A-Za-z0-9\-._~+/]+=*/gi, replacement: 'Bearer ***REDACTED***' },
     // Private keys
@@ -73,7 +107,15 @@ const deepRedact = (value) => {
         for (const [k, v] of Object.entries(value)) {
             // Completely mask known-sensitive field names
             const lowerKey = k.toLowerCase();
-            if (
+            if (PHONE_KEY_PATTERN.test(lowerKey)) {
+                if (Array.isArray(v)) {
+                    cleaned[k] = v.map(maskPhoneNumber);
+                } else if (v && typeof v === 'object') {
+                    cleaned[k] = deepRedact(v);
+                } else {
+                    cleaned[k] = maskPhoneNumber(v);
+                }
+            } else if (
                 lowerKey.includes('password') ||
                 lowerKey.includes('secret') ||
                 lowerKey.includes('pinhash') ||

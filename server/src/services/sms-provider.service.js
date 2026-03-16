@@ -1,5 +1,5 @@
 import msg91 from '../config/msg91.config.js';
-import logger from '../utils/logger.js';
+import logger, { maskPhoneNumber } from '../utils/logger.js';
 import { AppError } from '../utils/api-error.js';
 
 /**
@@ -22,7 +22,7 @@ export const sendOtp = async (mobile) => {
         }
 
         logger.info('MSG91 test mode - OTP send bypassed', {
-            mobile: mobile.slice(-4).padStart(mobile.length, '*'),
+            mobile: maskPhoneNumber(mobile),
             testOtp: msg91.testOtp,
         });
         return { success: true, requestId: 'test-mode' };
@@ -44,14 +44,14 @@ export const sendOtp = async (mobile) => {
 
         if (data.type === 'success') {
             logger.info('OTP sent successfully', {
-                mobile: mobile.slice(-4).padStart(mobile.length, '*'),
+                mobile: maskPhoneNumber(mobile),
                 requestId: data.request_id,
             });
             return { success: true, requestId: data.request_id };
         }
 
         logger.warn('MSG91 OTP send failed', {
-            mobile: mobile.slice(-4).padStart(mobile.length, '*'),
+            mobile: maskPhoneNumber(mobile),
             response: data,
         });
         return { success: false, requestId: null };
@@ -71,7 +71,7 @@ export const verifyOtp = async (mobile, otp) => {
     if (msg91.testMode) {
         const isValid = otp === msg91.testOtp;
         logger.info('MSG91 test mode - OTP verify bypassed', {
-            mobile: mobile.slice(-4).padStart(mobile.length, '*'),
+            mobile: maskPhoneNumber(mobile),
             valid: isValid,
         });
         return {
@@ -107,7 +107,7 @@ export const verifyOtp = async (mobile, otp) => {
 export const resendOtp = async (mobile, retryType = 'text') => {
     if (msg91.testMode) {
         logger.info('MSG91 test mode - OTP resend bypassed', {
-            mobile: mobile.slice(-4).padStart(mobile.length, '*'),
+            mobile: maskPhoneNumber(mobile),
         });
         return { success: true };
     }
