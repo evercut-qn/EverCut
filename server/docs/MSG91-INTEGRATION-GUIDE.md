@@ -1607,8 +1607,8 @@ server/
 - [x] `config/msg91.config.js` added — default-exports the configured `msg91` object
 - [x] `sms-provider.service.js` created and tested
 - [x] `otp.service.js` created and tested
-- [ ] `auth.service.js` fully rewritten — issues `onboardingToken` for new users, `accessToken` for returning
-- [ ] `auth.validator.js` rewritten with OTP/token schemas
+- [x] `auth.service.js` fully rewritten — issues `onboardingToken` for new users, `accessToken` for returning
+- [x] `auth.validator.js` rewritten with OTP/token schemas
 - [ ] `otp-rate-limiter.middleware.js` created
 - [ ] `auth.controller.js` rewritten — returns `onboardingToken` for new users, `accessToken`/`refreshToken` for returning users
 - [ ] `auth.routes.js` rewritten with all new routes
