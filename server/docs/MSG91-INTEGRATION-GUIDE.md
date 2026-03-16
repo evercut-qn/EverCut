@@ -1635,7 +1635,7 @@ server/
 - [x] Refresh token rotation tested (happy path + theft detection)
 - [x] New user → OTP → onboardingToken → CUSTOMER onboarding flow tested end-to-end
 - [x] New user → OTP → onboardingToken → BARBER onboarding flow tested end-to-end
-- [ ] Onboarding tokens blocked from standard API routes (401 test)
+- [x] Onboarding tokens blocked from standard API routes (401 test)
 - [ ] Already-onboarded user bypassing OTP to reuse old onboarding token is blocked (409 test)
 - [ ] Rate limiting tested (send + verify)
 - [ ] `rg "firebaseUid" src/` returns zero matches (Firebase config files are expected to remain)
