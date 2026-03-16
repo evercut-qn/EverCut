@@ -9,12 +9,6 @@ import { ROLES, ALL_ROLES } from '../utils/constants.js';
  */
 const userSchema = new mongoose.Schema(
     {
-        firebaseUid: {
-            type: String,
-            required: true,
-            unique: true,
-            index: true,
-        },
         phoneNumber: {
             type: String,
             required: true,
@@ -28,11 +22,20 @@ const userSchema = new mongoose.Schema(
             lowercase: true,
             trim: true,
         },
+        emailVerified: {
+            type: Boolean,
+            default: false,
+        },
         roleType: {
             type: String,
             required: true,
             enum: ALL_ROLES,
             default: ROLES.CUSTOMER,
+        },
+        refreshTokenHash: {
+            type: String,
+            default: null,
+            select: false,
         },
         isActive: {
             type: Boolean,

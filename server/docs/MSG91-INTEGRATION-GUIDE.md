@@ -1615,11 +1615,11 @@ server/
 - [x] `onboarding.routes.js` updated — uses `authenticateOnboarding` for onboarding endpoints
 - [x] `authenticate.middleware.js` rewritten — exports `authenticate` for fully onboarded routes and `authenticateOnboarding` for onboarding-only routes
 - [x] `authorize.middleware.js` updated — pure role checks after `authenticate`
-- [ ] `user.model.js` changes applied:
-  - [ ] `firebaseUid` removed
-  - [ ] `refreshTokenHash` added (select: false)
-  - [ ] `emailVerified` added (Boolean, default: false)
-  - [ ] Keeps `email` strictly required and strictly unique
+- [x] `user.model.js` changes applied:
+  - [x] `firebaseUid` removed
+  - [x] `refreshTokenHash` added (select: false)
+  - [x] `emailVerified` added (Boolean, default: false)
+  - [x] Keeps `email` strictly required and strictly unique
 - [ ] `user.repository.js` — `findByFirebaseUid()` removed, `findByIdWithRefreshHash()` added
 - [x] `constants.js` updated — `ONBOARDING` token type added, OTP + `TOKEN_TYPE` constants
 - [ ] `account.service.js` refactored to use JWT revocation
