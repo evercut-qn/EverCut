@@ -1631,8 +1631,8 @@ server/
 - [x] `barber-profile.controller.js` updated to pass `req.user._id` to `signOutEverywhere`
 - [x] Firebase-related model comments removed
 - [x] Seed script updated to use `phoneNumber` identity
-- [ ] All OTP endpoints tested (test mode)
-- [ ] Refresh token rotation tested (happy path + theft detection)
+- [x] All OTP endpoints tested (test mode)
+- [x] Refresh token rotation tested (happy path + theft detection)
 - [ ] New user → OTP → onboardingToken → CUSTOMER onboarding flow tested end-to-end
 - [ ] New user → OTP → onboardingToken → BARBER onboarding flow tested end-to-end
 - [ ] Onboarding tokens blocked from standard API routes (401 test)

@@ -68,6 +68,7 @@ export const generateTokenPair = (userId, roleType) => {
             sub: userId.toString(),
             role: roleType,
             type: TOKEN_TYPE.ACCESS,
+            jti: crypto.randomUUID(),
         },
         config.jwt.accessSecret,
         { expiresIn: config.jwt.accessExpiry },
@@ -77,6 +78,7 @@ export const generateTokenPair = (userId, roleType) => {
         {
             sub: userId.toString(),
             type: TOKEN_TYPE.REFRESH,
+            jti: crypto.randomUUID(),
         },
         config.jwt.refreshSecret,
         { expiresIn: config.jwt.refreshExpiry },
