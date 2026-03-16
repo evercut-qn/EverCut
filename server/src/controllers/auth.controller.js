@@ -1,35 +1,97 @@
 import * as authService from '../services/auth.service.js';
+import * as otpService from '../services/otp.service.js';
+import { BadRequestError } from '../utils/api-error.js';
 import { ApiResponse } from '../utils/api-response.js';
 
-/**
- * Auth controller - handles session bootstrap after Firebase auth.
- */
-export const createSession = async (req, res, next) => {
-    try {
-        const { firebaseUid, phoneNumber, email } = req.user;
-        const result = await authService.createSession(firebaseUid, { phoneNumber, email });
-
-        if (result.isNewUser) {
-            return res.status(200).json(
-                ApiResponse.success(
-                    {
-                        isNewUser: true,
-                        firebaseUid: result.firebaseUid,
-                        phoneNumber: result.phoneNumber,
-                        email: result.email,
-                    },
-                    'New user. Please complete your profile.',
-                ),
-            );
-        }
-
-        return res.status(200).json(
-            ApiResponse.success(
-                { isNewUser: false, user: result.user, profile: result.profile },
-                'Login successful',
-            ),
-        );
-    } catch (err) {
-        next(err);
+const buildSessionPayload = (session) => {
+    if (session.isNewUser) {
+        return {
+            message: 'OTP verified. Please complete your profile.',
+            data: {
+                isNewUser: true,
+                onboardingToken: session.onboardingToken,
+            },
+        };
     }
+
+    return {
+        message: 'Login successful',
+        data: {
+            isNewUser: false,
+            user: session.user,
+            profile: session.profile,
+            accessToken: session.tokens.accessToken,
+            refreshToken: session.tokens.refreshToken,
+        },
+    };
+};
+
+/** POST /auth/otp/send */
+export const sendOtp = async (req, res) => {
+    const { mobile } = req.body;
+    const result = await otpService.requestOtp(mobile);
+
+    return res.status(200).json(
+        ApiResponse.success(result, 'OTP sent successfully'),
+    );
+};
+
+/** POST /auth/otp/verify */
+export const verifyOtp = async (req, res) => {
+    const { mobile, otp } = req.body;
+
+    await otpService.verifyOtp(mobile, otp);
+    const session = await authService.resolveOtpSession(mobile);
+    const response = buildSessionPayload(session);
+
+    return res.status(200).json(
+        ApiResponse.success(response.data, response.message),
+    );
+};
+
+/** POST /auth/otp/resend */
+export const resendOtp = async (req, res) => {
+    const { mobile, retryType } = req.body;
+    const result = await otpService.resendOtp(mobile, retryType);
+
+    return res.status(200).json(
+        ApiResponse.success(result, result.message),
+    );
+};
+
+/** POST /auth/token/refresh */
+export const refreshToken = async (req, res) => {
+    const { refreshToken: token } = req.body;
+    const tokens = await authService.refreshAccessToken(token);
+
+    return res.status(200).json(
+        ApiResponse.success(tokens, 'Token refreshed successfully'),
+    );
+};
+
+/** POST /auth/logout */
+export const logout = async (req, res) => {
+    await authService.revokeRefreshToken(req.user._id);
+
+    return res.status(200).json(
+        ApiResponse.success(null, 'Logged out successfully'),
+    );
+};
+
+/**
+ * Temporary compatibility handler for the legacy Firebase-backed /auth/session route.
+ * Remove when auth.routes.js is rewritten to the OTP/JWT endpoints.
+ */
+export const createSession = async (req, res) => {
+    const phoneNumber = req.user?.phoneNumber;
+    if (!phoneNumber) {
+        throw new BadRequestError('Verified phone number is required');
+    }
+
+    const session = await authService.resolveOtpSession(phoneNumber);
+    const response = buildSessionPayload(session);
+
+    return res.status(200).json(
+        ApiResponse.success(response.data, response.message),
+    );
 };
