@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "EverCut - Authentication",
-    "description": "Session bootstrap endpoints for the Firebase customer and barber test users created by server/scripts/firebase-token-gen.js.",
+    "description": "OTP authentication endpoints for customer and barber test users. Sends OTP, verifies it, and captures onboarding tokens for brand-new users or JWT access/refresh tokens for returning users. Requires msg91.testMode set to true in config/index.js for local development.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -18,24 +18,47 @@
       "description": "API prefix used by every request"
     },
     {
-      "key": "customer_firebase_token",
-      "value": "",
-      "type": "string",
-      "description": "Paste the ID token for test-customer-001 here"
+      "key": "test_customer_mobile",
+      "value": "9876543210",
+      "type": "string"
     },
     {
-      "key": "barber_firebase_token",
-      "value": "",
-      "type": "string",
-      "description": "Paste the ID token for test-barber-001 here"
+      "key": "test_barber_mobile",
+      "value": "9876543211",
+      "type": "string"
     },
     {
-      "key": "last_session_role",
+      "key": "test_otp",
+      "value": "123456",
+      "type": "string"
+    },
+    {
+      "key": "customer_access_token",
       "value": "",
       "type": "string"
     },
     {
-      "key": "last_session_is_new_user",
+      "key": "customer_refresh_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "customer_onboarding_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "barber_access_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "barber_refresh_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "barber_onboarding_token",
       "value": "",
       "type": "string"
     }
@@ -59,17 +82,19 @@
           "if (baseUrl) { pm.collectionVariables.set('base_url', baseUrl); }",
           "const apiPrefix = readScopedValue('api_prefix');",
           "if (apiPrefix) { pm.collectionVariables.set('api_prefix', apiPrefix); }",
-          "const customerToken = readScopedValue('customer_firebase_token');",
-          "if (customerToken) { pm.collectionVariables.set('customer_firebase_token', customerToken); }",
-          "const barberToken = readScopedValue('barber_firebase_token');",
-          "if (barberToken) { pm.collectionVariables.set('barber_firebase_token', barberToken); }"
+          "const customerMobile = readScopedValue('test_customer_mobile');",
+          "if (customerMobile) { pm.collectionVariables.set('test_customer_mobile', customerMobile); }",
+          "const barberMobile = readScopedValue('test_barber_mobile');",
+          "if (barberMobile) { pm.collectionVariables.set('test_barber_mobile', barberMobile); }",
+          "const testOtp = readScopedValue('test_otp');",
+          "if (testOtp) { pm.collectionVariables.set('test_otp', testOtp); }"
         ]
       }
     }
   ],
   "item": [
     {
-      "name": "1. Create Customer Session",
+      "name": "1. Send Customer OTP",
       "request": {
         "method": "POST",
         "header": [
@@ -78,11 +103,11 @@
             "value": "application/json"
           }
         ],
-        "url": "{{base_url}}/{{api_prefix}}/auth/session",
-        "description": "Creates an authenticated API session for the Firebase customer test user. Run this before customer onboarding or customer collections.",
+        "url": "{{base_url}}/{{api_prefix}}/auth/otp/send",
+        "description": "Send an OTP to the customer test number configured in the active Postman environment.",
         "body": {
           "mode": "raw",
-          "raw": "{}",
+          "raw": "{\n  \"mobile\": \"{{test_customer_mobile}}\"\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -90,14 +115,44 @@
           }
         },
         "auth": {
-          "type": "bearer",
-          "bearer": [
-            {
-              "key": "token",
-              "value": "{{customer_firebase_token}}",
-              "type": "string"
+          "type": "noauth"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Verify Customer OTP",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/{{api_prefix}}/auth/otp/verify",
+        "description": "Verify the customer OTP and capture either onboarding or session JWTs for downstream collections.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"mobile\": \"{{test_customer_mobile}}\",\n  \"otp\": \"{{test_otp}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
             }
-          ]
+          }
+        },
+        "auth": {
+          "type": "noauth"
         }
       },
       "event": [
@@ -108,15 +163,35 @@
             "exec": [
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
               "const response = pm.response.json();",
+              "const data = response.data || {};",
+              "if (data.isNewUser && data.onboardingToken) {",
+              "  pm.collectionVariables.set('customer_onboarding_token', data.onboardingToken);",
+              "  pm.environment.set('customer_onboarding_token', data.onboardingToken);",
+              "  pm.collectionVariables.set('customer_access_token', '');",
+              "  pm.collectionVariables.set('customer_refresh_token', '');",
+              "  pm.environment.set('customer_access_token', '');",
+              "  pm.environment.set('customer_refresh_token', '');",
+              "} else {",
+              "  pm.collectionVariables.set('customer_onboarding_token', '');",
+              "  pm.environment.set('customer_onboarding_token', '');",
+              "  if (data.accessToken) {",
+              "    pm.collectionVariables.set('customer_access_token', data.accessToken);",
+              "    pm.environment.set('customer_access_token', data.accessToken);",
+              "  }",
+              "  if (data.refreshToken) {",
+              "    pm.collectionVariables.set('customer_refresh_token', data.refreshToken);",
+              "    pm.environment.set('customer_refresh_token', data.refreshToken);",
+              "  }",
+              "}",
               "pm.collectionVariables.set('last_session_role', 'CUSTOMER');",
-              "pm.collectionVariables.set('last_session_is_new_user', String(Boolean(response.data && response.data.isNewUser)));"
+              "pm.collectionVariables.set('last_session_is_new_user', String(Boolean(data.isNewUser)));"
             ]
           }
         }
       ]
     },
     {
-      "name": "2. Create Barber Session",
+      "name": "3. Send Barber OTP",
       "request": {
         "method": "POST",
         "header": [
@@ -125,11 +200,11 @@
             "value": "application/json"
           }
         ],
-        "url": "{{base_url}}/{{api_prefix}}/auth/session",
-        "description": "Creates an authenticated API session for the Firebase barber test user. Run this before barber onboarding or barber collections.",
+        "url": "{{base_url}}/{{api_prefix}}/auth/otp/send",
+        "description": "Send an OTP to the barber test number configured in the active Postman environment.",
         "body": {
           "mode": "raw",
-          "raw": "{}",
+          "raw": "{\n  \"mobile\": \"{{test_barber_mobile}}\"\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -137,11 +212,188 @@
           }
         },
         "auth": {
+          "type": "noauth"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Verify Barber OTP",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/{{api_prefix}}/auth/otp/verify",
+        "description": "Verify the barber OTP and capture either onboarding or session JWTs for downstream collections.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"mobile\": \"{{test_barber_mobile}}\",\n  \"otp\": \"{{test_otp}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "auth": {
+          "type": "noauth"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "const response = pm.response.json();",
+              "const data = response.data || {};",
+              "if (data.isNewUser && data.onboardingToken) {",
+              "  pm.collectionVariables.set('barber_onboarding_token', data.onboardingToken);",
+              "  pm.environment.set('barber_onboarding_token', data.onboardingToken);",
+              "  pm.collectionVariables.set('barber_access_token', '');",
+              "  pm.collectionVariables.set('barber_refresh_token', '');",
+              "  pm.environment.set('barber_access_token', '');",
+              "  pm.environment.set('barber_refresh_token', '');",
+              "} else {",
+              "  pm.collectionVariables.set('barber_onboarding_token', '');",
+              "  pm.environment.set('barber_onboarding_token', '');",
+              "  if (data.accessToken) {",
+              "    pm.collectionVariables.set('barber_access_token', data.accessToken);",
+              "    pm.environment.set('barber_access_token', data.accessToken);",
+              "  }",
+              "  if (data.refreshToken) {",
+              "    pm.collectionVariables.set('barber_refresh_token', data.refreshToken);",
+              "    pm.environment.set('barber_refresh_token', data.refreshToken);",
+              "  }",
+              "}",
+              "pm.collectionVariables.set('last_session_role', 'BARBER');",
+              "pm.collectionVariables.set('last_session_is_new_user', String(Boolean(data.isNewUser)));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Refresh Customer Token",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/{{api_prefix}}/auth/token/refresh",
+        "description": "Exchange the stored customer refresh token for a fresh access/refresh token pair.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"refreshToken\": \"{{customer_refresh_token}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "auth": {
+          "type": "noauth"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "const response = pm.response.json();",
+              "const data = response.data || {};",
+              "if (data.accessToken) {",
+              "  pm.collectionVariables.set('customer_access_token', data.accessToken);",
+              "  pm.environment.set('customer_access_token', data.accessToken);",
+              "}",
+              "if (data.refreshToken) {",
+              "  pm.collectionVariables.set('customer_refresh_token', data.refreshToken);",
+              "  pm.environment.set('customer_refresh_token', data.refreshToken);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Refresh Barber Token",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/{{api_prefix}}/auth/token/refresh",
+        "description": "Exchange the stored barber refresh token for a fresh access/refresh token pair.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"refreshToken\": \"{{barber_refresh_token}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "auth": {
+          "type": "noauth"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "const response = pm.response.json();",
+              "const data = response.data || {};",
+              "if (data.accessToken) {",
+              "  pm.collectionVariables.set('barber_access_token', data.accessToken);",
+              "  pm.environment.set('barber_access_token', data.accessToken);",
+              "}",
+              "if (data.refreshToken) {",
+              "  pm.collectionVariables.set('barber_refresh_token', data.refreshToken);",
+              "  pm.environment.set('barber_refresh_token', data.refreshToken);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Logout Customer (Terminal)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": "{{base_url}}/{{api_prefix}}/auth/logout",
+        "description": "Revoke the active customer refresh token and clear the stored customer session values.",
+        "auth": {
           "type": "bearer",
           "bearer": [
             {
               "key": "token",
-              "value": "{{barber_firebase_token}}",
+              "value": "{{customer_access_token}}",
               "type": "string"
             }
           ]
@@ -154,19 +406,54 @@
             "type": "text/javascript",
             "exec": [
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
-              "const response = pm.response.json();",
-              "pm.collectionVariables.set('last_session_role', 'BARBER');",
-              "pm.collectionVariables.set('last_session_is_new_user', String(Boolean(response.data && response.data.isNewUser)));",
-              "const profile = response.data && response.data.profile;",
-              "const shopId = profile && profile._id ? profile._id : '';",
-              "if (shopId) { pm.globals.set('shared_shop_id', shopId); }"
+              "pm.collectionVariables.set('customer_access_token', '');",
+              "pm.collectionVariables.set('customer_refresh_token', '');",
+              "pm.environment.set('customer_access_token', '');",
+              "pm.environment.set('customer_refresh_token', '');"
             ]
           }
         }
       ]
     },
     {
-      "name": "3. Health Check",
+      "name": "8. Resend Customer OTP (Text)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/{{api_prefix}}/auth/otp/resend",
+        "description": "Resend the customer OTP over the text channel for local OTP flow testing.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"mobile\": \"{{test_customer_mobile}}\",\n  \"retryType\": \"text\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "auth": {
+          "type": "noauth"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "9. Health Check",
       "request": {
         "method": "GET",
         "header": [],

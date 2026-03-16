@@ -20,6 +20,8 @@
 
 ## 1. Environment File
 
+**Status:** Completed on March 16, 2026.
+
 **File:** `postman-collections/EverCut.postman_environment.json`
 
 Replace Firebase token variables with OTP/JWT variables:
@@ -60,6 +62,8 @@ Replace Firebase token variables with OTP/JWT variables:
 ---
 
 ## 2. Rewrite `01-authentication.json`
+
+**Status:** Completed on March 16, 2026.
 
 The authentication collection uses the full OTP flow with 9 requests:
 
@@ -265,6 +269,8 @@ if (testOtp) { pm.collectionVariables.set('test_otp', testOtp); }
 
 ## 3. Update All Downstream Collections (02-13)
 
+**Status:** Completed on March 16, 2026.
+
 Every collection needs **three changes**:
 
 ### 3.1 Collection-Level `auth` - Use JWT Access Tokens
@@ -363,6 +369,8 @@ if (barberToken) { pm.collectionVariables.set('barber_access_token', barberToken
 
 ## 4. Update Collection Descriptions
 
+**Status:** Completed on March 16, 2026.
+
 | Collection | New Description |
 |---|---|
 | `01-authentication.json` | `"OTP authentication endpoints for customer and barber test users. Sends OTP, verifies it, and captures onboarding tokens for brand-new users or JWT access/refresh tokens for returning users. Requires msg91.testMode set to true in config/index.js for local development."` |
@@ -384,6 +392,8 @@ Request **9B** in `07-barber-profile-shop.json`:
 ---
 
 ## 5. Update `README.md`
+
+**Status:** Completed on March 16, 2026.
 
 **File:** `postman-collections/README.md`
 
@@ -469,6 +479,8 @@ No manual token generation needed - the authentication and onboarding collection
 ---
 
 ## 6. Update Postman Collection Generator
+
+**Status:** Completed on March 16, 2026.
 
 **File:** `scripts/regenerate-postman-collections.mjs`
 

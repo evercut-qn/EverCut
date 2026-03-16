@@ -9,7 +9,7 @@
     "bearer": [
       {
         "key": "token",
-        "value": "{{barber_firebase_token}}",
+        "value": "{{barber_access_token}}",
         "type": "string"
       }
     ]
@@ -39,8 +39,10 @@
           "syncScopedValue('api_prefix');",
           "syncScopedValue('shared_booking_id', 'booking_id_status');",
           "syncScopedValue('shared_booking_id', 'booking_id_delete');",
-          "const collectionToken = readScopedValue('barber_firebase_token');",
-          "if (collectionToken) { pm.collectionVariables.set('barber_firebase_token', collectionToken); } else { console.warn('Set barber_firebase_token in the selected Postman environment or globals.'); }"
+          "const customerToken = readScopedValue('customer_access_token');",
+          "if (customerToken) { pm.collectionVariables.set('customer_access_token', customerToken); }",
+          "const barberToken = readScopedValue('barber_access_token');",
+          "if (barberToken) { pm.collectionVariables.set('barber_access_token', barberToken); }"
         ]
       }
     }
@@ -59,10 +61,16 @@
       "description": "API prefix used by every request"
     },
     {
-      "key": "barber_firebase_token",
+      "key": "customer_access_token",
       "value": "",
       "type": "string",
-      "description": "Paste the ID token for test-barber-001 here"
+      "description": "JWT access token - auto-set by 01-authentication.json for returning users or by 02-onboarding.json after first-time signup"
+    },
+    {
+      "key": "barber_access_token",
+      "value": "",
+      "type": "string",
+      "description": "JWT access token - auto-set by 01-authentication.json for returning users or by 02-onboarding.json after first-time signup"
     },
     {
       "key": "booking_id_status",
