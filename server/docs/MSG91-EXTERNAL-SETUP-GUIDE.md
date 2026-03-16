@@ -6,6 +6,23 @@
 
 ---
 
+## Project Timeline
+
+| Day | Key Tasks & Milestones |
+|---|---|
+| **1** | MSG91 account created · Auth Key noted · OTP template created · DLT Entity registration submitted (Jio / Airtel / Vi) |
+| **2** | Development bypass enabled (`testMode: true` in `config/index.js`) · backend dev begins unblocked |
+| **3** | DLT Sender ID (`EVRCUT`) submitted for registration |
+| **4** | DLT OTP template text submitted for approval |
+| **5–7** | *(DLT approvals in progress — no action needed)* Backend integration continues in parallel |
+| **7** | PE–TM chain binding completed — MSG91 (Walkover) added as Telemarketer in DLT portal |
+| **8–9** | DLT approvals received · Entity ID + Sender ID + Template ID entered in MSG91 dashboard |
+| **10** | Staging SMS test with real credits · annual renewal reminder set · external setup checklist signed off |
+
+> ⏱ *DLT approval timelines are set by the telecom portals (typically 5–10 business days). All backend development proceeds in parallel using test mode.*
+
+---
+
 ## 1. Create MSG91 Account
 
 1. Sign up at [msg91.com](https://msg91.com)
@@ -46,9 +63,9 @@ Since DLT registration takes 1–2 weeks, use these strategies for development:
 
 ### 3.1 Development Bypass (Recommended)
 
-Set `MSG91_TEST_MODE=true` in `.env`. This makes `sms-provider.service.js`:
+In `src/config/index.js`, flip `testMode: true` inside the `msg91` config block. This makes `sms-provider.service.js`:
 - **Skip MSG91 API calls** entirely
-- Accept a hardcoded OTP (`MSG91_TEST_OTP`, default `123456`)
+- Accept the hardcoded OTP (`testOtp: '123456'` in the same config block)
 - Log the "sent" OTP to console for debugging
 
 ### 3.2 Staging with Real SMS

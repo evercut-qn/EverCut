@@ -6,6 +6,25 @@
 > **Target Codebase:** `server/src/` (Express 5 · ES Modules · Mongoose 9 · Joi validation)  
 > **Context:** The project is in the development phase with no users and no existing data — this is a clean replacement, not a gradual migration.
 
+### Project Timeline
+
+| Day | Key Tasks & Milestones |
+|---|---|
+| **1** | MSG91 account created · Auth Key + OTP template obtained · DLT registration submitted · Firebase removed from config & deps |
+| **2** | `.env` + `config/index.js` updated · `jsonwebtoken` installed · `sms-provider.service.js` built |
+| **3** | `otp.service.js` built · `auth.service.js` rewritten · JWT access / refresh / onboarding token strategy complete |
+| **4** | `otp-rate-limiter.middleware.js` + `authenticate.middleware.js` rewritten · validators + controller complete |
+| **5** | `auth.routes.js` + `onboarding.routes.js` updated · User model changes applied · repository updated |
+| **6** | All existing files refactored (account service, onboarding service/controller, upload middleware, authorize middleware) |
+| **7** | Firebase fully purged from all models, scripts, and config · `rg "firebase" src/` returns zero matches |
+| **8** | End-to-end flows tested in test mode — new user, returning user, token refresh, theft detection, rate limits |
+| **9** | Postman collections rewritten + verified · collection generator script updated |
+| **10** | Security review · pre-launch checklist signed off · staging smoke test with real SMS credits |
+
+> ⏱ *DLT approval (Steps 1–4 in the External Setup Guide) runs in parallel and is expected within 5–10 business days. Backend development proceeds using `testMode: true` in `config/index.js` throughout.*
+
+---
+
 ### Related Documents
 
 | Document | Scope |
