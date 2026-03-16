@@ -52,9 +52,3 @@ export const refreshTokenSchema = Joi.object({
             'any.required': 'Refresh token is required',
         }),
 });
-
-/**
- * Temporary compatibility export.
- * Remove when auth.routes.js is migrated off the legacy /auth/session route.
- */
-export const sessionSchema = Joi.object({});

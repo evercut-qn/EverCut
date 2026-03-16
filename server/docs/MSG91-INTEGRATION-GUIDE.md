@@ -1611,7 +1611,7 @@ server/
 - [x] `auth.validator.js` rewritten with OTP/token schemas
 - [x] `otp-rate-limiter.middleware.js` created
 - [x] `auth.controller.js` rewritten — returns `onboardingToken` for new users, `accessToken`/`refreshToken` for returning users
-- [ ] `auth.routes.js` rewritten with all new routes
+- [x] `auth.routes.js` rewritten with all new routes
 - [ ] `onboarding.routes.js` updated — uses `authenticateOnboarding` for onboarding endpoints
 - [ ] `authenticate.middleware.js` rewritten — exports `authenticate` for fully onboarded routes and `authenticateOnboarding` for onboarding-only routes
 - [ ] `authorize.middleware.js` updated — pure role checks after `authenticate`

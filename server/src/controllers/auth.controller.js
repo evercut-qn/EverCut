@@ -1,6 +1,5 @@
 import * as authService from '../services/auth.service.js';
 import * as otpService from '../services/otp.service.js';
-import { BadRequestError } from '../utils/api-error.js';
 import { ApiResponse } from '../utils/api-response.js';
 
 const buildSessionPayload = (session) => {
@@ -75,23 +74,5 @@ export const logout = async (req, res) => {
 
     return res.status(200).json(
         ApiResponse.success(null, 'Logged out successfully'),
-    );
-};
-
-/**
- * Temporary compatibility handler for the legacy Firebase-backed /auth/session route.
- * Remove when auth.routes.js is rewritten to the OTP/JWT endpoints.
- */
-export const createSession = async (req, res) => {
-    const phoneNumber = req.user?.phoneNumber;
-    if (!phoneNumber) {
-        throw new BadRequestError('Verified phone number is required');
-    }
-
-    const session = await authService.resolveOtpSession(phoneNumber);
-    const response = buildSessionPayload(session);
-
-    return res.status(200).json(
-        ApiResponse.success(response.data, response.message),
     );
 };
