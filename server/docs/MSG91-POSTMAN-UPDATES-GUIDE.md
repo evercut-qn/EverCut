@@ -49,7 +49,7 @@ Replace Firebase token variables with OTP/JWT variables:
 |---|---|---|
 | `test_customer_mobile` | Test customer phone (10-digit) | `9876543210` |
 | `test_barber_mobile` | Test barber phone (10-digit) | `9876543211` |
-| `test_otp` | Hardcoded OTP (only when `MSG91_TEST_MODE=true`) | `123456` |
+| `test_otp` | Hardcoded OTP used in test mode (only when `msg91.testMode` is `true` in `config/index.js`) | `123456` |
 | `customer_access_token` | Auto-set by auth or onboarding collections | *(set by test script)* |
 | `customer_refresh_token` | Auto-set by auth or onboarding collections | *(set by test script)* |
 | `barber_access_token` | Auto-set by auth or onboarding collections | *(set by test script)* |
@@ -305,14 +305,36 @@ Every collection needs **three changes**:
 
 ### 3.2 Collection Variables
 
+For **all** downstream collections (02–13), add the access token variables:
+
 ```json
 { "key": "customer_access_token", "value": "", "description": "JWT access token - auto-set by 01-authentication.json for returning users or by 02-onboarding.json after first-time signup" }
 { "key": "barber_access_token", "value": "", "description": "JWT access token - auto-set by 01-authentication.json for returning users or by 02-onboarding.json after first-time signup" }
 ```
 
+For **`02-onboarding.json` only**, also add the onboarding token variables — these are required because `02-onboarding.json` uses `{{customer_onboarding_token}}` and `{{barber_onboarding_token}}` as its Bearer tokens (see §3.1), and collection variables must be declared for template references to resolve:
+
+```json
+{ "key": "customer_onboarding_token", "value": "", "description": "Short-lived onboarding JWT - auto-set by 01-authentication.json when a new customer is detected" }
+{ "key": "barber_onboarding_token", "value": "", "description": "Short-lived onboarding JWT - auto-set by 01-authentication.json when a new barber is detected" }
+```
+
 ### 3.3 Pre-Request Script - Sync JWT Tokens
 
+> **Note:** `readScopedValue` is not shared between Postman collections — each collection script runs in its own isolated scope. The downstream collection pre-request scripts must include the full helper definition below. Copy the entire block as the collection-level pre-request script for collections 02–13.
+
 ```javascript
+// Must be redefined here — Postman does not share scope between collection scripts.
+const readScopedValue = (...keys) => {
+  for (const key of keys) {
+    const environmentValue = pm.environment.get(key);
+    if (environmentValue) return environmentValue;
+    const globalValue = pm.globals.get(key);
+    if (globalValue) return globalValue;
+  }
+  return '';
+};
+
 const customerToken = readScopedValue('customer_access_token');
 if (customerToken) { pm.collectionVariables.set('customer_access_token', customerToken); }
 
@@ -343,7 +365,7 @@ if (barberToken) { pm.collectionVariables.set('barber_access_token', barberToken
 
 | Collection | New Description |
 |---|---|
-| `01-authentication.json` | `"OTP authentication endpoints for customer and barber test users. Sends OTP, verifies it, and captures onboarding tokens for brand-new users or JWT access/refresh tokens for returning users. Requires MSG91_TEST_MODE=true for local development."` |
+| `01-authentication.json` | `"OTP authentication endpoints for customer and barber test users. Sends OTP, verifies it, and captures onboarding tokens for brand-new users or JWT access/refresh tokens for returning users. Requires msg91.testMode set to true in config/index.js for local development."` |
 | `02-onboarding.json` | `"Customer and barber onboarding requests wired for the OTP test users and the local sample upload asset. Run 01-authentication.json first to populate onboarding tokens. Upon successful onboarding, access and refresh tokens are captured for the other collections."` |
 | `07-barber-profile-shop.json` | `"Barber profile and shop management collection. Uses the barber JWT access token captured by 01-authentication.json for returning users or by 02-onboarding.json after first-time signup."` |
 
@@ -370,8 +392,8 @@ Request **9B** in `07-barber-profile-shop.json`:
 ```markdown
 ### Prerequisites
 
-1. Ensure `MSG91_TEST_MODE=true` in your `.env` file
-2. Ensure `MSG91_TEST_OTP=123456` in your `.env` file
+1. In `src/config/index.js`, set `testMode: true` inside the `msg91` config block to skip real SMS in development. (The default is `false`; the inline comment says "flip to true in dev to skip real SMS".)
+2. The test OTP is hardcoded as `123456` via `testOtp: '123456'` in the same config block — no env var needed.
 3. Start the server: `npm run dev`
 
 No manual token generation needed - the authentication and onboarding collections handle token capture automatically.
@@ -395,10 +417,10 @@ No manual token generation needed - the authentication and onboarding collection
 
 ### 5.3 Test Users
 
-| Role | UID | Email | Phone |
+| Role | MongoDB `_id` | Email | Phone |
 |---|---|---|---|
-| Customer | *(created during first successful onboarding)* | `test.customer@example.com` | `9876543210` |
-| Barber | *(created during first successful onboarding)* | `test.barber@example.com` | `9876543211` |
+| Customer | *(auto-generated on first successful onboarding)* | `test.customer@example.com` | `9876543210` |
+| Barber | *(auto-generated on first successful onboarding)* | `test.barber@example.com` | `9876543211` |
 
 ### 5.4 Environment Variables
 

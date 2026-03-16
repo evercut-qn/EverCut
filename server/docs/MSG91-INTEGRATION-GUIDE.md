@@ -48,7 +48,7 @@
    - [7.6 Update Upload Middleware](#76-update-upload-middleware)
    - [7.7 Clean Up Model Comments](#77-clean-up-model-comments)
    - [7.8 Update Authorize Middleware](#78-update-authorize-middleware)
-   - [7.9 Clean Up Scripts](#79-clean-up-scripts)
+   - [7.9 Update Barber Profile Controller & Clean Up Scripts](#79-update-barber-profile-controller--clean-up-scripts)
    - [7.10 Clean Up Environment & Config](#710-clean-up-environment--config)
    - [7.11 Remove Firebase Dependency](#711-remove-firebase-dependency)
 8. [Security Best Practices](#8-security-best-practices)
@@ -432,6 +432,11 @@ import logger from '../utils/logger.js';
 
 /** Generate a short-lived onboarding token. */
 export const generateOnboardingToken = (phoneNumber) => {
+    // Note: intentionally signed with accessSecret (same secret as access tokens).
+    // A third env variable is avoided; the `type: TOKEN_TYPE.ONBOARDING` claim is
+    // the enforced differentiation. Both `authenticate` and `authenticateOnboarding`
+    // verify the type claim after signature validation, so onboarding tokens are
+    // rejected on standard access routes and vice-versa.
     return jwt.sign(
         {
             sub: phoneNumber,
@@ -466,13 +471,8 @@ export const generateTokenPair = (userId, roleType) => {
 /** Verify a bearer token signed with the access secret. */
 export const verifyBearerToken = (token) => {
     try {
-        const decoded = jwt.verify(token, config.jwt.accessSecret);
-        if (![TOKEN_TYPE.ACCESS, TOKEN_TYPE.ONBOARDING].includes(decoded.type)) {
-            throw new UnauthorizedError('Invalid token type');
-        }
-        return decoded;
-    } catch (err) {
-        if (err instanceof UnauthorizedError) throw err;
+        return jwt.verify(token, config.jwt.accessSecret);
+    } catch {
         throw new UnauthorizedError('Invalid or expired token');
     }
 };
@@ -502,7 +502,7 @@ export const hashToken = (token) => {
  *
  * - **Existing user:** update lastLoginAt, issue tokens, load profile.
  * - **New user:** issues a short-lived `onboardingToken` (valid 30 mins, contains only the phone number).
- *   The client proceeds to onboarding and passes this token to `authenticate`.
+ *   The client proceeds to onboarding and passes this token to `authenticateOnboarding`.
  *
  * We DO NOT create a database record for incomplete user profiles.
  *
@@ -643,6 +643,8 @@ export const refreshTokenSchema = Joi.object({
 ```javascript
 import { TooManyRequestsError } from '../utils/api-error.js';
 
+// Dev-friendly in-memory store. Replace with Redis-backed storage
+// (for example via `rate-limiter-flexible`) before multi-instance production use.
 const store = new Map();
 
 // Periodic cleanup (every 10 minutes)
@@ -686,11 +688,15 @@ export const otpRateLimiter = ({ windowMs, max, keyPrefix, keySource = 'ip' }) =
 };
 ```
 
+> **Scaling note:** This in-memory `Map` limiter is fine for local development and a single backend instance. Before horizontal scaling or production load balancing, move the counters to Redis so limits are shared across instances.
+
 ---
 
 ### 4.7 Controller
 
 **File:** `src/controllers/auth.controller.js` — **REWRITE**:
+
+Because the target codebase is Express 5, async controller rejections automatically flow into the global error handler. The examples below keep controller code minimal and avoid `try...catch` wrappers that only call `next(err)`.
 
 ```javascript
 import * as otpService from '../services/otp.service.js';
@@ -698,71 +704,61 @@ import * as authService from '../services/auth.service.js';
 import { ApiResponse } from '../utils/api-response.js';
 
 /** POST /auth/otp/send */
-export const sendOtp = async (req, res, next) => {
-    try {
-        const { mobile } = req.body;
-        const result = await otpService.requestOtp(mobile);
-        return res.status(200).json(ApiResponse.success(result, 'OTP sent successfully'));
-    } catch (err) { next(err); }
+export const sendOtp = async (req, res) => {
+    const { mobile } = req.body;
+    const result = await otpService.requestOtp(mobile);
+    return res.status(200).json(ApiResponse.success(result, 'OTP sent successfully'));
 };
 
 /** POST /auth/otp/verify */
-export const verifyOtp = async (req, res, next) => {
-    try {
-        const { mobile, otp } = req.body;
-        await otpService.verifyOtp(mobile, otp);
-        const session = await authService.resolveOtpSession(mobile);
+export const verifyOtp = async (req, res) => {
+    const { mobile, otp } = req.body;
+    await otpService.verifyOtp(mobile, otp);
+    const session = await authService.resolveOtpSession(mobile);
 
-        let responseData;
-        if (session.isNewUser) {
-            responseData = {
-                isNewUser: true,
-                onboardingToken: session.onboardingToken,
-            };
-        } else {
-            responseData = {
-                isNewUser: false,
-                user: session.user,
-                profile: session.profile,
-                accessToken: session.tokens.accessToken,
-                refreshToken: session.tokens.refreshToken,
-            };
-        }
+    let responseData;
+    if (session.isNewUser) {
+        responseData = {
+            isNewUser: true,
+            onboardingToken: session.onboardingToken,
+        };
+    } else {
+        responseData = {
+            isNewUser: false,
+            user: session.user,
+            profile: session.profile,
+            accessToken: session.tokens.accessToken,
+            refreshToken: session.tokens.refreshToken,
+        };
+    }
 
-        const message = session.isNewUser
-            ? 'OTP verified. Please complete your profile.'
-            : 'Login successful';
+    const message = session.isNewUser
+        ? 'OTP verified. Please complete your profile.'
+        : 'Login successful';
 
-        return res.status(200).json(ApiResponse.success(responseData, message));
-    } catch (err) { next(err); }
+    return res.status(200).json(ApiResponse.success(responseData, message));
 };
 
 /** POST /auth/otp/resend */
-export const resendOtp = async (req, res, next) => {
-    try {
-        const { mobile, retryType } = req.body;
-        const result = await otpService.resendOtp(mobile, retryType);
-        return res.status(200).json(ApiResponse.success(result, result.message));
-    } catch (err) { next(err); }
+export const resendOtp = async (req, res) => {
+    const { mobile, retryType } = req.body;
+    const result = await otpService.resendOtp(mobile, retryType);
+    return res.status(200).json(ApiResponse.success(result, result.message));
 };
 
 /** POST /auth/token/refresh */
-export const refreshToken = async (req, res, next) => {
-    try {
-        const { refreshToken: token } = req.body;
-        const tokens = await authService.refreshAccessToken(token);
-        return res.status(200).json(
-            ApiResponse.success(tokens, 'Token refreshed successfully'),
-        );
-    } catch (err) { next(err); }
+export const refreshToken = async (req, res) => {
+    const { refreshToken: token } = req.body;
+    const tokens = await authService.refreshAccessToken(token);
+    return res.status(200).json(
+        ApiResponse.success(tokens, 'Token refreshed successfully'),
+    );
 };
 
 /** POST /auth/logout */
-export const logout = async (req, res, next) => {
-    try {
-        await authService.revokeRefreshToken(req.user._id);
-        return res.status(200).json(ApiResponse.success(null, 'Logged out successfully'));
-    } catch (err) { next(err); }
+export const logout = async (req, res) => {
+    await authService.revokeRefreshToken(req.user._id);
+    return res.status(200).json(ApiResponse.success(null, 'Logged out successfully'));
 };
 ```
 
@@ -949,7 +945,7 @@ export default authenticate;
 | **Storage (Server)** | SHA-256 hash in User model | Never store raw refresh tokens |
 | **Rotation** | Every refresh issues new pair | Detects token theft via hash mismatch |
 | **Revocation** | Set `refreshTokenHash` to null | Immediate logout / sign-out-everywhere |
-| **Onboarding Tokens** | Short-lived onboarding token | Used only for onboarding endpoints |
+| **Onboarding Tokens** | 30 minutes | Used only for onboarding endpoints; signed with access secret (type claim enforces differentiation) |
 
 > **Token Payload — `role` field:** Standard access tokens reflect the persisted user's current `roleType` at issuance time. Brand-new users do not receive a pseudo-user role; they receive an `onboardingToken` that carries only the verified phone number needed to finish onboarding.
 
@@ -1162,28 +1158,34 @@ rm firebase-admin-sdk.json
 > **Key change:** Replace `firebaseUid` logic with the validated `phoneNumber` obtained from `req.onboardingContext`. Onboarding routes now use `authenticateOnboarding` from the same middleware file, which accepts only onboarding tokens and populates `req.onboardingContext`. Furthermore, the newly created `accessToken` and `refreshToken` generated by the Auth Service are attached to the response.
 
 ```diff
-  export const createCustomerOnboarding = async (req, res, next) => {
-      try {
+  export const createCustomerOnboarding = async (req, res) => {
 -         const { firebaseUid } = req.user;
 -         const result = await onboardingService.createCustomerOnboarding(firebaseUid, req.body, req.file);
+-         return res.status(201).json(ApiResponse.success(result, 'Customer profile created'));
 +         const { phoneNumber } = req.onboardingContext;
 +         const result = await onboardingService.createCustomerOnboarding(phoneNumber, req.body, req.file);
-          return res.status(201).json(ApiResponse.success(result, 'Customer profile created'));
-      } catch (err) { next(err); }
++         const { user, profile, tokens } = result;
++         return res.status(201).json(ApiResponse.success(
++             { user, profile, accessToken: tokens.accessToken, refreshToken: tokens.refreshToken },
++             'Customer profile created'
++         ));
   };
 
-  export const createBarberOnboarding = async (req, res, next) => {
-      try {
+  export const createBarberOnboarding = async (req, res) => {
 -         const { firebaseUid } = req.user;
 -         const result = await onboardingService.createBarberOnboarding(firebaseUid, req.user, req.body, req.files);
+-         return res.status(201).json(ApiResponse.success(result, 'Barber profile created'));
 +         const { phoneNumber } = req.onboardingContext;
 +         const result = await onboardingService.createBarberOnboarding(phoneNumber, req.body, req.files);
-          return res.status(201).json(ApiResponse.success(result, 'Barber profile created'));
-      } catch (err) { next(err); }
++         const { user, shop, photos, tokens } = result;
++         return res.status(201).json(ApiResponse.success(
++             { user, shop, photos, accessToken: tokens.accessToken, refreshToken: tokens.refreshToken },
++             'Barber profile created'
++         ));
   };
 ```
 
-> **Response format:** The onboarding services now return `{ user, profile, tokens }` (customer) or `{ user, shop, photos, tokens }` (barber). The tokens are included in the response data so the client can immediately authenticate after onboarding.
+> **Response format:** Both onboarding endpoints return a flat `{ user, profile/shop/photos, accessToken, refreshToken }` structure — identical in shape to the `verifyOtp` returning-user response. The client receives `accessToken` and `refreshToken` at the top level and can immediately authenticate without any additional requests. The internal service returns `{ ..., tokens: { accessToken, refreshToken } }`; the controller is responsible for flattening before sending the API response.
 
 ### 7.4 Refactor Onboarding Service
 
@@ -1218,17 +1220,13 @@ A user shouldn't exist because we only trigger this endpoint if the user didn't 
 
 #### 7.4.2 Update `createCustomerOnboarding`
 
-The function now receives the `phoneNumber` directly from the valid `onboardingToken`. Instead of searching by `firebaseUid`, we enforce unique checks and then freshly create the user. Finally we generate the authentication tokens using the `authService` layer.
+The function now receives the `phoneNumber` directly from the valid `onboardingToken`. Instead of searching by `firebaseUid`, we rely on `ensureUniqueUserIdentity` for both phone and email uniqueness, then freshly create the user. Finally we generate the authentication tokens using the `authService` layer.
 
 ```javascript
 import * as authService from './auth.service.js';
 
 export const createCustomerOnboarding = async (phoneNumber, profileData, file) => {
     if (!file) throw new BadRequestError('Profile photo is required');
-
-    // Guard against race condition: reject if phone already taken
-    const existingUser = await userRepository.findByPhone(phoneNumber);
-    if (existingUser) throw new ConflictError('User already exists');
 
     await ensureUniqueUserIdentity({
         email: profileData.email,
@@ -1258,7 +1256,7 @@ export const createCustomerOnboarding = async (phoneNumber, profileData, file) =
 
 #### 7.4.3 Update `createBarberOnboarding`
 
-The function signature changes from `(firebaseUid, authUser, shopData, files)` to `(phoneNumber, shopData, files)`. `normalizeBarberOnboardingInput(authUser, shopData)` currently reads `authUser.phoneNumber` and `authUser.email`, so we pass a synthetic context object that carries the verified phone number. The email still comes from `shopData`.
+The function signature changes from `(firebaseUid, authUser, shopData, files)` to `(phoneNumber, shopData, files)`. `normalizeBarberOnboardingInput(authUser, shopData)` currently reads `authUser.phoneNumber` and `authUser.email`, so we pass a synthetic context object that carries the verified phone number. The email still comes from `shopData`, and `ensureUniqueUserIdentity` remains the single uniqueness gate for both phone and email.
 
 ```javascript
 export const createBarberOnboarding = async (phoneNumber, shopData, files) => {
@@ -1266,10 +1264,6 @@ export const createBarberOnboarding = async (phoneNumber, shopData, files) => {
     // which reads authUser.phoneNumber and (optionally) authUser.email.
     const authContext = { phoneNumber, email: null };
     const normalized = normalizeBarberOnboardingInput(authContext, shopData);
-
-    // Guard against race condition: reject if phone already taken
-    const existingUser = await userRepository.findByPhone(normalized.phoneNumber);
-    if (existingUser) throw new ConflictError('Barber already exists');
 
     await ensureUniqueUserIdentity({
         email: normalized.email,
@@ -1386,7 +1380,7 @@ In the new design, `authenticate` is used only on routes that require a fully on
 
 > **Onboarding routes** use `authenticateOnboarding` and then read `req.onboardingContext`. Customer/barber route groups continue to use `authenticate` plus `authorize(ROLES.CUSTOMER)` or `authorize(ROLES.BARBER)`. Logged-in non-role routes such as logout use `authenticate` only.
 
-### 7.9 Clean Up Scripts
+### 7.9 Update Barber Profile Controller & Clean Up Scripts
 
 **File:** `src/controllers/barber/barber-profile.controller.js`
 
@@ -1492,12 +1486,12 @@ All errors follow the existing `AppError` hierarchy:
 | OTP send failure | `BadRequestError` | 400 | "Failed to send OTP" |
 | MSG91 API unavailable | `AppError` | 503 | "SMS service unavailable" |
 | Rate limit exceeded | `TooManyRequestsError` | 429 | "Too many requests…" |
-| Invalid access token | `UnauthorizedError` | 401 | "Invalid or expired access token" |
+| Invalid access token | `UnauthorizedError` | 401 | "Invalid or expired token" |
 | Invalid refresh token | `UnauthorizedError` | 401 | "Invalid or expired refresh token" |
 | Refresh token mismatch | `UnauthorizedError` | 401 | "Session invalidated" |
 | Inactive/deleted account | `UnauthorizedError` | 401 | "Account is inactive or deleted" |
-| Onboarding token used on standard API route | `UnauthorizedError` | 401 | "Onboarding token cannot be used for standard API access" |
-| Already-onboarded user attempting onboarding | `ConflictError` | 409 | "User is already onboarded" |
+| Onboarding token used on standard API route | `UnauthorizedError` | 401 | "Standard account access token required" |
+| Already-onboarded user attempting onboarding | `ConflictError` | 409 | "Phone number already registered" / "Email already registered" |
 
 ---
 
@@ -1614,7 +1608,7 @@ server/
   - [ ] `emailVerified` added (Boolean, default: false)
   - [ ] Keeps `email` strictly required and strictly unique
 - [ ] `user.repository.js` — `findByFirebaseUid()` removed, `findByIdWithRefreshHash()` added
-- [ ] `constants.js` updated — `OTP_RATE_LIMIT` and `TOKEN_TYPE` constants added
+- [ ] `constants.js` updated — `ONBOARDING` token type added, OTP + `TOKEN_TYPE` constants
 - [ ] `account.service.js` refactored to use JWT revocation
 - [ ] `onboarding.controller.js` refactored — relies on `req.onboardingContext.phoneNumber`
 - [ ] `onboarding.service.js` refactored — explicitly CREATES user upon completion of the profile
@@ -1664,4 +1658,3 @@ See **[`MSG91-POSTMAN-UPDATES-GUIDE.md`](./MSG91-POSTMAN-UPDATES-GUIDE.md)** for
 ---
 
 *This guide is designed for direct implementation within the EverCut `server/` codebase. Every code sample follows existing project conventions: ES Modules, Express 5 router patterns, Joi validation, the AppError/ApiResponse pattern, and the repository → service → controller → route layered architecture.*
-
