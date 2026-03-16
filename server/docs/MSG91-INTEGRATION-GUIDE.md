@@ -1620,7 +1620,7 @@ server/
   - [x] `refreshTokenHash` added (select: false)
   - [x] `emailVerified` added (Boolean, default: false)
   - [x] Keeps `email` strictly required and strictly unique
-- [ ] `user.repository.js` — `findByFirebaseUid()` removed, `findByIdWithRefreshHash()` added
+- [x] `user.repository.js` — `findByFirebaseUid()` removed, `findByIdWithRefreshHash()` added
 - [x] `constants.js` updated — `ONBOARDING` token type added, OTP + `TOKEN_TYPE` constants
 - [ ] `account.service.js` refactored to use JWT revocation
 - [ ] `onboarding.controller.js` refactored — relies on `req.onboardingContext.phoneNumber`

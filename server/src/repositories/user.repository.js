@@ -9,8 +9,8 @@ class UserRepository {
         return User.findById(id);
     }
 
-    async findByFirebaseUid(firebaseUid, options = {}) {
-        return User.findOne({ firebaseUid }, null, options);
+    async findByIdWithRefreshHash(id) {
+        return User.findById(id).select('+refreshTokenHash');
     }
 
     async findByEmail(email) {

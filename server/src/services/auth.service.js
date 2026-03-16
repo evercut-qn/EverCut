@@ -51,17 +51,6 @@ const loadUserProfile = async (user) => {
     return null;
 };
 
-/**
- * Uses the repository helper once refreshTokenHash becomes select:false.
- */
-const findUserWithRefreshHash = async (userId) => {
-    if (typeof userRepository.findByIdWithRefreshHash === 'function') {
-        return userRepository.findByIdWithRefreshHash(userId);
-    }
-
-    return userRepository.findById(userId);
-};
-
 /** Generate a short-lived onboarding token. */
 export const generateOnboardingToken = (phoneNumber) => jwt.sign(
     {
@@ -162,7 +151,7 @@ export const resolveOtpSession = async (phoneNumber) => {
 export const refreshAccessToken = async (refreshToken) => {
     const decoded = verifyRefreshToken(refreshToken);
     const userId = decoded.sub;
-    const user = await findUserWithRefreshHash(userId);
+    const user = await userRepository.findByIdWithRefreshHash(userId);
 
     assertAccountIsActive(user);
 
