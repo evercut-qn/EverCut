@@ -159,14 +159,16 @@ The previous guide's SMS provider service had a test mode that could technically
 The revised guide adds an explicit production guard:
 
 ```js
-if (config.msg91.testMode) {
-    if (config.env === 'production') {
+if (msg91.testMode) {
+    if (process.env.NODE_ENV === 'production') {
         logger.error('CRITICAL: MSG91 test mode is enabled in production!');
         throw new AppError('Configuration error', 500);
     }
     // ... test mode logic
 }
 ```
+
+In the current implementation, `sms-provider.service.js` imports `msg91` from `config/msg91.config.js` directly instead of reaching through the general `config` object at each use site.
 
 Misconfiguration now fails loudly at the call site rather than silently degrading security. This guard is also listed as a distinct row in the Security Best Practices table so it is visible to reviewers and auditors.
 
@@ -444,7 +446,7 @@ The previous guide's header understated the scope ("integrating MSG91 OTP authen
 
 ### 6.5 `TOKEN_TYPE` Constant Includes `ONBOARDING` Type
 
-The previous guide's `TOKEN_TYPE` only defined `ACCESS` and `REFRESH`. The revised guide adds `ONBOARDING`, ensuring the new token type is a named constant rather than a raw string literal scattered across the codebase. A clarifying note is also added explaining that OTP length and expiry are in `config.msg91` and are intentionally not duplicated here.
+The previous guide's `TOKEN_TYPE` only defined `ACCESS` and `REFRESH`. The revised guide adds `ONBOARDING`, ensuring the new token type is a named constant rather than a raw string literal scattered across the codebase. A clarifying note is also added explaining that OTP length and expiry live in `msg91.config.js` (backed by `config/index.js`) and are intentionally not duplicated here.
 
 ---
 

@@ -46,7 +46,7 @@
 | Day | Key Tasks & Milestones |
 |---|---|
 | **1** | MSG91 account created · Auth Key + OTP template obtained · DLT registration submitted · Firebase Phone Auth removed from auth/onboarding code (config + credentials retained for Google OAuth) |
-| **2** | `.env` + `config/index.js` updated · `jsonwebtoken` installed · `sms-provider.service.js` built |
+| **2** | `.env` + `config/index.js` + `config/msg91.config.js` updated · `jsonwebtoken` installed · `sms-provider.service.js` built |
 | **3** | `otp.service.js` built · `auth.service.js` rewritten · JWT access / refresh / onboarding token strategy complete |
 | **4** | `otp-rate-limiter.middleware.js` + `authenticate.middleware.js` rewritten · validators + controller complete |
 | **5** | `auth.routes.js` + `onboarding.routes.js` updated · User model changes applied · repository updated |
@@ -97,7 +97,7 @@
 
 | Layer | New File(s) / Changes |
 |---|---|
-| **Config** | `config/index.js` — replace `firebase` section with `msg91` + `jwt` sections |
+| **Config** | `config/index.js` — keep `firebase`, add `msg91` + `jwt` sections; `config/msg91.config.js` — default-export the ready-to-use `msg91` config object |
 | **Provider** | `services/sms-provider.service.js` — **NEW** (SMS now handled here; `config/firebase.config.js` is **retained** for future Google OAuth) |
 | **Service** | `services/otp.service.js` — **NEW**; `services/auth.service.js` — **REWRITE** |
 | **Validator** | `validators/auth.validator.js` — **REWRITE** with OTP schemas |
@@ -152,6 +152,28 @@ jwt: Object.freeze({
 }),
 ```
 
+Then add a dedicated MSG91 config module so the rest of the app imports `msg91` directly, following the same default-export pattern used by the other files in `src/config/`:
+
+```javascript
+import config from './index.js';
+
+const msg91 = Object.freeze({
+    ...config.msg91,
+    endpoints: Object.freeze({
+        sendOtp: `${config.msg91.baseUrl}/otp`,
+        verifyOtp: `${config.msg91.baseUrl}/otp/verify`,
+        resendOtp: `${config.msg91.baseUrl}/otp/retry`,
+    }),
+    headers: Object.freeze({
+        authkey: config.msg91.authKey,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+    }),
+});
+
+export default msg91;
+```
+
 ---
 
 ## 3. Dependencies
@@ -185,7 +207,7 @@ export const ALL_ROLES = Object.values(ROLES);
 
 // ── OTP Rate Limiting ──────────────────────────────────────────────
 // Used by otp-rate-limiter.middleware.js.
-// OTP length and expiry are configured via config.msg91 (env vars),
+// OTP length and expiry are configured via msg91.config.js,
 // not duplicated here.
 export const OTP_RATE_LIMIT = Object.freeze({
     windowMs: 15 * 60 * 1000,   // 15 minutes
@@ -209,7 +231,7 @@ export const TOKEN_TYPE = Object.freeze({
 **File:** `src/services/sms-provider.service.js` — **NEW**
 
 ```javascript
-import config from '../config/index.js';
+import msg91 from '../config/msg91.config.js';
 import logger from '../utils/logger.js';
 import { AppError } from '../utils/api-error.js';
 
@@ -220,46 +242,34 @@ import { AppError } from '../utils/api-error.js';
  * (Twilio, 2Factor, etc.), only this file needs to change.
  */
 
-const MSG91_ENDPOINTS = {
-    sendOtp: `${config.msg91.baseUrl}/otp`,
-    verifyOtp: `${config.msg91.baseUrl}/otp/verify`,
-    resendOtp: `${config.msg91.baseUrl}/otp/retry`,
-};
-
-const msg91Headers = {
-    authkey: config.msg91.authKey,
-    'Content-Type': 'application/json',
-    Accept: 'application/json',
-};
-
 /**
  * Send OTP to a mobile number via MSG91.
  * @param {string} mobile — 10-digit Indian mobile number (without country code)
  * @returns {Promise<{ success: boolean, requestId: string|null }>}
  */
 export const sendOtp = async (mobile) => {
-    if (config.msg91.testMode) {
-        if (config.env === 'production') {
+    if (msg91.testMode) {
+        if (process.env.NODE_ENV === 'production') {
             logger.error('CRITICAL: MSG91 test mode is enabled in production!');
             throw new AppError('Configuration error', 500);
         }
 
         logger.info('MSG91 test mode — OTP send bypassed', {
             mobile: mobile.slice(-4).padStart(mobile.length, '*'),
-            testOtp: config.msg91.testOtp,
+            testOtp: msg91.testOtp,
         });
         return { success: true, requestId: 'test-mode' };
     }
 
     try {
-        const response = await fetch(MSG91_ENDPOINTS.sendOtp, {
+        const response = await fetch(msg91.endpoints.sendOtp, {
             method: 'POST',
-            headers: msg91Headers,
+            headers: msg91.headers,
             body: JSON.stringify({
-                template_id: config.msg91.otpTemplateId,
+                template_id: msg91.otpTemplateId,
                 mobile: `91${mobile}`,
-                otp_length: config.msg91.otpLength,
-                otp_expiry: config.msg91.otpExpiry,
+                otp_length: msg91.otpLength,
+                otp_expiry: msg91.otpExpiry,
             }),
         });
 
@@ -291,8 +301,8 @@ export const sendOtp = async (mobile) => {
  * @returns {Promise<{ success: boolean, message: string }>}
  */
 export const verifyOtp = async (mobile, otp) => {
-    if (config.msg91.testMode) {
-        const isValid = otp === config.msg91.testOtp;
+    if (msg91.testMode) {
+        const isValid = otp === msg91.testOtp;
         logger.info('MSG91 test mode — OTP verify bypassed', {
             mobile: mobile.slice(-4).padStart(mobile.length, '*'),
             valid: isValid,
@@ -304,10 +314,10 @@ export const verifyOtp = async (mobile, otp) => {
     }
 
     try {
-        const url = `${MSG91_ENDPOINTS.verifyOtp}?mobile=91${mobile}&otp=${otp}`;
+        const url = `${msg91.endpoints.verifyOtp}?mobile=91${mobile}&otp=${otp}`;
         const response = await fetch(url, {
             method: 'GET',
-            headers: { authkey: config.msg91.authKey },
+            headers: { authkey: msg91.authKey },
         });
 
         const data = await response.json();
@@ -328,7 +338,7 @@ export const verifyOtp = async (mobile, otp) => {
  * @returns {Promise<{ success: boolean }>}
  */
 export const resendOtp = async (mobile, retryType = 'text') => {
-    if (config.msg91.testMode) {
+    if (msg91.testMode) {
         logger.info('MSG91 test mode — OTP resend bypassed', {
             mobile: mobile.slice(-4).padStart(mobile.length, '*'),
         });
@@ -336,9 +346,9 @@ export const resendOtp = async (mobile, retryType = 'text') => {
     }
 
     try {
-        const response = await fetch(MSG91_ENDPOINTS.resendOtp, {
+        const response = await fetch(msg91.endpoints.resendOtp, {
             method: 'POST',
-            headers: msg91Headers,
+            headers: msg91.headers,
             body: JSON.stringify({
                 mobile: `91${mobile}`,
                 retrytype: retryType,
@@ -1496,9 +1506,10 @@ server/
 ├── .env                                     ← UPDATE: keep FIREBASE_*, add MSG91 + JWT vars
 ├── .gitignore                               ← NO CHANGE: Firebase entries retained for Google OAuth
 ├── package.json                             ← ADD: jsonwebtoken (firebase-admin retained)
-└── src/
+    └── src/
     ├── config/
     │   ├── firebase.config.js               ← KEEP (retained for Google OAuth)
+    │   ├── msg91.config.js                  ← NEW: default-exported MSG91 settings, endpoints, and headers
     │   └── index.js                         ← UPDATE: keep firebase block; add msg91 + jwt config
     ├── controllers/
     │   ├── auth.controller.js               ← REWRITE: OTP + token + logout handlers
@@ -1549,6 +1560,7 @@ server/
 - [ ] `firebase.config.js` and `firebase-admin-sdk.json` **preserved** (required for Google OAuth)
 - [ ] `FIREBASE_*` env vars **retained** in `.env` and `.env.example` (required for Google OAuth)
 - [ ] `config/index.js` updated — `firebase` block kept; `msg91` + `jwt` sections added
+- [ ] `config/msg91.config.js` added — default-exports the configured `msg91` object
 - [ ] `sms-provider.service.js` created and tested
 - [ ] `otp.service.js` created and tested
 - [ ] `auth.service.js` fully rewritten — issues `onboardingToken` for new users, `accessToken` for returning

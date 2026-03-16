@@ -141,6 +141,30 @@ export const ALL_GENDERS = Object.values(GENDER);
 export const SECURITY_PIN_LENGTH = 4;
 
 // ---------------------------------------------------------------------------
+// OTP Rate Limiting
+// ---------------------------------------------------------------------------
+// Used by otp-rate-limiter.middleware.js.
+// OTP length and expiry are configured via msg91.config.js,
+// not duplicated here.
+
+export const OTP_RATE_LIMIT = Object.freeze({
+    windowMs: 15 * 60 * 1000,   // 15 minutes
+    maxSendPerPhone: 5,
+    maxSendPerIp: 10,
+    maxVerifyPerPhone: 10,
+});
+
+// ---------------------------------------------------------------------------
+// Token Types
+// ---------------------------------------------------------------------------
+
+export const TOKEN_TYPE = Object.freeze({
+    ONBOARDING: 'onboarding',
+    ACCESS: 'access',
+    REFRESH: 'refresh',
+});
+
+// ---------------------------------------------------------------------------
 // Miscellaneous
 // ---------------------------------------------------------------------------
 
