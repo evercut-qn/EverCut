@@ -1609,7 +1609,7 @@ server/
 - [x] `otp.service.js` created and tested
 - [x] `auth.service.js` fully rewritten — issues `onboardingToken` for new users, `accessToken` for returning
 - [x] `auth.validator.js` rewritten with OTP/token schemas
-- [ ] `otp-rate-limiter.middleware.js` created
+- [x] `otp-rate-limiter.middleware.js` created
 - [ ] `auth.controller.js` rewritten — returns `onboardingToken` for new users, `accessToken`/`refreshToken` for returning users
 - [ ] `auth.routes.js` rewritten with all new routes
 - [ ] `onboarding.routes.js` updated — uses `authenticateOnboarding` for onboarding endpoints
