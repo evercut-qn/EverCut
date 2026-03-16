@@ -4,22 +4,39 @@ import { ApiResponse } from '../utils/api-response.js';
 /**
  * Onboarding controller - handles first-time profile creation for both roles.
  */
-export const createCustomerOnboarding = async (req, res, next) => {
-    try {
-        const { firebaseUid } = req.user;
-        const result = await onboardingService.createCustomerOnboarding(firebaseUid, req.body, req.file);
-        return res.status(201).json(ApiResponse.success(result, 'Customer profile created'));
-    } catch (err) {
-        next(err);
-    }
+export const createCustomerOnboarding = async (req, res) => {
+    const { phoneNumber } = req.onboardingContext;
+    const result = await onboardingService.createCustomerOnboarding(phoneNumber, req.body, req.file);
+    const { user, profile, tokens } = result;
+
+    return res.status(201).json(
+        ApiResponse.success(
+            {
+                user,
+                profile,
+                accessToken: tokens.accessToken,
+                refreshToken: tokens.refreshToken,
+            },
+            'Customer profile created',
+        ),
+    );
 };
 
-export const createBarberOnboarding = async (req, res, next) => {
-    try {
-        const { firebaseUid } = req.user;
-        const result = await onboardingService.createBarberOnboarding(firebaseUid, req.user, req.body, req.files);
-        return res.status(201).json(ApiResponse.success(result, 'Barber profile created'));
-    } catch (err) {
-        next(err);
-    }
+export const createBarberOnboarding = async (req, res) => {
+    const { phoneNumber } = req.onboardingContext;
+    const result = await onboardingService.createBarberOnboarding(phoneNumber, req.body, req.files);
+    const { user, shop, photos, tokens } = result;
+
+    return res.status(201).json(
+        ApiResponse.success(
+            {
+                user,
+                shop,
+                photos,
+                accessToken: tokens.accessToken,
+                refreshToken: tokens.refreshToken,
+            },
+            'Barber profile created',
+        ),
+    );
 };

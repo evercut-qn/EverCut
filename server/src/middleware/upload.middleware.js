@@ -20,7 +20,7 @@ const imageFilter = (_req, file, cb) => {
     }
 };
 
-const resolveActorKey = (req) => req.user?._id?.toString() || req.user?.firebaseUid || 'anonymous';
+const resolveActorKey = (req) => req.user?._id?.toString() || req.onboardingContext?.phoneNumber || 'anonymous';
 
 // ── Storage factories ────────────────────────────────────────────────────
 

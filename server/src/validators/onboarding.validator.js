@@ -34,7 +34,6 @@ const breakTimesSchema = Joi.alternatives().try(
 const targetCustomersSchema = Joi.string().valid(...ALL_SERVICE_FOR, 'men', 'women');
 
 export const customerOnboardingSchema = Joi.object({
-    phoneNumber: Joi.string().required(),
     email: Joi.string().email().required(),
     firstName: Joi.string().trim().min(1).max(50).required(),
     lastName: Joi.string().trim().min(1).max(50).required(),

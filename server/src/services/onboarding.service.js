@@ -1,20 +1,30 @@
-import userRepository from '../repositories/user.repository.js';
 import customerProfileRepo from '../repositories/customer-profile.repository.js';
 import photoRepository from '../repositories/photo.repository.js';
 import shopRepository from '../repositories/shop.repository.js';
+import userRepository from '../repositories/user.repository.js';
+import { serializeBarberProfile } from '../utils/barber-profile.utils.js';
 import {
     ALL_SERVICE_FOR,
     ALL_SHOP_AMENITIES,
     DAYS_OF_WEEK,
     ROLES,
 } from '../utils/constants.js';
-import { serializeBarberProfile } from '../utils/barber-profile.utils.js';
-import { ConflictError, BadRequestError } from '../utils/api-error.js';
+import { BadRequestError, ConflictError } from '../utils/api-error.js';
+import * as authService from './auth.service.js';
 import { hashPin, validatePinCreation } from './pin.service.js';
 
 /**
  * Onboarding service - handles first-time user and barber profile creation.
  */
+
+const normalizeVerifiedPhoneNumber = (phoneNumber) => String(phoneNumber ?? '').trim();
+
+const issueAuthenticationTokens = async (user) => {
+    const tokens = authService.generateTokenPair(user._id, user.roleType);
+    const refreshHash = authService.hashToken(tokens.refreshToken);
+    await userRepository.updateById(user._id, { refreshTokenHash: refreshHash });
+    return tokens;
+};
 
 const parseJsonIfString = (value, fieldName) => {
     if (typeof value !== 'string') return value;
@@ -233,7 +243,7 @@ const normalizeBarberOnboardingInput = (authUser, shopData) => {
     };
 };
 
-const ensureUniqueUserIdentity = async ({ firebaseUid, email, phoneNumber }) => {
+const ensureUniqueUserIdentity = async ({ email, phoneNumber }) => {
     const normalizedEmail = email ? String(email).trim().toLowerCase() : null;
     const normalizedPhoneNumber = phoneNumber ? String(phoneNumber).trim() : null;
 
@@ -242,25 +252,27 @@ const ensureUniqueUserIdentity = async ({ firebaseUid, email, phoneNumber }) => 
         normalizedPhoneNumber ? userRepository.findByPhone(normalizedPhoneNumber) : null,
     ]);
 
-    if (emailOwner && emailOwner.firebaseUid !== firebaseUid) {
+    if (emailOwner) {
         throw new ConflictError('Email already registered');
     }
 
-    if (phoneOwner && phoneOwner.firebaseUid !== firebaseUid) {
+    if (phoneOwner) {
         throw new ConflictError('Phone number already registered');
     }
 };
 
-export const createCustomerOnboarding = async (firebaseUid, profileData, file) => {
-    const existing = await userRepository.findByFirebaseUid(firebaseUid);
-    if (existing) throw new ConflictError('User already exists');
-
-    if (!file) throw new BadRequestError('Profile photo is required');
+export const createCustomerOnboarding = async (phoneNumber, profileData, file) => {
+    const verifiedPhoneNumber = normalizeVerifiedPhoneNumber(phoneNumber);
+    if (!verifiedPhoneNumber) {
+        throw new BadRequestError('Verified phone number is required');
+    }
+    if (!file) {
+        throw new BadRequestError('Profile photo is required');
+    }
 
     await ensureUniqueUserIdentity({
-        firebaseUid,
         email: profileData.email,
-        phoneNumber: profileData.phoneNumber,
+        phoneNumber: verifiedPhoneNumber,
     });
 
     let location = profileData.location;
@@ -273,8 +285,7 @@ export const createCustomerOnboarding = async (firebaseUid, profileData, file) =
     }
 
     const user = await userRepository.create({
-        firebaseUid,
-        phoneNumber: profileData.phoneNumber,
+        phoneNumber: verifiedPhoneNumber,
         email: profileData.email,
         roleType: ROLES.CUSTOMER,
     });
@@ -291,16 +302,21 @@ export const createCustomerOnboarding = async (firebaseUid, profileData, file) =
         cloudinaryId: file.filename || file.public_id,
     });
 
-    return { user, profile };
+    const tokens = await issueAuthenticationTokens(user);
+
+    return { user, profile, tokens };
 };
 
-export const createBarberOnboarding = async (firebaseUid, authUser, shopData, files) => {
-    const existing = await userRepository.findByFirebaseUid(firebaseUid);
-    if (existing) throw new ConflictError('Barber already exists');
+export const createBarberOnboarding = async (phoneNumber, shopData, files) => {
+    const verifiedPhoneNumber = normalizeVerifiedPhoneNumber(phoneNumber);
+    if (!verifiedPhoneNumber) {
+        throw new BadRequestError('Verified phone number is required');
+    }
 
-    const normalized = normalizeBarberOnboardingInput(authUser, shopData);
+    const authContext = { phoneNumber: verifiedPhoneNumber, email: null };
+    const normalized = normalizeBarberOnboardingInput(authContext, shopData);
+
     await ensureUniqueUserIdentity({
-        firebaseUid,
         email: normalized.email,
         phoneNumber: normalized.phoneNumber,
     });
@@ -311,7 +327,9 @@ export const createBarberOnboarding = async (firebaseUid, authUser, shopData, fi
     }
 
     const pinResult = validatePinCreation(normalized.pin, normalized.confirmPin);
-    if (!pinResult.isValid) throw new BadRequestError(pinResult.message);
+    if (!pinResult.isValid) {
+        throw new BadRequestError(pinResult.message);
+    }
 
     const pinHash = await hashPin(normalized.pin);
 
@@ -320,7 +338,6 @@ export const createBarberOnboarding = async (firebaseUid, authUser, shopData, fi
     const coverCloudinaryId = coverImage.public_id || coverImage.filename;
 
     const user = await userRepository.create({
-        firebaseUid,
         phoneNumber: normalized.phoneNumber,
         email: normalized.email,
         roleType: ROLES.BARBER,
@@ -369,9 +386,12 @@ export const createBarberOnboarding = async (firebaseUid, authUser, shopData, fi
         photos.push(photo);
     }
 
+    const tokens = await issueAuthenticationTokens(user);
+
     return {
         user,
         shop: serializeBarberProfile(createdShop, user, { photos }),
         photos,
+        tokens,
     };
 };

@@ -1623,11 +1623,11 @@ server/
 - [x] `user.repository.js` — `findByFirebaseUid()` removed, `findByIdWithRefreshHash()` added
 - [x] `constants.js` updated — `ONBOARDING` token type added, OTP + `TOKEN_TYPE` constants
 - [x] `account.service.js` refactored to use JWT revocation
-- [ ] `onboarding.controller.js` refactored — relies on `req.onboardingContext.phoneNumber`
-- [ ] `onboarding.service.js` refactored — explicitly CREATES user upon completion of the profile
-- [ ] `onboarding.validator.js` — `phoneNumber` removed from customer onboarding schema
+- [x] `onboarding.controller.js` refactored — relies on `req.onboardingContext.phoneNumber`
+- [x] `onboarding.service.js` refactored — explicitly CREATES user upon completion of the profile
+- [x] `onboarding.validator.js` — `phoneNumber` removed from customer onboarding schema
 - [ ] `shop.model.js` — Firebase-related comments removed
-- [ ] `upload.middleware.js` — `resolveActorKey` updated to use `req.onboardingContext.phoneNumber` fallback
+- [x] `upload.middleware.js` — `resolveActorKey` updated to use `req.onboardingContext.phoneNumber` fallback
 - [ ] `barber-profile.controller.js` updated to pass `req.user._id` to `signOutEverywhere`
 - [ ] Firebase-related model comments removed
 - [ ] Seed script updated to use `phoneNumber` identity
