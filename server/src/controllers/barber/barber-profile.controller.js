@@ -57,7 +57,7 @@ export const updatePicture = async (req, res, next) => {
 
 export const signOutEverywhere = async (req, res, next) => {
     try {
-        const result = await accountService.signOutEverywhere(req.user.firebaseUid);
+        const result = await accountService.signOutEverywhere(req.user._id);
         return res.status(200).json(ApiResponse.success(result, 'Signed out from all devices'));
     } catch (err) {
         next(err);

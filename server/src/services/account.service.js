@@ -1,39 +1,10 @@
-import admin from '../config/firebase.config.js';
 import cloudinary from '../config/cloudinary.config.js';
 import logger from '../utils/logger.js';
 import { BadRequestError, NotFoundError } from '../utils/api-error.js';
 import { verifyPin } from './pin.service.js';
+import { revokeRefreshToken } from './auth.service.js';
 import shopRepository from '../repositories/shop.repository.js';
 import userRepository from '../repositories/user.repository.js';
-
-const cleanupFirebaseAccess = async (firebaseUid) => {
-    let authCleanup = 'none';
-
-    try {
-        await admin.auth().revokeRefreshTokens(firebaseUid);
-        authCleanup = 'revoked';
-    } catch (revokeError) {
-        logger.warn('Firebase revokeRefreshTokens failed during account deletion', {
-            firebaseUid,
-            error: revokeError.message,
-        });
-    }
-
-    try {
-        await admin.auth().updateUser(firebaseUid, { disabled: true });
-        return { authCleanup: 'disabled' };
-    } catch (disableError) {
-        if (disableError.code === 'auth/user-not-found') {
-            return { authCleanup: authCleanup === 'revoked' ? 'revoked_only' : 'missing_user' };
-        }
-
-        logger.error('Failed to disable Firebase user during account deletion', {
-            firebaseUid,
-            error: disableError.message,
-        });
-        return { authCleanup: authCleanup === 'revoked' ? 'revoked_only' : 'db_only' };
-    }
-};
 
 export const updateBarberProfilePicture = async (ownerId, file) => {
     if (!file) throw new BadRequestError('No profile picture uploaded');
@@ -82,8 +53,8 @@ export const updateBarberProfilePicture = async (ownerId, file) => {
     };
 };
 
-export const signOutEverywhere = async (firebaseUid) => {
-    await admin.auth().revokeRefreshTokens(firebaseUid);
+export const signOutEverywhere = async (userId) => {
+    await revokeRefreshToken(userId);
 
     return {
         revokedAt: new Date().toISOString(),
@@ -103,6 +74,9 @@ export const deleteBarberAccount = async (authUser, currentPin) => {
     try {
         await shopRepository.updateByOwnerId(authUser._id, { deletedAt, isOpen: false });
         shopSoftDeleted = true;
+
+        // Revoke refresh access before the soft delete so the token hash can still be updated.
+        await revokeRefreshToken(authUser._id);
         await userRepository.softDelete(authUser._id);
     } catch (err) {
         if (shopSoftDeleted) {
@@ -118,10 +92,8 @@ export const deleteBarberAccount = async (authUser, currentPin) => {
         throw err;
     }
 
-    const firebaseResult = await cleanupFirebaseAccess(authUser.firebaseUid);
-
     return {
         deleted: true,
-        authCleanup: firebaseResult.authCleanup,
+        authCleanup: 'revoked',
     };
 };

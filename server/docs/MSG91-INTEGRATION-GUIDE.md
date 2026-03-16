@@ -1622,7 +1622,7 @@ server/
   - [x] Keeps `email` strictly required and strictly unique
 - [x] `user.repository.js` — `findByFirebaseUid()` removed, `findByIdWithRefreshHash()` added
 - [x] `constants.js` updated — `ONBOARDING` token type added, OTP + `TOKEN_TYPE` constants
-- [ ] `account.service.js` refactored to use JWT revocation
+- [x] `account.service.js` refactored to use JWT revocation
 - [ ] `onboarding.controller.js` refactored — relies on `req.onboardingContext.phoneNumber`
 - [ ] `onboarding.service.js` refactored — explicitly CREATES user upon completion of the profile
 - [ ] `onboarding.validator.js` — `phoneNumber` removed from customer onboarding schema
