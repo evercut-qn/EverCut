@@ -1614,7 +1614,7 @@ server/
 - [x] `auth.routes.js` rewritten with all new routes
 - [x] `onboarding.routes.js` updated — uses `authenticateOnboarding` for onboarding endpoints
 - [x] `authenticate.middleware.js` rewritten — exports `authenticate` for fully onboarded routes and `authenticateOnboarding` for onboarding-only routes
-- [ ] `authorize.middleware.js` updated — pure role checks after `authenticate`
+- [x] `authorize.middleware.js` updated — pure role checks after `authenticate`
 - [ ] `user.model.js` changes applied:
   - [ ] `firebaseUid` removed
   - [ ] `refreshTokenHash` added (select: false)
