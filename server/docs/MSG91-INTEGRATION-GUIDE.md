@@ -1638,7 +1638,7 @@ server/
 - [x] Onboarding tokens blocked from standard API routes (401 test)
 - [x] Already-onboarded user bypassing OTP to reuse old onboarding token is blocked (409 test)
 - [x] Rate limiting tested (send + verify)
-- [ ] `rg "firebaseUid" src/` returns zero matches (Firebase config files are expected to remain)
+- [x] `rg "firebaseUid" src/` returns zero matches (Firebase config files are expected to remain)
 
 ### Security
 
