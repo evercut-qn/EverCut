@@ -6,23 +6,6 @@
 
 ---
 
-## Project Timeline
-
-| Day | Key Tasks & Milestones |
-|---|---|
-| **1** | MSG91 account created · Auth Key noted · OTP template created · DLT Entity registration submitted (Jio / Airtel / Vi) |
-| **2** | Development bypass enabled (`testMode: true` in `config/index.js`) · backend dev begins unblocked |
-| **3** | DLT Sender ID (`EVRCUT`) submitted for registration |
-| **4** | DLT OTP template text submitted for approval |
-| **5–7** | *(DLT approvals in progress — no action needed)* Backend integration continues in parallel |
-| **7** | PE–TM chain binding completed — MSG91 (Walkover) added as Telemarketer in DLT portal |
-| **8–9** | DLT approvals received · Entity ID + Sender ID + Template ID entered in MSG91 dashboard |
-| **10** | Staging SMS test with real credits · annual renewal reminder set · external setup checklist signed off |
-
-> ⏱ *DLT approval timelines are set by the telecom portals (typically 5–10 business days). All backend development proceeds in parallel using test mode.*
-
----
-
 ## 1. Create MSG91 Account
 
 1. Sign up at [msg91.com](https://msg91.com)

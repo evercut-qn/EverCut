@@ -6,19 +6,6 @@
 
 ---
 
-## Project Timeline
-
-| Day | Key Tasks & Milestones |
-|---|---|
-| **1–7** | *(Backend implementation in progress — see `MSG91-INTEGRATION-GUIDE.md`)* |
-| **8** | Postman environment file rewritten · `01-authentication.json` rewritten with full OTP flow (9 requests) |
-| **9** | Collections `02–13` updated to use JWT access tokens · collection generator script updated · regenerated + verified |
-| **10** | `README.md` rewritten · all collections imported and smoke-tested · zero Firebase references confirmed |
-
-> 📌 *Postman updates are the final step — begin only after backend implementation and Firebase removal are complete (Days 1–7).*
-
----
-
 ## Table of Contents
 
 1. [Environment File](#1-environment-file)
