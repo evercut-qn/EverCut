@@ -1,6 +1,6 @@
 import * as authService from '../services/auth.service.js';
 import userRepository from '../repositories/user.repository.js';
-import { UnauthorizedError } from '../utils/api-error.js';
+import { AppError, ConflictError, UnauthorizedError } from '../utils/api-error.js';
 import { TOKEN_TYPE } from '../utils/constants.js';
 import logger from '../utils/logger.js';
 
@@ -48,7 +48,7 @@ export const authenticate = async (req, _res, next) => {
 
         return next();
     } catch (err) {
-        if (err instanceof UnauthorizedError) {
+        if (err instanceof AppError) {
             return next(err);
         }
 
@@ -66,13 +66,18 @@ export const authenticateOnboarding = async (req, _res, next) => {
             throw new UnauthorizedError('Onboarding token required');
         }
 
+        const existingUser = await userRepository.findByPhone(decoded.sub);
+        if (existingUser) {
+            throw new ConflictError('Phone number already registered');
+        }
+
         req.onboardingContext = {
             phoneNumber: decoded.sub,
         };
 
         return next();
     } catch (err) {
-        if (err instanceof UnauthorizedError) {
+        if (err instanceof AppError) {
             return next(err);
         }
 
