@@ -274,15 +274,7 @@ export const createCustomerOnboarding = async (phoneNumber, profileData, file) =
         email: profileData.email,
         phoneNumber: verifiedPhoneNumber,
     });
-
-    let location = profileData.location;
-    if (location && typeof location === 'string') {
-        try {
-            location = JSON.parse(location);
-        } catch {
-            throw new BadRequestError('Invalid location format');
-        }
-    }
+    const location = normalizeLocation(profileData.location);
 
     const user = await userRepository.create({
         phoneNumber: verifiedPhoneNumber,

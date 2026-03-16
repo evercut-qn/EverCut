@@ -1633,7 +1633,7 @@ server/
 - [x] Seed script updated to use `phoneNumber` identity
 - [x] All OTP endpoints tested (test mode)
 - [x] Refresh token rotation tested (happy path + theft detection)
-- [ ] New user → OTP → onboardingToken → CUSTOMER onboarding flow tested end-to-end
+- [x] New user → OTP → onboardingToken → CUSTOMER onboarding flow tested end-to-end
 - [ ] New user → OTP → onboardingToken → BARBER onboarding flow tested end-to-end
 - [ ] Onboarding tokens blocked from standard API routes (401 test)
 - [ ] Already-onboarded user bypassing OTP to reuse old onboarding token is blocked (409 test)
