@@ -1628,9 +1628,9 @@ server/
 - [x] `onboarding.validator.js` — `phoneNumber` removed from customer onboarding schema
 - [x] `shop.model.js` — Firebase-related comments removed
 - [x] `upload.middleware.js` — `resolveActorKey` updated to use `req.onboardingContext.phoneNumber` fallback
-- [ ] `barber-profile.controller.js` updated to pass `req.user._id` to `signOutEverywhere`
+- [x] `barber-profile.controller.js` updated to pass `req.user._id` to `signOutEverywhere`
 - [x] Firebase-related model comments removed
-- [ ] Seed script updated to use `phoneNumber` identity
+- [x] Seed script updated to use `phoneNumber` identity
 - [ ] All OTP endpoints tested (test mode)
 - [ ] Refresh token rotation tested (happy path + theft detection)
 - [ ] New user → OTP → onboardingToken → CUSTOMER onboarding flow tested end-to-end

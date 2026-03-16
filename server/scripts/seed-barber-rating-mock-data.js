@@ -30,8 +30,7 @@ import { hashPin } from '../src/services/pin.service.js';
 import { BOOKING_STATUS, PAYMENT_STATUS, ROLES } from '../src/utils/constants.js';
 
 const BARBER_FIXTURE = {
-    firebaseUid: 'test-barber-001',
-    phoneNumber: '+15550000002',
+    phoneNumber: '+919876543211',
     email: 'test.barber@example.com',
     roleType: ROLES.BARBER,
 };
@@ -39,8 +38,7 @@ const BARBER_FIXTURE = {
 const CUSTOMER_FIXTURES = [
     {
         key: 'addReply',
-        firebaseUid: 'mock-rating-customer-001',
-        phoneNumber: '+15550100001',
+        phoneNumber: '+919876551001',
         email: 'mock.rating.customer.001@example.com',
         profile: {
             firstName: 'Ava',
@@ -62,8 +60,7 @@ const CUSTOMER_FIXTURES = [
     },
     {
         key: 'updateReply',
-        firebaseUid: 'mock-rating-customer-002',
-        phoneNumber: '+15550100002',
+        phoneNumber: '+919876551002',
         email: 'mock.rating.customer.002@example.com',
         profile: {
             firstName: 'Ben',
@@ -86,8 +83,7 @@ const CUSTOMER_FIXTURES = [
     },
     {
         key: 'removeRating',
-        firebaseUid: 'mock-rating-customer-003',
-        phoneNumber: '+15550100003',
+        phoneNumber: '+919876551003',
         email: 'mock.rating.customer.003@example.com',
         profile: {
             firstName: 'Cara',
@@ -136,11 +132,11 @@ const SERVICE_FIXTURE = {
 
 const withDeleted = (query) => query.setOptions({ includeDeleted: true });
 
-const upsertUser = async ({ firebaseUid, phoneNumber, email, roleType }) => {
-    let user = await withDeleted(User.findOne({ firebaseUid }));
+const upsertUser = async ({ phoneNumber, email, roleType }) => {
+    let user = await withDeleted(User.findOne({ phoneNumber }));
 
     if (!user) {
-        user = await User.create({ firebaseUid, phoneNumber, email, roleType });
+        user = await User.create({ phoneNumber, email, roleType });
         return user;
     }
 
@@ -293,7 +289,6 @@ const main = async () => {
         const customers = [];
         for (const fixture of CUSTOMER_FIXTURES) {
             const user = await upsertUser({
-                firebaseUid: fixture.firebaseUid,
                 phoneNumber: fixture.phoneNumber,
                 email: fixture.email,
                 roleType: ROLES.CUSTOMER,
@@ -317,10 +312,10 @@ const main = async () => {
             generatedAt: new Date().toISOString(),
             note: 'Use this data only against a dev or test database. Running the seed again resets the mock bookings and ratings for the seeded barber shop.',
             auth: {
-                firebaseUid: BARBER_FIXTURE.firebaseUid,
                 email: BARBER_FIXTURE.email,
                 phoneNumber: BARBER_FIXTURE.phoneNumber,
-                instructions: 'Generate or refresh the Firebase ID token for this barber with node scripts/firebase-token-gen.js and use that token in Postman.',
+                otpLoginMobile: '9876543211',
+                instructions: 'Use the OTP authentication flow for mobile 9876543211 in test mode, or run the authentication Postman collection, to obtain the barber access token for these seeded ratings.',
             },
             shop: {
                 userId: barberUser._id.toString(),
@@ -339,8 +334,8 @@ const main = async () => {
             customers: customers.map(({ fixture, user, profile }) => ({
                 key: fixture.key,
                 userId: user._id.toString(),
-                firebaseUid: fixture.firebaseUid,
                 email: user.email,
+                phoneNumber: user.phoneNumber,
                 name: `${profile.firstName} ${profile.lastName}`,
             })),
             bookings: Object.fromEntries(
