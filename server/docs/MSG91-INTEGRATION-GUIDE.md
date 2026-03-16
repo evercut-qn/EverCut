@@ -1613,7 +1613,7 @@ server/
 - [x] `auth.controller.js` rewritten — returns `onboardingToken` for new users, `accessToken`/`refreshToken` for returning users
 - [x] `auth.routes.js` rewritten with all new routes
 - [ ] `onboarding.routes.js` updated — uses `authenticateOnboarding` for onboarding endpoints
-- [ ] `authenticate.middleware.js` rewritten — exports `authenticate` for fully onboarded routes and `authenticateOnboarding` for onboarding-only routes
+- [x] `authenticate.middleware.js` rewritten — exports `authenticate` for fully onboarded routes and `authenticateOnboarding` for onboarding-only routes
 - [ ] `authorize.middleware.js` updated — pure role checks after `authenticate`
 - [ ] `user.model.js` changes applied:
   - [ ] `firebaseUid` removed
