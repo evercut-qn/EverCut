@@ -77,6 +77,25 @@ const config = Object.freeze({
     rateLimitMax: 100, // requests per window
   }),
 
+  /** MSG91 OTP */
+  msg91: Object.freeze({
+    authKey: requireEnv('MSG91_AUTH_KEY'),
+    otpTemplateId: requireEnv('MSG91_OTP_TEMPLATE_ID'),
+    otpLength: 6,
+    otpExpiry: 10,                                              // minutes
+    testMode: process.env.NODE_ENV !== 'production' && false,   // flip to true in dev to skip real SMS
+    testOtp: '123456',
+    baseUrl: 'https://control.msg91.com/api/v5',
+  }),
+
+  /** JWT */
+  jwt: Object.freeze({
+    accessSecret: requireEnv('JWT_ACCESS_SECRET'),
+    refreshSecret: requireEnv('JWT_REFRESH_SECRET'),
+    accessExpiry: optionalEnv('JWT_ACCESS_EXPIRY', '15m'),
+    refreshExpiry: optionalEnv('JWT_REFRESH_EXPIRY', '180d'),
+  }),
+
   /** Pagination defaults */
   pagination: Object.freeze({
     defaultPage: 1,

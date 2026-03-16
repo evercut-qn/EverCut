@@ -1589,10 +1589,10 @@ server/
 
 ### Backend Implementation
 
-- [ ] `jsonwebtoken` installed; `firebase-admin` **retained** (required for Google OAuth — do not uninstall)
-- [ ] `firebase.config.js` and `firebase-admin-sdk.json` **preserved** (required for Google OAuth)
-- [ ] `FIREBASE_*` env vars **retained** in `.env` and `.env.example` (required for Google OAuth)
-- [ ] `config/index.js` updated — `firebase` block kept; `msg91` + `jwt` sections added
+- [x] `jsonwebtoken` installed; `firebase-admin` **retained** (required for Google OAuth — do not uninstall)
+- [x] `firebase.config.js` and `firebase-admin-sdk.json` **preserved** (required for Google OAuth)
+- [x] `FIREBASE_*` env vars **retained** in `.env` and `.env.example` (required for Google OAuth)
+- [x] `config/index.js` updated — `firebase` block kept; `msg91` + `jwt` sections added
 - [ ] `sms-provider.service.js` created and tested
 - [ ] `otp.service.js` created and tested
 - [ ] `auth.service.js` fully rewritten — issues `onboardingToken` for new users, `accessToken` for returning
