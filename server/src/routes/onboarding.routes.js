@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import authenticate from '../middleware/authenticate.middleware.js';
+import { authenticateOnboarding } from '../middleware/authenticate.middleware.js';
 import {
     uploadBarberOnboardingImages,
     uploadCustomerPhoto,
@@ -15,11 +15,11 @@ const router = Router();
 
 /**
  * POST /api/v1/onboarding/customers
- * Create customer profile after authentication.
+ * Create customer profile after OTP verification with onboarding token.
  */
 router.post(
     '/customers',
-    authenticate,
+    authenticateOnboarding,
     uploadCustomerPhoto,
     validate(customerOnboardingSchema, 'body'),
     onboardingController.createCustomerOnboarding,
@@ -27,11 +27,11 @@ router.post(
 
 /**
  * POST /api/v1/onboarding/barbers
- * Create barber/shop profile after authentication.
+ * Create barber/shop profile after OTP verification with onboarding token.
  */
 router.post(
     '/barbers',
-    authenticate,
+    authenticateOnboarding,
     uploadBarberOnboardingImages,
     validate(barberOnboardingSchema, 'body'),
     onboardingController.createBarberOnboarding,
