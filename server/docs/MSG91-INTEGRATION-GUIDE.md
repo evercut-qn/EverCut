@@ -39,8 +39,8 @@
    - [6.5 Updated Indexes](#65-updated-indexes)
    - [6.6 Full Updated Schema Reference](#66-full-updated-schema-reference)
    - [6.7 User Repository Updates](#67-user-repository-updates)
-7. [Firebase Removal — Existing File Changes](#7-firebase-removal--existing-file-changes)
-   - [7.1 Remove Firebase Config](#71-remove-firebase-config)
+7. [Firebase — Existing File Changes](#7-firebase--existing-file-changes)
+   - [7.1 Preserve Firebase Config (Required for Google OAuth)](#71-preserve-firebase-config-required-for-google-oauth)
    - [7.2 Refactor Account Service](#72-refactor-account-service)
    - [7.3 Refactor Onboarding Controller](#73-refactor-onboarding-controller)
    - [7.4 Refactor Onboarding Service](#74-refactor-onboarding-service)
@@ -49,8 +49,8 @@
    - [7.7 Clean Up Model Comments](#77-clean-up-model-comments)
    - [7.8 Update Authorize Middleware](#78-update-authorize-middleware)
    - [7.9 Update Barber Profile Controller & Clean Up Scripts](#79-update-barber-profile-controller--clean-up-scripts)
-   - [7.10 Clean Up Environment & Config](#710-clean-up-environment--config)
-   - [7.11 Remove Firebase Dependency](#711-remove-firebase-dependency)
+   - [7.10 Environment & Config — No Firebase Changes](#710-environment--config--no-firebase-changes)
+   - [7.11 Retain Firebase Dependency](#711-retain-firebase-dependency)
 8. [Security Best Practices](#8-security-best-practices)
 9. [Error Handling](#9-error-handling)
 10. [Future SMS Use Cases](#10-future-sms-use-cases)
@@ -100,7 +100,7 @@
 | Layer | New File(s) / Changes |
 |---|---|
 | **Config** | `config/index.js` — replace `firebase` section with `msg91` + `jwt` sections |
-| **Provider** | `services/sms-provider.service.js` — **NEW** (replaces `config/firebase.config.js`) |
+| **Provider** | `services/sms-provider.service.js` — **NEW** (SMS now handled here; `config/firebase.config.js` is **retained** for future Google OAuth) |
 | **Service** | `services/otp.service.js` — **NEW**; `services/auth.service.js` — **REWRITE** |
 | **Validator** | `validators/auth.validator.js` — **REWRITE** with OTP schemas |
 | **Controller** | `controllers/auth.controller.js` — **REWRITE** with OTP + token handlers |
@@ -117,7 +117,7 @@
 
 ### 2.1 Update `.env.example`
 
-Remove all `FIREBASE_*` variables and add:
+Keep all existing `FIREBASE_*` variables as-is — they are required for the future Google OAuth implementation. Add the following new variables:
 
 ```env
 # ── MSG91 (OTP / SMS) ───────────────────────────────────────────────
@@ -133,7 +133,7 @@ JWT_REFRESH_EXPIRY=180d
 
 ### 2.2 Update `config/index.js`
 
-Remove the entire `firebase` config block and add:
+Keep the existing `firebase` config block exactly as-is — it will be needed for Google OAuth. Add the following new sections alongside it:
 
 ```javascript
 /** MSG91 OTP */
@@ -162,13 +162,12 @@ jwt: Object.freeze({
 
 ```bash
 npm install jsonwebtoken
-npm uninstall firebase-admin
 ```
 
 | Action | Package | Purpose |
 |---|---|---|
 | **Install** | `jsonwebtoken` | Sign/verify access & refresh tokens |
-| **Remove** | `firebase-admin` | No longer needed — replaced by MSG91 + JWT |
+| **Retain** | `firebase-admin` | Kept for future Google OAuth implementation — do **not** uninstall |
 
 > **MSG91 API calls use native `fetch`** (Node 18+). No additional HTTP client needed.
 
@@ -1101,17 +1100,22 @@ Update `authService.refreshAccessToken()` to use `findByIdWithRefreshHash()` ins
 
 ---
 
-## 7. Firebase Removal — Existing File Changes
+## 7. Firebase — Existing File Changes
 
-Since there are no users or existing data, all Firebase references are removed directly. This section covers every existing file that currently references Firebase.
+Since there are no users or existing data, all `firebaseUid` references are removed directly. **Firebase configuration, credentials, environment variables, and the `firebase-admin` package are intentionally preserved** for the future Google OAuth implementation. This section covers every existing file that currently references `firebaseUid` or calls Firebase services from auth/onboarding code.
 
-### 7.1 Remove Firebase Config
+### 7.1 Preserve Firebase Config (Required for Google OAuth)
 
-```bash
-# Delete these files
-rm src/config/firebase.config.js
-rm firebase-admin-sdk.json
-```
+**Do NOT delete these files.** They are required for the future Google OAuth implementation:
+
+| File | Status | Reason |
+|---|---|---|
+| `src/config/firebase.config.js` | **KEEP** | Firebase Admin SDK initialisation — needed for Google OAuth |
+| `firebase-admin-sdk.json` | **KEEP** | Service account credentials — needed for Google OAuth |
+
+The Firebase Admin SDK is no longer imported by any auth or onboarding code after this migration (those now use MSG91 + JWT), but the config file and credentials must remain in place so Google OAuth can be wired up without additional setup.
+
+> ℹ️ When implementing Google OAuth, `firebase.config.js` will be imported by the new Google auth service to call `admin.auth().verifyIdToken()` on the Firebase ID token returned by the client.
 
 ### 7.2 Refactor Account Service
 
@@ -1417,42 +1421,39 @@ In the new design, `authenticate` is used only on routes that require a fully on
 
 **File:** `scripts/README.md` — Remove all Firebase token generation and verification instructions.
 
-### 7.10 Clean Up Environment & Config
+### 7.10 Environment & Config — No Firebase Changes
 
-**Remove from `.env` and `.env.example`:**
+**Keep all `FIREBASE_*` variables** in `.env` and `.env.example`. They are required for the future Google OAuth implementation:
 - `FIREBASE_PROJECT_ID`
 - `FIREBASE_CLIENT_EMAIL`
 - `FIREBASE_PRIVATE_KEY`
 - `FIREBASE_API_KEY`
 - The `# ── Firebase` section header
 
-**Remove from `.gitignore`** (Firebase-specific entries only):
+**Keep all Firebase `.gitignore` entries** — do not remove:
 
-```diff
-- # Firebase service account keys or any secrets
-- firebase-admin-sdk.json
-- *-firebase-adminsdk-*.json
-- # Firebase test tokens (in any location)
-- firebase-tokens.txt
+```
+# Firebase service account keys or any secrets
+firebase-admin-sdk.json
+*-firebase-adminsdk-*.json
+# Firebase test tokens (in any location)
+firebase-tokens.txt
 ```
 
-### 7.11 Remove Firebase Dependency
+Only the new MSG91 + JWT variables added in [§2.1](#21-update-envexample) need to be appended to these files.
+
+### 7.11 Retain Firebase Dependency
+
+**Do NOT uninstall `firebase-admin`.** It is retained for the future Google OAuth implementation.
+
+**Final check — zero `firebaseUid` references in application code:**
 
 ```bash
-npm uninstall firebase-admin
+rg -n "firebaseUid" src/
+rg -n "firebaseUid" scripts/
 ```
 
-**Verify:** `npm ls firebase-admin` should show `(empty)`.
-
-**Final check — zero Firebase references in source code:**
-
-```bash
-rg -n "firebase|firebaseUid|Firebase" src/
-rg -n "firebase|firebaseUid|Firebase" scripts/
-rg -n "FIREBASE" .env .env.example
-```
-
-> Searches in `docs/` will match historical files (`IMPLEMENTATION-PLAN.md`, `SECURITY_AUDIT.md`, etc.) — this is expected and acceptable. Those serve as historical records.
+> Both commands must return zero matches. References to `firebase` itself (in `firebase.config.js`, env vars, and `.gitignore`) are expected and intentional — only the `firebaseUid` database field and its usages should be gone.
 
 ---
 
@@ -1534,15 +1535,15 @@ export const resendOtp = async (mobile, retryType) => { /* { success } */ };
 
 ```text
 server/
-├── firebase-admin-sdk.json                  ← DELETE
-├── .env.example                             ← UPDATE: remove FIREBASE_*, add MSG91 + JWT vars
-├── .env                                     ← UPDATE: remove FIREBASE_*, add MSG91 + JWT vars
-├── .gitignore                               ← REMOVE: Firebase-specific ignore entries
-├── package.json                             ← ADD: jsonwebtoken; REMOVE: firebase-admin
+├── firebase-admin-sdk.json                  ← KEEP (retained for Google OAuth)
+├── .env.example                             ← UPDATE: keep FIREBASE_*, add MSG91 + JWT vars
+├── .env                                     ← UPDATE: keep FIREBASE_*, add MSG91 + JWT vars
+├── .gitignore                               ← NO CHANGE: Firebase entries retained for Google OAuth
+├── package.json                             ← ADD: jsonwebtoken (firebase-admin retained)
 └── src/
     ├── config/
-    │   ├── firebase.config.js               ← DELETE
-    │   └── index.js                         ← REPLACE: firebase → msg91 + jwt config
+    │   ├── firebase.config.js               ← KEEP (retained for Google OAuth)
+    │   └── index.js                         ← UPDATE: keep firebase block; add msg91 + jwt config
     ├── controllers/
     │   ├── auth.controller.js               ← REWRITE: OTP + token + logout handlers
     │   ├── onboarding.controller.js         ← REFACTOR: pass verified onboarding phoneNumber
@@ -1588,10 +1589,10 @@ server/
 
 ### Backend Implementation
 
-- [ ] `jsonwebtoken` installed, `firebase-admin` uninstalled
-- [ ] `firebase.config.js` and `firebase-admin-sdk.json` deleted
-- [ ] All `FIREBASE_*` env vars removed from `.env` and `.env.example`
-- [ ] `config/index.js` updated — `firebase` section removed, `msg91` + `jwt` sections added
+- [ ] `jsonwebtoken` installed; `firebase-admin` **retained** (required for Google OAuth — do not uninstall)
+- [ ] `firebase.config.js` and `firebase-admin-sdk.json` **preserved** (required for Google OAuth)
+- [ ] `FIREBASE_*` env vars **retained** in `.env` and `.env.example` (required for Google OAuth)
+- [ ] `config/index.js` updated — `firebase` block kept; `msg91` + `jwt` sections added
 - [ ] `sms-provider.service.js` created and tested
 - [ ] `otp.service.js` created and tested
 - [ ] `auth.service.js` fully rewritten — issues `onboardingToken` for new users, `accessToken` for returning
@@ -1625,7 +1626,7 @@ server/
 - [ ] Onboarding tokens blocked from standard API routes (401 test)
 - [ ] Already-onboarded user bypassing OTP to reuse old onboarding token is blocked (409 test)
 - [ ] Rate limiting tested (send + verify)
-- [ ] `rg "firebase" src/` returns zero matches
+- [ ] `rg "firebaseUid" src/` returns zero matches (Firebase config files are expected to remain)
 
 ### Security
 
