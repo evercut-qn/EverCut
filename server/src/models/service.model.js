@@ -1,10 +1,8 @@
 import mongoose from 'mongoose';
-import { ALL_SERVICE_TYPES, ALL_SERVICE_FOR } from '../utils/constants.js';
+import { ALL_SERVICE_FOR, ALL_SERVICE_TYPES } from '../utils/constants.js';
 
 /**
- * Service model — linked to Shop via shopId.
- *
- * Replaces the old Service model that used `firebaseUid`.
+ * Service model - linked to Shop via shopId.
  */
 const serviceSchema = new mongoose.Schema(
     {
@@ -34,18 +32,18 @@ const serviceSchema = new mongoose.Schema(
             required: true,
         },
 
-        // ── Single-service fields ──────────────────────────────────────────
+        // Single-service fields
         duration: { type: Number },
         actualPrice: { type: Number },
         offerPrice: { type: Number, default: 0 },
         finalPrice: { type: Number },
 
-        // ── Bundled-service fields ─────────────────────────────────────────
+        // Bundled-service fields
         bundledServices: [{ type: String }],
         totalDuration: { type: Number },
         totalPrice: { type: Number },
 
-        // ── Status ─────────────────────────────────────────────────────────
+        // Status
         isActive: {
             type: Boolean,
             default: true,

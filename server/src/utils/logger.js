@@ -34,7 +34,7 @@ const SENSITIVE_PATTERNS = [
     { regex: /\/\/[^:]+:[^@]+@[^\s,'"}\]]+/gi, replacement: '//***REDACTED***' },
     // Bearer tokens
     { regex: /Bearer\s+[A-Za-z0-9\-._~+/]+=*/gi, replacement: 'Bearer ***REDACTED***' },
-    // Firebase private keys
+    // Private keys
     { regex: /-----BEGIN\s+(RSA\s+)?PRIVATE\s+KEY-----[\s\S]*?-----END\s+(RSA\s+)?PRIVATE\s+KEY-----/gi, replacement: '***PRIVATE_KEY_REDACTED***' },
     // API keys/secrets that look like long hex or base64 strings (32+ chars)
     { regex: /(?:api[_-]?key|api[_-]?secret|password|passwd|secret|token|authorization)\s*[:=]\s*['"]?([A-Za-z0-9+/=_\-]{20,})['"]?/gi, replacement: '$1: ***REDACTED***' },

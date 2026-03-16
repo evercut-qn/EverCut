@@ -2,9 +2,7 @@ import mongoose from 'mongoose';
 import { ALL_PHOTO_TYPES } from '../utils/constants.js';
 
 /**
- * Photo model — linked to Shop via shopId.
- *
- * Change: `firebaseUid` (string) → `shopId` (ObjectId → Shop).
+ * Photo model - linked to Shop via shopId.
  */
 const photoSchema = new mongoose.Schema(
     {

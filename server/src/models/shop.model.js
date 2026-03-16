@@ -8,12 +8,10 @@ import {
 } from '../utils/constants.js';
 
 /**
- * Shop / Salon model — replaces the old BarberSetup.
+ * Shop / Salon model - replaces the old BarberSetup.
  *
- * Key changes from old schema:
- *   - `ownerId` (ObjectId → User) replaces `firebaseUid` (String)
- *   - Renamed to "Shop" (domain-neutral term)
- *   - Added soft-delete, proper indexes, and validation
+ * Renamed to "Shop" (domain-neutral term) and includes soft-delete,
+ * indexes, and validation for the current domain model.
  */
 const shopSchema = new mongoose.Schema(
     {
