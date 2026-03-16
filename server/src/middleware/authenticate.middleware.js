@@ -44,7 +44,6 @@ export const authenticate = async (req, _res, next) => {
             phoneNumber: user.phoneNumber,
             email: user.email || null,
             emailVerified: Boolean(user.emailVerified),
-            firebaseUid: user.firebaseUid || null,
         };
 
         return next();
