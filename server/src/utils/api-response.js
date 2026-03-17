@@ -1,58 +1,66 @@
 /**
- * Standardised API response helpers.
+ * Standardized API response helpers.
  *
  * Usage in controllers:
  *   res.status(200).json(ApiResponse.success(data, 'User fetched'));
- *   res.status(400).json(ApiResponse.error('Validation failed', 400, errors));
+ *   res.status(400).json(ApiResponse.error('Validation failed', { errors }));
  */
+
+const isPlainObject = (value) => Object.prototype.toString.call(value) === '[object Object]';
+
+const isMessageOnlyPayload = (value) => (
+    isPlainObject(value)
+    && Object.keys(value).length === 1
+    && typeof value.message === 'string'
+);
+
+const normalizeData = (value) => (value === null || value === undefined ? {} : value);
 
 export class ApiResponse {
     /**
      * Success envelope.
-     * @param {*}      data
+     * @param {*} data
      * @param {string} message
-     * @param {number} statusCode
      */
-    static success(data = null, message = 'Success', statusCode = 200) {
+    static success(data = {}, message = 'Success') {
+        const normalizedMessage = isMessageOnlyPayload(data) && message === 'Success'
+            ? data.message
+            : message;
+
         return {
             success: true,
-            statusCode,
-            message,
-            data,
+            message: normalizedMessage,
+            data: isMessageOnlyPayload(data) ? {} : normalizeData(data),
         };
     }
 
     /**
      * Error envelope.
      * @param {string} message
-     * @param {number} statusCode
-     * @param {Array}  errors      – optional field-level details
+     * @param {*} data
      */
-    static error(message = 'Error', statusCode = 500, errors = []) {
-        const body = {
+    static error(message = 'Error', data = {}) {
+        return {
             success: false,
-            statusCode,
             message,
+            data: normalizeData(data),
         };
-        if (errors.length > 0) {
-            body.errors = errors;
-        }
-        return body;
     }
 
     /**
      * Paginated success envelope.
-     * @param {Array}  items
-     * @param {Object} pagination – { page, limit, total, totalPages }
+     * @param {Array} items
+     * @param {Object} pagination
      * @param {string} message
      */
     static paginated(items, pagination, message = 'Success') {
         return {
             success: true,
-            statusCode: 200,
             message,
-            data: items,
-            pagination,
+            data: {
+                items,
+                pagination,
+            },
         };
     }
 }

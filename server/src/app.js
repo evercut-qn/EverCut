@@ -44,7 +44,7 @@ const createApp = () => {
     // ── 5. 404 catch-all ───────────────────────────────────────────────────
     app.use((_req, res) => {
         res.status(404).json(
-            ApiResponse.error('Route not found', 404),
+            ApiResponse.error('Route not found'),
         );
     });
 
