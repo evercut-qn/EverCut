@@ -3,8 +3,8 @@ import { ApiResponse } from '../../utils/api-response.js';
 
 export const getRatings = async (req, res, next) => {
     try {
-        const ratings = await ratingService.getRatingsByShopForBarber(req.user._id);
-        return res.status(200).json(ApiResponse.success(ratings, 'Ratings fetched'));
+        const result = await ratingService.getRatingsByShopForBarber(req.user._id, req.query);
+        return res.status(200).json(ApiResponse.paginated(result.items, result.pagination, 'Ratings fetched'));
     } catch (err) {
         next(err);
     }

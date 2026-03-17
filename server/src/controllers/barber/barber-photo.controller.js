@@ -13,8 +13,8 @@ export const uploadPhotos = async (req, res, next) => {
 
 export const getPhotos = async (req, res, next) => {
     try {
-        const photos = await photoService.getPhotos(req.user._id, req.query);
-        return res.status(200).json(ApiResponse.success(photos, 'Photos fetched'));
+        const result = await photoService.getPhotos(req.user._id, req.query);
+        return res.status(200).json(ApiResponse.paginated(result.items, result.pagination, 'Photos fetched'));
     } catch (err) {
         next(err);
     }

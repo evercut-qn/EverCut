@@ -3,6 +3,7 @@ import shopRepository from '../repositories/shop.repository.js';
 import cloudinary from '../config/cloudinary.config.js';
 import { NotFoundError, ConflictError } from '../utils/api-error.js';
 import { escapeRegex } from '../utils/regex.utils.js';
+import { buildPagination } from '../utils/pagination.utils.js';
 
 /**
  * Service-catalog service — manages the salon services (haircut, etc.)
@@ -51,10 +52,15 @@ export const addService = async (ownerId, data) => {
     return serviceRepository.create(serviceData);
 };
 
-export const getServices = async (ownerId) => {
+export const getServices = async (ownerId, queryFilters = {}) => {
     const shop = await shopRepository.findByOwnerId(ownerId);
     if (!shop) throw new NotFoundError('Shop profile');
-    return serviceRepository.findByShopId(shop._id);
+    
+    const total = await serviceRepository.countByShopId(shop._id);
+    const { skip, limit, pagination } = buildPagination(queryFilters, total);
+    
+    const items = await serviceRepository.findByShopId(shop._id, {}, { skip, limit });
+    return { items, pagination };
 };
 
 export const updateService = async (ownerId, serviceId, data) => {

@@ -12,8 +12,8 @@ export const addEmployee = async (req, res, next) => {
 
 export const getEmployees = async (req, res, next) => {
     try {
-        const employees = await employeeService.getEmployees(req.user._id);
-        return res.status(200).json(ApiResponse.success(employees, 'Employees fetched'));
+        const result = await employeeService.getEmployees(req.user._id, req.query);
+        return res.status(200).json(ApiResponse.paginated(result.items, result.pagination, 'Employees fetched'));
     } catch (err) {
         next(err);
     }

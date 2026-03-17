@@ -13,8 +13,8 @@ export const bookSalon = async (req, res, next) => {
 export const getBookings = async (req, res, next) => {
     try {
         const { type } = req.query;
-        const bookings = await bookingService.getCustomerBookings(req.user._id, type);
-        return res.status(200).json(ApiResponse.success(bookings, 'Bookings fetched'));
+        const result = await bookingService.getCustomerBookings(req.user._id, type, req.query);
+        return res.status(200).json(ApiResponse.paginated(result.items, result.pagination, 'Bookings fetched'));
     } catch (err) {
         next(err);
     }

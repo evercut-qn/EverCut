@@ -2,6 +2,7 @@ import photoRepository from '../repositories/photo.repository.js';
 import shopRepository from '../repositories/shop.repository.js';
 import cloudinary from '../config/cloudinary.config.js';
 import { NotFoundError, BadRequestError } from '../utils/api-error.js';
+import { buildPagination } from '../utils/pagination.utils.js';
 import { MAX_PHOTOS_PER_SHOP } from '../utils/constants.js';
 
 /**
@@ -46,7 +47,11 @@ export const getPhotos = async (ownerId, queryFilters = {}) => {
         filter.photoType = queryFilters.photoType;
     }
 
-    return photoRepository.findByShopId(shop._id, filter);
+    const total = await photoRepository.getActiveCountByShop(shop._id, filter);
+    const { skip, limit, pagination } = buildPagination(queryFilters, total);
+
+    const items = await photoRepository.findByShopId(shop._id, filter, { skip, limit });
+    return { items, pagination };
 };
 
 export const getPhotoById = async (ownerId, photoId) => {

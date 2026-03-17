@@ -5,9 +5,13 @@ class PhotoRepository {
         return Photo.create(data);
     }
 
-    async findByShopId(shopId, query = {}) {
+    async findByShopId(shopId, query = {}, options = {}) {
         const filter = { shopId, isActive: true, ...query };
-        return Photo.find(filter).sort({ createdAt: -1 });
+        const mongoQuery = Photo.find(filter).sort({ createdAt: -1 });
+        
+        if (options.skip !== undefined) mongoQuery.skip(options.skip);
+        if (options.limit !== undefined) mongoQuery.limit(options.limit);
+        return mongoQuery;
     }
 
     async findByIdAndShop(id, shopId) {
@@ -18,8 +22,9 @@ class PhotoRepository {
         return Photo.findOneAndDelete({ _id: id, shopId, isActive: true });
     }
 
-    async getActiveCountByShop(shopId) {
-        return Photo.countDocuments({ shopId, isActive: true });
+    async getActiveCountByShop(shopId, query = {}) {
+        const filter = { shopId, isActive: true, ...query };
+        return Photo.countDocuments(filter);
     }
 
     async getStatsByShop(shopId) {

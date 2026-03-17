@@ -16,9 +16,18 @@ class ServiceRepository {
         return query.lean();
     }
 
-    async findByShopId(shopId, filters = {}) {
+    async findByShopId(shopId, filters = {}, options = {}) {
         const query = { shopId, isActive: true, ...filters };
-        return Service.find(query);
+        const mongoQuery = Service.find(query);
+        
+        if (options.skip !== undefined) mongoQuery.skip(options.skip);
+        if (options.limit !== undefined) mongoQuery.limit(options.limit);
+        return mongoQuery;
+    }
+
+    async countByShopId(shopId, filters = {}) {
+        const query = { shopId, isActive: true, ...filters };
+        return Service.countDocuments(query);
     }
 
     async findByShopIdAndType(shopId, serviceType, selectFields) {

@@ -3,6 +3,7 @@ import shopRepository from '../repositories/shop.repository.js';
 import logger from '../utils/logger.js';
 import { BadRequestError, NotFoundError, ConflictError } from '../utils/api-error.js';
 import cloudinary from '../config/cloudinary.config.js';
+import { buildPagination } from '../utils/pagination.utils.js';
 
 /**
  * Employee service — CRUD operations for shop employees.
@@ -97,10 +98,15 @@ export const addEmployee = async (ownerId, data, file) => {
     return employeeRepository.create(employeeData);
 };
 
-export const getEmployees = async (ownerId) => {
+export const getEmployees = async (ownerId, query = {}) => {
     const shop = await shopRepository.findByOwnerId(ownerId);
     if (!shop) throw new NotFoundError('Shop profile');
-    return employeeRepository.findByShopId(shop._id);
+    
+    const total = await employeeRepository.countByShopId(shop._id);
+    const { skip, limit, pagination } = buildPagination(query, total);
+    
+    const items = await employeeRepository.findByShopId(shop._id, { skip, limit });
+    return { items, pagination };
 };
 
 export const updateEmployee = async (ownerId, employeeId, data, file) => {

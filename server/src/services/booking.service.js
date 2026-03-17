@@ -6,6 +6,7 @@ import shopRepository from '../repositories/shop.repository.js';
 import customerRepository from '../repositories/customer.repository.js';
 import { NotFoundError, BadRequestError, ForbiddenError } from '../utils/api-error.js';
 import { isBookingInFuture, isWithinShopHours, getDayOfWeek, isWithinCancellationWindow } from '../utils/time.utils.js';
+import { buildPagination } from '../utils/pagination.utils.js';
 import { BOOKING_STATUS, MAX_RESCHEDULE_COUNT, CANCELLATION_WINDOW_HOURS } from '../utils/constants.js';
 
 /**
@@ -230,15 +231,28 @@ export const reorderBooking = async (customerId, bookingId, newDate, newTime) =>
 
 // ── Customer: list bookings (past/upcoming/favorites) ────────────────────
 
-export const getCustomerBookings = async (customerId, type) => {
+export const getCustomerBookings = async (customerId, type, query = {}) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    if (type === 'past') return bookingRepository.findPastByCustomer(customerId, today);
-    if (type === 'upcoming') return bookingRepository.findUpcomingByCustomer(customerId, today);
+    if (type === 'past') {
+        const total = await bookingRepository.countPastByCustomer(customerId, today);
+        const { skip, limit, pagination } = buildPagination(query, total);
+        const items = await bookingRepository.findPastByCustomer(customerId, today, { skip, limit });
+        return { items, pagination };
+    }
+    if (type === 'upcoming') {
+        const total = await bookingRepository.countUpcomingByCustomer(customerId, today);
+        const { skip, limit, pagination } = buildPagination(query, total);
+        const items = await bookingRepository.findUpcomingByCustomer(customerId, today, { skip, limit });
+        return { items, pagination };
+    }
     if (type === 'favorites') {
         const customer = await customerRepository.findByUserIdPopulated(customerId);
-        return customer?.favoriteBookings || [];
+        const favorites = customer?.favoriteBookings || [];
+        const total = favorites.length;
+        const { skip, limit, pagination } = buildPagination(query, total);
+        return { items: favorites.slice(skip, limit ? skip + limit : undefined), pagination };
     }
 
     throw new BadRequestError('Invalid filter type. Use: past, upcoming, or favorites');
@@ -376,15 +390,19 @@ export const getEmployeeCalendar = async (employeeId, date) => {
 
 // ── Barber-side: booking management ──────────────────────────────────────
 
-export const getBookingsByShop = async (ownerId) => {
+export const getBookingsByShop = async (ownerId, query = {}) => {
     const shop = await shopRepository.findByOwnerId(ownerId);
     if (!shop) throw new NotFoundError('Shop');
 
     const employeeIds = await employeeRepository.getIdsForShop(shop._id);
-    const bookings = await bookingRepository.findByEmployeeIds(employeeIds);
+    
+    const total = await bookingRepository.countAll({ employeeId: { $in: employeeIds } });
+    const { skip, limit, pagination } = buildPagination(query, total);
+    
+    const bookings = await bookingRepository.findByEmployeeIds(employeeIds, {}, { skip, limit });
     const numCustomers = await bookingRepository.getUniqueCustomerCount(employeeIds);
 
-    return { bookings, numberOfEmployees: employeeIds.length, numberOfCustomers: numCustomers };
+    return { items: bookings, pagination, numberOfEmployees: employeeIds.length, numberOfCustomers: numCustomers };
 };
 
 export const updateBookingStatus = async (bookingId, status, ownerId) => {
@@ -435,10 +453,15 @@ export const getBookingStats = async (ownerId) => {
     return { total, pending, completed, cancelled };
 };
 
-export const getBookingsByStatusDetailed = async (ownerId, status) => {
+export const getBookingsByStatusDetailed = async (ownerId, status, query = {}) => {
     const shop = await shopRepository.findByOwnerId(ownerId);
     if (!shop) throw new NotFoundError('Shop');
 
     const employeeIds = await employeeRepository.getIdsForShop(shop._id);
-    return bookingRepository.findByStatusPopulated(status, employeeIds);
+    
+    const total = await bookingRepository.countByStatus(status, employeeIds);
+    const { skip, limit, pagination } = buildPagination(query, total);
+    
+    const items = await bookingRepository.findByStatusPopulated(status, employeeIds, { skip, limit });
+    return { items, pagination };
 };

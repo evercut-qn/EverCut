@@ -9,10 +9,18 @@ class RatingRepository {
         return Rating.findOne({ customerId, shopId });
     }
 
-    async findByShop(shopId) {
-        return Rating.find({ shopId })
+    async countByShop(shopId) {
+        return Rating.countDocuments({ shopId });
+    }
+
+    async findByShop(shopId, options = {}) {
+        const query = Rating.find({ shopId })
             .populate('customerId', 'firstName lastName email')
             .sort({ createdAt: -1 });
+            
+        if (options.skip !== undefined) query.skip(options.skip);
+        if (options.limit !== undefined) query.limit(options.limit);
+        return query;
     }
 
     async findById(id) {

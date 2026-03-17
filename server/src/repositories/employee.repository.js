@@ -9,8 +9,16 @@ class EmployeeRepository {
         return Employee.findById(id);
     }
 
-    async findByShopId(shopId) {
-        return Employee.find({ shopId, isActive: true });
+    async findByShopId(shopId, options = {}) {
+        const query = Employee.find({ shopId, isActive: true });
+        
+        if (options.skip !== undefined) query.skip(options.skip);
+        if (options.limit !== undefined) query.limit(options.limit);
+        return query;
+    }
+
+    async countByShopId(shopId) {
+        return Employee.countDocuments({ shopId, isActive: true });
     }
 
     async findByShopIdAndPhone(shopId, phoneNumber) {

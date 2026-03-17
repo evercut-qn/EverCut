@@ -45,8 +45,8 @@ class BookingRepository {
             .sort({ date: -1 });
     }
 
-    async findUpcomingByCustomer(customerId, today) {
-        return Booking.find({
+    async findUpcomingByCustomer(customerId, today, options = {}) {
+        const query = Booking.find({
             customerId,
             date: { $gte: today },
         })
@@ -54,10 +54,18 @@ class BookingRepository {
             .populate('employeeId', 'firstName lastName photoUrl')
             .populate('shopId', 'shopName address coverUrl')
             .sort({ date: 1 });
+            
+        if (options.skip !== undefined) query.skip(options.skip);
+        if (options.limit !== undefined) query.limit(options.limit);
+        return query;
     }
 
-    async findPastByCustomer(customerId, today) {
-        return Booking.find({
+    async countUpcomingByCustomer(customerId, today) {
+        return Booking.countDocuments({ customerId, date: { $gte: today } });
+    }
+
+    async findPastByCustomer(customerId, today, options = {}) {
+        const query = Booking.find({
             customerId,
             date: { $lt: today },
         })
@@ -65,15 +73,27 @@ class BookingRepository {
             .populate('employeeId', 'firstName lastName photoUrl')
             .populate('shopId', 'shopName address coverUrl')
             .sort({ date: -1 });
+
+        if (options.skip !== undefined) query.skip(options.skip);
+        if (options.limit !== undefined) query.limit(options.limit);
+        return query;
+    }
+
+    async countPastByCustomer(customerId, today) {
+        return Booking.countDocuments({ customerId, date: { $lt: today } });
     }
 
     // ── Shop/Barber-side queries ───────────────────────────────────────
 
-    async findByEmployeeIds(employeeIds, filters = {}) {
-        return Booking.find({ employeeId: { $in: employeeIds }, ...filters })
+    async findByEmployeeIds(employeeIds, filters = {}, options = {}) {
+        const query = Booking.find({ employeeId: { $in: employeeIds }, ...filters })
             .populate('customerId', 'phoneNumber')
             .populate('employeeId', 'firstName lastName')
             .populate('serviceIds', 'serviceName offerPrice');
+            
+        if (options.skip !== undefined) query.skip(options.skip);
+        if (options.limit !== undefined) query.limit(options.limit);
+        return query;
     }
 
     async countAll(filter = {}) {
@@ -87,11 +107,15 @@ class BookingRepository {
         });
     }
 
-    async findByStatusPopulated(status, employeeIds) {
-        return Booking.find({ status, employeeId: { $in: employeeIds } })
+    async findByStatusPopulated(status, employeeIds, options = {}) {
+        const query = Booking.find({ status, employeeId: { $in: employeeIds } })
             .populate('customerId', 'firstName lastName')
             .populate('employeeId', 'firstName lastName')
             .lean();
+            
+        if (options.skip !== undefined) query.skip(options.skip);
+        if (options.limit !== undefined) query.limit(options.limit);
+        return query;
     }
 
     async getUniqueCustomerCount(employeeIds) {

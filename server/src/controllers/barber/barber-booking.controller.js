@@ -3,8 +3,17 @@ import { ApiResponse } from '../../utils/api-response.js';
 
 export const getBookings = async (req, res, next) => {
     try {
-        const result = await bookingService.getBookingsByShop(req.user._id);
-        return res.status(200).json(ApiResponse.success(result, 'Shop bookings fetched'));
+        const result = await bookingService.getBookingsByShop(req.user._id, req.query);
+        return res.status(200).json({
+            success: true,
+            message: 'Shop bookings fetched',
+            data: {
+                items: result.items,
+                pagination: result.pagination,
+                numberOfEmployees: result.numberOfEmployees,
+                numberOfCustomers: result.numberOfCustomers,
+            }
+        });
     } catch (err) {
         next(err);
     }
@@ -41,8 +50,8 @@ export const deleteBooking = async (req, res, next) => {
 export const getBookingsByStatus = async (req, res, next) => {
     try {
         const { status } = req.query;
-        const bookings = await bookingService.getBookingsByStatusDetailed(req.user._id, status);
-        return res.status(200).json(ApiResponse.success(bookings, `Bookings with status: ${status}`));
+        const result = await bookingService.getBookingsByStatusDetailed(req.user._id, status, req.query);
+        return res.status(200).json(ApiResponse.paginated(result.items, result.pagination, `Bookings with status: ${status}`));
     } catch (err) {
         next(err);
     }

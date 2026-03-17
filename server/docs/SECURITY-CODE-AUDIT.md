@@ -187,7 +187,7 @@ export const updateBookingStatus = async (bookingId, status, ownerId) => {
 ### 3.4 ✅ ~~CRITICAL — Transaction Not Used for DB Operations in `reorderBooking`~~ **[FIXED]**
 
 > **Status:** ✅ Resolved  
-> **Fixed on:** March 11, 2026  
+> **Fixed on:** March 17, 2026  
 > **Fix:** Added optional `options` parameter (supporting `{ session }`) to `bookingRepository.create()`, `bookingRepository.findById()`, `employeeRepository.claimSlot()`, and `serviceRepository.findByIds()`. Updated `reorderBooking` in `booking.service.js` to pass `{ session }` to all four DB operations within the transaction, ensuring atomicity. `Booking.create()` uses the array syntax `Booking.create([data], options)` as required by Mongoose for session-aware creation.
 
 **File:** `src/services/booking.service.js` — Lines 172–217
@@ -224,7 +224,7 @@ async create(data, options = {}) {
 ### 4.1 ✅ ~~HIGH — `updateBooking` Doesn't Release Old Slot When Same Employee Changes Time~~ **[FIXED]**
 
 > **Status:** ✅ Resolved  
-> **Fixed on:** March 11, 2026  
+> **Fixed on:** March 17, 2026  
 > **Fix:** Refactored `updateBooking` in `booking.service.js` to always release the old slot before claiming the new one, regardless of whether the employee changed. Added a short-circuit for the no-change case and a rollback mechanism that restores the old slot if the new `claimSlot` call fails.
 
 **File:** `src/services/booking.service.js` — Lines 262–280
@@ -259,7 +259,7 @@ const employee = await employeeRepository.claimSlot(employeeId, date, time);
 ### 4.2 ✅ ~~HIGH — Booking Deletion Doesn't Verify Shop Ownership~~ **[FIXED]**
 
 > **Status:** ✅ Resolved  
-> **Fixed on:** March 11, 2026  
+> **Fixed on:** March 17, 2026  
 > **Fix:** Already resolved as part of Issue 3.3. The `deleteBookingAfterPayment` function now verifies that the requesting barber owns the shop the booking belongs to before proceeding, using `shopRepository.findByOwnerId()` and a `ForbiddenError` guard.
 
 **File:** `src/services/booking.service.js` — Lines 356–364
@@ -274,7 +274,7 @@ const employee = await employeeRepository.claimSlot(employeeId, date, time);
 ### 4.3 ✅ ~~HIGH — `addToFavorites` Always Adds, Never Toggles~~ **[FIXED]**
 
 > **Status:** ✅ Resolved  
-> **Fixed on:** March 11, 2026  
+> **Fixed on:** March 17, 2026  
 > **Fix:** Updated `toggleFavorite` logic in `booking.service.js` to correctly toggle the favorite status by checking if the booking is already favorited and adjusting accordingly. Also updated the controller to call `toggleFavorite`.
 
 **File:** `src/services/booking.service.js` — Lines 237–239
@@ -305,7 +305,7 @@ export const toggleFavorite = async (customerId, bookingId) => {
 ### 5.1 ✅ ~~MEDIUM — `searchShops` Bypasses Repository Layer~~ **[FIXED]**
 
 > **Status:** ✅ Resolved  
-> **Fixed on:** March 11, 2026  
+> **Fixed on:** March 17, 2026  
 > **Fix:** Updated `searchShops` and `getServicesByGender` in `service-catalog.service.js` to rely on robust repository methods (`shopRepository.searchByName` and `serviceRepository.findByGender`) instead of dynamic model imports and direct DB queries.
 
 **File:** `src/services/service-catalog.service.js` — Lines 83–87
@@ -332,7 +332,7 @@ Similarly, `getServicesByGender` at line 89–93 bypasses the `ServiceRepository
 ### 5.2 ✅ ~~MEDIUM — Earnings Aggregation Uses `createdAt` Instead of Booking `date`~~ **[FIXED]**
 
 > **Status:** ✅ Resolved  
-> **Fixed on:** March 11, 2026  
+> **Fixed on:** March 17, 2026  
 > **Fix:** Modified the `$cond` pipelines in `getEarningsAggregation` within `booking.repository.js` to use the `$date` field instead of `$createdAt` for both `lastMonthEarning` and `todayEarning` calculations, ensuring earnings align with actual booking dates.
 
 **File:** `src/repositories/booking.repository.js` — Lines 124–153
@@ -344,7 +344,11 @@ The earnings aggregation calculates `todayEarning` and `lastMonthEarning` based 
 
 ---
 
-### 5.3 🟡 MEDIUM — No Pagination on List Endpoints
+### 5.3 ✅ ~~MEDIUM — No Pagination on List Endpoints~~ **[FIXED]**
+
+> **Status:** ✅ Resolved  
+> **Fixed on:** March 17, 2026  
+> **Fix:** Implemented pagination across all list endpoints mentioned using the `buildPagination` utility. Repositories were updated to support skipping and limiting records, while services and controllers were refactored to consume `req.query` and format responses using `ApiResponse.paginated`.
 
 **Files:**
 - `src/services/booking.service.js` — `getBookingsByShop`, `getCustomerBookings`, `getBookingsByStatusDetailed`

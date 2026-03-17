@@ -13,8 +13,8 @@ export const addRating = async (req, res, next) => {
 
 export const getRatingsByShop = async (req, res, next) => {
     try {
-        const ratings = await ratingService.getRatingsByShop(req.params.id);
-        return res.status(200).json(ApiResponse.success(ratings, 'Ratings fetched'));
+        const result = await ratingService.getRatingsByShop(req.params.id, req.query);
+        return res.status(200).json(ApiResponse.paginated(result.items, result.pagination, 'Ratings fetched'));
     } catch (err) {
         next(err);
     }

@@ -1,6 +1,7 @@
 import ratingRepository from '../repositories/rating.repository.js';
 import shopRepository from '../repositories/shop.repository.js';
 import { NotFoundError, BadRequestError, ConflictError } from '../utils/api-error.js';
+import { buildPagination } from '../utils/pagination.utils.js';
 
 /**
  * Rating service.
@@ -18,9 +19,12 @@ export const addRating = async (customerId, shopId, rating, review) => {
     return ratingRepository.create({ customerId, shopId, rating, review });
 };
 
-export const getRatingsByShop = async (shopId) => {
-    const ratings = await ratingRepository.findByShop(shopId);
-    return ratings.map((r) => ({
+export const getRatingsByShop = async (shopId, query = {}) => {
+    const total = await ratingRepository.countByShop(shopId);
+    const { skip, limit, pagination } = buildPagination(query, total);
+    
+    const ratings = await ratingRepository.findByShop(shopId, { skip, limit });
+    const items = ratings.map((r) => ({
         ratingId: r._id,
         rating: r.rating,
         review: r.review,
@@ -35,6 +39,8 @@ export const getRatingsByShop = async (shopId) => {
         } : null,
         createdAt: r.createdAt,
     }));
+    
+    return { items, pagination };
 };
 
 export const getRatingSummary = async (shopId) => {
@@ -151,12 +157,15 @@ export const deleteReplyFromRating = async (ratingId, ownerId) => {
     return { message: 'Reply deleted successfully' };
 };
 
-export const getRatingsByShopForBarber = async (ownerId) => {
+export const getRatingsByShopForBarber = async (ownerId, query = {}) => {
     const shop = await shopRepository.findByOwnerId(ownerId);
     if (!shop) throw new NotFoundError('Shop');
 
-    const ratings = await ratingRepository.findByShop(shop._id);
-    return ratings.map((r) => ({
+    const total = await ratingRepository.countByShop(shop._id);
+    const { skip, limit, pagination } = buildPagination(query, total);
+
+    const ratings = await ratingRepository.findByShop(shop._id, { skip, limit });
+    const items = ratings.map((r) => ({
         ratingId: r._id,
         rating: r.rating,
         review: r.review,
@@ -171,4 +180,6 @@ export const getRatingsByShopForBarber = async (ownerId) => {
         } : null,
         createdAt: r.createdAt,
     }));
+    
+    return { items, pagination };
 };

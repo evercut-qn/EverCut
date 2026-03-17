@@ -12,8 +12,8 @@ export const addService = async (req, res, next) => {
 
 export const getServices = async (req, res, next) => {
     try {
-        const services = await serviceCatalogService.getServices(req.user._id);
-        return res.status(200).json(ApiResponse.success(services, 'Services fetched'));
+        const result = await serviceCatalogService.getServices(req.user._id, req.query);
+        return res.status(200).json(ApiResponse.paginated(result.items, result.pagination, 'Services fetched'));
     } catch (err) {
         next(err);
     }
