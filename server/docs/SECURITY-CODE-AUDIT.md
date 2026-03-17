@@ -366,11 +366,16 @@ A `buildPagination` utility exists in `src/utils/pagination.utils.js` but is **n
 
 ---
 
-### 5.4 🟡 MEDIUM — `Booking.customerId` References `User` but `populate` Uses `Customer` Fields
+### 5.4 ✅ ~~MEDIUM — `Booking.customerId` References `User` but `populate` Uses `Customer` Fields~~ **[FIXED]**
+
+> **Status:** ✅ Resolved  
+> **Fixed on:** March 17, 2026  
+> **Fix:** Changed `Booking` model's `customerId` to reference the `Customer` model directly instead of `User`. Updated all corresponding `populate` queries across repositories to eagerly populate the `userId` field nested under `customerId` ensuring full data loads without errors. Services using `userId` were updated to resolve to the customer object first.
 
 **Files:**
-- `src/models/booking.model.js` — Line 23: `ref: 'User'`
-- `src/repositories/booking.repository.js` — Lines 16, 40: `.populate('customerId', 'firstName lastName email')`
+- `src/models/booking.model.js` — Changed `ref: 'User'` to `ref: 'Customer'`
+- `src/repositories/booking.repository.js` — Multi-level population added
+- `src/services/booking.service.js` — User-to-Customer mapping added
 
 **Description:**  
 The `Booking` model's `customerId` references the `User` model, but the `User` model does **not** have `firstName`, `lastName` fields — those are on the `Customer` model. The populate calls will return `firstName: undefined, lastName: undefined`.
@@ -384,11 +389,15 @@ The `Booking` model's `customerId` references the `User` model, but the `User` m
 
 ---
 
-### 5.5 🟡 MEDIUM — `Rating.customerId` References `User` but Populates Customer-Specific Fields
+### 5.5 ✅ ~~MEDIUM — `Rating.customerId` References `User` but Populates Customer-Specific Fields~~ **[FIXED]**
+
+> **Status:** ✅ Resolved  
+> **Fixed on:** March 17, 2026  
+> **Fix:** Changed `Rating` model's `customerId` to reference the `Customer` model instead of `User`. Added nested population in `rating.repository.js` to correctly fetch the nested user document for the email field. Updated mapping logic in `rating.service.js` to correctly resolve `userId` from controller to the `Customer` document.
 
 **File:**
-- `src/models/rating.model.js` — Line 14: `ref: 'User'`
-- `src/repositories/rating.repository.js` — Lines 14, 52, 63, 71: `.populate('customerId', 'firstName lastName email')`
+- `src/models/rating.model.js` — Changed `ref: 'User'` to `ref: 'Customer'`
+- `src/repositories/rating.repository.js` — Multi-level population added
 
 **Description:**  
 Same issue as 5.4 — the `Rating` model's `customerId` references `User`, but populates try to select `firstName lastName email`. `User` has `email` but **not** `firstName`/`lastName`.

@@ -7,8 +7,12 @@ import { buildPagination } from '../utils/pagination.utils.js';
  * Rating service.
  */
 
-export const addRating = async (customerId, shopId, rating, review) => {
+export const addRating = async (userId, shopId, rating, review) => {
     if (!shopId || !rating) throw new BadRequestError('shopId and rating are required');
+
+    const customer = await customerRepository.findByUserId(userId);
+    if (!customer) throw new NotFoundError('Customer profile');
+    const customerId = customer._id;
 
     const shop = await shopRepository.findById(shopId);
     if (!shop) throw new NotFoundError('Shop');
@@ -31,7 +35,7 @@ export const getRatingsByShop = async (shopId, query = {}) => {
         user: {
             firstName: r.customerId?.firstName || 'Unknown',
             lastName: r.customerId?.lastName || '',
-            email: r.customerId?.email || null,
+            email: r.customerId?.userId?.email || null,
         },
         reply: r.reply ? {
             text: r.reply.text,
@@ -88,7 +92,7 @@ export const addReplyToRating = async (ratingId, replyText, ownerId) => {
         user: {
             firstName: updatedRating.customerId?.firstName || 'Unknown',
             lastName: updatedRating.customerId?.lastName || '',
-            email: updatedRating.customerId?.email || null,
+            email: updatedRating.customerId?.userId?.email || null,
         },
         reply: {
             text: updatedRating.reply.text,
@@ -129,7 +133,7 @@ export const updateReplyToRating = async (ratingId, replyText, ownerId) => {
         user: {
             firstName: updatedRating.customerId?.firstName || 'Unknown',
             lastName: updatedRating.customerId?.lastName || '',
-            email: updatedRating.customerId?.email || null,
+            email: updatedRating.customerId?.userId?.email || null,
         },
         reply: {
             text: updatedRating.reply.text,
@@ -172,7 +176,7 @@ export const getRatingsByShopForBarber = async (ownerId, query = {}) => {
         user: {
             firstName: r.customerId?.firstName || 'Unknown',
             lastName: r.customerId?.lastName || '',
-            email: r.customerId?.email || null,
+            email: r.customerId?.userId?.email || null,
         },
         reply: r.reply ? {
             text: r.reply.text,

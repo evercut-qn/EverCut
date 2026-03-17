@@ -15,7 +15,11 @@ class RatingRepository {
 
     async findByShop(shopId, options = {}) {
         const query = Rating.find({ shopId })
-            .populate('customerId', 'firstName lastName email')
+            .populate({
+                path: 'customerId',
+                select: 'firstName lastName userId',
+                populate: { path: 'userId', select: 'email' }
+            })
             .sort({ createdAt: -1 });
             
         if (options.skip !== undefined) query.skip(options.skip);
@@ -56,8 +60,11 @@ class RatingRepository {
                     repliedBy,
                 },
             },
-            { new: true }
-        ).populate('customerId', 'firstName lastName email');
+        ).populate({
+            path: 'customerId',
+            select: 'firstName lastName userId',
+            populate: { path: 'userId', select: 'email' }
+        });
     }
 
     async updateReply(ratingId, replyText) {
@@ -67,16 +74,22 @@ class RatingRepository {
                 'reply.text': replyText,
                 'reply.repliedAt': new Date(),
             },
-            { new: true }
-        ).populate('customerId', 'firstName lastName email');
+        ).populate({
+            path: 'customerId',
+            select: 'firstName lastName userId',
+            populate: { path: 'userId', select: 'email' }
+        });
     }
 
     async deleteReply(ratingId) {
         return Rating.findByIdAndUpdate(
             ratingId,
             { $unset: { reply: '' } },
-            { new: true }
-        ).populate('customerId', 'firstName lastName email');
+        ).populate({
+            path: 'customerId',
+            select: 'firstName lastName userId',
+            populate: { path: 'userId', select: 'email' }
+        });
     }
 }
 

@@ -17,8 +17,11 @@ class BookingRepository {
         return Booking.findById(id)
             .populate('shopId', 'shopName coverUrl address openTime closeTime')
             .populate('employeeId', 'firstName lastName photoUrl')
-            .populate('customerId', 'firstName lastName email')
-            .lean();
+            .populate({
+                path: 'customerId',
+                select: 'firstName lastName userId',
+                populate: { path: 'userId', select: 'email phoneNumber' }
+            })
     }
 
     async updateById(id, data) {
@@ -87,7 +90,11 @@ class BookingRepository {
 
     async findByEmployeeIds(employeeIds, filters = {}, options = {}) {
         const query = Booking.find({ employeeId: { $in: employeeIds }, ...filters })
-            .populate('customerId', 'phoneNumber')
+            .populate({
+                path: 'customerId',
+                select: 'firstName lastName userId',
+                populate: { path: 'userId', select: 'phoneNumber' }
+            })
             .populate('employeeId', 'firstName lastName')
             .populate('serviceIds', 'serviceName offerPrice');
             

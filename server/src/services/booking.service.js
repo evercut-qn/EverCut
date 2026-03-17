@@ -15,8 +15,12 @@ import { BOOKING_STATUS, MAX_RESCHEDULE_COUNT, CANCELLATION_WINDOW_HOURS } from 
 
 // ── Customer: book a salon ───────────────────────────────────────────────
 
-export const bookSalon = async (customerId, data) => {
+export const bookSalon = async (userId, data) => {
     const { serviceId, employeeId, shopId, date, time, amount } = data;
+
+    const customer = await customerRepository.findByUserId(userId);
+    if (!customer) throw new NotFoundError('Customer profile');
+    const customerId = customer._id;
 
     // Validate date/time is in future
     if (!isBookingInFuture(date, time)) {
@@ -80,11 +84,12 @@ export const bookSalon = async (customerId, data) => {
 
 // ── Customer: get booking details ────────────────────────────────────────
 
-export const getBookingDetails = async (bookingId, customerId) => {
+export const getBookingDetails = async (bookingId, userId) => {
     const booking = await bookingRepository.findByIdPopulated(bookingId);
     if (!booking) throw new NotFoundError('Booking');
 
-    if ((booking.customerId._id || booking.customerId).toString() !== customerId.toString()) {
+    const customer = await customerRepository.findByUserId(userId);
+    if (!customer || (booking.customerId._id || booking.customerId).toString() !== customer._id.toString()) {
         throw new ForbiddenError('You can only access your own bookings');
     }
 
@@ -108,11 +113,12 @@ export const getBookingDetails = async (bookingId, customerId) => {
 
 // ── Customer: cancel booking ─────────────────────────────────────────────
 
-export const cancelBooking = async (bookingId, customerId) => {
+export const cancelBooking = async (bookingId, userId) => {
     const booking = await bookingRepository.findById(bookingId);
     if (!booking) throw new NotFoundError('Booking');
 
-    if ((booking.customerId._id || booking.customerId).toString() !== customerId.toString()) {
+    const customer = await customerRepository.findByUserId(userId);
+    if (!customer || (booking.customerId._id || booking.customerId).toString() !== customer._id.toString()) {
         throw new ForbiddenError('You can only cancel your own bookings');
     }
 
@@ -137,11 +143,12 @@ export const cancelBooking = async (bookingId, customerId) => {
 
 // ── Customer: reschedule booking ─────────────────────────────────────────
 
-export const rescheduleBooking = async (bookingId, customerId, newDate, newTime) => {
+export const rescheduleBooking = async (bookingId, userId, newDate, newTime) => {
     const booking = await bookingRepository.findById(bookingId);
     if (!booking) throw new NotFoundError('Booking');
 
-    if ((booking.customerId._id || booking.customerId).toString() !== customerId.toString()) {
+    const customer = await customerRepository.findByUserId(userId);
+    if (!customer || (booking.customerId._id || booking.customerId).toString() !== customer._id.toString()) {
         throw new ForbiddenError('You can only reschedule your own bookings');
     }
 
@@ -182,7 +189,11 @@ export const rescheduleBooking = async (bookingId, customerId, newDate, newTime)
 
 // ── Customer: reorder (re-book) ──────────────────────────────────────────
 
-export const reorderBooking = async (customerId, bookingId, newDate, newTime) => {
+export const reorderBooking = async (userId, bookingId, newDate, newTime) => {
+    const customer = await customerRepository.findByUserId(userId);
+    if (!customer) throw new NotFoundError('Customer profile');
+    const customerId = customer._id;
+
     const session = await mongoose.startSession();
     session.startTransaction();
 
@@ -231,9 +242,13 @@ export const reorderBooking = async (customerId, bookingId, newDate, newTime) =>
 
 // ── Customer: list bookings (past/upcoming/favorites) ────────────────────
 
-export const getCustomerBookings = async (customerId, type, query = {}) => {
+export const getCustomerBookings = async (userId, type, query = {}) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+
+    const customer = await customerRepository.findByUserId(userId);
+    if (!customer) throw new NotFoundError('Customer profile');
+    const customerId = customer._id;
 
     if (type === 'past') {
         const total = await bookingRepository.countPastByCustomer(customerId, today);
@@ -248,8 +263,8 @@ export const getCustomerBookings = async (customerId, type, query = {}) => {
         return { items, pagination };
     }
     if (type === 'favorites') {
-        const customer = await customerRepository.findByUserIdPopulated(customerId);
-        const favorites = customer?.favoriteBookings || [];
+        const customerPopulated = await customerRepository.findByUserIdPopulated(userId);
+        const favorites = customerPopulated?.favoriteBookings || [];
         const total = favorites.length;
         const { skip, limit, pagination } = buildPagination(query, total);
         return { items: favorites.slice(skip, limit ? skip + limit : undefined), pagination };
@@ -260,24 +275,25 @@ export const getCustomerBookings = async (customerId, type, query = {}) => {
 
 // ── Customer: toggle favorite ────────────────────────────────────────────
 
-export const toggleFavorite = async (customerId, bookingId) => {
-    const customer = await customerRepository.findByUserId(customerId);
+export const toggleFavorite = async (userId, bookingId) => {
+    const customer = await customerRepository.findByUserId(userId);
     if (!customer) throw new NotFoundError('Customer');
 
     const isFavorited = customer.favoriteBookings.some((id) => id.toString() === bookingId);
     if (isFavorited) {
-        return customerRepository.removeFavoriteBooking(customerId, bookingId);
+        return customerRepository.removeFavoriteBooking(userId, bookingId);
     }
-    return customerRepository.addFavoriteBooking(customerId, bookingId);
+    return customerRepository.addFavoriteBooking(userId, bookingId);
 };
 
 // ── Customer: booking confirmation ───────────────────────────────────────
 
-export const getBookingConfirmation = async (bookingId, customerId) => {
+export const getBookingConfirmation = async (bookingId, userId) => {
     const booking = await bookingRepository.findByIdPopulated(bookingId);
     if (!booking) throw new NotFoundError('Booking');
 
-    if ((booking.customerId._id || booking.customerId).toString() !== customerId.toString()) {
+    const customer = await customerRepository.findByUserId(userId);
+    if (!customer || (booking.customerId._id || booking.customerId).toString() !== customer._id.toString()) {
         throw new ForbiddenError('You can only access your own bookings');
     }
 
@@ -296,11 +312,12 @@ export const getBookingConfirmation = async (bookingId, customerId) => {
 
 // ── Customer: update booking ─────────────────────────────────────────────
 
-export const updateBooking = async (bookingId, customerId, { employeeId, date, time }) => {
+export const updateBooking = async (bookingId, userId, { employeeId, date, time }) => {
     const booking = await bookingRepository.findById(bookingId);
     if (!booking) throw new NotFoundError('Booking');
 
-    if ((booking.customerId._id || booking.customerId).toString() !== customerId.toString()) {
+    const customer = await customerRepository.findByUserId(userId);
+    if (!customer || (booking.customerId._id || booking.customerId).toString() !== customer._id.toString()) {
         throw new ForbiddenError('You can only update your own bookings');
     }
 
@@ -333,11 +350,12 @@ export const updateBooking = async (bookingId, customerId, { employeeId, date, t
 
 // ── Customer: delete service from booking ────────────────────────────────
 
-export const deleteServiceFromBooking = async (bookingId, customerId, serviceId) => {
+export const deleteServiceFromBooking = async (bookingId, userId, serviceId) => {
     const booking = await bookingRepository.findById(bookingId);
     if (!booking) throw new NotFoundError('Booking');
 
-    if ((booking.customerId._id || booking.customerId).toString() !== customerId.toString()) {
+    const customer = await customerRepository.findByUserId(userId);
+    if (!customer || (booking.customerId._id || booking.customerId).toString() !== customer._id.toString()) {
         throw new ForbiddenError('You can only retrieve from your own bookings');
     }
 
