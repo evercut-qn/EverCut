@@ -68,6 +68,7 @@ const breakTimesSchema = Joi.alternatives().try(
 const targetCustomersSchema = Joi.string().valid(...ALL_SERVICE_FOR, 'men', 'women');
 
 export const updateBusinessSchema = Joi.object({
+    email: Joi.string().email(),
     shopName: Joi.string().trim().min(1).max(100),
     ownerName: Joi.string().trim().min(1).max(100),
     shopOwner: Joi.string().trim().min(1).max(100),

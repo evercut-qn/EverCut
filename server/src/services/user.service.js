@@ -56,7 +56,17 @@ export const updateProfile = async (userId, data, file) => {
 
     // Also update email on User model if changed
     if (data.email) {
-        await userRepository.updateById(userId, { email: data.email });
+        const currentUser = await userRepository.findById(userId);
+        if (currentUser && currentUser.email !== data.email) {
+            const existingUser = await userRepository.findByEmail(data.email);
+            if (existingUser && existingUser._id.toString() !== userId.toString()) {
+                throw new BadRequestError('Email is already in use');
+            }
+            await userRepository.updateById(userId, { 
+                email: data.email,
+                emailVerified: false 
+            });
+        }
     }
 
     return updated;

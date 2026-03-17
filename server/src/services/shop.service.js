@@ -2,6 +2,7 @@ import shopRepository from '../repositories/shop.repository.js';
 import serviceRepository from '../repositories/service.repository.js';
 import photoRepository from '../repositories/photo.repository.js';
 import ratingRepository from '../repositories/rating.repository.js';
+import userRepository from '../repositories/user.repository.js';
 import { BadRequestError, NotFoundError } from '../utils/api-error.js';
 import { serializeBarberProfile, serializeUpiDetails } from '../utils/barber-profile.utils.js';
 import { escapeRegex } from '../utils/regex.utils.js';
@@ -27,6 +28,7 @@ export const getShopByOwner = async (ownerId, userContext) => {
 };
 
 const ALLOWED_UPDATE_FIELDS = [
+    'email',
     'shopName',
     'numberOfEmployees',
     'yearsOfExperience',
@@ -259,11 +261,25 @@ export const updateBusinessInfo = async (ownerId, body, userContext) => {
     const normalizedBody = normalizeUpdateBody(body);
     const updateData = {};
     const errors = [];
+    let emailToUpdate = null;
 
     for (const [key, value] of Object.entries(normalizedBody)) {
         if (!ALLOWED_UPDATE_FIELDS.includes(key)) continue;
         if (value === undefined || value === null) continue;
         if (typeof value === 'string' && value === '' && key !== 'bio') continue;
+
+        if (key === 'email') {
+            const currentUser = await userRepository.findById(ownerId);
+            if (currentUser && currentUser.email !== value) {
+                const existingUser = await userRepository.findByEmail(value);
+                if (existingUser && existingUser._id.toString() !== ownerId.toString()) {
+                    errors.push('Email is already in use');
+                } else {
+                    emailToUpdate = value;
+                }
+            }
+            continue;
+        }
 
         validateAndAssign(key, value, updateData, errors);
     }
@@ -275,16 +291,26 @@ export const updateBusinessInfo = async (ownerId, body, userContext) => {
     }
 
     if (errors.length) throw new BadRequestError('Validation failed', errors);
-    if (Object.keys(updateData).length === 0) {
+    if (Object.keys(updateData).length === 0 && !emailToUpdate) {
         throw new BadRequestError('No valid fields provided for update');
     }
 
-    const updated = await shopRepository.updateByOwnerId(ownerId, updateData);
+    let updated = shop;
+    if (Object.keys(updateData).length > 0) {
+        updated = await shopRepository.updateByOwnerId(ownerId, updateData);
+    }
     const photos = await photoRepository.findByShopId(updated._id, {});
+
+    if (emailToUpdate) {
+        await userRepository.updateById(ownerId, {
+            email: emailToUpdate,
+            emailVerified: false,
+        });
+    }
 
     return {
         shop: serializeBarberProfile(updated, userContext, { photos }),
-        updatedFields: Object.keys(updateData),
+        updatedFields: Object.keys(updateData).concat(emailToUpdate ? ['email'] : []),
     };
 };
 
