@@ -289,12 +289,12 @@ The route is `PUT /bookings/:id/favorite` (implying toggle behavior) and the con
 Implement actual toggle logic:
 ```javascript
 export const toggleFavorite = async (customerId, bookingId) => {
-    const profile = await customerProfileRepo.findByUserId(customerId);
+    const profile = await customerRepository.findByUserId(customerId);
     const isFavorited = profile.favoriteBookings.some(id => id.toString() === bookingId);
     if (isFavorited) {
-        return customerProfileRepo.removeFavoriteBooking(customerId, bookingId);
+        return customerRepository.removeFavoriteBooking(customerId, bookingId);
     }
-    return customerProfileRepo.addFavoriteBooking(customerId, bookingId);
+    return customerRepository.addFavoriteBooking(customerId, bookingId);
 };
 ```
 
@@ -362,20 +362,20 @@ A `buildPagination` utility exists in `src/utils/pagination.utils.js` but is **n
 
 ---
 
-### 5.4 🟡 MEDIUM — `Booking.customerId` References `User` but `populate` Uses `CustomerProfile` Fields
+### 5.4 🟡 MEDIUM — `Booking.customerId` References `User` but `populate` Uses `Customer` Fields
 
 **Files:**
 - `src/models/booking.model.js` — Line 23: `ref: 'User'`
 - `src/repositories/booking.repository.js` — Lines 16, 40: `.populate('customerId', 'firstName lastName email')`
 
 **Description:**  
-The `Booking` model's `customerId` references the `User` model, but the `User` model does **not** have `firstName`, `lastName` fields — those are on the `CustomerProfile` model. The populate calls will return `firstName: undefined, lastName: undefined`.
+The `Booking` model's `customerId` references the `User` model, but the `User` model does **not** have `firstName`, `lastName` fields — those are on the `Customer` model. The populate calls will return `firstName: undefined, lastName: undefined`.
 
 **Risk:** Booking details shown to barbers will have missing customer names, breaking the UI.
 
 **Remediation:** Either:
-1. Change `customerId` to reference `CustomerProfile`, or
-2. Use a two-step population: first populate the user, then look up their `CustomerProfile`, or
+1. Change `customerId` to reference `Customer`, or
+2. Use a two-step population: first populate the user, then look up their `Customer`, or
 3. Add a virtual populate path.
 
 ---
@@ -432,7 +432,7 @@ Employee soft-delete middleware filters by `deletedAt: null`, and `findByShopId`
 - `src/services/shop.service.js` — Lines 96–132 (`normalizeUpdateBody`)
 
 **Description:**  
-The same field-aliasing and normalization logic (e.g., `emailId || email`, `upiId || upiAddress`, `openTime || opensAt`) is duplicated in both the Joi validators and the service layer.
+The same field-aliasing and normalization logic (e.g., contact field aliasing, `upiId || upiAddress`, `openTime || opensAt`) is duplicated in both the Joi validators and the service layer.
 
 **Risk:** Maintenance burden — if aliases change, two places must be updated in sync. Violation of DRY principle.
 
