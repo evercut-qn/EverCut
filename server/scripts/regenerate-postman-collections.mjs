@@ -534,7 +534,7 @@ const onboardingCollection = {
           textField('location', customerLocationGeoJson, 'GeoJSON point near the barber test shop'),
           fileField('photo', 'Prewired local sample upload'),
         ]),
-        description: 'Creates the customer profile for the OTP-verified customer test user. A rerun returns 409 because onboarding only succeeds once per account.',
+        description: 'Creates the customer for the OTP-verified customer test user. A rerun returns 409 because onboarding only succeeds once per account.',
         event: testEvent(
           "pm.test('status is 201 or 409', function () { pm.expect(pm.response.code).to.be.oneOf([201, 409]); });",
           'const response = pm.response.code === 201 ? pm.response.json() : null;',
@@ -611,10 +611,10 @@ const onboardingCollection = {
   ],
 };
 
-const customerProfileCollection = {
+const customerCollection = {
   info: {
-    name: 'EverCut - Customer Profile',
-    description: 'Customer profile, home payload, and nearby service discovery. The final request also captures shared shop/service IDs for later collections.',
+    name: 'EverCut - Customer',
+    description: 'Customer data, home payload, and nearby service discovery. The final request also captures shared shop/service IDs for later collections.',
     schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
   },
   auth: bearerAuth('customer_access_token'),
@@ -633,7 +633,7 @@ const customerProfileCollection = {
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/customer/profile',
-        description: 'Returns the current customer profile.',
+        description: 'Returns the current customer data.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
     },
@@ -642,7 +642,7 @@ const customerProfileCollection = {
       ...request({
         method: 'PUT',
         url: '{{base_url}}/{{api_prefix}}/customer/profile',
-        description: 'Updates the customer profile and reuses the sample image as an optional replacement photo.',
+        description: 'Updates the customer data and reuses the sample image as an optional replacement photo.',
         body: formDataBody([
           textField('firstName', 'Test'),
           textField('lastName', 'Customer'),
@@ -1781,7 +1781,7 @@ const environmentTemplate = {
 
 writeCollection('01-authentication.json', authenticationCollection);
 writeCollection('02-onboarding.json', onboardingCollection);
-writeCollection('03-customer-profile.json', customerProfileCollection);
+writeCollection('03-customer-profile.json', customerCollection);
 writeCollection('04-customer-bookings.json', customerBookingsCollection);
 writeCollection('05-customer-shop-discovery.json', customerShopDiscoveryCollection);
 writeCollection('06-customer-ratings.json', customerRatingsCollection);

@@ -270,7 +270,7 @@ src/
 │
 ├── models/                          # Mongoose schema definitions
 │   ├── user.model.js                # Core identity (both roles)
-│   ├── customer-profile.model.js    # Customer-specific profile data
+│   ├── customer.model.js    # Customer-specific data
 │   ├── shop.model.js                # Shop/Salon (replaces BarberSetup)
 │   ├── employee.model.js
 │   ├── service.model.js
@@ -319,10 +319,10 @@ const userSchema = new mongoose.Schema({
 }, { timestamps: true });
 ```
 
-## 5.2 `CustomerProfile` (only for roleType = 'CUSTOMER')
+## 5.2 `Customer` (only for roleType = 'CUSTOMER')
 
 ```javascript
-const customerProfileSchema = new mongoose.Schema({
+const customerSchema = new mongoose.Schema({
   userId:       { type: ObjectId, ref: 'User', required: true, unique: true },
   firstName:    { type: String, required: true, trim: true },
   lastName:     { type: String, required: true, trim: true },
@@ -488,8 +488,8 @@ photoSchema.index({ shopId: 1, isActive: 1 });
 | `Photo.firebaseUid` | `Photo.shopId` (ObjectId ref) | Same |
 | `Booking.userId` | `Booking.customerId` | Clearer naming |
 | `Booking.salonist` | `Booking.employeeId` | Clearer naming |
-| `User` (has all profile fields) | `User` (auth only) + `CustomerProfile` | Persona-based: separate identity from profile |
-| `User.favorateBookings` (typo) | `CustomerProfile.favoriteBookings` | Fixed typo, moved to profile |
+| `User` (has all profile fields) | `User` (auth only) + `Customer` | Persona-based: separate identity from profile |
+| `User.favorateBookings` (typo) | `Customer.favoriteBookings` | Fixed typo, moved to profile |
 | `Rating.advice` | `Rating.review` | Clearer naming |
 
 ---
@@ -537,7 +537,7 @@ photoSchema.index({ shopId: 1, isActive: 1 });
 
 **Files to create (8 models):**
 - `src/models/user.model.js`
-- `src/models/customer-profile.model.js`
+- `src/models/customer.model.js`
 - `src/models/shop.model.js`
 - `src/models/employee.model.js`
 - `src/models/service.model.js`
@@ -759,7 +759,7 @@ Using **Joi** for input validation schemas.
 | `config/cloudinary.js` | `src/config/cloudinary.config.js` | Unchanged, clean up |
 | `firebaseService.js` | `src/config/firebase.config.js` | Move into config/ |
 | `middleware/verifyToken.js` | `src/middleware/authenticate.middleware.js` + `src/middleware/authorize.middleware.js` | Split auth from role guard, REMOVE test tokens |
-| `models/User.model.js` | `src/models/user.model.js` + `src/models/customer-profile.model.js` | Split into identity + profile |
+| `models/User.model.js` | `src/models/user.model.js` + `src/models/customer.model.js` | Split into identity + profile |
 | `models/Barber.model.js` | `src/models/shop.model.js` | Rename, change FK to `ownerId` |
 | `models/EmployeeModel.js` | `src/models/employee.model.js` | Change FK from `firebaseUid` to `shopId` |
 | `models/Service.js` | `src/models/service.model.js` | Change FK, consistent naming |
@@ -790,7 +790,7 @@ Using **Joi** for input validation schemas.
 | Type | Convention | Example |
 |---|---|---|
 | Directories | `kebab-case/` | `src/middleware/` |
-| Models | `kebab-case.model.js` | `customer-profile.model.js` |
+| Models | `kebab-case.model.js` | `customer.model.js` |
 | Controllers | `kebab-case.controller.js` | `barber-booking.controller.js` |
 | Services | `kebab-case.service.js` | `service-catalog.service.js` |
 | Repositories | `kebab-case.repository.js` | `booking.repository.js` |
@@ -802,7 +802,7 @@ Using **Joi** for input validation schemas.
 ## Variables & Functions
 | Type | Convention | Example |
 |---|---|---|
-| Variables | `camelCase` | `customerProfile`, `totalAmount` |
+| Variables | `camelCase` | `customer`, `totalAmount` |
 | Functions | `camelCase` (verb-first) | `findByShopId()`, `calculateEarnings()` |
 | Constants | `UPPER_SNAKE_CASE` | `MAX_PHOTOS`, `BOOKING_STATUSES` |
 | Classes | `PascalCase` | `BookingService`, `AppError` |

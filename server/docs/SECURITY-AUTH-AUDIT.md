@@ -324,12 +324,12 @@ const email = String(authUser?.email || shopData.email || '').trim().toLowerCase
 |---|---|
 | **Severity** | 🟡 **High** |
 | **File** | `services/user.service.js` — `updateProfile()` (L27–63) |
-| **Validator** | `validators/customer.validator.js` — `updateCustomerProfileSchema` |
+| **Validator** | `validators/customer.validator.js` — `updateCustomerSchema` |
 
 **Code:**
 ```javascript
 // services/user.service.js L55-59
-const updated = await customerProfileRepo.updateByUserId(userId, data);
+const updated = await customerRepository.updateByUserId(userId, data);
 
 // Also update email on User model if changed
 if (data.email) {
@@ -343,7 +343,7 @@ if (data.email) {
 
 **Recommended Fix:**
 Either:
-1. Remove `email` from `updateCustomerProfileSchema` and the update flow entirely — email changes should go through Firebase's email verification flow.
+1. Remove `email` from `updateCustomerSchema` and the update flow entirely — email changes should go through Firebase's email verification flow.
 2. Or add a verification step where the new email must be confirmed (e.g., Firebase `updateEmail` + email verification link).
 
 ---
@@ -513,18 +513,18 @@ if ((existing.customerId._id || existing.customerId).toString() !== customerId.t
 |---|---|
 | **Severity** | 🟠 **Medium** |
 | **File** | `services/booking.service.js` — `addToFavorites()` (L249–251) |
-| **Repository** | `repositories/customer-profile.repository.js` — `addFavoriteBooking()` |
+| **Repository** | `repositories/customer.repository.js` — `addFavoriteBooking()` |
 
 **Code:**
 ```javascript
 // booking.service.js
 export const addToFavorites = async (customerId, bookingId) => {
-    return customerProfileRepo.addFavoriteBooking(customerId, bookingId);
+    return customerRepository.addFavoriteBooking(customerId, bookingId);
 };
 
-// customer-profile.repository.js
+// customer.repository.js
 async addFavoriteBooking(userId, bookingId) {
-    return CustomerProfile.findOneAndUpdate(
+    return Customer.findOneAndUpdate(
         { userId },
         { $addToSet: { favoriteBookings: bookingId } },
         { new: true },
@@ -539,7 +539,7 @@ async addFavoriteBooking(userId, bookingId) {
 **Recommended Fix:**
 ```javascript
 export const toggleFavorite = async (customerId, bookingId) => {
-    const profile = await customerProfileRepo.findByUserId(customerId);
+    const profile = await customerRepository.findByUserId(customerId);
     if (!profile) throw new NotFoundError('Customer profile');
 
     const isFavorited = profile.favoriteBookings.some(
@@ -547,9 +547,9 @@ export const toggleFavorite = async (customerId, bookingId) => {
     );
 
     if (isFavorited) {
-        return customerProfileRepo.removeFavoriteBooking(customerId, bookingId);
+        return customerRepository.removeFavoriteBooking(customerId, bookingId);
     }
-    return customerProfileRepo.addFavoriteBooking(customerId, bookingId);
+    return customerRepository.addFavoriteBooking(customerId, bookingId);
 };
 ```
 
@@ -732,7 +732,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 ---
 
-### SEC-13 — `Booking.customerId` Populated to `User` But Model References `CustomerProfile`
+### SEC-13 — `Booking.customerId` Populated to `User` But Model References `Customer`
 
 | | |
 |---|---|
@@ -748,13 +748,13 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 .populate('customerId')    // implied full populate
 ```
 
-**Issue:** `Booking.customerId` references the `User` model, but `firstName`/`lastName` are on `CustomerProfile`, not `User`. The populate selects `firstName lastName email` from `User`, but `User` doesn't have `firstName` or `lastName` — those are on `CustomerProfile.firstName/.lastName`.
+**Issue:** `Booking.customerId` references the `User` model, but `firstName`/`lastName` are on `Customer`, not `User`. The populate selects `firstName lastName email` from `User`, but `User` doesn't have `firstName` or `lastName` — those are on `Customer.firstName/.lastName`.
 
 **Risk:** The populated `customerId` will have `undefined` for `firstName` and `lastName`. The `email` field will work correctly since it's on `User`.
 
 **Recommended Fix:** Either:
-1. Populate through the `CustomerProfile` model (add a virtual or change the reference), or
-2. Do a separate `customerProfileRepo.findByUserId()` call to get name data.
+1. Populate through the `Customer` model (add a virtual or change the reference), or
+2. Do a separate `customerRepository.findByUserId()` call to get name data.
 
 ---
 
@@ -774,7 +774,7 @@ async findByShop(shopId) {
 }
 ```
 
-**Issue:** Same as SEC-13. `Rating.customerId` references `User`, but `firstName`/`lastName` are on `CustomerProfile`. The populate will return `undefined` for name fields.
+**Issue:** Same as SEC-13. `Rating.customerId` references `User`, but `firstName`/`lastName` are on `Customer`. The populate will return `undefined` for name fields.
 
 **Risk:** Rating displays will show `'Unknown'` for all customer names (the services have a fallback `r.customerId?.firstName || 'Unknown'`).
 
@@ -798,7 +798,7 @@ export const updateProfile = async (userId, data, file) => {
         data.cloudinaryId = file.filename || file.public_id;
     }
     // ...
-    const updated = await customerProfileRepo.updateByUserId(userId, data);
+    const updated = await customerRepository.updateByUserId(userId, data);
 ```
 
 **Issue:** The `data` object is `req.body` and is passed directly to `updateByUserId` with `$set`. While Joi validation with `stripUnknown: true` removes unexpected fields at the route level, mutating `req.body` directly is a code smell. If the Joi schema were misconfigured to `allowUnknown: true`, arbitrary fields could be set.

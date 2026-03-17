@@ -26,7 +26,7 @@ Validation and field-level failures are returned inside `data.errors`.
 |---|---|---|
 | `01-authentication.json` | EverCut - Authentication | OTP authentication for customer and barber test users, token capture, and health check |
 | `02-onboarding.json` | EverCut - Onboarding | First-run customer and barber onboarding using onboarding JWTs |
-| `03-customer-profile.json` | EverCut - Customer Profile | Profile read/update and homepage endpoints |
+| `03-customer-profile.json` | EverCut - Customer | Profile read/update and homepage endpoints |
 | `04-customer-bookings.json` | EverCut - Customer Bookings | Full booking lifecycle: create, update, reschedule, reorder, cancel |
 | `05-customer-shop-discovery.json` | EverCut - Customer Shop Discovery | Nearby shop/service search and keyword search |
 | `06-customer-ratings.json` | EverCut - Customer Ratings | Submit a rating and read shop rating data |
@@ -62,7 +62,7 @@ Validation and field-level failures are returned inside `data.errors`.
 
 | # | Method | Endpoint | Description |
 |---|---|---|---|
-| 1 | POST | `/api/v1/onboarding/customers` | Complete customer profile *(first run only)* |
+| 1 | POST | `/api/v1/onboarding/customers` | Complete customer onboarding *(first run only)* |
 | 2 | POST | `/api/v1/onboarding/barbers` | Complete barber profile *(first run only)* |
 
 ### `03-customer-profile.json`
@@ -248,7 +248,7 @@ No manual token generation needed - the authentication and onboarding collection
 **Customer side:**
 
 1. `01-authentication.json` → **1. Send Customer OTP** → **2. Verify Customer OTP**
-2. `02-onboarding.json` → **1. Complete Customer Profile** *(first run only)*
+2. `02-onboarding.json` → **1. Complete Customer** *(first run only)*
 3. Continue with customer collections in order.
 
 > Requests marked ***(Terminal)*** are destructive. Run them last within their collection and avoid them if you still need the related account or data for later requests.

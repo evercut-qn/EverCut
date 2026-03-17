@@ -15,7 +15,7 @@ const router = Router();
 
 /**
  * POST /api/v1/onboarding/customers
- * Create customer profile after OTP verification with onboarding token.
+ * Create customer after OTP verification with onboarding token.
  */
 router.post(
     '/customers',

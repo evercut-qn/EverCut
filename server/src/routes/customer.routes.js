@@ -22,11 +22,11 @@ import {
     servicesByGenderQuerySchema,
     shopIdParamSchema,
 } from '../validators/shop.validator.js';
-import { updateCustomerProfileSchema } from '../validators/customer.validator.js';
+import { updateCustomerSchema } from '../validators/customer.validator.js';
 import { ROLES } from '../utils/constants.js';
 
 // Controllers
-import * as profileCtrl from '../controllers/customer/customer-profile.controller.js';
+import * as customerCtrl from '../controllers/customer/customer-profile.controller.js';
 import * as bookingCtrl from '../controllers/customer/customer-booking.controller.js';
 import * as shopCtrl from '../controllers/customer/customer-shop.controller.js';
 import * as ratingCtrl from '../controllers/customer/customer-rating.controller.js';
@@ -37,11 +37,11 @@ const router = Router();
 router.use(authenticate, authorize(ROLES.CUSTOMER));
 
 // Profile
-router.get('/profile', profileCtrl.getProfile);
-router.put('/profile', uploadCustomerPhoto, validate(updateCustomerProfileSchema, 'body'), profileCtrl.updateProfile);
+router.get('/profile', customerCtrl.getProfile);
+router.put('/profile', uploadCustomerPhoto, validate(updateCustomerSchema, 'body'), customerCtrl.updateProfile);
 
 // Homepage
-router.get('/homepage', profileCtrl.getHomeProfile);
+router.get('/homepage', customerCtrl.getHomeProfile);
 router.get('/homepage/services', validate(servicesByGenderQuerySchema, 'query'), shopCtrl.getServicesByGender);
 
 // Bookings

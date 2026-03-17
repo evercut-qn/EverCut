@@ -45,7 +45,7 @@ const coverStorage = new CloudinaryStorage({
 
 // ── Exported upload middleware ────────────────────────────────────────────
 
-/** Single customer profile photo */
+/** Single customer photo */
 export const uploadCustomerPhoto = multer({
     storage: makeStorage((req) => `evercut/customers/${resolveActorKey(req)}`),
     limits: { fileSize: config.upload.maxFileSize },

@@ -1,7 +1,7 @@
 {
   "info": {
-    "name": "EverCut - Customer Profile",
-    "description": "Customer profile, home payload, and nearby service discovery. The final request also captures shared shop/service IDs for later collections.",
+    "name": "EverCut - Customer",
+    "description": "Customer data, home payload, and nearby service discovery. The final request also captures shared shop/service IDs for later collections.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -93,7 +93,7 @@
         "method": "GET",
         "header": [],
         "url": "{{base_url}}/{{api_prefix}}/customer/profile",
-        "description": "Returns the current customer profile."
+        "description": "Returns the current customer data."
       },
       "event": [
         {
@@ -122,7 +122,7 @@
         "method": "PUT",
         "header": [],
         "url": "{{base_url}}/{{api_prefix}}/customer/profile",
-        "description": "Updates the customer profile and reuses the sample image as an optional replacement photo.",
+        "description": "Updates the customer data and reuses the sample image as an optional replacement photo.",
         "body": {
           "mode": "formdata",
           "formdata": [

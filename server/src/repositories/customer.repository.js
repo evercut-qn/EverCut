@@ -1,20 +1,20 @@
-import CustomerProfile from '../models/customer-profile.model.js';
+import Customer from '../models/customer.model.js';
 
-class CustomerProfileRepository {
+class CustomerRepository {
     async create(data) {
-        return CustomerProfile.create(data);
+        return Customer.create(data);
     }
 
     async findByUserId(userId) {
-        return CustomerProfile.findOne({ userId });
+        return Customer.findOne({ userId });
     }
 
     async findById(id) {
-        return CustomerProfile.findById(id);
+        return Customer.findById(id);
     }
 
     async updateByUserId(userId, data) {
-        return CustomerProfile.findOneAndUpdate(
+        return Customer.findOneAndUpdate(
             { userId },
             { $set: data },
             { new: true, runValidators: true },
@@ -22,7 +22,7 @@ class CustomerProfileRepository {
     }
 
     async addFavoriteBooking(userId, bookingId) {
-        return CustomerProfile.findOneAndUpdate(
+        return Customer.findOneAndUpdate(
             { userId },
             { $addToSet: { favoriteBookings: bookingId } },
             { new: true },
@@ -30,7 +30,7 @@ class CustomerProfileRepository {
     }
 
     async removeFavoriteBooking(userId, bookingId) {
-        return CustomerProfile.findOneAndUpdate(
+        return Customer.findOneAndUpdate(
             { userId },
             { $pull: { favoriteBookings: bookingId } },
             { new: true },
@@ -38,7 +38,7 @@ class CustomerProfileRepository {
     }
 
     async findByUserIdPopulated(userId) {
-        return CustomerProfile.findOne({ userId }).populate({
+        return Customer.findOne({ userId }).populate({
             path: 'favoriteBookings',
             populate: [
                 { path: 'serviceIds' },
@@ -49,4 +49,4 @@ class CustomerProfileRepository {
     }
 }
 
-export default new CustomerProfileRepository();
+export default new CustomerRepository();

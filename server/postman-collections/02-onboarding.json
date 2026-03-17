@@ -84,7 +84,7 @@
         "method": "POST",
         "header": [],
         "url": "{{base_url}}/{{api_prefix}}/onboarding/customers",
-        "description": "Creates the customer profile for the OTP-verified customer test user. A rerun returns 409 because onboarding only succeeds once per account.",
+        "description": "Creates the customer for the OTP-verified customer test user. A rerun returns 409 because onboarding only succeeds once per account.",
         "body": {
           "mode": "formdata",
           "formdata": [

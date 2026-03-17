@@ -3,7 +3,7 @@ import bookingRepository from '../repositories/booking.repository.js';
 import employeeRepository from '../repositories/employee.repository.js';
 import serviceRepository from '../repositories/service.repository.js';
 import shopRepository from '../repositories/shop.repository.js';
-import customerProfileRepo from '../repositories/customer-profile.repository.js';
+import customerRepository from '../repositories/customer.repository.js';
 import { NotFoundError, BadRequestError, ForbiddenError } from '../utils/api-error.js';
 import { isBookingInFuture, isWithinShopHours, getDayOfWeek, isWithinCancellationWindow } from '../utils/time.utils.js';
 import { BOOKING_STATUS, MAX_RESCHEDULE_COUNT, CANCELLATION_WINDOW_HOURS } from '../utils/constants.js';
@@ -237,8 +237,8 @@ export const getCustomerBookings = async (customerId, type) => {
     if (type === 'past') return bookingRepository.findPastByCustomer(customerId, today);
     if (type === 'upcoming') return bookingRepository.findUpcomingByCustomer(customerId, today);
     if (type === 'favorites') {
-        const profile = await customerProfileRepo.findByUserIdPopulated(customerId);
-        return profile?.favoriteBookings || [];
+        const customer = await customerRepository.findByUserIdPopulated(customerId);
+        return customer?.favoriteBookings || [];
     }
 
     throw new BadRequestError('Invalid filter type. Use: past, upcoming, or favorites');
@@ -247,12 +247,14 @@ export const getCustomerBookings = async (customerId, type) => {
 // ── Customer: toggle favorite ────────────────────────────────────────────
 
 export const toggleFavorite = async (customerId, bookingId) => {
-    const profile = await customerProfileRepo.findByUserId(customerId);
-    const isFavorited = profile.favoriteBookings.some(id => id.toString() === bookingId);
+    const customer = await customerRepository.findByUserId(customerId);
+    if (!customer) throw new NotFoundError('Customer');
+
+    const isFavorited = customer.favoriteBookings.some((id) => id.toString() === bookingId);
     if (isFavorited) {
-        return customerProfileRepo.removeFavoriteBooking(customerId, bookingId);
+        return customerRepository.removeFavoriteBooking(customerId, bookingId);
     }
-    return customerProfileRepo.addFavoriteBooking(customerId, bookingId);
+    return customerRepository.addFavoriteBooking(customerId, bookingId);
 };
 
 // ── Customer: booking confirmation ───────────────────────────────────────

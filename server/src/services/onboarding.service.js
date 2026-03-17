@@ -1,4 +1,4 @@
-import customerProfileRepo from '../repositories/customer-profile.repository.js';
+import customerRepository from '../repositories/customer.repository.js';
 import photoRepository from '../repositories/photo.repository.js';
 import shopRepository from '../repositories/shop.repository.js';
 import userRepository from '../repositories/user.repository.js';
@@ -282,7 +282,7 @@ export const createCustomerOnboarding = async (phoneNumber, profileData, file) =
         roleType: ROLES.CUSTOMER,
     });
 
-    const profile = await customerProfileRepo.create({
+    const profile = await customerRepository.create({
         userId: user._id,
         firstName: profileData.firstName,
         lastName: profileData.lastName,

@@ -2,13 +2,13 @@ import mongoose from 'mongoose';
 import { ALL_GENDERS } from '../utils/constants.js';
 
 /**
- * Customer-specific profile data.
+ * Customer-specific data.
  *
  * Linked 1:1 to a User with roleType 'CUSTOMER'.
  * This separates customer-specific fields (name, DOB, photo, favourites)
  * from the core identity table – following the Persona-Based pattern.
  */
-const customerProfileSchema = new mongoose.Schema(
+const customerSchema = new mongoose.Schema(
     {
         userId: {
             type: mongoose.Schema.Types.ObjectId,
@@ -71,7 +71,7 @@ const customerProfileSchema = new mongoose.Schema(
 );
 
 // Geospatial index for location-based queries
-customerProfileSchema.index({ location: '2dsphere' });
+customerSchema.index({ location: '2dsphere' });
 
-const CustomerProfile = mongoose.model('CustomerProfile', customerProfileSchema);
-export default CustomerProfile;
+const Customer = mongoose.model('Customer', customerSchema);
+export default Customer;

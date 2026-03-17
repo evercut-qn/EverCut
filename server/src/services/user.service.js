@@ -1,21 +1,21 @@
-import customerProfileRepo from '../repositories/customer-profile.repository.js';
+import customerRepository from '../repositories/customer.repository.js';
 import userRepository from '../repositories/user.repository.js';
 import { NotFoundError, BadRequestError } from '../utils/api-error.js';
 import cloudinary from '../config/cloudinary.config.js';
 
 /**
- * User (Customer) profile service.
+ * Customer-facing profile service.
  */
 
 export const getProfile = async (userId) => {
-    const profile = await customerProfileRepo.findByUserId(userId);
-    if (!profile) throw new NotFoundError('Customer profile');
+    const profile = await customerRepository.findByUserId(userId);
+    if (!profile) throw new NotFoundError('Customer');
     return profile;
 };
 
 export const getHomeProfile = async (userId) => {
-    const profile = await customerProfileRepo.findByUserId(userId);
-    if (!profile) throw new NotFoundError('Customer profile');
+    const profile = await customerRepository.findByUserId(userId);
+    if (!profile) throw new NotFoundError('Customer');
 
     return {
         photo: profile.photoUrl || null,
@@ -25,8 +25,8 @@ export const getHomeProfile = async (userId) => {
 };
 
 export const updateProfile = async (userId, data, file) => {
-    const profile = await customerProfileRepo.findByUserId(userId);
-    if (!profile) throw new NotFoundError('Customer profile');
+    const profile = await customerRepository.findByUserId(userId);
+    if (!profile) throw new NotFoundError('Customer');
 
     // Handle photo replacement
     if (file) {
@@ -52,7 +52,7 @@ export const updateProfile = async (userId, data, file) => {
     }
 
     // Update profile (only provided fields overwrite)
-    const updated = await customerProfileRepo.updateByUserId(userId, data);
+    const updated = await customerRepository.updateByUserId(userId, data);
 
     // Also update email on User model if changed
     if (data.email) {

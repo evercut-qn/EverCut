@@ -17,7 +17,7 @@ export const createCustomerOnboarding = async (req, res) => {
                 accessToken: tokens.accessToken,
                 refreshToken: tokens.refreshToken,
             },
-            'Customer profile created',
+            'Customer created',
         ),
     );
 };

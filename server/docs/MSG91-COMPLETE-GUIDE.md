@@ -421,7 +421,7 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import config from '../config/index.js';
 import userRepository from '../repositories/user.repository.js';
-import customerProfileRepo from '../repositories/customer-profile.repository.js';
+import customerRepository from '../repositories/customer.repository.js';
 import shopRepository from '../repositories/shop.repository.js';
 import photoRepository from '../repositories/photo.repository.js';
 import { serializeBarberProfile } from '../utils/barber-profile.utils.js';
@@ -527,7 +527,7 @@ export const resolveOtpSession = async (phoneNumber) => {
 
         let profile = null;
         if (existingUser.roleType === ROLES.CUSTOMER) {
-            profile = await customerProfileRepo.findByUserId(existingUser._id);
+            profile = await customerRepository.findByUserId(existingUser._id);
         } else if (existingUser.roleType === ROLES.BARBER) {
             const shop = await shopRepository.findByOwnerId(existingUser._id);
             if (shop) {
@@ -1139,13 +1139,13 @@ The Firebase Admin SDK is no longer imported by any auth or onboarding code afte
   export const createCustomerOnboarding = async (req, res) => {
 -         const { firebaseUid } = req.user;
 -         const result = await onboardingService.createCustomerOnboarding(firebaseUid, req.body, req.file);
--         return res.status(201).json(ApiResponse.success(result, 'Customer profile created'));
+-         return res.status(201).json(ApiResponse.success(result, 'Customer created'));
 +         const { phoneNumber } = req.onboardingContext;
 +         const result = await onboardingService.createCustomerOnboarding(phoneNumber, req.body, req.file);
 +         const { user, profile, tokens } = result;
 +         return res.status(201).json(ApiResponse.success(
 +             { user, profile, accessToken: tokens.accessToken, refreshToken: tokens.refreshToken },
-+             'Customer profile created'
++             'Customer created'
 +         ));
   };
 
@@ -1217,7 +1217,7 @@ export const createCustomerOnboarding = async (phoneNumber, profileData, file) =
         roleType: ROLES.CUSTOMER,
     });
 
-    const profile = await customerProfileRepo.create({
+    const profile = await customerRepository.create({
         userId: user._id,
         // ... mapped profileData fields ...
     });
@@ -2146,7 +2146,7 @@ No manual token generation needed - the authentication and onboarding collection
 **Customer side:**
 
 1. `01-authentication.json` → **1. Send Customer OTP** → **2. Verify Customer OTP**
-2. `02-onboarding.json` → **1. Complete Customer Profile** *(first run only)*
+2. `02-onboarding.json` → **1. Complete Customer** *(first run only)*
 3. Continue with customer collections in order...
 
 ---

@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import config from '../config/index.js';
-import customerProfileRepo from '../repositories/customer-profile.repository.js';
+import customerRepository from '../repositories/customer.repository.js';
 import photoRepository from '../repositories/photo.repository.js';
 import shopRepository from '../repositories/shop.repository.js';
 import userRepository from '../repositories/user.repository.js';
@@ -32,7 +32,7 @@ const loadUserProfile = async (user) => {
     if (!user) return null;
 
     if (user.roleType === ROLES.CUSTOMER) {
-        return customerProfileRepo.findByUserId(user._id);
+        return customerRepository.findByUserId(user._id);
     }
 
     if (user.roleType === ROLES.BARBER) {

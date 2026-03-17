@@ -473,7 +473,7 @@ No manual token generation needed - the authentication and onboarding collection
 **Customer side:**
 
 1. `01-authentication.json` → **1. Send Customer OTP** → **2. Verify Customer OTP**
-2. `02-onboarding.json` → **1. Complete Customer Profile** *(first run only)*
+2. `02-onboarding.json` → **1. Complete Customer** *(first run only)*
 3. Continue with customer collections in order...
 
 ---

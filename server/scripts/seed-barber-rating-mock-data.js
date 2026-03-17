@@ -6,7 +6,7 @@
  * What this script does:
  *   1. Creates or updates the mock barber user in MongoDB
  *   2. Creates or updates the barber shop owned by that user
- *   3. Creates mock customers and customer profiles
+ *   3. Creates mock customers
  *   4. Resets the mock shop's employees, services, bookings, and ratings
  *   5. Creates one employee, one service, three completed bookings, and three ratings
  *   6. Prints a summary of the seeded IDs to the console
@@ -21,7 +21,7 @@
 import connectDB, { disconnectDB } from '../src/config/database.config.js';
 import User from '../src/models/user.model.js';
 import Shop from '../src/models/shop.model.js';
-import CustomerProfile from '../src/models/customer-profile.model.js';
+import Customer from '../src/models/customer.model.js';
 import Employee from '../src/models/employee.model.js';
 import Service from '../src/models/service.model.js';
 import Booking from '../src/models/booking.model.js';
@@ -149,17 +149,17 @@ const upsertUser = async ({ phoneNumber, email, roleType }) => {
     return user;
 };
 
-const upsertCustomerProfile = async (userId, profileFixture) => {
-    let profile = await CustomerProfile.findOne({ userId });
+const upsertCustomer = async (userId, profileFixture) => {
+    let customer = await Customer.findOne({ userId });
 
-    if (!profile) {
-        profile = await CustomerProfile.create({ userId, ...profileFixture });
-        return profile;
+    if (!customer) {
+        customer = await Customer.create({ userId, ...profileFixture });
+        return customer;
     }
 
-    Object.assign(profile, profileFixture);
-    await profile.save();
-    return profile;
+    Object.assign(customer, profileFixture);
+    await customer.save();
+    return customer;
 };
 
 const upsertShop = async (ownerId) => {
@@ -293,7 +293,7 @@ const main = async () => {
                 email: fixture.email,
                 roleType: ROLES.CUSTOMER,
             });
-            const profile = await upsertCustomerProfile(user._id, fixture.profile);
+            const profile = await upsertCustomer(user._id, fixture.profile);
             customers.push({ fixture, user, profile });
         }
 
