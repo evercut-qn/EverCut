@@ -100,12 +100,24 @@ const textField = (key, value, description) => {
   return field;
 };
 
+const standardEnvelopeAssertions = [
+  "pm.test('response uses the standard envelope', function () {",
+  '  const response = pm.response.json();',
+  "  pm.expect(response).to.be.an('object');",
+  "  pm.expect(response).to.have.property('success');",
+  "  pm.expect(response.success).to.be.a('boolean');",
+  "  pm.expect(response).to.have.property('message');",
+  "  pm.expect(response.message).to.be.a('string');",
+  "  pm.expect(response).to.have.property('data');",
+  '});',
+];
+
 const testEvent = (...exec) => [
   {
     listen: 'test',
     script: {
       type: 'text/javascript',
-      exec,
+      exec: [...standardEnvelopeAssertions, ...exec],
     },
   },
 ];

@@ -4,6 +4,22 @@ A complete set of Postman collections for the EverCut API, with shared-variable 
 
 ---
 
+## Response Envelope
+
+All collections now assume the backend returns the same JSON envelope for both success and error responses:
+
+```json
+{
+  "success": true,
+  "message": "Human-readable status",
+  "data": {}
+}
+```
+
+Validation and field-level failures are returned inside `data.errors`.
+
+---
+
 ## Files in This Directory
 
 | File | Collection name | Description |
