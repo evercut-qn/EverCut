@@ -103,6 +103,15 @@
           "script": {
             "type": "text/javascript",
             "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
               "const response = pm.response.json();",
               "const shopId = response.data && response.data._id;",
@@ -140,6 +149,15 @@
           "script": {
             "type": "text/javascript",
             "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
             ]
           }
@@ -160,6 +178,15 @@
           "script": {
             "type": "text/javascript",
             "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
             ]
           }
@@ -194,6 +221,15 @@
           "script": {
             "type": "text/javascript",
             "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
             ]
           }
@@ -228,6 +264,15 @@
           "script": {
             "type": "text/javascript",
             "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
             ]
           }
@@ -247,7 +292,7 @@
             {
               "key": "photo",
               "type": "file",
-              "src": "/Users/prankitapotbhare/Projects/EverCut/server/postman-collections/assets/sample-upload.png",
+              "src": "C:\\Users\\manis\\Projects\\EverCut\\server\\postman-collections\\assets\\sample-upload.png",
               "description": "Prewired local sample upload"
             }
           ]
@@ -259,6 +304,15 @@
           "script": {
             "type": "text/javascript",
             "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
             ]
           }
@@ -278,7 +332,7 @@
             {
               "key": "cover",
               "type": "file",
-              "src": "/Users/prankitapotbhare/Projects/EverCut/server/postman-collections/assets/sample-upload.png",
+              "src": "C:\\Users\\manis\\Projects\\EverCut\\server\\postman-collections\\assets\\sample-upload.png",
               "description": "Prewired local sample upload"
             }
           ]
@@ -290,6 +344,15 @@
           "script": {
             "type": "text/javascript",
             "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
             ]
           }
@@ -335,6 +398,15 @@
           "script": {
             "type": "text/javascript",
             "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
               "const nextPin = pm.collectionVariables.get('barber_next_pin');",
               "pm.collectionVariables.set('barber_active_pin', nextPin);",
@@ -358,6 +430,15 @@
           "script": {
             "type": "text/javascript",
             "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
             ]
           }
@@ -392,6 +473,15 @@
           "script": {
             "type": "text/javascript",
             "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
             ]
           }
