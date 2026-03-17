@@ -10,7 +10,7 @@ class EmployeeRepository {
     }
 
     async findByShopId(shopId, options = {}) {
-        const query = Employee.find({ shopId, isActive: true });
+        const query = Employee.find({ shopId });
         
         if (options.skip !== undefined) query.skip(options.skip);
         if (options.limit !== undefined) query.limit(options.limit);
@@ -18,7 +18,7 @@ class EmployeeRepository {
     }
 
     async countByShopId(shopId) {
-        return Employee.countDocuments({ shopId, isActive: true });
+        return Employee.countDocuments({ shopId });
     }
 
     async findByShopIdAndPhone(shopId, phoneNumber) {
@@ -66,7 +66,7 @@ class EmployeeRepository {
     }
 
     async getIdsForShop(shopId) {
-        const employees = await Employee.find({ shopId, isActive: true }).select('_id');
+        const employees = await Employee.find({ shopId }).select('_id');
         return employees.map((e) => e._id);
     }
 

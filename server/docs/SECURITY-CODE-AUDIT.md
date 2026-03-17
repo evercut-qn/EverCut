@@ -406,11 +406,15 @@ Same issue as 5.4 — the `Rating` model's `customerId` references `User`, but p
 
 ---
 
-### 5.6 🟡 MEDIUM — Inconsistent `isActive` Filtering in Soft-Delete
+### 5.6 ✅ ~~MEDIUM — Inconsistent `isActive` Filtering in Soft-Delete~~ **[FIXED]**
+
+> **Status:** ✅ Resolved  
+> **Fixed on:** March 17, 2026  
+> **Fix:** Removed redundant `isActive: true` filters entirely from `findByShopId`, `countByShopId`, and `getIdsForShop` in `employee.repository.js`. Modified the schema pre-hook on `employee.model.js` from `/^find/` to `/^(find|count)/` to ensure `countDocuments` operations also reliably filter out soft-deleted employees containing `deletedAt: null`. This provides a single source of truth for handling excluded/deleted employees.
 
 **Files:**
-- `src/models/employee.model.js` — Lines 82–86
-- `src/repositories/employee.repository.js` — Line 16: `findByShopIdAndPhone` (no `isActive` filter)
+- `src/models/employee.model.js` — Updated pre-hook regex to cover count operations
+- `src/repositories/employee.repository.js` — Removed redundant `isActive` manual filters
 
 **Description:**  
 Employee soft-delete middleware filters by `deletedAt: null`, and `findByShopId` adds `isActive: true`. However, `findByShopIdAndPhone` does **not** add `isActive: true` — so when checking for duplicate employees, it will find soft-deleted employees and prevent re-adding them.

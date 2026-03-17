@@ -76,7 +76,7 @@ employeeSchema.index({ shopId: 1, phoneNumber: 1 }, { unique: true });
 // ---------------------------------------------------------------------------
 // Soft-delete query middleware
 // ---------------------------------------------------------------------------
-employeeSchema.pre(/^find/, function () {
+employeeSchema.pre(/^(find|count)/, function () {
     if (!this.getOptions()?.includeDeleted) {
         this.where({ deletedAt: null });
     }
