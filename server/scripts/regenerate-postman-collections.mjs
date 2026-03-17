@@ -6,7 +6,7 @@
  * What this script does:
  *   1. Defines all request items, pre-request scripts, and test scripts in code
  *   2. Writes one JSON file per collection (01-authentication.json … 13-barber-ratings.json)
- *   3. Leaves EverCut.postman_environment.json untouched — only collections are regenerated
+ *   3. Writes the local Postman environment template used by the collections
  *
  * When to run it:
  *   Run after changing route URLs, request bodies, validator shapes, or Postman test scripts.
@@ -124,8 +124,8 @@ const collectionPreRequest = ({
   syncPairs = [],
   includeDateHelpers = false,
   extra = [],
-  tokenSourceKey,
-  tokenTarget = null,
+  includeAccessTokens = true,
+  includeOnboardingTokens = false,
 } = {}) => {
   const exec = [
     "const readScopedValue = (...keys) => {",
@@ -148,11 +148,21 @@ const collectionPreRequest = ({
     ...syncPairs.map(([sourceKey, collectionKey]) => `syncScopedValue('${sourceKey}', '${collectionKey}');`),
   ];
 
-  if (tokenSourceKey) {
-    const resolvedTokenTarget = tokenTarget || tokenSourceKey;
+  if (includeAccessTokens) {
     exec.push(
-      `const collectionToken = readScopedValue('${tokenSourceKey}');`,
-      `if (collectionToken) { pm.collectionVariables.set('${resolvedTokenTarget}', collectionToken); } else { console.warn('Set ${tokenSourceKey} in the selected Postman environment or globals.'); }`,
+      "const customerToken = readScopedValue('customer_access_token');",
+      "if (customerToken) { pm.collectionVariables.set('customer_access_token', customerToken); }",
+      "const barberToken = readScopedValue('barber_access_token');",
+      "if (barberToken) { pm.collectionVariables.set('barber_access_token', barberToken); }",
+    );
+  }
+
+  if (includeOnboardingTokens) {
+    exec.push(
+      "const customerOnboardingToken = readScopedValue('customer_onboarding_token');",
+      "if (customerOnboardingToken) { pm.collectionVariables.set('customer_onboarding_token', customerOnboardingToken); }",
+      "const barberOnboardingToken = readScopedValue('barber_onboarding_token');",
+      "if (barberOnboardingToken) { pm.collectionVariables.set('barber_onboarding_token', barberOnboardingToken); }",
     );
   }
 
@@ -191,6 +201,32 @@ const baseVariables = (...extra) => [
   ...extra,
 ];
 
+const accessTokenVariables = () => ([
+  textVariable(
+    'customer_access_token',
+    '',
+    'JWT access token - auto-set by 01-authentication.json for returning users or by 02-onboarding.json after first-time signup',
+  ),
+  textVariable(
+    'barber_access_token',
+    '',
+    'JWT access token - auto-set by 01-authentication.json for returning users or by 02-onboarding.json after first-time signup',
+  ),
+]);
+
+const onboardingTokenVariables = () => ([
+  textVariable(
+    'customer_onboarding_token',
+    '',
+    'Short-lived onboarding JWT - auto-set by 01-authentication.json when a new customer is detected',
+  ),
+  textVariable(
+    'barber_onboarding_token',
+    '',
+    'Short-lived onboarding JWT - auto-set by 01-authentication.json when a new barber is detected',
+  ),
+]);
+
 const writeCollection = (filename, collection) => {
   const filePath = resolve(COLLECTIONS_DIR, filename);
   writeFileSync(filePath, `${JSON.stringify(collection, null, 2)}\n`);
@@ -205,15 +241,20 @@ const barberLocationGeoJson = '{"type":"Point","coordinates":[77.5946,12.9716]}'
 const authenticationCollection = {
   info: {
     name: 'EverCut - Authentication',
-    description: 'Session bootstrap endpoints for the Firebase customer and barber test users created by server/scripts/firebase-token-gen.js.',
+    description: 'OTP authentication endpoints for customer and barber test users. Sends OTP, verifies it, and captures onboarding tokens for brand-new users or JWT access/refresh tokens for returning users. Requires msg91.testMode set to true in config/index.js for local development.',
     schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
   },
   variable: [
     ...baseVariables(
-      textVariable('customer_firebase_token', '', 'Paste the ID token for test-customer-001 here'),
-      textVariable('barber_firebase_token', '', 'Paste the ID token for test-barber-001 here'),
-      textVariable('last_session_role', ''),
-      textVariable('last_session_is_new_user', ''),
+      textVariable('test_customer_mobile', '9876543210'),
+      textVariable('test_barber_mobile', '9876543211'),
+      textVariable('test_otp', '123456'),
+      textVariable('customer_access_token', ''),
+      textVariable('customer_refresh_token', ''),
+      textVariable('customer_onboarding_token', ''),
+      textVariable('barber_access_token', ''),
+      textVariable('barber_refresh_token', ''),
+      textVariable('barber_onboarding_token', ''),
     ),
   ],
   event: preRequestEvent(
@@ -230,51 +271,213 @@ const authenticationCollection = {
     "if (baseUrl) { pm.collectionVariables.set('base_url', baseUrl); }",
     "const apiPrefix = readScopedValue('api_prefix');",
     "if (apiPrefix) { pm.collectionVariables.set('api_prefix', apiPrefix); }",
-    "const customerToken = readScopedValue('customer_firebase_token');",
-    "if (customerToken) { pm.collectionVariables.set('customer_firebase_token', customerToken); }",
-    "const barberToken = readScopedValue('barber_firebase_token');",
-    "if (barberToken) { pm.collectionVariables.set('barber_firebase_token', barberToken); }",
+    "const customerMobile = readScopedValue('test_customer_mobile');",
+    "if (customerMobile) { pm.collectionVariables.set('test_customer_mobile', customerMobile); }",
+    "const barberMobile = readScopedValue('test_barber_mobile');",
+    "if (barberMobile) { pm.collectionVariables.set('test_barber_mobile', barberMobile); }",
+    "const testOtp = readScopedValue('test_otp');",
+    "if (testOtp) { pm.collectionVariables.set('test_otp', testOtp); }",
   ),
   item: [
     {
-      name: '1. Create Customer Session',
+      name: '1. Send Customer OTP',
       ...request({
         method: 'POST',
-        url: '{{base_url}}/{{api_prefix}}/auth/session',
-        auth: bearerAuth('customer_firebase_token'),
+        url: '{{base_url}}/{{api_prefix}}/auth/otp/send',
+        auth: { type: 'noauth' },
         headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody('{}'),
-        description: 'Creates an authenticated API session for the Firebase customer test user. Run this before customer onboarding or customer collections.',
+        body: jsonBody(`{
+  "mobile": "{{test_customer_mobile}}"
+}`),
+        description: 'Send an OTP to the customer test number configured in the active Postman environment.',
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+        ),
+      }),
+    },
+    {
+      name: '2. Verify Customer OTP',
+      ...request({
+        method: 'POST',
+        url: '{{base_url}}/{{api_prefix}}/auth/otp/verify',
+        auth: { type: 'noauth' },
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{
+  "mobile": "{{test_customer_mobile}}",
+  "otp": "{{test_otp}}"
+}`),
+        description: 'Verify the customer OTP and capture either onboarding or session JWTs for downstream collections.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           'const response = pm.response.json();',
+          'const data = response.data || {};',
+          "if (data.isNewUser && data.onboardingToken) {",
+          "  pm.collectionVariables.set('customer_onboarding_token', data.onboardingToken);",
+          "  pm.environment.set('customer_onboarding_token', data.onboardingToken);",
+          "  pm.collectionVariables.set('customer_access_token', '');",
+          "  pm.collectionVariables.set('customer_refresh_token', '');",
+          "  pm.environment.set('customer_access_token', '');",
+          "  pm.environment.set('customer_refresh_token', '');",
+          "} else {",
+          "  pm.collectionVariables.set('customer_onboarding_token', '');",
+          "  pm.environment.set('customer_onboarding_token', '');",
+          "  if (data.accessToken) {",
+          "    pm.collectionVariables.set('customer_access_token', data.accessToken);",
+          "    pm.environment.set('customer_access_token', data.accessToken);",
+          "  }",
+          "  if (data.refreshToken) {",
+          "    pm.collectionVariables.set('customer_refresh_token', data.refreshToken);",
+          "    pm.environment.set('customer_refresh_token', data.refreshToken);",
+          "  }",
+          "}",
           "pm.collectionVariables.set('last_session_role', 'CUSTOMER');",
-          "pm.collectionVariables.set('last_session_is_new_user', String(Boolean(response.data && response.data.isNewUser)));",
+          "pm.collectionVariables.set('last_session_is_new_user', String(Boolean(data.isNewUser)));",
         ),
       }),
     },
     {
-      name: '2. Create Barber Session',
+      name: '3. Send Barber OTP',
       ...request({
         method: 'POST',
-        url: '{{base_url}}/{{api_prefix}}/auth/session',
-        auth: bearerAuth('barber_firebase_token'),
+        url: '{{base_url}}/{{api_prefix}}/auth/otp/send',
+        auth: { type: 'noauth' },
         headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody('{}'),
-        description: 'Creates an authenticated API session for the Firebase barber test user. Run this before barber onboarding or barber collections.',
+        body: jsonBody(`{
+  "mobile": "{{test_barber_mobile}}"
+}`),
+        description: 'Send an OTP to the barber test number configured in the active Postman environment.',
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+        ),
+      }),
+    },
+    {
+      name: '4. Verify Barber OTP',
+      ...request({
+        method: 'POST',
+        url: '{{base_url}}/{{api_prefix}}/auth/otp/verify',
+        auth: { type: 'noauth' },
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{
+  "mobile": "{{test_barber_mobile}}",
+  "otp": "{{test_otp}}"
+}`),
+        description: 'Verify the barber OTP and capture either onboarding or session JWTs for downstream collections.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           'const response = pm.response.json();',
+          'const data = response.data || {};',
+          "if (data.isNewUser && data.onboardingToken) {",
+          "  pm.collectionVariables.set('barber_onboarding_token', data.onboardingToken);",
+          "  pm.environment.set('barber_onboarding_token', data.onboardingToken);",
+          "  pm.collectionVariables.set('barber_access_token', '');",
+          "  pm.collectionVariables.set('barber_refresh_token', '');",
+          "  pm.environment.set('barber_access_token', '');",
+          "  pm.environment.set('barber_refresh_token', '');",
+          "} else {",
+          "  pm.collectionVariables.set('barber_onboarding_token', '');",
+          "  pm.environment.set('barber_onboarding_token', '');",
+          "  if (data.accessToken) {",
+          "    pm.collectionVariables.set('barber_access_token', data.accessToken);",
+          "    pm.environment.set('barber_access_token', data.accessToken);",
+          "  }",
+          "  if (data.refreshToken) {",
+          "    pm.collectionVariables.set('barber_refresh_token', data.refreshToken);",
+          "    pm.environment.set('barber_refresh_token', data.refreshToken);",
+          "  }",
+          "}",
           "pm.collectionVariables.set('last_session_role', 'BARBER');",
-          "pm.collectionVariables.set('last_session_is_new_user', String(Boolean(response.data && response.data.isNewUser)));",
-          'const profile = response.data && response.data.profile;',
-          "const shopId = profile && profile._id ? profile._id : '';",
-          "if (shopId) { pm.globals.set('shared_shop_id', shopId); }",
+          "pm.collectionVariables.set('last_session_is_new_user', String(Boolean(data.isNewUser)));",
         ),
       }),
     },
     {
-      name: '3. Health Check',
+      name: '5. Refresh Customer Token',
+      ...request({
+        method: 'POST',
+        url: '{{base_url}}/{{api_prefix}}/auth/token/refresh',
+        auth: { type: 'noauth' },
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{
+  "refreshToken": "{{customer_refresh_token}}"
+}`),
+        description: 'Exchange the stored customer refresh token for a fresh access/refresh token pair.',
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          'const response = pm.response.json();',
+          'const data = response.data || {};',
+          "if (data.accessToken) {",
+          "  pm.collectionVariables.set('customer_access_token', data.accessToken);",
+          "  pm.environment.set('customer_access_token', data.accessToken);",
+          "}",
+          "if (data.refreshToken) {",
+          "  pm.collectionVariables.set('customer_refresh_token', data.refreshToken);",
+          "  pm.environment.set('customer_refresh_token', data.refreshToken);",
+          "}",
+        ),
+      }),
+    },
+    {
+      name: '6. Refresh Barber Token',
+      ...request({
+        method: 'POST',
+        url: '{{base_url}}/{{api_prefix}}/auth/token/refresh',
+        auth: { type: 'noauth' },
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{
+  "refreshToken": "{{barber_refresh_token}}"
+}`),
+        description: 'Exchange the stored barber refresh token for a fresh access/refresh token pair.',
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          'const response = pm.response.json();',
+          'const data = response.data || {};',
+          "if (data.accessToken) {",
+          "  pm.collectionVariables.set('barber_access_token', data.accessToken);",
+          "  pm.environment.set('barber_access_token', data.accessToken);",
+          "}",
+          "if (data.refreshToken) {",
+          "  pm.collectionVariables.set('barber_refresh_token', data.refreshToken);",
+          "  pm.environment.set('barber_refresh_token', data.refreshToken);",
+          "}",
+        ),
+      }),
+    },
+    {
+      name: '7. Logout Customer (Terminal)',
+      ...request({
+        method: 'POST',
+        url: '{{base_url}}/{{api_prefix}}/auth/logout',
+        auth: bearerAuth('customer_access_token'),
+        description: 'Revoke the active customer refresh token and clear the stored customer session values.',
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          "pm.collectionVariables.set('customer_access_token', '');",
+          "pm.collectionVariables.set('customer_refresh_token', '');",
+          "pm.environment.set('customer_access_token', '');",
+          "pm.environment.set('customer_refresh_token', '');",
+        ),
+      }),
+    },
+    {
+      name: '8. Resend Customer OTP (Text)',
+      ...request({
+        method: 'POST',
+        url: '{{base_url}}/{{api_prefix}}/auth/otp/resend',
+        auth: { type: 'noauth' },
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{
+  "mobile": "{{test_customer_mobile}}",
+  "retryType": "text"
+}`),
+        description: 'Resend the customer OTP over the text channel for local OTP flow testing.',
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+        ),
+      }),
+    },
+    {
+      name: '9. Health Check',
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/health',
@@ -291,45 +494,27 @@ const authenticationCollection = {
 const onboardingCollection = {
   info: {
     name: 'EverCut - Onboarding',
-    description: 'Customer and barber onboarding requests wired for the Firebase test users and the local sample upload asset.',
+    description: 'Customer and barber onboarding requests wired for the OTP test users and the local sample upload asset. Run 01-authentication.json first to populate onboarding tokens. Upon successful onboarding, access and refresh tokens are captured for the other collections.',
     schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
   },
   variable: [
     ...baseVariables(
-      textVariable('customer_firebase_token', '', 'Paste the ID token for test-customer-001 here'),
-      textVariable('barber_firebase_token', '', 'Paste the ID token for test-barber-001 here'),
+      ...accessTokenVariables(),
+      ...onboardingTokenVariables(),
     ),
   ],
-  event: preRequestEvent(
-    "const readScopedValue = (...keys) => {",
-    "  for (const key of keys) {",
-    "    const environmentValue = pm.environment.get(key);",
-    "    if (environmentValue) return environmentValue;",
-    "    const globalValue = pm.globals.get(key);",
-    "    if (globalValue) return globalValue;",
-    "  }",
-    "  return '';",
-    "};",
-    "const baseUrl = readScopedValue('base_url');",
-    "if (baseUrl) { pm.collectionVariables.set('base_url', baseUrl); }",
-    "const apiPrefix = readScopedValue('api_prefix');",
-    "if (apiPrefix) { pm.collectionVariables.set('api_prefix', apiPrefix); }",
-    "const customerToken = readScopedValue('customer_firebase_token');",
-    "if (customerToken) { pm.collectionVariables.set('customer_firebase_token', customerToken); }",
-    "const barberToken = readScopedValue('barber_firebase_token');",
-    "if (barberToken) { pm.collectionVariables.set('barber_firebase_token', barberToken); }",
-  ),
+  event: collectionPreRequest({ includeOnboardingTokens: true }),
   item: [
     {
       name: '1. Complete Customer Profile',
       ...request({
         method: 'POST',
         url: '{{base_url}}/{{api_prefix}}/onboarding/customers',
-        auth: bearerAuth('customer_firebase_token'),
+        auth: bearerAuth('customer_onboarding_token'),
         body: formDataBody([
           textField('firstName', 'Test'),
           textField('lastName', 'Customer'),
-          textField('phoneNumber', '+15550000001'),
+          textField('phoneNumber', '9876543210'),
           textField('email', 'test.customer@example.com'),
           textField('gender', 'Male'),
           textField('dateOfBirth', '1994-06-15'),
@@ -337,9 +522,23 @@ const onboardingCollection = {
           textField('location', customerLocationGeoJson, 'GeoJSON point near the barber test shop'),
           fileField('photo', 'Prewired local sample upload'),
         ]),
-        description: 'Creates the customer profile for test-customer-001. A rerun returns 409 because onboarding only succeeds once per Firebase user.',
+        description: 'Creates the customer profile for the OTP-verified customer test user. A rerun returns 409 because onboarding only succeeds once per account.',
         event: testEvent(
           "pm.test('status is 201 or 409', function () { pm.expect(pm.response.code).to.be.oneOf([201, 409]); });",
+          'const response = pm.response.code === 201 ? pm.response.json() : null;',
+          'const data = response && response.data ? response.data : {};',
+          "if (pm.response.code === 201) {",
+          "  if (data.accessToken) {",
+          "    pm.collectionVariables.set('customer_access_token', data.accessToken);",
+          "    pm.environment.set('customer_access_token', data.accessToken);",
+          "  }",
+          "  if (data.refreshToken) {",
+          "    pm.collectionVariables.set('customer_refresh_token', data.refreshToken);",
+          "    pm.environment.set('customer_refresh_token', data.refreshToken);",
+          "  }",
+          "  pm.collectionVariables.set('customer_onboarding_token', '');",
+          "  pm.environment.set('customer_onboarding_token', '');",
+          "}",
         ),
       }),
     },
@@ -348,7 +547,7 @@ const onboardingCollection = {
       ...request({
         method: 'POST',
         url: '{{base_url}}/{{api_prefix}}/onboarding/barbers',
-        auth: bearerAuth('barber_firebase_token'),
+        auth: bearerAuth('barber_onboarding_token'),
         body: formDataBody([
           textField('firstName', 'Test'),
           textField('lastName', 'Barber'),
@@ -374,13 +573,26 @@ const onboardingCollection = {
           fileField('shopImages', 'Sample shop image 2 of 3'),
           fileField('shopImages', 'Sample shop image 3 of 3'),
         ]),
-        description: 'Creates the barber shop for test-barber-001. The three shop image fields already point to the local sample file.',
+        description: 'Creates the barber shop for the OTP-verified barber test user. The three shop image fields already point to the local sample file.',
         event: testEvent(
           "pm.test('status is 201 or 409', function () { pm.expect(pm.response.code).to.be.oneOf([201, 409]); });",
           'const response = pm.response.code === 201 ? pm.response.json() : null;',
-          'const shopId = response && response.data && response.data.shop && response.data.shop._id;',
+          'const data = response && response.data ? response.data : {};',
+          'const shopId = data.shop && data.shop._id;',
           "if (shopId) { pm.globals.set('shared_shop_id', shopId); }",
-          "if (pm.response.code === 201) { pm.globals.set('shared_barber_pin', '1234'); }",
+          "if (pm.response.code === 201) {",
+          "  if (data.accessToken) {",
+          "    pm.collectionVariables.set('barber_access_token', data.accessToken);",
+          "    pm.environment.set('barber_access_token', data.accessToken);",
+          "  }",
+          "  if (data.refreshToken) {",
+          "    pm.collectionVariables.set('barber_refresh_token', data.refreshToken);",
+          "    pm.environment.set('barber_refresh_token', data.refreshToken);",
+          "  }",
+          "  pm.collectionVariables.set('barber_onboarding_token', '');",
+          "  pm.environment.set('barber_onboarding_token', '');",
+          "  pm.globals.set('shared_barber_pin', '1234');",
+          "}",
         ),
       }),
     },
@@ -393,13 +605,11 @@ const customerProfileCollection = {
     description: 'Customer profile, home payload, and nearby service discovery. The final request also captures shared shop/service IDs for later collections.',
     schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
   },
-  auth: bearerAuth('customer_firebase_token'),
-  event: collectionPreRequest({
-    tokenSourceKey: 'customer_firebase_token',
-  }),
+  auth: bearerAuth('customer_access_token'),
+  event: collectionPreRequest(),
   variable: [
     ...baseVariables(
-      textVariable('customer_firebase_token', '', 'Paste the ID token for test-customer-001 here'),
+      ...accessTokenVariables(),
       textVariable('coordinates', sharedCoordinates),
       textVariable('shop_id', ''),
       textVariable('service_id', ''),
@@ -469,7 +679,7 @@ const customerBookingsCollection = {
     description: 'Customer booking workflow with shared-variable automation. It reuses the shop, employee, and service IDs captured by the barber-side collections so there is no copy-paste between collections.',
     schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
   },
-  auth: bearerAuth('customer_firebase_token'),
+  auth: bearerAuth('customer_access_token'),
   event: collectionPreRequest({
     syncPairs: [
       ['shared_shop_id', 'shop_id'],
@@ -478,11 +688,10 @@ const customerBookingsCollection = {
       ['shared_booking_id', 'booking_id'],
     ],
     includeDateHelpers: true,
-    tokenSourceKey: 'customer_firebase_token',
   }),
   variable: [
     ...baseVariables(
-      textVariable('customer_firebase_token', '', 'Paste the ID token for test-customer-001 here'),
+      ...accessTokenVariables(),
       textVariable('shop_id', ''),
       textVariable('employee_id', ''),
       textVariable('service_id', ''),
@@ -661,17 +870,16 @@ const customerShopDiscoveryCollection = {
     description: 'Nearby shop discovery and search requests using the same Bengaluru coordinates as the barber onboarding flow.',
     schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
   },
-  auth: bearerAuth('customer_firebase_token'),
+  auth: bearerAuth('customer_access_token'),
   event: collectionPreRequest({
     syncPairs: [
       ['shared_shop_id', 'shop_id'],
       ['shared_service_id', 'service_id'],
     ],
-    tokenSourceKey: 'customer_firebase_token',
   }),
   variable: [
     ...baseVariables(
-      textVariable('customer_firebase_token', '', 'Paste the ID token for test-customer-001 here'),
+      ...accessTokenVariables(),
       textVariable('coordinates', sharedCoordinates),
       textVariable('shop_id', ''),
       textVariable('service_id', ''),
@@ -750,14 +958,13 @@ const customerRatingsCollection = {
     description: 'Customer rating flow with a bootstrap request that captures the nearby Postman shop ID before submitting the rating.',
     schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
   },
-  auth: bearerAuth('customer_firebase_token'),
+  auth: bearerAuth('customer_access_token'),
   event: collectionPreRequest({
     syncPairs: [['shared_shop_id', 'shop_id']],
-    tokenSourceKey: 'customer_firebase_token',
   }),
   variable: [
     ...baseVariables(
-      textVariable('customer_firebase_token', '', 'Paste the ID token for test-customer-001 here'),
+      ...accessTokenVariables(),
       textVariable('coordinates', sharedCoordinates),
       textVariable('shop_id', ''),
       textVariable('customer_email', 'test.customer@example.com'),
@@ -788,7 +995,7 @@ const customerRatingsCollection = {
         body: jsonBody(`{
   "shopId": "{{shop_id}}",
   "rating": 5,
-  "review": "Postman collection review for the Firebase customer flow."
+  "review": "Postman collection review for the OTP/JWT customer flow."
 }`),
         description: 'Creates a new rating for the captured shop. The API allows only one rating per customer per shop, so reruns return 409 instead of 201 after the first success.',
         event: testEvent(
@@ -820,20 +1027,19 @@ const customerRatingsCollection = {
 const barberProfileCollection = {
   info: {
     name: 'EverCut - Barber Profile & Shop',
-    description: 'Barber profile and shop management collection aligned with the onboarding payloads, shared IDs, and the local sample upload asset.',
+    description: 'Barber profile and shop management collection. Uses the barber JWT access token captured by 01-authentication.json for returning users or by 02-onboarding.json after first-time signup.',
     schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
   },
-  auth: bearerAuth('barber_firebase_token'),
+  auth: bearerAuth('barber_access_token'),
   event: collectionPreRequest({
     syncPairs: [
       ['shared_shop_id', 'shop_id'],
       ['shared_barber_pin', 'barber_active_pin'],
     ],
-    tokenSourceKey: 'barber_firebase_token',
   }),
   variable: [
     ...baseVariables(
-      textVariable('barber_firebase_token', '', 'Paste the ID token for test-barber-001 here'),
+      ...accessTokenVariables(),
       textVariable('shop_id', ''),
       textVariable('barber_active_pin', '1234'),
       textVariable('barber_next_pin', '5678'),
@@ -981,7 +1187,7 @@ const barberProfileCollection = {
       ...request({
         method: 'POST',
         url: '{{base_url}}/{{api_prefix}}/barber/profile/sign-out-everywhere',
-        description: 'Revokes the current Firebase session. Run this only when you are finished with the current barber token.',
+        description: 'Revokes the JWT refresh token, invalidating all sessions. Run this only when you are finished testing.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
     },
@@ -994,7 +1200,7 @@ const barberProfileCollection = {
         body: jsonBody(`{
   "currentPin": "{{barber_active_pin}}"
 }`),
-        description: 'Soft-deletes the barber account and disables the Firebase user. Run this instead of the sign-out request when you want the account deleted.',
+        description: 'Soft-deletes the barber account and revokes the JWT refresh token. Run this instead of the sign-out request when you want the account deleted.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
     },
@@ -1007,14 +1213,13 @@ const barberEmployeesCollection = {
     description: 'Employee CRUD collection with automatic ID capture and a prewired sample image for the optional employee photo.',
     schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
   },
-  auth: bearerAuth('barber_firebase_token'),
+  auth: bearerAuth('barber_access_token'),
   event: collectionPreRequest({
     syncPairs: [['shared_employee_id', 'employee_id']],
-    tokenSourceKey: 'barber_firebase_token',
   }),
   variable: [
     ...baseVariables(
-      textVariable('barber_firebase_token', '', 'Paste the ID token for test-barber-001 here'),
+      ...accessTokenVariables(),
       textVariable('employee_id', ''),
       textVariable('employee_phone', ''),
     ),
@@ -1102,14 +1307,13 @@ const barberServicesCollection = {
     description: 'Service catalogue collection with request bodies matched to the real Joi validators and automatic shared ID capture.',
     schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
   },
-  auth: bearerAuth('barber_firebase_token'),
+  auth: bearerAuth('barber_access_token'),
   event: collectionPreRequest({
     syncPairs: [['shared_service_id', 'service_id']],
-    tokenSourceKey: 'barber_firebase_token',
   }),
   variable: [
     ...baseVariables(
-      textVariable('barber_firebase_token', '', 'Paste the ID token for test-barber-001 here'),
+      ...accessTokenVariables(),
       textVariable('service_id', ''),
       textVariable('single_service_name', ''),
       textVariable('bundled_service_name', ''),
@@ -1218,17 +1422,16 @@ const barberBookingsCollection = {
     description: 'Barber booking administration collection. It captures separate IDs for status updates and delete-after-payment so the limitations of the public API are explicit.',
     schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
   },
-  auth: bearerAuth('barber_firebase_token'),
+  auth: bearerAuth('barber_access_token'),
   event: collectionPreRequest({
     syncPairs: [
       ['shared_booking_id', 'booking_id_status'],
       ['shared_booking_id', 'booking_id_delete'],
     ],
-    tokenSourceKey: 'barber_firebase_token',
   }),
   variable: [
     ...baseVariables(
-      textVariable('barber_firebase_token', '', 'Paste the ID token for test-barber-001 here'),
+      ...accessTokenVariables(),
       textVariable('booking_id_status', ''),
       textVariable('booking_id_delete', ''),
     ),
@@ -1306,14 +1509,13 @@ const barberPhotosCollection = {
     description: 'Shop gallery management collection with ID capture and a prewired local sample upload file.',
     schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
   },
-  auth: bearerAuth('barber_firebase_token'),
+  auth: bearerAuth('barber_access_token'),
   event: collectionPreRequest({
     syncPairs: [['shared_photo_id', 'photo_id']],
-    tokenSourceKey: 'barber_firebase_token',
   }),
   variable: [
     ...baseVariables(
-      textVariable('barber_firebase_token', '', 'Paste the ID token for test-barber-001 here'),
+      ...accessTokenVariables(),
       textVariable('photo_id', ''),
     ),
   ],
@@ -1393,13 +1595,11 @@ const barberEarningsCollection = {
     description: 'Single-request collection for the barber earnings summary. Completed bookings are required for non-zero values.',
     schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
   },
-  auth: bearerAuth('barber_firebase_token'),
-  event: collectionPreRequest({
-    tokenSourceKey: 'barber_firebase_token',
-  }),
+  auth: bearerAuth('barber_access_token'),
+  event: collectionPreRequest(),
   variable: [
     ...baseVariables(
-      textVariable('barber_firebase_token', '', 'Paste the ID token for test-barber-001 here'),
+      ...accessTokenVariables(),
     ),
   ],
   item: [
@@ -1418,16 +1618,14 @@ const barberEarningsCollection = {
 const barberRatingsCollection = {
   info: {
     name: 'EverCut - Barber Ratings',
-    description: 'Focused Postman collection for barber rating routes using seeded mock data and the Firebase-authenticated barber user. This remains the reference standard for seeded-ID capture.',
+    description: 'Focused Postman collection for barber rating routes using seeded mock data and the JWT-authenticated barber user. This remains the reference standard for seeded-ID capture.',
     schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
   },
-  auth: bearerAuth('barber_firebase_token'),
-  event: collectionPreRequest({
-    tokenSourceKey: 'barber_firebase_token',
-  }),
+  auth: bearerAuth('barber_access_token'),
+  event: collectionPreRequest(),
   variable: [
     ...baseVariables(
-      textVariable('barber_firebase_token', '', 'Paste the ID token for test-barber-001 here'),
+      ...accessTokenVariables(),
       textVariable('rating_id_add_reply', ''),
       textVariable('rating_id_update_reply', ''),
       textVariable('rating_id_remove_rating', ''),
@@ -1452,7 +1650,7 @@ const barberRatingsCollection = {
           "capture('rating_id_update_reply', '[UPDATE_REPLY_TARGET]');",
           "capture('rating_id_remove_rating', '[REMOVE_RATING_TARGET]');",
           "if (!pm.collectionVariables.get('rating_id_add_reply') || !pm.collectionVariables.get('rating_id_update_reply') || !pm.collectionVariables.get('rating_id_remove_rating')) {",
-          "  console.warn('Seeded rating markers were not found. Run `node scripts/seed-barber-rating-mock-data.js` for test-barber-001.');",
+          "  console.warn('Seeded rating markers were not found. Run `node scripts/seed-barber-rating-mock-data.js` before using this collection.');",
           "}",
         ),
       }),
@@ -1519,12 +1717,47 @@ const environmentTemplate = {
       enabled: true,
     },
     {
-      key: 'customer_firebase_token',
+      key: 'test_customer_mobile',
+      value: '9876543210',
+      enabled: true,
+    },
+    {
+      key: 'test_barber_mobile',
+      value: '9876543211',
+      enabled: true,
+    },
+    {
+      key: 'test_otp',
+      value: '123456',
+      enabled: true,
+    },
+    {
+      key: 'customer_access_token',
       value: '',
       enabled: true,
     },
     {
-      key: 'barber_firebase_token',
+      key: 'customer_refresh_token',
+      value: '',
+      enabled: true,
+    },
+    {
+      key: 'customer_onboarding_token',
+      value: '',
+      enabled: true,
+    },
+    {
+      key: 'barber_access_token',
+      value: '',
+      enabled: true,
+    },
+    {
+      key: 'barber_refresh_token',
+      value: '',
+      enabled: true,
+    },
+    {
+      key: 'barber_onboarding_token',
       value: '',
       enabled: true,
     },

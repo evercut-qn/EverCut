@@ -9,7 +9,7 @@
     "bearer": [
       {
         "key": "token",
-        "value": "{{customer_firebase_token}}",
+        "value": "{{customer_access_token}}",
         "type": "string"
       }
     ]
@@ -38,8 +38,10 @@
           "syncScopedValue('base_url');",
           "syncScopedValue('api_prefix');",
           "syncScopedValue('shared_shop_id', 'shop_id');",
-          "const collectionToken = readScopedValue('customer_firebase_token');",
-          "if (collectionToken) { pm.collectionVariables.set('customer_firebase_token', collectionToken); } else { console.warn('Set customer_firebase_token in the selected Postman environment or globals.'); }"
+          "const customerToken = readScopedValue('customer_access_token');",
+          "if (customerToken) { pm.collectionVariables.set('customer_access_token', customerToken); }",
+          "const barberToken = readScopedValue('barber_access_token');",
+          "if (barberToken) { pm.collectionVariables.set('barber_access_token', barberToken); }"
         ]
       }
     }
@@ -58,10 +60,16 @@
       "description": "API prefix used by every request"
     },
     {
-      "key": "customer_firebase_token",
+      "key": "customer_access_token",
       "value": "",
       "type": "string",
-      "description": "Paste the ID token for test-customer-001 here"
+      "description": "JWT access token - auto-set by 01-authentication.json for returning users or by 02-onboarding.json after first-time signup"
+    },
+    {
+      "key": "barber_access_token",
+      "value": "",
+      "type": "string",
+      "description": "JWT access token - auto-set by 01-authentication.json for returning users or by 02-onboarding.json after first-time signup"
     },
     {
       "key": "coordinates",
@@ -118,7 +126,7 @@
         "description": "Creates a new rating for the captured shop. The API allows only one rating per customer per shop, so reruns return 409 instead of 201 after the first success.",
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"shopId\": \"{{shop_id}}\",\n  \"rating\": 5,\n  \"review\": \"Postman collection review for the Firebase customer flow.\"\n}",
+          "raw": "{\n  \"shopId\": \"{{shop_id}}\",\n  \"rating\": 5,\n  \"review\": \"Postman collection review for the OTP/JWT customer flow.\"\n}",
           "options": {
             "raw": {
               "language": "json"

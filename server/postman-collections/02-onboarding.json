@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "EverCut - Onboarding",
-    "description": "Customer and barber onboarding requests wired for the Firebase test users and the local sample upload asset.",
+    "description": "Customer and barber onboarding requests wired for the OTP test users and the local sample upload asset. Run 01-authentication.json first to populate onboarding tokens. Upon successful onboarding, access and refresh tokens are captured for the other collections.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -18,16 +18,28 @@
       "description": "API prefix used by every request"
     },
     {
-      "key": "customer_firebase_token",
+      "key": "customer_access_token",
       "value": "",
       "type": "string",
-      "description": "Paste the ID token for test-customer-001 here"
+      "description": "JWT access token - auto-set by 01-authentication.json for returning users or by 02-onboarding.json after first-time signup"
     },
     {
-      "key": "barber_firebase_token",
+      "key": "barber_access_token",
       "value": "",
       "type": "string",
-      "description": "Paste the ID token for test-barber-001 here"
+      "description": "JWT access token - auto-set by 01-authentication.json for returning users or by 02-onboarding.json after first-time signup"
+    },
+    {
+      "key": "customer_onboarding_token",
+      "value": "",
+      "type": "string",
+      "description": "Short-lived onboarding JWT - auto-set by 01-authentication.json when a new customer is detected"
+    },
+    {
+      "key": "barber_onboarding_token",
+      "value": "",
+      "type": "string",
+      "description": "Short-lived onboarding JWT - auto-set by 01-authentication.json when a new barber is detected"
     }
   ],
   "event": [
@@ -45,14 +57,22 @@
           "  }",
           "  return '';",
           "};",
-          "const baseUrl = readScopedValue('base_url');",
-          "if (baseUrl) { pm.collectionVariables.set('base_url', baseUrl); }",
-          "const apiPrefix = readScopedValue('api_prefix');",
-          "if (apiPrefix) { pm.collectionVariables.set('api_prefix', apiPrefix); }",
-          "const customerToken = readScopedValue('customer_firebase_token');",
-          "if (customerToken) { pm.collectionVariables.set('customer_firebase_token', customerToken); }",
-          "const barberToken = readScopedValue('barber_firebase_token');",
-          "if (barberToken) { pm.collectionVariables.set('barber_firebase_token', barberToken); }"
+          "const syncScopedValue = (sourceKey, collectionKey = sourceKey) => {",
+          "  const scopedValue = readScopedValue(sourceKey);",
+          "  if (scopedValue) {",
+          "    pm.collectionVariables.set(collectionKey, scopedValue);",
+          "  }",
+          "};",
+          "syncScopedValue('base_url');",
+          "syncScopedValue('api_prefix');",
+          "const customerToken = readScopedValue('customer_access_token');",
+          "if (customerToken) { pm.collectionVariables.set('customer_access_token', customerToken); }",
+          "const barberToken = readScopedValue('barber_access_token');",
+          "if (barberToken) { pm.collectionVariables.set('barber_access_token', barberToken); }",
+          "const customerOnboardingToken = readScopedValue('customer_onboarding_token');",
+          "if (customerOnboardingToken) { pm.collectionVariables.set('customer_onboarding_token', customerOnboardingToken); }",
+          "const barberOnboardingToken = readScopedValue('barber_onboarding_token');",
+          "if (barberOnboardingToken) { pm.collectionVariables.set('barber_onboarding_token', barberOnboardingToken); }"
         ]
       }
     }
@@ -64,7 +84,7 @@
         "method": "POST",
         "header": [],
         "url": "{{base_url}}/{{api_prefix}}/onboarding/customers",
-        "description": "Creates the customer profile for test-customer-001. A rerun returns 409 because onboarding only succeeds once per Firebase user.",
+        "description": "Creates the customer profile for the OTP-verified customer test user. A rerun returns 409 because onboarding only succeeds once per account.",
         "body": {
           "mode": "formdata",
           "formdata": [
@@ -80,7 +100,7 @@
             },
             {
               "key": "phoneNumber",
-              "value": "+15550000001",
+              "value": "9876543210",
               "type": "text"
             },
             {
@@ -112,7 +132,7 @@
             {
               "key": "photo",
               "type": "file",
-              "src": "C:\\Users\\manis\\Projects\\EverCut\\server\\postman-collections\\assets\\sample-upload.png",
+              "src": "/Users/prankitapotbhare/Projects/EverCut/server/postman-collections/assets/sample-upload.png",
               "description": "Prewired local sample upload"
             }
           ]
@@ -122,7 +142,7 @@
           "bearer": [
             {
               "key": "token",
-              "value": "{{customer_firebase_token}}",
+              "value": "{{customer_onboarding_token}}",
               "type": "string"
             }
           ]
@@ -134,7 +154,21 @@
           "script": {
             "type": "text/javascript",
             "exec": [
-              "pm.test('status is 201 or 409', function () { pm.expect(pm.response.code).to.be.oneOf([201, 409]); });"
+              "pm.test('status is 201 or 409', function () { pm.expect(pm.response.code).to.be.oneOf([201, 409]); });",
+              "const response = pm.response.code === 201 ? pm.response.json() : null;",
+              "const data = response && response.data ? response.data : {};",
+              "if (pm.response.code === 201) {",
+              "  if (data.accessToken) {",
+              "    pm.collectionVariables.set('customer_access_token', data.accessToken);",
+              "    pm.environment.set('customer_access_token', data.accessToken);",
+              "  }",
+              "  if (data.refreshToken) {",
+              "    pm.collectionVariables.set('customer_refresh_token', data.refreshToken);",
+              "    pm.environment.set('customer_refresh_token', data.refreshToken);",
+              "  }",
+              "  pm.collectionVariables.set('customer_onboarding_token', '');",
+              "  pm.environment.set('customer_onboarding_token', '');",
+              "}"
             ]
           }
         }
@@ -146,7 +180,7 @@
         "method": "POST",
         "header": [],
         "url": "{{base_url}}/{{api_prefix}}/onboarding/barbers",
-        "description": "Creates the barber shop for test-barber-001. The three shop image fields already point to the local sample file.",
+        "description": "Creates the barber shop for the OTP-verified barber test user. The three shop image fields already point to the local sample file.",
         "body": {
           "mode": "formdata",
           "formdata": [
@@ -254,19 +288,19 @@
             {
               "key": "shopImages",
               "type": "file",
-              "src": "C:\\Users\\manis\\Projects\\EverCut\\server\\postman-collections\\assets\\sample-upload.png",
+              "src": "/Users/prankitapotbhare/Projects/EverCut/server/postman-collections/assets/sample-upload.png",
               "description": "Sample shop image 1 of 3"
             },
             {
               "key": "shopImages",
               "type": "file",
-              "src": "C:\\Users\\manis\\Projects\\EverCut\\server\\postman-collections\\assets\\sample-upload.png",
+              "src": "/Users/prankitapotbhare/Projects/EverCut/server/postman-collections/assets/sample-upload.png",
               "description": "Sample shop image 2 of 3"
             },
             {
               "key": "shopImages",
               "type": "file",
-              "src": "C:\\Users\\manis\\Projects\\EverCut\\server\\postman-collections\\assets\\sample-upload.png",
+              "src": "/Users/prankitapotbhare/Projects/EverCut/server/postman-collections/assets/sample-upload.png",
               "description": "Sample shop image 3 of 3"
             }
           ]
@@ -276,7 +310,7 @@
           "bearer": [
             {
               "key": "token",
-              "value": "{{barber_firebase_token}}",
+              "value": "{{barber_onboarding_token}}",
               "type": "string"
             }
           ]
@@ -290,9 +324,22 @@
             "exec": [
               "pm.test('status is 201 or 409', function () { pm.expect(pm.response.code).to.be.oneOf([201, 409]); });",
               "const response = pm.response.code === 201 ? pm.response.json() : null;",
-              "const shopId = response && response.data && response.data.shop && response.data.shop._id;",
+              "const data = response && response.data ? response.data : {};",
+              "const shopId = data.shop && data.shop._id;",
               "if (shopId) { pm.globals.set('shared_shop_id', shopId); }",
-              "if (pm.response.code === 201) { pm.globals.set('shared_barber_pin', '1234'); }"
+              "if (pm.response.code === 201) {",
+              "  if (data.accessToken) {",
+              "    pm.collectionVariables.set('barber_access_token', data.accessToken);",
+              "    pm.environment.set('barber_access_token', data.accessToken);",
+              "  }",
+              "  if (data.refreshToken) {",
+              "    pm.collectionVariables.set('barber_refresh_token', data.refreshToken);",
+              "    pm.environment.set('barber_refresh_token', data.refreshToken);",
+              "  }",
+              "  pm.collectionVariables.set('barber_onboarding_token', '');",
+              "  pm.environment.set('barber_onboarding_token', '');",
+              "  pm.globals.set('shared_barber_pin', '1234');",
+              "}"
             ]
           }
         }

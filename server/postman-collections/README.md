@@ -1,6 +1,6 @@
 # EverCut API — Postman Collections
 
-A complete set of Postman collections for every EverCut API route, with shared-variable automation, pre-wired file uploads, and automatic ID capture so requests can be run sequentially without manual copy-pasting.
+A complete set of Postman collections for the EverCut API, with shared-variable automation, pre-wired file uploads, OTP/JWT token capture, and reusable IDs so requests can be run sequentially without manual copy-pasting.
 
 ---
 
@@ -8,21 +8,21 @@ A complete set of Postman collections for every EverCut API route, with shared-v
 
 | File | Collection name | Description |
 |---|---|---|
-| `01-authentication.json` | EverCut - Authentication | Session bootstrap for both test users plus a health check |
-| `02-onboarding.json` | EverCut - Onboarding | First-run profile creation for customer and barber |
+| `01-authentication.json` | EverCut - Authentication | OTP authentication for customer and barber test users, token capture, and health check |
+| `02-onboarding.json` | EverCut - Onboarding | First-run customer and barber onboarding using onboarding JWTs |
 | `03-customer-profile.json` | EverCut - Customer Profile | Profile read/update and homepage endpoints |
 | `04-customer-bookings.json` | EverCut - Customer Bookings | Full booking lifecycle: create, update, reschedule, reorder, cancel |
 | `05-customer-shop-discovery.json` | EverCut - Customer Shop Discovery | Nearby shop/service search and keyword search |
 | `06-customer-ratings.json` | EverCut - Customer Ratings | Submit a rating and read shop rating data |
-| `07-barber-profile-shop.json` | EverCut - Barber Profile & Shop | Shop management: info, UPI, status, images, PIN, account actions |
+| `07-barber-profile-shop.json` | EverCut - Barber Profile & Shop | Shop management: info, UPI, status, images, PIN, and account actions |
 | `08-barber-employees.json` | EverCut - Barber Employees | Employee CRUD with optional photo upload |
 | `09-barber-services.json` | EverCut - Barber Services | Service catalogue CRUD (single and bundled services) |
 | `10-barber-bookings.json` | EverCut - Barber Bookings | Booking administration: list, stats, status update, delete |
 | `11-barber-photos.json` | EverCut - Barber Photos | Shop gallery: upload, list, stats, delete |
 | `12-barber-earnings.json` | EverCut - Barber Earnings | Earnings summary (requires completed bookings for non-zero values) |
 | `13-barber-ratings.json` | EverCut - Barber Ratings | Rating reply management (add, update, delete) and rating removal |
-| `EverCut.postman_environment.json` | — | Active environment — set `customer_firebase_token` and `barber_firebase_token` here |
-| `assets/sample-upload.png` | — | Sample image pre-wired into all file-upload requests |
+| `EverCut.postman_environment.json` | — | Active environment with OTP/JWT variables for local testing |
+| `assets/sample-upload.png` | — | Sample image pre-wired into file-upload requests |
 
 ---
 
@@ -32,16 +32,22 @@ A complete set of Postman collections for every EverCut API route, with shared-v
 
 | # | Method | Endpoint | Description |
 |---|---|---|---|
-| 1 | POST | `/api/v1/auth/session` | Create customer session |
-| 2 | POST | `/api/v1/auth/session` | Create barber session |
-| 3 | GET | `/api/v1/health` | Health check |
+| 1 | POST | `/api/v1/auth/otp/send` | Send OTP to customer |
+| 2 | POST | `/api/v1/auth/otp/verify` | Verify customer OTP - captures onboarding or session tokens |
+| 3 | POST | `/api/v1/auth/otp/send` | Send OTP to barber |
+| 4 | POST | `/api/v1/auth/otp/verify` | Verify barber OTP - captures onboarding or session tokens |
+| 5 | POST | `/api/v1/auth/token/refresh` | Refresh customer access token |
+| 6 | POST | `/api/v1/auth/token/refresh` | Refresh barber access token |
+| 7 | POST | `/api/v1/auth/logout` | Logout customer *(Terminal)* |
+| 8 | POST | `/api/v1/auth/otp/resend` | Resend OTP (text channel) |
+| 9 | GET | `/api/v1/health` | Health check |
 
 ### `02-onboarding.json`
 
 | # | Method | Endpoint | Description |
 |---|---|---|---|
-| 1 | POST | `/api/v1/onboarding/customers` | Complete customer profile (first run only) |
-| 2 | POST | `/api/v1/onboarding/barbers` | Complete barber profile (first run only) |
+| 1 | POST | `/api/v1/onboarding/customers` | Complete customer profile *(first run only)* |
+| 2 | POST | `/api/v1/onboarding/barbers` | Complete barber profile *(first run only)* |
 
 ### `03-customer-profile.json`
 
@@ -50,13 +56,13 @@ A complete set of Postman collections for every EverCut API route, with shared-v
 | 1 | GET | `/api/v1/customer/profile` | Get profile |
 | 2 | PUT | `/api/v1/customer/profile` | Update profile |
 | 3 | GET | `/api/v1/customer/homepage` | Get homepage |
-| 4 | GET | `/api/v1/customer/homepage/services` | Get services by gender — also captures shared shop/service IDs |
+| 4 | GET | `/api/v1/customer/homepage/services` | Get services by gender - also captures shared shop/service IDs |
 
 ### `04-customer-bookings.json`
 
 | # | Method | Endpoint | Description |
 |---|---|---|---|
-| 1 | GET | `/api/v1/customer/bookings?type=upcoming` | List upcoming bookings — captures booking ID |
+| 1 | GET | `/api/v1/customer/bookings?type=upcoming` | List upcoming bookings - captures booking ID |
 | 2 | GET | `/api/v1/customer/employees/{{employee_id}}/calendar` | Get employee availability |
 | 3 | POST | `/api/v1/customer/bookings` | Create a booking |
 | 4 | GET | `/api/v1/customer/bookings/{{booking_id}}` | Get booking details |
@@ -72,8 +78,8 @@ A complete set of Postman collections for every EverCut API route, with shared-v
 
 | # | Method | Endpoint | Description |
 |---|---|---|---|
-| 1 | GET | `/api/v1/customer/shops/nearby` | Get nearby shops — captures shop ID |
-| 2 | GET | `/api/v1/customer/shops/{{shop_id}}` | Get shop details — captures service ID |
+| 1 | GET | `/api/v1/customer/shops/nearby` | Get nearby shops - captures shop ID |
+| 2 | GET | `/api/v1/customer/shops/{{shop_id}}` | Get shop details - captures service ID |
 | 3 | GET | `/api/v1/customer/shops/doorstep` | Get doorstep shops |
 | 4 | GET | `/api/v1/customer/search/services` | Search services by keyword and gender |
 | 5 | GET | `/api/v1/customer/search/shops` | Search shops by keyword |
@@ -83,7 +89,7 @@ A complete set of Postman collections for every EverCut API route, with shared-v
 | # | Method | Endpoint | Description |
 |---|---|---|---|
 | 1 | GET | `/api/v1/customer/shops/nearby` | Bootstrap: get shop ID for the rating |
-| 2 | POST | `/api/v1/customer/ratings` | Submit a rating (once per customer/shop — returns 409 on rerun) |
+| 2 | POST | `/api/v1/customer/ratings` | Submit a rating *(once per customer/shop - returns 409 on rerun)* |
 | 3 | GET | `/api/v1/customer/shops/{{shop_id}}/ratings` | List shop ratings |
 | 4 | GET | `/api/v1/customer/shops/{{shop_id}}/ratings/summary` | Get rating summary |
 
@@ -91,7 +97,7 @@ A complete set of Postman collections for every EverCut API route, with shared-v
 
 | # | Method | Endpoint | Description |
 |---|---|---|---|
-| 1 | GET | `/api/v1/barber/profile` | Get profile — captures shop ID |
+| 1 | GET | `/api/v1/barber/profile` | Get profile - captures shop ID |
 | 2 | PUT | `/api/v1/barber/profile` | Update business info |
 | 3 | GET | `/api/v1/barber/profile/upi` | Get UPI details |
 | 4 | PUT | `/api/v1/barber/profile/upi` | Update UPI details |
@@ -106,7 +112,7 @@ A complete set of Postman collections for every EverCut API route, with shared-v
 
 | # | Method | Endpoint | Description |
 |---|---|---|---|
-| 1 | GET | `/api/v1/barber/employees` | List employees — captures employee ID |
+| 1 | GET | `/api/v1/barber/employees` | List employees - captures employee ID |
 | 2 | POST | `/api/v1/barber/employees` | Add employee |
 | 3 | PUT | `/api/v1/barber/employees/{{employee_id}}` | Update employee |
 | 4 | DELETE | `/api/v1/barber/employees/{{employee_id}}` | Delete employee *(Terminal)* |
@@ -115,7 +121,7 @@ A complete set of Postman collections for every EverCut API route, with shared-v
 
 | # | Method | Endpoint | Description |
 |---|---|---|---|
-| 1 | GET | `/api/v1/barber/services` | List services — captures service ID |
+| 1 | GET | `/api/v1/barber/services` | List services - captures service ID |
 | 2 | POST | `/api/v1/barber/services` | Add a single service |
 | 3 | POST | `/api/v1/barber/services` | Add a bundled service |
 | 4 | PUT | `/api/v1/barber/services/{{service_id}}` | Update service |
@@ -125,7 +131,7 @@ A complete set of Postman collections for every EverCut API route, with shared-v
 
 | # | Method | Endpoint | Description |
 |---|---|---|---|
-| 1 | GET | `/api/v1/barber/bookings` | List all bookings — captures IDs for status update and delete |
+| 1 | GET | `/api/v1/barber/bookings` | List all bookings - captures IDs for status update and delete |
 | 2 | GET | `/api/v1/barber/bookings/stats` | Get booking stats |
 | 3 | GET | `/api/v1/barber/bookings/status?status=confirmed` | Filter bookings by status |
 | 4 | PUT | `/api/v1/barber/bookings/{{booking_id_status}}/status` | Update booking status |
@@ -135,7 +141,7 @@ A complete set of Postman collections for every EverCut API route, with shared-v
 
 | # | Method | Endpoint | Description |
 |---|---|---|---|
-| 1 | GET | `/api/v1/barber/photos` | List gallery photos — captures photo ID |
+| 1 | GET | `/api/v1/barber/photos` | List gallery photos - captures photo ID |
 | 2 | POST | `/api/v1/barber/photos` | Upload photos |
 | 3 | GET | `/api/v1/barber/photos/stats` | Get photo stats |
 | 4 | GET | `/api/v1/barber/photos/{{photo_id}}` | Get photo by ID |
@@ -151,7 +157,7 @@ A complete set of Postman collections for every EverCut API route, with shared-v
 
 | # | Method | Endpoint | Description |
 |---|---|---|---|
-| 1 | GET | `/api/v1/barber/ratings` | List ratings — captures seeded IDs for reply/remove operations |
+| 1 | GET | `/api/v1/barber/ratings` | List ratings - captures seeded IDs for reply/remove operations |
 | 2 | POST | `/api/v1/barber/ratings/{{rating_id_add_reply}}/reply` | Add reply to a rating |
 | 3 | PUT | `/api/v1/barber/ratings/{{rating_id_update_reply}}/reply` | Update an existing reply |
 | 4 | DELETE | `/api/v1/barber/ratings/{{rating_id_update_reply}}/reply` | Delete a reply |
@@ -159,71 +165,77 @@ A complete set of Postman collections for every EverCut API route, with shared-v
 
 ---
 
-## Setup
+### Prerequisites
 
-### 1. Generate tokens
+1. In `src/config/index.js`, set `testMode: true` inside the `msg91` config block to skip real SMS in development. The default is `false`; the inline comment says `flip to true in dev to skip real SMS`.
+2. The test OTP is hardcoded as `123456` via `testOtp: '123456'` in the same config block - no env var needed.
+3. From `server/`, start the API with `npm run dev`.
 
-```bash
-cd server
-node scripts/firebase-token-gen.js
-```
+No manual token generation needed - the authentication and onboarding collections handle token capture automatically.
 
-This creates two Firebase test users (idempotent) and saves fresh ID tokens to `scripts/test-tokens.txt`.
-
-### 2. Import into Postman
+### Import into Postman
 
 1. Import every `.json` collection from this folder.
 2. Import `EverCut.postman_environment.json` as the active environment.
-3. Copy the customer ID token from `scripts/test-tokens.txt` into the `customer_firebase_token` environment variable.
-4. Copy the barber ID token into the `barber_firebase_token` environment variable.
-5. Run requests.
+3. Verify `test_customer_mobile`, `test_barber_mobile`, and `test_otp` are set in the environment.
+4. Run `01-authentication.json` requests 1-4 to send and verify OTP for both test users.
+5. Returning users get access tokens immediately; brand-new users get onboarding tokens first and then receive access tokens from `02-onboarding.json`.
+6. Run the other collections in order.
 
-> Re-run `node scripts/firebase-token-gen.js` and update the environment variables when tokens expire (after 1 hour).
+> Access tokens expire after 15 minutes once onboarding is complete. Run the **Refresh Token** requests (5-6) or re-run requests 1-4 to get fresh tokens. Tokens are auto-captured - no manual copy-paste.
 
-### Test users
+### Test Users
 
-| Role | UID | Email | Phone |
+| Role | MongoDB `_id` | Email | Phone |
 |---|---|---|---|
-| Customer | `test-customer-001` | `test.customer@example.com` | `+15550000001` |
-| Barber | `test-barber-001` | `test.barber@example.com` | `+15550000002` |
+| Customer | *(auto-generated on first successful onboarding)* | `test.customer@example.com` | `9876543210` |
+| Barber | *(auto-generated on first successful onboarding)* | `test.barber@example.com` | `9876543211` |
 
-### Environment variables
-
-All collections read these from the active environment automatically:
+### Environment Variables
 
 | Variable | Value |
 |---|---|
 | `base_url` | `http://localhost:5000` |
 | `api_prefix` | `api/v1` |
-| `customer_firebase_token` | Customer ID token (set by token generator) |
-| `barber_firebase_token` | Barber ID token (set by token generator) |
+| `test_customer_mobile` | `9876543210` |
+| `test_barber_mobile` | `9876543211` |
+| `test_otp` | `123456` |
+| `customer_access_token` | *(auto-set by 01-authentication.json for returning users or by 02-onboarding.json after first-time signup)* |
+| `customer_refresh_token` | *(auto-set by 01-authentication.json for returning users or by 02-onboarding.json after first-time signup)* |
+| `barber_access_token` | *(auto-set by 01-authentication.json for returning users or by 02-onboarding.json after first-time signup)* |
+| `barber_refresh_token` | *(auto-set by 01-authentication.json for returning users or by 02-onboarding.json after first-time signup)* |
+| `customer_onboarding_token` | *(auto-set by 01-authentication.json)* |
+| `barber_onboarding_token` | *(auto-set by 01-authentication.json)* |
 
----
+### Auth Collection Requests
 
-## Recommended Run Order
+| # | Method | Endpoint | Description |
+|---|---|---|---|
+| 1 | POST | `/api/v1/auth/otp/send` | Send OTP to customer |
+| 2 | POST | `/api/v1/auth/otp/verify` | Verify customer OTP - captures onboarding or session tokens |
+| 3 | POST | `/api/v1/auth/otp/send` | Send OTP to barber |
+| 4 | POST | `/api/v1/auth/otp/verify` | Verify barber OTP - captures onboarding or session tokens |
+| 5 | POST | `/api/v1/auth/token/refresh` | Refresh customer access token |
+| 6 | POST | `/api/v1/auth/token/refresh` | Refresh barber access token |
+| 7 | POST | `/api/v1/auth/logout` | Logout customer *(Terminal)* |
+| 8 | POST | `/api/v1/auth/otp/resend` | Resend OTP (text channel) |
+| 9 | GET | `/api/v1/health` | Health check |
 
-### Barber side (must run first to create bookable data)
+### Recommended Run Order
 
-1. `01-authentication.json` → **2. Create Barber Session**
+**Barber side** (must run first to create bookable data):
+
+1. `01-authentication.json` → **3. Send Barber OTP** → **4. Verify Barber OTP**
 2. `02-onboarding.json` → **2. Complete Barber Profile** *(first run only)*
-3. `07-barber-profile-shop.json` — captures `shared_shop_id`, ensures shop is open
-4. `08-barber-employees.json` — at minimum run Add Employee to populate `shared_employee_id`
-5. `09-barber-services.json` — at minimum run Add Service to populate `shared_service_id`
-6. `11-barber-photos.json`
-7. `10-barber-bookings.json`
-8. `12-barber-earnings.json`
-9. `13-barber-ratings.json` *(requires seeded data — see Special Cases below)*
+3. Continue with barber collections in order.
 
-### Customer side
+**Customer side:**
 
-1. `01-authentication.json` → **1. Create Customer Session**
+1. `01-authentication.json` → **1. Send Customer OTP** → **2. Verify Customer OTP**
 2. `02-onboarding.json` → **1. Complete Customer Profile** *(first run only)*
-3. `03-customer-profile.json`
-4. `05-customer-shop-discovery.json`
-5. `04-customer-bookings.json`
-6. `06-customer-ratings.json`
+3. Continue with customer collections in order.
 
-> Requests marked ***(Terminal)*** are destructive (delete/sign-out). Run them last within their collection and do not run them if you need that data for subsequent requests.
+> Requests marked ***(Terminal)*** are destructive. Run them last within their collection and avoid them if you still need the related account or data for later requests.
 
 ---
 
@@ -233,18 +245,18 @@ Collections capture and share the following Postman globals automatically:
 
 | Global | Set by | Used by |
 |---|---|---|
-| `shared_shop_id` | `07-barber-profile-shop.json` request 1 | Customer collections, ratings |
-| `shared_employee_id` | `08-barber-employees.json` requests 1 & 2 | Customer bookings |
-| `shared_service_id` | `09-barber-services.json` requests 1 & 2 | Customer bookings |
-| `shared_booking_id` | `04-customer-bookings.json` requests 1 & 3 | Booking detail requests |
-| `shared_photo_id` | `11-barber-photos.json` requests 1 & 2 | Photo detail/delete |
+| `shared_shop_id` | `07-barber-profile-shop.json` request 1 | Customer collections and ratings |
+| `shared_employee_id` | `08-barber-employees.json` requests 1 and 2 | Customer bookings |
+| `shared_service_id` | `09-barber-services.json` requests 1 and 2 | Customer bookings |
+| `shared_booking_id` | `04-customer-bookings.json` requests 1 and 3 | Booking detail requests |
+| `shared_photo_id` | `11-barber-photos.json` requests 1 and 2 | Photo detail and delete |
 | `shared_barber_pin` | `07-barber-profile-shop.json` request 8 | Future PIN-gated requests |
 
 ---
 
 ## Special Cases
 
-### `13-barber-ratings.json` — seed data required
+### `13-barber-ratings.json` — Seed Data Required
 
 The rating reply and remove requests each need ratings in different states (no reply, has reply, removable). The live API cannot manufacture these on demand. Run the seed script first:
 
@@ -253,23 +265,10 @@ cd server
 node scripts/seed-barber-rating-mock-data.js
 ```
 
-### `06-customer-ratings.json` — Add Rating (request 2)
+### `06-customer-ratings.json` — Add Rating (Request 2)
 
-Succeeds once per customer/shop pair. Returns `409 Conflict` on every subsequent run because the API enforces one rating per customer per shop. This is expected behaviour, not a bug.
+This succeeds once per customer/shop pair. It returns `409 Conflict` on subsequent runs because the API allows only one rating per customer per shop.
 
-### `10-barber-bookings.json` — Delete Paid Booking (request 5)
+### `10-barber-bookings.json` — Delete Paid Booking (Request 5)
 
-Only succeeds when a booking with `paymentStatus: success` exists. The collection captures one automatically if the backend returns it — otherwise skip this request.
-
----
-
-## Sample Upload Asset
-
-All file-upload requests (profile picture, cover image, employee photo, gallery photos) are pre-wired to:
-
-```
-server/postman-collections/assets/sample-upload.png
-```
-
-The path is absolute. If you move the repository, update the `src` field in the affected form-data requests, or re-run `node scripts/regenerate-postman-collections.mjs` after updating the path constant in that script.
-
+This is destructive and should be left until the end of a test cycle, after any booking status, earnings, or customer confirmation checks are complete.
