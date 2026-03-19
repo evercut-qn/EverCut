@@ -22,6 +22,7 @@ class ServiceRepository {
         
         if (options.skip !== undefined) mongoQuery.skip(options.skip);
         if (options.limit !== undefined) mongoQuery.limit(options.limit);
+        mongoQuery.sort({ createdAt: -1 });
         return mongoQuery;
     }
 
@@ -36,11 +37,12 @@ class ServiceRepository {
         return query.sort({ createdAt: -1 }).lean();
     }
 
-    async findByShopIdAndName(shopId, serviceName) {
+    async findByShopIdAndName(shopId, serviceName, filters = {}) {
         return Service.findOne({
             shopId,
             serviceName: { $regex: new RegExp(`^${escapeRegex(serviceName)}$`, 'i') },
             isActive: true,
+            ...filters,
         });
     }
 

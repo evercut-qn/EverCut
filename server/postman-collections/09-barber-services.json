@@ -94,7 +94,7 @@
         "method": "GET",
         "header": [],
         "url": "{{base_url}}/{{api_prefix}}/barber/services",
-        "description": "Lists current services and captures the first Postman service ID when it already exists."
+        "description": "Lists current services from the paginated barber service endpoint and captures the first Postman service ID when it already exists."
       },
       "event": [
         {
@@ -113,7 +113,8 @@
               "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
               "const response = pm.response.json();",
-              "const services = Array.isArray(response.data) ? response.data : [];",
+              "const data = response.data || {};",
+              "const services = Array.isArray(data.items) ? data.items : [];",
               "const preferredService = services.find((service) => typeof service.serviceName === 'string' && service.serviceName.includes('Postman')) || services[0];",
               "if (preferredService && preferredService._id) { pm.collectionVariables.set('service_id', preferredService._id); pm.globals.set('shared_service_id', preferredService._id); }"
             ]
@@ -132,10 +133,10 @@
           }
         ],
         "url": "{{base_url}}/{{api_prefix}}/barber/services",
-        "description": "Creates a single service using only fields that the API validator accepts.",
+        "description": "Creates a single service using the fields shown in the current barber add-service UI. Duration is optional and intentionally omitted here.",
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"serviceName\": \"{{single_service_name}}\",\n  \"serviceType\": \"single\",\n  \"serviceFor\": \"male\",\n  \"duration\": 30,\n  \"actualPrice\": 500,\n  \"offerPrice\": 50\n}",
+          "raw": "{\n  \"serviceName\": \"{{single_service_name}}\",\n  \"serviceType\": \"single\",\n  \"serviceFor\": \"male\",\n  \"actualPrice\": 500,\n  \"offerPrice\": 50\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -187,10 +188,10 @@
           }
         ],
         "url": "{{base_url}}/{{api_prefix}}/barber/services",
-        "description": "Creates a bundled service using the fields required by the backend validator.",
+        "description": "Creates a bundled service using the fields shown in the current barber add-service UI. `bundledServices` is required and `totalDuration` is optional.",
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"serviceName\": \"{{bundled_service_name}}\",\n  \"serviceType\": \"bundled\",\n  \"serviceFor\": \"male\",\n  \"actualPrice\": 900,\n  \"offerPrice\": 100,\n  \"bundledServices\": [\"Haircut\", \"Beard Trim\", \"Head Massage\"],\n  \"totalDuration\": 75\n}",
+          "raw": "{\n  \"serviceName\": \"{{bundled_service_name}}\",\n  \"serviceType\": \"bundled\",\n  \"serviceFor\": \"male\",\n  \"actualPrice\": 900,\n  \"offerPrice\": 100,\n  \"bundledServices\": [\"Haircut\", \"Beard Trim\", \"Head Massage\"]\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -239,10 +240,10 @@
           }
         ],
         "url": "{{base_url}}/{{api_prefix}}/barber/services/{{service_id}}",
-        "description": "Updates the captured service with a validator-approved field.",
+        "description": "Updates the captured service with pricing and gender fields that the barber edit flow depends on.",
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"serviceFor\": \"unisex\"\n}",
+          "raw": "{\n  \"serviceFor\": \"unisex\",\n  \"actualPrice\": 550,\n  \"offerPrice\": 40\n}",
           "options": {
             "raw": {
               "language": "json"

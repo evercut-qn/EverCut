@@ -6,6 +6,7 @@ import userRepository from '../repositories/user.repository.js';
 import { BadRequestError, NotFoundError } from '../utils/api-error.js';
 import { serializeBarberProfile, serializeUpiDetails } from '../utils/barber-profile.utils.js';
 import { escapeRegex } from '../utils/regex.utils.js';
+import { normalizeServicePricing } from '../utils/service-pricing.utils.js';
 import {
     ALL_SERVICE_FOR,
     ALL_SHOP_AMENITIES,
@@ -355,12 +356,12 @@ export const getShopInfoForCustomer = async (shopId) => {
         serviceRepository.findByShopIdAndType(
             shopId,
             'single',
-            'serviceName duration finalPrice actualPrice offerPrice imageUrl serviceFor',
+            'serviceName duration finalPrice actualPrice offerPrice imageUrl serviceFor serviceType',
         ),
         serviceRepository.findByShopIdAndType(
             shopId,
             'bundled',
-            'serviceName bundledServices totalDuration totalPrice imageUrl serviceFor',
+            'serviceName bundledServices totalDuration totalPrice finalPrice actualPrice offerPrice imageUrl serviceFor serviceType',
         ),
         photoRepository.findByShopId(shopId, {}),
         ratingRepository.getShopSummary(shopId),
@@ -388,7 +389,10 @@ export const getShopInfoForCustomer = async (shopId) => {
 
     return {
         shop: safeShop,
-        services: { single: singleServices, bundled: bundledServices },
+        services: {
+            single: singleServices.map(normalizeServicePricing),
+            bundled: bundledServices.map(normalizeServicePricing),
+        },
         photos,
         ratings: { ...ratingSummary, details: formattedRatings },
     };

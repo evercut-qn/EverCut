@@ -60,7 +60,16 @@ const serviceSchema = new mongoose.Schema(
 // Indexes
 // ---------------------------------------------------------------------------
 serviceSchema.index({ shopId: 1, isActive: 1 });
-serviceSchema.index({ shopId: 1, serviceName: 1 }, { unique: true });
+serviceSchema.index(
+    { shopId: 1, serviceType: 1, serviceFor: 1, serviceName: 1 },
+    {
+        unique: true,
+        partialFilterExpression: {
+            isActive: true,
+            deletedAt: null,
+        },
+    },
+);
 serviceSchema.index({ serviceFor: 1 });
 
 // ---------------------------------------------------------------------------

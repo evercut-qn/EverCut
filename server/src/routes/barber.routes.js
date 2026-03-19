@@ -22,7 +22,7 @@ import {
 } from '../validators/employee.validator.js';
 import { photoFilterQuerySchema, photoUploadSchema } from '../validators/photo.validator.js';
 import { addReplySchema } from '../validators/rating.validator.js';
-import { addServiceSchema, updateServiceSchema } from '../validators/service.validator.js';
+import { addServiceSchema, serviceListQuerySchema, updateServiceSchema } from '../validators/service.validator.js';
 import {
     toggleStatusSchema,
     updateBusinessSchema,
@@ -65,7 +65,7 @@ router.put('/employees/:id', validate(employeeIdParamSchema, 'params'), uploadEm
 router.delete('/employees/:id', validate(employeeIdParamSchema, 'params'), employeeCtrl.deleteEmployee);
 
 // Services
-router.get('/services', serviceCtrl.getServices);
+router.get('/services', validate(serviceListQuerySchema, 'query'), serviceCtrl.getServices);
 router.post('/services', validate(addServiceSchema, 'body'), serviceCtrl.addService);
 router.put('/services/:id', validate(objectIdParamSchema, 'params'), validate(updateServiceSchema, 'body'), serviceCtrl.updateService);
 router.delete('/services/:id', validate(objectIdParamSchema, 'params'), serviceCtrl.deleteService);

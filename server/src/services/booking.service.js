@@ -8,12 +8,19 @@ import { NotFoundError, BadRequestError, ForbiddenError } from '../utils/api-err
 import { isBookingInFuture, isWithinShopHours, getDayOfWeek, isWithinCancellationWindow } from '../utils/time.utils.js';
 import { buildPagination } from '../utils/pagination.utils.js';
 import { BOOKING_STATUS, MAX_RESCHEDULE_COUNT, CANCELLATION_WINDOW_HOURS } from '../utils/constants.js';
+import { getEffectiveServicePrice, normalizeServicePricing } from '../utils/service-pricing.utils.js';
 
 /**
  * Booking service — all booking business logic.
  */
 
 // ── Customer: book a salon ───────────────────────────────────────────────
+
+const normalizeBookedServices = (services = []) => services.map(normalizeServicePricing);
+const sumServicePrices = (services = []) => services.reduce(
+    (sum, service) => sum + (getEffectiveServicePrice(service) ?? 0),
+    0,
+);
 
 export const bookSalon = async (userId, data) => {
     const { serviceId, employeeId, shopId, date, time, amount } = data;
@@ -47,15 +54,26 @@ export const bookSalon = async (userId, data) => {
     const serviceIds = Array.isArray(serviceId) ? serviceId : [serviceId];
 
     // Validate services
-    const services = await serviceRepository.findByIds(serviceIds, 'serviceName finalPrice');
+    const services = normalizeBookedServices(
+        await serviceRepository.findByIds(
+            serviceIds,
+            'serviceName finalPrice totalPrice actualPrice offerPrice serviceType shopId',
+        ),
+    );
     if (!services.length) throw new NotFoundError('Services');
+    if (
+        services.length !== serviceIds.length
+        || services.some((service) => service.shopId?.toString() !== shopId)
+    ) {
+        throw new BadRequestError('Selected services must belong to the target shop');
+    }
 
     // Claim employee slot atomically
     const employee = await employeeRepository.claimSlot(employeeId, date, time, customerId, serviceIds);
     if (!employee) throw new BadRequestError('Employee not available at this date/time');
 
     // Calculate amount
-    const totalAmount = amount || services.reduce((sum, s) => sum + (s.finalPrice || 0), 0);
+    const totalAmount = amount || sumServicePrices(services);
 
     // Create booking
     const booking = await bookingRepository.create({
@@ -93,8 +111,13 @@ export const getBookingDetails = async (bookingId, userId) => {
         throw new ForbiddenError('You can only access your own bookings');
     }
 
-    const services = await serviceRepository.findByIds(booking.serviceIds, 'serviceName finalPrice imageUrl serviceType');
-    const totalAmount = services.reduce((sum, s) => sum + (s.finalPrice || 0), 0);
+    const services = normalizeBookedServices(
+        await serviceRepository.findByIds(
+            booking.serviceIds,
+            'serviceName finalPrice totalPrice actualPrice offerPrice imageUrl serviceType',
+        ),
+    );
+    const totalAmount = sumServicePrices(services);
 
     return {
         bookingId: booking._id,
@@ -212,8 +235,14 @@ export const reorderBooking = async (userId, bookingId, newDate, newTime) => {
             throw new BadRequestError('Cannot book for a past date/time');
         }
 
-        const services = await serviceRepository.findByIds(existing.serviceIds, 'serviceName finalPrice', { session });
-        const totalAmount = services.reduce((sum, s) => sum + (s.finalPrice || 0), 0);
+        const services = normalizeBookedServices(
+            await serviceRepository.findByIds(
+                existing.serviceIds,
+                'serviceName finalPrice totalPrice actualPrice offerPrice serviceType',
+                { session },
+            ),
+        );
+        const totalAmount = sumServicePrices(services);
 
         const employee = await employeeRepository.claimSlot(existing.employeeId, newDate, newTime, customerId, existing.serviceIds, { session });
         if (!employee) { await session.abortTransaction(); session.endSession(); throw new BadRequestError('Employee not available'); }
@@ -297,8 +326,13 @@ export const getBookingConfirmation = async (bookingId, userId) => {
         throw new ForbiddenError('You can only access your own bookings');
     }
 
-    const services = await serviceRepository.findByIds(booking.serviceIds, 'serviceName finalPrice');
-    const totalAmount = services.reduce((sum, s) => sum + (s.finalPrice || 0), 0);
+    const services = normalizeBookedServices(
+        await serviceRepository.findByIds(
+            booking.serviceIds,
+            'serviceName finalPrice totalPrice actualPrice offerPrice serviceType',
+        ),
+    );
+    const totalAmount = sumServicePrices(services);
 
     return {
         shopCoverUrl: booking.shopId?.coverUrl,
@@ -364,8 +398,13 @@ export const deleteServiceFromBooking = async (bookingId, userId, serviceId) => 
     if (booking.serviceIds.length === 0) {
         booking.totalAmount = 0;
     } else {
-        const remaining = await serviceRepository.findByIds(booking.serviceIds, 'finalPrice');
-        booking.totalAmount = remaining.reduce((sum, s) => sum + (s.finalPrice || 0), 0);
+        const remaining = normalizeBookedServices(
+            await serviceRepository.findByIds(
+                booking.serviceIds,
+                'finalPrice totalPrice actualPrice offerPrice serviceType',
+            ),
+        );
+        booking.totalAmount = sumServicePrices(remaining);
     }
 
     await booking.save();
