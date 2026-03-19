@@ -10,7 +10,6 @@ export const bookSalonSchema = Joi.object({
     ).required(),
     date: dateString.required(),
     time: timeString.required(),
-    amount: Joi.number().min(0).optional(),
 });
 
 export const rescheduleSchema = Joi.object({

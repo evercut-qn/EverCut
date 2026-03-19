@@ -1,4 +1,5 @@
 import ratingRepository from '../repositories/rating.repository.js';
+import customerRepository from '../repositories/customer.repository.js';
 import shopRepository from '../repositories/shop.repository.js';
 import { NotFoundError, BadRequestError, ConflictError } from '../utils/api-error.js';
 import { buildPagination } from '../utils/pagination.utils.js';

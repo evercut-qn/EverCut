@@ -108,7 +108,8 @@
               "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
               "const response = pm.response.json();",
-              "const employees = Array.isArray(response.data) ? response.data : [];",
+              "const data = response.data || {};",
+              "const employees = Array.isArray(data.items) ? data.items : [];",
               "const preferredEmployee = employees.find((employee) => typeof employee.firstName === 'string' && employee.firstName.includes('Postman')) || employees[0];",
               "if (preferredEmployee && preferredEmployee._id) { pm.collectionVariables.set('employee_id', preferredEmployee._id); pm.globals.set('shared_employee_id', preferredEmployee._id); }"
             ]

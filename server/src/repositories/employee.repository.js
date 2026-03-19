@@ -37,16 +37,21 @@ class EmployeeRepository {
      * Atomically claim a slot for a booking.
      * Returns null if the slot is already taken or the date is blocked.
      */
-    async claimSlot(employeeId, date, time, customerId, serviceIds, options = {}) {
+    async claimSlot(employeeId, date, time, options = {}) {
         const queryOptions = { new: true };
         if (options.session) queryOptions.session = options.session;
 
+        const query = {
+            _id: employeeId,
+            isActive: true,
+            deletedAt: null,
+            bookedSlots: { $not: { $elemMatch: { date, time } } },
+            blockedDates: { $ne: new Date(date) },
+        };
+        if (options.shopId) query.shopId = options.shopId;
+
         return Employee.findOneAndUpdate(
-            {
-                _id: employeeId,
-                bookedSlots: { $not: { $elemMatch: { date, time } } },
-                blockedDates: { $ne: new Date(date) },
-            },
+            query,
             {
                 $push: {
                     bookedSlots: { date, time },

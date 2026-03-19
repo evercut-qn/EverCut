@@ -64,6 +64,10 @@ serviceSchema.index(
     { shopId: 1, serviceType: 1, serviceFor: 1, serviceName: 1 },
     {
         unique: true,
+        collation: {
+            locale: 'en',
+            strength: 2,
+        },
         partialFilterExpression: {
             isActive: true,
             deletedAt: null,

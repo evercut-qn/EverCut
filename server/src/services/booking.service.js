@@ -23,7 +23,7 @@ const sumServicePrices = (services = []) => services.reduce(
 );
 
 export const bookSalon = async (userId, data) => {
-    const { serviceId, employeeId, shopId, date, time, amount } = data;
+    const { serviceId, employeeId, shopId, date, time } = data;
 
     const customer = await customerRepository.findByUserId(userId);
     if (!customer) throw new NotFoundError('Customer profile');
@@ -69,11 +69,10 @@ export const bookSalon = async (userId, data) => {
     }
 
     // Claim employee slot atomically
-    const employee = await employeeRepository.claimSlot(employeeId, date, time, customerId, serviceIds);
+    const employee = await employeeRepository.claimSlot(employeeId, date, time, { shopId });
     if (!employee) throw new BadRequestError('Employee not available at this date/time');
 
-    // Calculate amount
-    const totalAmount = amount || sumServicePrices(services);
+    const totalAmount = sumServicePrices(services);
 
     // Create booking
     const booking = await bookingRepository.create({
@@ -195,10 +194,10 @@ export const rescheduleBooking = async (bookingId, userId, newDate, newTime) => 
     const oldDate = booking.date.toISOString().split('T')[0];
     await employeeRepository.releaseSlot(booking.employeeId, oldDate, booking.time);
 
-    const claimed = await employeeRepository.claimSlot(booking.employeeId, newDate, newTime);
+    const claimed = await employeeRepository.claimSlot(booking.employeeId, newDate, newTime, { shopId: booking.shopId });
     if (!claimed) {
         // Restore old slot if new claim fails
-        await employeeRepository.claimSlot(booking.employeeId, oldDate, booking.time);
+        await employeeRepository.claimSlot(booking.employeeId, oldDate, booking.time, { shopId: booking.shopId });
         throw new BadRequestError('Employee not available at the new date/time');
     }
 
@@ -223,6 +222,11 @@ export const reorderBooking = async (userId, bookingId, newDate, newTime) => {
     try {
         const existing = await bookingRepository.findById(bookingId, { session });
         if (!existing) { await session.abortTransaction(); session.endSession(); throw new NotFoundError('Original booking'); }
+        if ((existing.customerId._id || existing.customerId).toString() !== customerId.toString()) {
+            await session.abortTransaction();
+            session.endSession();
+            throw new ForbiddenError('You can only reorder your own bookings');
+        }
 
         // Prevent same date/time
         if (existing.date.toISOString().split('T')[0] === new Date(newDate).toISOString().split('T')[0] && existing.time === newTime) {
@@ -244,7 +248,10 @@ export const reorderBooking = async (userId, bookingId, newDate, newTime) => {
         );
         const totalAmount = sumServicePrices(services);
 
-        const employee = await employeeRepository.claimSlot(existing.employeeId, newDate, newTime, customerId, existing.serviceIds, { session });
+        const employee = await employeeRepository.claimSlot(existing.employeeId, newDate, newTime, {
+            shopId: existing.shopId,
+            session,
+        });
         if (!employee) { await session.abortTransaction(); session.endSession(); throw new BadRequestError('Employee not available'); }
 
         const newBooking = await bookingRepository.create({
@@ -367,10 +374,10 @@ export const updateBooking = async (bookingId, userId, { employeeId, date, time 
     await employeeRepository.releaseSlot(booking.employeeId, oldDate, booking.time);
 
     // Claim the new slot
-    const employee = await employeeRepository.claimSlot(employeeId, date, time);
+    const employee = await employeeRepository.claimSlot(employeeId, date, time, { shopId: booking.shopId });
     if (!employee) {
         // Restore the old slot if the new claim fails
-        await employeeRepository.claimSlot(booking.employeeId, oldDate, booking.time);
+        await employeeRepository.claimSlot(booking.employeeId, oldDate, booking.time, { shopId: booking.shopId });
         throw new BadRequestError('Employee not available at this date/time');
     }
 

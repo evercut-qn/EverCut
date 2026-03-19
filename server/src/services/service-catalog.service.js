@@ -104,6 +104,14 @@ const ensureUniqueActiveService = async (shopId, serviceData, currentServiceId =
     }
 };
 
+const rethrowDuplicateServiceWrite = (error) => {
+    if (error?.code === 11000) {
+        throw new ConflictError('Service already exists for this service type and gender');
+    }
+
+    throw error;
+};
+
 export const addService = async (ownerId, data) => {
     const shop = await shopRepository.findByOwnerId(ownerId);
     if (!shop) throw new NotFoundError('Shop profile');
@@ -111,11 +119,16 @@ export const addService = async (ownerId, data) => {
     const serviceData = buildServicePayload(data);
     await ensureUniqueActiveService(shop._id, serviceData);
 
-    const createdService = await serviceRepository.create({
-        shopId: shop._id,
-        imageUrl: await resolveServiceImage(serviceData.serviceName, serviceData.serviceType),
-        ...serviceData,
-    });
+    let createdService;
+    try {
+        createdService = await serviceRepository.create({
+            shopId: shop._id,
+            imageUrl: await resolveServiceImage(serviceData.serviceName, serviceData.serviceType),
+            ...serviceData,
+        });
+    } catch (error) {
+        rethrowDuplicateServiceWrite(error);
+    }
 
     return normalizeServicePricing(createdService);
 };
@@ -148,7 +161,12 @@ export const updateService = async (ownerId, serviceId, data) => {
         updateData.imageUrl = await resolveServiceImage(updateData.serviceName, updateData.serviceType);
     }
 
-    const updated = await serviceRepository.updateById(serviceId, shop._id, updateData);
+    let updated;
+    try {
+        updated = await serviceRepository.updateById(serviceId, shop._id, updateData);
+    } catch (error) {
+        rethrowDuplicateServiceWrite(error);
+    }
     if (!updated) throw new NotFoundError('Service');
     return normalizeServicePricing(updated);
 };

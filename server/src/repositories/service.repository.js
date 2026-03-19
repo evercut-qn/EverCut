@@ -40,10 +40,10 @@ class ServiceRepository {
     async findByShopIdAndName(shopId, serviceName, filters = {}) {
         return Service.findOne({
             shopId,
-            serviceName: { $regex: new RegExp(`^${escapeRegex(serviceName)}$`, 'i') },
+            serviceName: serviceName.trim(),
             isActive: true,
             ...filters,
-        });
+        }).collation({ locale: 'en', strength: 2 });
     }
 
     async findByShopIds(shopIds, filters = {}, selectFields) {
