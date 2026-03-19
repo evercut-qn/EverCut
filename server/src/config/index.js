@@ -83,7 +83,7 @@ const config = Object.freeze({
     otpTemplateId: requireEnv('MSG91_OTP_TEMPLATE_ID'),
     otpLength: 6,
     otpExpiry: 10,                                              // minutes
-    testMode: process.env.NODE_ENV !== 'production' && false,   // flip to true in dev to skip real SMS
+    testMode: process.env.NODE_ENV !== 'production' && true,   // flip to true in dev to skip real SMS
     testOtp: '123456',
     baseUrl: 'https://control.msg91.com/api/v5',
   }),

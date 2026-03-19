@@ -1079,6 +1079,7 @@ const barberProfileCollection = {
         url: '{{base_url}}/{{api_prefix}}/barber/profile',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
         body: jsonBody(`{
+  "email": "test.barber.updated@example.com",
   "firstName": "Test",
   "lastName": "Barber",
   "shopOwner": "Test Barber",
