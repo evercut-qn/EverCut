@@ -285,15 +285,14 @@
         "method": "PUT",
         "header": [],
         "url": "{{base_url}}/{{api_prefix}}/barber/profile/picture",
-        "description": "Uploads or replaces the owner profile picture using the local sample image.",
+        "description": "Uploads or replaces the owner profile picture.",
         "body": {
           "mode": "formdata",
           "formdata": [
             {
               "key": "photo",
               "type": "file",
-              "src": "C:\\Users\\manis\\Projects\\EverCut\\server\\postman-collections\\assets\\sample-upload.png",
-              "description": "Prewired local sample upload"
+              "description": "Attach profile picture file manually in Postman"
             }
           ]
         }
@@ -325,15 +324,14 @@
         "method": "PUT",
         "header": [],
         "url": "{{base_url}}/{{api_prefix}}/barber/profile/cover",
-        "description": "Uploads or replaces the shop cover image using the same local sample file.",
+        "description": "Uploads or replaces the shop cover image.",
         "body": {
           "mode": "formdata",
           "formdata": [
             {
               "key": "cover",
               "type": "file",
-              "src": "C:\\Users\\manis\\Projects\\EverCut\\server\\postman-collections\\assets\\sample-upload.png",
-              "description": "Prewired local sample upload"
+              "description": "Attach cover image file manually in Postman"
             }
           ]
         }

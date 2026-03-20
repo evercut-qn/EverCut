@@ -132,8 +132,7 @@
             {
               "key": "photo",
               "type": "file",
-              "src": "C:\\Users\\manis\\Projects\\EverCut\\server\\postman-collections\\assets\\sample-upload.png",
-              "description": "Prewired local sample upload"
+              "description": "Attach customer photo file manually in Postman"
             }
           ]
         },
@@ -297,20 +296,17 @@
             {
               "key": "shopImages",
               "type": "file",
-              "src": "C:\\Users\\manis\\Projects\\EverCut\\server\\postman-collections\\assets\\sample-upload.png",
-              "description": "Sample shop image 1 of 3"
+              "description": "Attach shop image 1 of 3 manually in Postman"
             },
             {
               "key": "shopImages",
               "type": "file",
-              "src": "C:\\Users\\manis\\Projects\\EverCut\\server\\postman-collections\\assets\\sample-upload.png",
-              "description": "Sample shop image 2 of 3"
+              "description": "Attach shop image 2 of 3 manually in Postman"
             },
             {
               "key": "shopImages",
               "type": "file",
-              "src": "C:\\Users\\manis\\Projects\\EverCut\\server\\postman-collections\\assets\\sample-upload.png",
-              "description": "Sample shop image 3 of 3"
+              "description": "Attach shop image 3 of 3 manually in Postman"
             }
           ]
         },

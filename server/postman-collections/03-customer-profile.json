@@ -154,8 +154,7 @@
             {
               "key": "photo",
               "type": "file",
-              "src": "C:\\Users\\manis\\Projects\\EverCut\\server\\postman-collections\\assets\\sample-upload.png",
-              "description": "Optional sample replacement photo"
+              "description": "Attach replacement photo file manually in Postman (optional)"
             }
           ]
         }

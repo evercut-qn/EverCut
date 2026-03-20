@@ -27,7 +27,6 @@ import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const COLLECTIONS_DIR = resolve(__dirname, '..', 'postman-collections');
-const SAMPLE_UPLOAD_PATH = resolve(COLLECTIONS_DIR, 'assets', 'sample-upload.png');
 
 mkdirSync(COLLECTIONS_DIR, { recursive: true });
 
@@ -87,12 +86,11 @@ const formDataBody = (formdata) => ({
   formdata,
 });
 
-const fileField = (key, description) => ({
-  key,
-  type: 'file',
-  src: SAMPLE_UPLOAD_PATH,
-  description,
-});
+const fileField = (key, description) => {
+  const field = { key, type: 'file' };
+  if (description) field.description = description;
+  return field;
+};
 
 const textField = (key, value, description) => {
   const field = { key, value, type: 'text' };
@@ -532,7 +530,7 @@ const onboardingCollection = {
           textField('dateOfBirth', '1994-06-15'),
           textField('address', customerLocationText),
           textField('location', customerLocationGeoJson, 'GeoJSON point near the barber test shop'),
-          fileField('photo', 'Prewired local sample upload'),
+          fileField('photo', 'Attach customer photo file manually in Postman'),
         ]),
         description: 'Creates the customer for the OTP-verified customer test user. A rerun returns 409 because onboarding only succeeds once per account.',
         event: testEvent(
@@ -581,9 +579,9 @@ const onboardingCollection = {
           textField('upiAddress', 'test.barber@upi'),
           textField('pin', '1234'),
           textField('confirmPin', '1234'),
-          fileField('shopImages', 'Sample shop image 1 of 3'),
-          fileField('shopImages', 'Sample shop image 2 of 3'),
-          fileField('shopImages', 'Sample shop image 3 of 3'),
+          fileField('shopImages', 'Attach shop image 1 of 3 manually in Postman'),
+          fileField('shopImages', 'Attach shop image 2 of 3 manually in Postman'),
+          fileField('shopImages', 'Attach shop image 3 of 3 manually in Postman'),
         ]),
         description: 'Creates the barber shop for the OTP-verified barber test user. The three shop image fields already point to the local sample file.',
         event: testEvent(
@@ -649,7 +647,7 @@ const customerCollection = {
           textField('email', 'test.customer@example.com'),
           textField('address', `${customerLocationText}, India`),
           textField('location', customerLocationGeoJson),
-          fileField('photo', 'Optional sample replacement photo'),
+          fileField('photo', 'Attach replacement photo file manually in Postman (optional)'),
         ]),
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -1153,8 +1151,8 @@ const barberProfileCollection = {
       ...request({
         method: 'PUT',
         url: '{{base_url}}/{{api_prefix}}/barber/profile/picture',
-        body: formDataBody([fileField('photo', 'Prewired local sample upload')]),
-        description: 'Uploads or replaces the owner profile picture using the local sample image.',
+        body: formDataBody([fileField('photo', 'Attach profile picture file manually in Postman')]),
+        description: 'Uploads or replaces the owner profile picture.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
     },
@@ -1163,8 +1161,8 @@ const barberProfileCollection = {
       ...request({
         method: 'PUT',
         url: '{{base_url}}/{{api_prefix}}/barber/profile/cover',
-        body: formDataBody([fileField('cover', 'Prewired local sample upload')]),
-        description: 'Uploads or replaces the shop cover image using the same local sample file.',
+        body: formDataBody([fileField('cover', 'Attach cover image file manually in Postman')]),
+        description: 'Uploads or replaces the shop cover image.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
     },
@@ -1265,7 +1263,7 @@ const barberEmployeesCollection = {
           textField('gender', 'Female'),
           textField('dateOfBirth', '1995-05-15'),
           textField('workingHours', '{"start":"09:00","end":"18:00"}'),
-          fileField('photo', 'Optional sample employee photo'),
+          fileField('photo', 'Attach employee photo file manually in Postman (optional)'),
         ]),
         description: 'Creates a new employee with a generated phone number so the request stays rerunnable.',
         event: [
@@ -1292,7 +1290,7 @@ const barberEmployeesCollection = {
           textField('lastName', 'Automation Updated'),
           textField('workingHours', '{"start":"10:00","end":"19:00"}'),
           textField('blockedDates', '[]'),
-          fileField('photo', 'Optional sample employee photo replacement'),
+          fileField('photo', 'Attach employee photo file manually in Postman (optional)'),
         ]),
         description: 'Updates the captured employee with only fields that the validator supports.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
@@ -1554,7 +1552,7 @@ const barberPhotosCollection = {
         method: 'POST',
         url: '{{base_url}}/{{api_prefix}}/barber/photos',
         body: formDataBody([
-          fileField('photos', 'Prewired local sample upload'),
+          fileField('photos', 'Attach photo file manually in Postman'),
           textField('photoType', 'shop_interior'),
           textField('description', 'Uploaded from the automated Postman photo collection'),
         ]),

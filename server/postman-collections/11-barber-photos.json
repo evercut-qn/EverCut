@@ -83,8 +83,8 @@
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/barber/photos?photoType=all&page=1&limit=10",
-        "description": "Lists the current gallery from the paginated photo endpoint and captures the first photo ID. Barber onboarding already creates gallery photos."
+        "url": "{{base_url}}/{{api_prefix}}/barber/photos",
+        "description": "Lists the current gallery and captures the first photo ID. Barber onboarding already creates three gallery photos."
       },
       "event": [
         {
@@ -103,8 +103,7 @@
               "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
               "const response = pm.response.json();",
-              "const data = response.data || {};",
-              "const photos = Array.isArray(data.items) ? data.items : [];",
+              "const photos = Array.isArray(response.data) ? response.data : [];",
               "const firstPhoto = photos[0];",
               "if (firstPhoto && firstPhoto._id) { pm.collectionVariables.set('photo_id', firstPhoto._id); pm.globals.set('shared_photo_id', firstPhoto._id); }"
             ]
@@ -125,8 +124,7 @@
             {
               "key": "photos",
               "type": "file",
-              "src": "C:\\Users\\manis\\Projects\\EverCut\\server\\postman-collections\\assets\\sample-upload.png",
-              "description": "Prewired local sample upload"
+              "description": "Attach photo file manually in Postman"
             },
             {
               "key": "photoType",
