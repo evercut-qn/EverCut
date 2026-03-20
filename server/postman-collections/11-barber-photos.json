@@ -103,7 +103,8 @@
               "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
               "const response = pm.response.json();",
-              "const photos = Array.isArray(response.data) ? response.data : [];",
+              "const data = response.data || {};",
+              "const photos = Array.isArray(data.items) ? data.items : [];",
               "const firstPhoto = photos[0];",
               "if (firstPhoto && firstPhoto._id) { pm.collectionVariables.set('photo_id', firstPhoto._id); pm.globals.set('shared_photo_id', firstPhoto._id); }"
             ]

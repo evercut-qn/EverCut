@@ -89,12 +89,12 @@
   ],
   "item": [
     {
-      "name": "1. Get Nearby Shops And Capture Shop ID",
+      "name": "1. Get Past Completed Booking And Capture Shop ID",
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/customer/shops/nearby?coordinates={{coordinates}}",
-        "description": "Captures the nearby Postman shop ID so the rest of the rating flow is ready without manual copy-paste."
+        "url": "{{base_url}}/{{api_prefix}}/customer/bookings?type=past&limit=50",
+        "description": "Captures the shop ID from the first completed past booking. The rating API only accepts shops where the authenticated customer has completed at least one booking."
       },
       "event": [
         {
@@ -113,9 +113,11 @@
               "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
               "const response = pm.response.json();",
-              "const shops = Array.isArray(response.data) ? response.data : [];",
-              "const preferredShop = shops.find((shop) => typeof shop.shopName === 'string' && shop.shopName.includes('Postman')) || shops[0];",
-              "if (preferredShop && preferredShop._id) { pm.collectionVariables.set('shop_id', preferredShop._id); pm.globals.set('shared_shop_id', preferredShop._id); }"
+              "const data = response.data || {};",
+              "const bookings = Array.isArray(data.items) ? data.items : [];",
+              "const completedBooking = bookings.find((booking) => booking && booking.status === 'completed' && booking.shopId && booking.shopId._id);",
+              "if (completedBooking && completedBooking.shopId && completedBooking.shopId._id) { pm.collectionVariables.set('shop_id', completedBooking.shopId._id); pm.globals.set('shared_shop_id', completedBooking.shopId._id); }",
+              "if (!pm.collectionVariables.get('shop_id')) { console.warn('No completed booking was found for the authenticated customer. Complete a booking first before running the customer ratings collection.'); }"
             ]
           }
         }

@@ -1,4 +1,16 @@
+import mongoose from 'mongoose';
 import Rating from '../models/rating.model.js';
+import { trustQueryOperators } from '../utils/mongoose-query.utils.js';
+
+const RATING_CUSTOMER_POPULATE = {
+    path: 'customerId',
+    select: 'firstName lastName photoUrl',
+};
+
+const buildReplyStateFilter = (ratingId, hasReply) => trustQueryOperators({
+    _id: ratingId,
+    'reply.text': { $exists: hasReply },
+});
 
 class RatingRepository {
     async create(data) {
@@ -15,13 +27,9 @@ class RatingRepository {
 
     async findByShop(shopId, options = {}) {
         const query = Rating.find({ shopId })
-            .populate({
-                path: 'customerId',
-                select: 'firstName lastName userId',
-                populate: { path: 'userId', select: 'email' }
-            })
+            .populate(RATING_CUSTOMER_POPULATE)
             .sort({ createdAt: -1 });
-            
+
         if (options.skip !== undefined) query.skip(options.skip);
         if (options.limit !== undefined) query.limit(options.limit);
         return query;
@@ -36,60 +44,90 @@ class RatingRepository {
     }
 
     async getShopSummary(shopId) {
-        const ratings = await Rating.find({ shopId }).lean();
-        const total = ratings.length;
-        const average = total > 0
-            ? +(ratings.reduce((sum, r) => sum + r.rating, 0) / total).toFixed(1)
-            : 0;
+        const normalizedShopId = typeof shopId === 'string'
+            ? new mongoose.Types.ObjectId(shopId)
+            : shopId;
 
-        const stars = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
-        ratings.forEach((r) => {
-            if (r.rating >= 1 && r.rating <= 5) stars[r.rating] += 1;
-        });
+        const [summary] = await Rating.aggregate([
+            { $match: { shopId: normalizedShopId } },
+            {
+                $group: {
+                    _id: '$shopId',
+                    totalReviews: { $sum: 1 },
+                    averageRating: { $avg: '$rating' },
+                    fiveStar: {
+                        $sum: { $cond: [{ $eq: ['$rating', 5] }, 1, 0] },
+                    },
+                    fourStar: {
+                        $sum: { $cond: [{ $eq: ['$rating', 4] }, 1, 0] },
+                    },
+                    threeStar: {
+                        $sum: { $cond: [{ $eq: ['$rating', 3] }, 1, 0] },
+                    },
+                    twoStar: {
+                        $sum: { $cond: [{ $eq: ['$rating', 2] }, 1, 0] },
+                    },
+                    oneStar: {
+                        $sum: { $cond: [{ $eq: ['$rating', 1] }, 1, 0] },
+                    },
+                },
+            },
+        ]);
 
-        return { averageRating: average, totalReviews: total, stars };
+        if (!summary) {
+            return {
+                averageRating: 0,
+                totalReviews: 0,
+                stars: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 },
+            };
+        }
+
+        return {
+            averageRating: Number(summary.averageRating.toFixed(1)),
+            totalReviews: summary.totalReviews,
+            stars: {
+                5: summary.fiveStar,
+                4: summary.fourStar,
+                3: summary.threeStar,
+                2: summary.twoStar,
+                1: summary.oneStar,
+            },
+        };
     }
 
     async addReply(ratingId, replyText, repliedBy) {
-        return Rating.findByIdAndUpdate(
-            ratingId,
+        return Rating.findOneAndUpdate(
+            buildReplyStateFilter(ratingId, false),
             {
-                reply: {
-                    text: replyText,
-                    repliedAt: new Date(),
-                    repliedBy,
+                $set: {
+                    'reply.text': replyText,
+                    'reply.repliedAt': new Date(),
+                    'reply.repliedBy': repliedBy,
                 },
             },
-        ).populate({
-            path: 'customerId',
-            select: 'firstName lastName userId',
-            populate: { path: 'userId', select: 'email' }
-        });
+            { new: true, runValidators: true },
+        ).populate(RATING_CUSTOMER_POPULATE);
     }
 
     async updateReply(ratingId, replyText) {
-        return Rating.findByIdAndUpdate(
-            ratingId,
+        return Rating.findOneAndUpdate(
+            buildReplyStateFilter(ratingId, true),
             {
-                'reply.text': replyText,
-                'reply.repliedAt': new Date(),
+                $set: {
+                    'reply.text': replyText,
+                    'reply.repliedAt': new Date(),
+                },
             },
-        ).populate({
-            path: 'customerId',
-            select: 'firstName lastName userId',
-            populate: { path: 'userId', select: 'email' }
-        });
+            { new: true, runValidators: true },
+        ).populate(RATING_CUSTOMER_POPULATE);
     }
 
     async deleteReply(ratingId) {
-        return Rating.findByIdAndUpdate(
-            ratingId,
+        return Rating.findOneAndUpdate(
+            buildReplyStateFilter(ratingId, true),
             { $unset: { reply: '' } },
-        ).populate({
-            path: 'customerId',
-            select: 'firstName lastName userId',
-            populate: { path: 'userId', select: 'email' }
-        });
+            { new: true },
+        ).populate(RATING_CUSTOMER_POPULATE);
     }
 }
 

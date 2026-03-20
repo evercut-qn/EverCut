@@ -113,7 +113,8 @@
               "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
               "const response = pm.response.json();",
-              "const services = Array.isArray(response.data) ? response.data : [];",
+              "const data = response.data || {};",
+              "const services = Array.isArray(data.items) ? data.items : [];",
               "const preferredService = services.find((service) => typeof service.serviceName === 'string' && service.serviceName.includes('Postman')) || services[0];",
               "if (preferredService && preferredService._id) { pm.collectionVariables.set('service_id', preferredService._id); pm.globals.set('shared_service_id', preferredService._id); }"
             ]

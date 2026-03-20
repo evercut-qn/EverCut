@@ -104,7 +104,7 @@ Validation and field-level failures are returned inside `data.errors`.
 
 | # | Method | Endpoint | Description |
 |---|---|---|---|
-| 1 | GET | `/api/v1/customer/shops/nearby` | Bootstrap: get shop ID for the rating |
+| 1 | GET | `/api/v1/customer/bookings?type=past&limit=50` | Bootstrap: capture a shop ID from a completed past booking |
 | 2 | POST | `/api/v1/customer/ratings` | Submit a rating *(once per customer/shop - returns 409 on rerun)* |
 | 3 | GET | `/api/v1/customer/shops/{{shop_id}}/ratings` | List shop ratings |
 | 4 | GET | `/api/v1/customer/shops/{{shop_id}}/ratings/summary` | Get rating summary |

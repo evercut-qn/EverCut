@@ -12,14 +12,15 @@ export const addRatingSchema = Joi.object({
         'number.max': 'Rating must be between 1 and 5',
         'any.required': 'Rating is required',
     }),
-    review: Joi.string().max(500).allow('').optional().messages({
+    review: Joi.string().trim().max(500).allow('').optional().messages({
         'string.max': 'Review cannot exceed 500 characters',
     }),
 });
 
 export const addReplySchema = Joi.object({
-    replyText: Joi.string().required().max(500).messages({
+    replyText: Joi.string().trim().min(1).max(500).required().messages({
         'string.empty': 'Reply text is required',
+        'string.min': 'Reply text is required',
         'any.required': 'Reply text is required',
         'string.max': 'Reply text cannot exceed 500 characters',
     }),

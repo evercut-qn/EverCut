@@ -1,4 +1,5 @@
 import Booking from '../models/booking.model.js';
+import { BOOKING_STATUS } from '../utils/constants.js';
 import { trustQueryOperators } from '../utils/mongoose-query.utils.js';
 
 class BookingRepository {
@@ -153,6 +154,16 @@ class BookingRepository {
             .populate('serviceIds', 'serviceName offerPrice duration')
             .populate('employeeId', 'firstName lastName')
             .populate('shopId', 'shopName address');
+    }
+
+    async hasCompletedBooking(customerId, shopId) {
+        const booking = await Booking.exists(trustQueryOperators({
+            customerId,
+            shopId,
+            status: BOOKING_STATUS.COMPLETED,
+        }));
+
+        return Boolean(booking);
     }
 
     // ── Aggregations ───────────────────────────────────────────────────
