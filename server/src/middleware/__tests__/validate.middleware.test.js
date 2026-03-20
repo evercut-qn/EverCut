@@ -8,6 +8,7 @@ import {
     bookingsByStatusQuerySchema,
     customerBookingsQuerySchema,
 } from '../../validators/booking.validator.js';
+import { addEmployeeSchema } from '../../validators/employee.validator.js';
 import { serviceListQuerySchema } from '../../validators/service.validator.js';
 import { getValidatedRequestData } from '../../utils/request-validation.utils.js';
 
@@ -151,5 +152,28 @@ test('booking query schemas preserve pagination fields', () => {
         status: 'confirmed',
         page: 3,
         limit: 10,
+    });
+});
+
+test('employee creation schema accepts multipart string fields', () => {
+    const employee = addEmployeeSchema.validate({
+        firstName: 'Alex',
+        lastName: 'Stylist',
+        phoneNumber: '9876543210',
+        gender: 'Male',
+        dateOfBirth: '1994-04-12',
+        workingHours: '{"start":"09:00","end":"18:00"}',
+        blockedDates: '[]',
+    });
+
+    assert.equal(employee.error, undefined);
+    assert.deepEqual(employee.value, {
+        firstName: 'Alex',
+        lastName: 'Stylist',
+        phoneNumber: '9876543210',
+        gender: 'Male',
+        dateOfBirth: new Date('1994-04-12T00:00:00.000Z'),
+        workingHours: '{"start":"09:00","end":"18:00"}',
+        blockedDates: '[]',
     });
 });

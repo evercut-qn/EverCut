@@ -15,7 +15,7 @@ export const addEmployeeSchema = Joi.object({
         }),
         Joi.string(),
     ),
-    blockedDates: Joi.array().items(Joi.date()).default([]),
+    blockedDates: Joi.alternatives().try(Joi.array().items(Joi.date()), Joi.string()).default([]),
 });
 
 export const updateEmployeeSchema = Joi.object({

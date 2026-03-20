@@ -1,4 +1,3 @@
-import mongoose from 'mongoose';
 import bookingRepository from '../repositories/booking.repository.js';
 import employeeRepository from '../repositories/employee.repository.js';
 import serviceRepository from '../repositories/service.repository.js';
@@ -216,44 +215,35 @@ export const reorderBooking = async (userId, bookingId, newDate, newTime) => {
     if (!customer) throw new NotFoundError('Customer profile');
     const customerId = customer._id;
 
-    const session = await mongoose.startSession();
-    session.startTransaction();
+    const existing = await bookingRepository.findById(bookingId);
+    if (!existing) throw new NotFoundError('Original booking');
+    if ((existing.customerId._id || existing.customerId).toString() !== customerId.toString()) {
+        throw new ForbiddenError('You can only reorder your own bookings');
+    }
+
+    // Prevent same date/time
+    if (existing.date.toISOString().split('T')[0] === new Date(newDate).toISOString().split('T')[0] && existing.time === newTime) {
+        throw new BadRequestError('Please choose a different date or time');
+    }
+
+    if (!isBookingInFuture(newDate, newTime)) {
+        throw new BadRequestError('Cannot book for a past date/time');
+    }
+
+    const services = normalizeBookedServices(
+        await serviceRepository.findByIds(
+            existing.serviceIds,
+            'serviceName finalPrice totalPrice actualPrice offerPrice serviceType',
+        ),
+    );
+    const totalAmount = sumServicePrices(services);
+
+    const employee = await employeeRepository.claimSlot(existing.employeeId, newDate, newTime, {
+        shopId: existing.shopId,
+    });
+    if (!employee) throw new BadRequestError('Employee not available');
 
     try {
-        const existing = await bookingRepository.findById(bookingId, { session });
-        if (!existing) { await session.abortTransaction(); session.endSession(); throw new NotFoundError('Original booking'); }
-        if ((existing.customerId._id || existing.customerId).toString() !== customerId.toString()) {
-            await session.abortTransaction();
-            session.endSession();
-            throw new ForbiddenError('You can only reorder your own bookings');
-        }
-
-        // Prevent same date/time
-        if (existing.date.toISOString().split('T')[0] === new Date(newDate).toISOString().split('T')[0] && existing.time === newTime) {
-            await session.abortTransaction(); session.endSession();
-            throw new BadRequestError('Please choose a different date or time');
-        }
-
-        if (!isBookingInFuture(newDate, newTime)) {
-            await session.abortTransaction(); session.endSession();
-            throw new BadRequestError('Cannot book for a past date/time');
-        }
-
-        const services = normalizeBookedServices(
-            await serviceRepository.findByIds(
-                existing.serviceIds,
-                'serviceName finalPrice totalPrice actualPrice offerPrice serviceType',
-                { session },
-            ),
-        );
-        const totalAmount = sumServicePrices(services);
-
-        const employee = await employeeRepository.claimSlot(existing.employeeId, newDate, newTime, {
-            shopId: existing.shopId,
-            session,
-        });
-        if (!employee) { await session.abortTransaction(); session.endSession(); throw new BadRequestError('Employee not available'); }
-
         const newBooking = await bookingRepository.create({
             customerId,
             serviceIds: existing.serviceIds,
@@ -263,15 +253,11 @@ export const reorderBooking = async (userId, bookingId, newDate, newTime) => {
             time: newTime,
             totalAmount,
             status: BOOKING_STATUS.CONFIRMED,
-        }, { session });
-
-        await session.commitTransaction();
-        session.endSession();
+        });
 
         return { bookingId: newBooking._id, employee, services, totalAmount };
     } catch (err) {
-        await session.abortTransaction();
-        session.endSession();
+        await employeeRepository.releaseSlot(existing.employeeId, newDate, newTime);
         throw err;
     }
 };

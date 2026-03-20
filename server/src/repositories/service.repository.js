@@ -1,5 +1,6 @@
 import Service from '../models/service.model.js';
 import { escapeRegex } from '../utils/regex.utils.js';
+import { trustQueryOperators } from '../utils/mongoose-query.utils.js';
 
 class ServiceRepository {
     async create(data) {
@@ -11,13 +12,15 @@ class ServiceRepository {
     }
 
     async findByIds(ids, selectFields, options = {}) {
-        const query = Service.find({ _id: { $in: ids }, isActive: true }).session(options.session || null);
+        const query = Service.find(
+            trustQueryOperators({ _id: { $in: ids }, isActive: true }),
+        ).session(options.session || null);
         if (selectFields) query.select(selectFields);
         return query.lean();
     }
 
     async findByShopId(shopId, filters = {}, options = {}) {
-        const query = { shopId, isActive: true, ...filters };
+        const query = trustQueryOperators({ shopId, isActive: true, ...filters });
         const mongoQuery = Service.find(query);
         
         if (options.skip !== undefined) mongoQuery.skip(options.skip);
@@ -27,7 +30,7 @@ class ServiceRepository {
     }
 
     async countByShopId(shopId, filters = {}) {
-        const query = { shopId, isActive: true, ...filters };
+        const query = trustQueryOperators({ shopId, isActive: true, ...filters });
         return Service.countDocuments(query);
     }
 
@@ -38,26 +41,28 @@ class ServiceRepository {
     }
 
     async findByShopIdAndName(shopId, serviceName, filters = {}) {
-        return Service.findOne({
+        return Service.findOne(trustQueryOperators({
             shopId,
             serviceName: serviceName.trim(),
             isActive: true,
             ...filters,
-        }).collation({ locale: 'en', strength: 2 });
+        })).collation({ locale: 'en', strength: 2 });
     }
 
     async findByShopIds(shopIds, filters = {}, selectFields) {
-        const query = Service.find({ shopId: { $in: shopIds }, isActive: true, ...filters });
+        const query = Service.find(
+            trustQueryOperators({ shopId: { $in: shopIds }, isActive: true, ...filters }),
+        );
         if (selectFields) query.select(selectFields);
         return query.lean();
     }
 
     async searchByName(nameQuery, filters = {}, selectFields) {
-        const query = Service.find({
+        const query = Service.find(trustQueryOperators({
             serviceName: { $regex: new RegExp(escapeRegex(nameQuery), 'i') },
             isActive: true,
             ...filters,
-        });
+        }));
         if (selectFields) query.select(selectFields);
         return query.populate('shopId', 'shopName address location category coverUrl').lean();
     }

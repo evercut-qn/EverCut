@@ -1,4 +1,5 @@
 import Booking from '../models/booking.model.js';
+import { trustQueryOperators } from '../utils/mongoose-query.utils.js';
 
 class BookingRepository {
     async create(data, options = {}) {
@@ -41,7 +42,7 @@ class BookingRepository {
     // ── Customer-side queries ──────────────────────────────────────────
 
     async findByCustomer(customerId, filters = {}) {
-        return Booking.find({ customerId, ...filters })
+        return Booking.find(trustQueryOperators({ customerId, ...filters }))
             .populate('serviceIds')
             .populate('employeeId', 'firstName lastName photoUrl')
             .populate('shopId', 'shopName address coverUrl')
@@ -49,10 +50,10 @@ class BookingRepository {
     }
 
     async findUpcomingByCustomer(customerId, today, options = {}) {
-        const query = Booking.find({
+        const query = Booking.find(trustQueryOperators({
             customerId,
             date: { $gte: today },
-        })
+        }))
             .populate('serviceIds')
             .populate('employeeId', 'firstName lastName photoUrl')
             .populate('shopId', 'shopName address coverUrl')
@@ -64,14 +65,14 @@ class BookingRepository {
     }
 
     async countUpcomingByCustomer(customerId, today) {
-        return Booking.countDocuments({ customerId, date: { $gte: today } });
+        return Booking.countDocuments(trustQueryOperators({ customerId, date: { $gte: today } }));
     }
 
     async findPastByCustomer(customerId, today, options = {}) {
-        const query = Booking.find({
+        const query = Booking.find(trustQueryOperators({
             customerId,
             date: { $lt: today },
-        })
+        }))
             .populate('serviceIds')
             .populate('employeeId', 'firstName lastName photoUrl')
             .populate('shopId', 'shopName address coverUrl')
@@ -83,13 +84,13 @@ class BookingRepository {
     }
 
     async countPastByCustomer(customerId, today) {
-        return Booking.countDocuments({ customerId, date: { $lt: today } });
+        return Booking.countDocuments(trustQueryOperators({ customerId, date: { $lt: today } }));
     }
 
     // ── Shop/Barber-side queries ───────────────────────────────────────
 
     async findByEmployeeIds(employeeIds, filters = {}, options = {}) {
-        const query = Booking.find({ employeeId: { $in: employeeIds }, ...filters })
+        const query = Booking.find(trustQueryOperators({ employeeId: { $in: employeeIds }, ...filters }))
             .populate({
                 path: 'customerId',
                 select: 'firstName lastName userId',
@@ -104,18 +105,18 @@ class BookingRepository {
     }
 
     async countAll(filter = {}) {
-        return Booking.countDocuments(filter);
+        return Booking.countDocuments(trustQueryOperators(filter));
     }
 
     async countByStatus(status, employeeIds) {
-        return Booking.countDocuments({
+        return Booking.countDocuments(trustQueryOperators({
             status,
             employeeId: { $in: employeeIds },
-        });
+        }));
     }
 
     async findByStatusPopulated(status, employeeIds, options = {}) {
-        const query = Booking.find({ status, employeeId: { $in: employeeIds } })
+        const query = Booking.find(trustQueryOperators({ status, employeeId: { $in: employeeIds } }))
             .populate('customerId', 'firstName lastName')
             .populate('employeeId', 'firstName lastName')
             .lean();
@@ -126,9 +127,9 @@ class BookingRepository {
     }
 
     async getUniqueCustomerCount(employeeIds) {
-        const ids = await Booking.distinct('customerId', {
+        const ids = await Booking.distinct('customerId', trustQueryOperators({
             employeeId: { $in: employeeIds },
-        });
+        }));
         return ids.length;
     }
 
@@ -139,16 +140,16 @@ class BookingRepository {
     async findConflict(shopId, employeeId, date, time, excludeBookingId) {
         const filter = { shopId, employeeId, date, time };
         if (excludeBookingId) filter._id = { $ne: excludeBookingId };
-        return Booking.findOne(filter);
+        return Booking.findOne(trustQueryOperators(filter));
     }
 
     // ── User booking detail queries ─────────────────────────────────────
 
     async findByCustomerWithDateRange(customerId, startDate, endDate) {
-        return Booking.find({
+        return Booking.find(trustQueryOperators({
             customerId,
             date: { $gte: startDate, $lte: endDate },
-        })
+        }))
             .populate('serviceIds', 'serviceName offerPrice duration')
             .populate('employeeId', 'firstName lastName')
             .populate('shopId', 'shopName address');

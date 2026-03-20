@@ -61,6 +61,7 @@ Reports documenting issues found and fixes applied.
 | Document | Description | Status |
 |----------|-------------|--------|
 | [BACKEND-INTEGRITY-FIXES-REPORT.md](./reports/BACKEND-INTEGRITY-FIXES-REPORT.md) | Backend integrity issues and fixes applied | ✅ Completed |
+| [E2E-BACKEND-VERIFICATION-REPORT.md](./reports/E2E-BACKEND-VERIFICATION-REPORT.md) | Full authenticated backend verification and follow-up fixes | ✅ Completed |
 | [MSG91-Revision-Improvements-Report.md](./reports/MSG91-Revision-Improvements-Report.md) | MSG91 integration improvements report | ✅ Completed |
 | [PHOTO-GALLERY-FIXES-REPORT.md](./reports/PHOTO-GALLERY-FIXES-REPORT.md) | Photo gallery backend fixes | ✅ Completed |
 | [REQUEST-VALIDATION-QUERY-FIX-REPORT.md](./reports/REQUEST-VALIDATION-QUERY-FIX-REPORT.md) | Express 5 query-validation runtime fix report | ✅ Completed |
@@ -100,6 +101,7 @@ server/docs/
 │       └── MSG91-POSTMAN-UPDATES-GUIDE.md
 ├── reports/                           # Bug fixes & improvement reports
 │   ├── BACKEND-INTEGRITY-FIXES-REPORT.md
+│   ├── E2E-BACKEND-VERIFICATION-REPORT.md
 │   ├── MSG91-Revision-Improvements-Report.md
 │   ├── PHOTO-GALLERY-FIXES-REPORT.md
 │   ├── REQUEST-VALIDATION-QUERY-FIX-REPORT.md

@@ -1,4 +1,5 @@
 import Employee from '../models/employee.model.js';
+import { trustQueryOperators } from '../utils/mongoose-query.utils.js';
 
 class EmployeeRepository {
     async create(data) {
@@ -51,7 +52,7 @@ class EmployeeRepository {
         if (options.shopId) query.shopId = options.shopId;
 
         return Employee.findOneAndUpdate(
-            query,
+            trustQueryOperators(query),
             {
                 $push: {
                     bookedSlots: { date, time },

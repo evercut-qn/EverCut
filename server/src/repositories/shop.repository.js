@@ -1,5 +1,6 @@
 import Shop from '../models/shop.model.js';
 import { NEARBY_DISTANCE_METERS } from '../utils/constants.js';
+import { trustQueryOperators } from '../utils/mongoose-query.utils.js';
 import { escapeRegex } from '../utils/regex.utils.js';
 
 class ShopRepository {
@@ -28,14 +29,14 @@ class ShopRepository {
     }
 
     async findNearby(coordinates, maxDistance = NEARBY_DISTANCE_METERS, selectFields) {
-        const query = Shop.find({
+        const query = Shop.find(trustQueryOperators({
             location: {
                 $near: {
                     $geometry: { type: 'Point', coordinates },
                     $maxDistance: maxDistance,
                 },
             },
-        });
+        }));
         if (selectFields) query.select(selectFields);
         return query;
     }
@@ -47,7 +48,9 @@ class ShopRepository {
     }
 
     async searchByName(nameQuery, selectFields) {
-        const query = Shop.find({ shopName: { $regex: new RegExp(escapeRegex(nameQuery), 'i') } });
+        const query = Shop.find(
+            trustQueryOperators({ shopName: { $regex: new RegExp(escapeRegex(nameQuery), 'i') } }),
+        );
         if (selectFields) query.select(selectFields);
         return query;
     }
