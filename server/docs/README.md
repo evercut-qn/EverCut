@@ -63,6 +63,7 @@ Reports documenting issues found and fixes applied.
 | [BACKEND-INTEGRITY-FIXES-REPORT.md](./reports/BACKEND-INTEGRITY-FIXES-REPORT.md) | Backend integrity issues and fixes applied | ✅ Completed |
 | [MSG91-Revision-Improvements-Report.md](./reports/MSG91-Revision-Improvements-Report.md) | MSG91 integration improvements report | ✅ Completed |
 | [PHOTO-GALLERY-FIXES-REPORT.md](./reports/PHOTO-GALLERY-FIXES-REPORT.md) | Photo gallery backend fixes | ✅ Completed |
+| [REQUEST-VALIDATION-QUERY-FIX-REPORT.md](./reports/REQUEST-VALIDATION-QUERY-FIX-REPORT.md) | Express 5 query-validation runtime fix report | ✅ Completed |
 | [SERVICE-CATALOG-FIXES-REPORT.md](./reports/SERVICE-CATALOG-FIXES-REPORT.md) | Service catalog backend fixes | ✅ Completed |
 
 ---
@@ -101,6 +102,7 @@ server/docs/
 │   ├── BACKEND-INTEGRITY-FIXES-REPORT.md
 │   ├── MSG91-Revision-Improvements-Report.md
 │   ├── PHOTO-GALLERY-FIXES-REPORT.md
+│   ├── REQUEST-VALIDATION-QUERY-FIX-REPORT.md
 │   └── SERVICE-CATALOG-FIXES-REPORT.md
 └── research/                          # Research & analysis docs
     ├── OBJECT-STORAGE-RESEARCH.MD

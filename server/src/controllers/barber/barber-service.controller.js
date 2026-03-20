@@ -1,5 +1,6 @@
 import * as serviceCatalogService from '../../services/service-catalog.service.js';
 import { ApiResponse } from '../../utils/api-response.js';
+import { getValidatedRequestData } from '../../utils/request-validation.utils.js';
 
 export const addService = async (req, res, next) => {
     try {
@@ -12,7 +13,8 @@ export const addService = async (req, res, next) => {
 
 export const getServices = async (req, res, next) => {
     try {
-        const result = await serviceCatalogService.getServices(req.user._id, req.query);
+        const query = getValidatedRequestData(req, 'query');
+        const result = await serviceCatalogService.getServices(req.user._id, query);
         return res.status(200).json(ApiResponse.paginated(result.items, result.pagination, 'Services fetched'));
     } catch (err) {
         next(err);

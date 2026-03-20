@@ -1,5 +1,6 @@
 import * as bookingService from '../../services/booking.service.js';
 import { ApiResponse } from '../../utils/api-response.js';
+import { getValidatedRequestData } from '../../utils/request-validation.utils.js';
 
 export const bookSalon = async (req, res, next) => {
     try {
@@ -12,8 +13,9 @@ export const bookSalon = async (req, res, next) => {
 
 export const getBookings = async (req, res, next) => {
     try {
-        const { type } = req.query;
-        const result = await bookingService.getCustomerBookings(req.user._id, type, req.query);
+        const query = getValidatedRequestData(req, 'query');
+        const { type } = query;
+        const result = await bookingService.getCustomerBookings(req.user._id, type, query);
         return res.status(200).json(ApiResponse.paginated(result.items, result.pagination, 'Bookings fetched'));
     } catch (err) {
         next(err);
@@ -96,7 +98,8 @@ export const deleteServiceFromBooking = async (req, res, next) => {
 
 export const getEmployeeCalendar = async (req, res, next) => {
     try {
-        const result = await bookingService.getEmployeeCalendar(req.params.id, req.query.date);
+        const query = getValidatedRequestData(req, 'query');
+        const result = await bookingService.getEmployeeCalendar(req.params.id, query.date);
         return res.status(200).json(ApiResponse.success(result, 'Calendar fetched'));
     } catch (err) {
         next(err);

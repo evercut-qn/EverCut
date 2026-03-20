@@ -1,5 +1,6 @@
 import * as photoService from '../../services/photo.service.js';
 import { ApiResponse } from '../../utils/api-response.js';
+import { getValidatedRequestData } from '../../utils/request-validation.utils.js';
 
 export const uploadPhotos = async (req, res, next) => {
     try {
@@ -13,7 +14,8 @@ export const uploadPhotos = async (req, res, next) => {
 
 export const getPhotos = async (req, res, next) => {
     try {
-        const result = await photoService.getPhotos(req.user._id, req.query);
+        const query = getValidatedRequestData(req, 'query');
+        const result = await photoService.getPhotos(req.user._id, query);
         return res.status(200).json(ApiResponse.paginated(result.items, result.pagination, 'Photos fetched'));
     } catch (err) {
         next(err);

@@ -1,5 +1,6 @@
 import * as bookingService from '../../services/booking.service.js';
 import { ApiResponse } from '../../utils/api-response.js';
+import { getValidatedRequestData } from '../../utils/request-validation.utils.js';
 
 export const getBookings = async (req, res, next) => {
     try {
@@ -49,8 +50,9 @@ export const deleteBooking = async (req, res, next) => {
 
 export const getBookingsByStatus = async (req, res, next) => {
     try {
-        const { status } = req.query;
-        const result = await bookingService.getBookingsByStatusDetailed(req.user._id, status, req.query);
+        const query = getValidatedRequestData(req, 'query');
+        const { status } = query;
+        const result = await bookingService.getBookingsByStatusDetailed(req.user._id, status, query);
         return res.status(200).json(ApiResponse.paginated(result.items, result.pagination, `Bookings with status: ${status}`));
     } catch (err) {
         next(err);

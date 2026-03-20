@@ -1,6 +1,7 @@
 import * as shopService from '../../services/shop.service.js';
 import * as serviceCatalogService from '../../services/service-catalog.service.js';
 import { ApiResponse } from '../../utils/api-response.js';
+import { getValidatedRequestData } from '../../utils/request-validation.utils.js';
 
 export const getShopInfo = async (req, res, next) => {
     try {
@@ -13,7 +14,7 @@ export const getShopInfo = async (req, res, next) => {
 
 export const getNearbyShops = async (req, res, next) => {
     try {
-        const { longitude, latitude } = req.query;
+        const { longitude, latitude } = getValidatedRequestData(req, 'query');
         const shops = await shopService.getNearbyShops([Number(longitude), Number(latitude)]);
         return res.status(200).json(ApiResponse.success(shops, 'Nearby shops fetched'));
     } catch (err) {
@@ -32,7 +33,7 @@ export const getDoorstepShops = async (req, res, next) => {
 
 export const getServicesByGender = async (req, res, next) => {
     try {
-        const { longitude, latitude, gender, search } = req.query;
+        const { longitude, latitude, gender, search } = getValidatedRequestData(req, 'query');
         const result = await shopService.getNearbyServicesByGender(
             [Number(longitude), Number(latitude)],
             gender || 'unisex',
@@ -46,7 +47,7 @@ export const getServicesByGender = async (req, res, next) => {
 
 export const searchServices = async (req, res, next) => {
     try {
-        const { query: q, gender } = req.query;
+        const { query: q, gender } = getValidatedRequestData(req, 'query');
         const results = await serviceCatalogService.searchServices(q, gender);
         return res.status(200).json(ApiResponse.success(results, 'Search results'));
     } catch (err) {
@@ -56,7 +57,7 @@ export const searchServices = async (req, res, next) => {
 
 export const searchShops = async (req, res, next) => {
     try {
-        const { query: q } = req.query;
+        const { query: q } = getValidatedRequestData(req, 'query');
         const results = await serviceCatalogService.searchShops(q);
         return res.status(200).json(ApiResponse.success(results, 'Shop search results'));
     } catch (err) {
