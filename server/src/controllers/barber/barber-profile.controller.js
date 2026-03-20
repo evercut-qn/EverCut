@@ -5,6 +5,7 @@ import * as accountService from '../../services/account.service.js';
 import shopRepository from '../../repositories/shop.repository.js';
 import { ApiResponse } from '../../utils/api-response.js';
 import { BadRequestError, NotFoundError } from '../../utils/api-error.js';
+import { getValidatedRequestData } from '../../utils/request-validation.utils.js';
 
 export const getProfile = async (req, res, next) => {
     try {
@@ -17,7 +18,7 @@ export const getProfile = async (req, res, next) => {
 
 export const updatePin = async (req, res, next) => {
     try {
-        const { currentPin, newPin, confirmNewPin } = req.body;
+        const { currentPin, newPin, confirmNewPin } = getValidatedRequestData(req, 'body');
 
         const validation = pinService.validatePinUpdate({ currentPin, newPin, confirmNewPin });
         if (!validation.isValid) throw new BadRequestError(validation.message);
@@ -66,7 +67,8 @@ export const signOutEverywhere = async (req, res, next) => {
 
 export const deleteAccount = async (req, res, next) => {
     try {
-        const result = await accountService.deleteBarberAccount(req.user, req.body.currentPin);
+        const { currentPin } = getValidatedRequestData(req, 'body');
+        const result = await accountService.deleteBarberAccount(req.user, currentPin);
         return res.status(200).json(ApiResponse.success(result, 'Account deleted successfully'));
     } catch (err) {
         next(err);

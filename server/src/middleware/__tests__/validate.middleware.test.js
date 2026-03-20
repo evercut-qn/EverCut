@@ -4,6 +4,10 @@ import express from 'express';
 import Joi from 'joi';
 
 import { validate } from '../validate.middleware.js';
+import {
+    bookingsByStatusQuerySchema,
+    customerBookingsQuerySchema,
+} from '../../validators/booking.validator.js';
 import { serviceListQuerySchema } from '../../validators/service.validator.js';
 import { getValidatedRequestData } from '../../utils/request-validation.utils.js';
 
@@ -28,7 +32,6 @@ test('query validation stores sanitized data without mutating req.query', async 
     app.get('/services', validate(serviceListQuerySchema, 'query'), (req, res) => {
         res.status(200).json({
             validated: getValidatedRequestData(req, 'query'),
-            alias: req.validatedQuery,
             raw: req.query,
         });
     });
@@ -46,7 +49,6 @@ test('query validation stores sanitized data without mutating req.query', async 
             limit: 5,
             serviceType: 'single',
         });
-        assert.deepEqual(body.alias, body.validated);
         assert.deepEqual(body.raw, {
             page: '2',
             limit: '5',
@@ -58,7 +60,7 @@ test('query validation stores sanitized data without mutating req.query', async 
     }
 });
 
-test('body validation still replaces req.body with the sanitized payload', async () => {
+test('body validation stores sanitized data without mutating req.body', async () => {
     const app = express();
     const bodySchema = Joi.object({
         serviceName: Joi.string().trim().required(),
@@ -67,9 +69,8 @@ test('body validation still replaces req.body with the sanitized payload', async
     app.use(express.json());
     app.post('/services', validate(bodySchema, 'body'), (req, res) => {
         res.status(200).json({
-            body: req.body,
-            validated: req.validated.body,
-            alias: req.validatedBody,
+            raw: req.body,
+            validated: getValidatedRequestData(req, 'body'),
         });
     });
 
@@ -88,10 +89,67 @@ test('body validation still replaces req.body with the sanitized payload', async
         const body = await response.json();
 
         assert.equal(response.status, 200);
-        assert.deepEqual(body.body, { serviceName: 'Haircut' });
-        assert.deepEqual(body.validated, body.body);
-        assert.deepEqual(body.alias, body.body);
+        assert.deepEqual(body.raw, {
+            serviceName: '  Haircut  ',
+            ignored: true,
+        });
+        assert.deepEqual(body.validated, { serviceName: 'Haircut' });
     } finally {
         await stopServer(server);
     }
+});
+
+test('params validation stores sanitized data without mutating req.params', async () => {
+    const app = express();
+    const paramsSchema = Joi.object({
+        id: Joi.string().lowercase().required(),
+    });
+
+    app.get('/services/:id', validate(paramsSchema, 'params'), (req, res) => {
+        res.status(200).json({
+            raw: req.params,
+            validated: getValidatedRequestData(req, 'params'),
+        });
+    });
+
+    const server = await startServer(app);
+
+    try {
+        const { port } = server.address();
+        const response = await fetch(`http://127.0.0.1:${port}/services/ABC123`);
+        const body = await response.json();
+
+        assert.equal(response.status, 200);
+        assert.deepEqual(body.raw, { id: 'ABC123' });
+        assert.deepEqual(body.validated, { id: 'abc123' });
+    } finally {
+        await stopServer(server);
+    }
+});
+
+test('booking query schemas preserve pagination fields', () => {
+    const customerBookings = customerBookingsQuerySchema.validate({
+        type: 'past',
+        page: '2',
+        limit: '5',
+    });
+    const bookingsByStatus = bookingsByStatusQuerySchema.validate({
+        status: 'confirmed',
+        page: '3',
+        limit: '10',
+    });
+
+    assert.equal(customerBookings.error, undefined);
+    assert.deepEqual(customerBookings.value, {
+        type: 'past',
+        page: 2,
+        limit: 5,
+    });
+
+    assert.equal(bookingsByStatus.error, undefined);
+    assert.deepEqual(bookingsByStatus.value, {
+        status: 'confirmed',
+        page: 3,
+        limit: 10,
+    });
 });

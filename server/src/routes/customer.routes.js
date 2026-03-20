@@ -23,6 +23,7 @@ import {
     shopIdParamSchema,
 } from '../validators/shop.validator.js';
 import { updateCustomerSchema } from '../validators/customer.validator.js';
+import { paginationSchema } from '../validators/common.validator.js';
 import { ROLES } from '../utils/constants.js';
 
 // Controllers
@@ -67,7 +68,7 @@ router.get('/search/shops', validate(searchShopsQuerySchema, 'query'), shopCtrl.
 
 // Ratings
 router.post('/ratings', validate(addRatingSchema, 'body'), ratingCtrl.addRating);
-router.get('/shops/:id/ratings', validate(shopIdParamSchema, 'params'), ratingCtrl.getRatingsByShop);
+router.get('/shops/:id/ratings', validate(shopIdParamSchema, 'params'), validate(paginationSchema, 'query'), ratingCtrl.getRatingsByShop);
 router.get('/shops/:id/ratings/summary', validate(shopIdParamSchema, 'params'), ratingCtrl.getRatingSummary);
 
 // Employee calendar

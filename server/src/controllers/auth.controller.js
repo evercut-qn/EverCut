@@ -1,6 +1,7 @@
 import * as authService from '../services/auth.service.js';
 import * as otpService from '../services/otp.service.js';
 import { ApiResponse } from '../utils/api-response.js';
+import { getValidatedRequestData } from '../utils/request-validation.utils.js';
 
 const buildSessionPayload = (session) => {
     if (session.isNewUser) {
@@ -27,7 +28,7 @@ const buildSessionPayload = (session) => {
 
 /** POST /auth/otp/send */
 export const sendOtp = async (req, res) => {
-    const { mobile } = req.body;
+    const { mobile } = getValidatedRequestData(req, 'body');
     const result = await otpService.requestOtp(mobile);
 
     return res.status(200).json(
@@ -37,7 +38,7 @@ export const sendOtp = async (req, res) => {
 
 /** POST /auth/otp/verify */
 export const verifyOtp = async (req, res) => {
-    const { mobile, otp } = req.body;
+    const { mobile, otp } = getValidatedRequestData(req, 'body');
 
     await otpService.verifyOtp(mobile, otp);
     const session = await authService.resolveOtpSession(mobile);
@@ -50,7 +51,7 @@ export const verifyOtp = async (req, res) => {
 
 /** POST /auth/otp/resend */
 export const resendOtp = async (req, res) => {
-    const { mobile, retryType } = req.body;
+    const { mobile, retryType } = getValidatedRequestData(req, 'body');
     const result = await otpService.resendOtp(mobile, retryType);
 
     return res.status(200).json(
@@ -60,7 +61,7 @@ export const resendOtp = async (req, res) => {
 
 /** POST /auth/token/refresh */
 export const refreshToken = async (req, res) => {
-    const { refreshToken: token } = req.body;
+    const { refreshToken: token } = getValidatedRequestData(req, 'body');
     const tokens = await authService.refreshAccessToken(token);
 
     return res.status(200).json(

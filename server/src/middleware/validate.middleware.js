@@ -11,9 +11,9 @@ import { storeValidatedRequestData } from '../utils/request-validation.utils.js'
  *   router.post('/booking', validate(bookingSchema, 'body'), controller);
  *   router.get('/services', validate(serviceListQuerySchema, 'query'), controller);
  *
- * Sanitized values are always stored under `req.validated[source]`.
- * Query values are also exposed as `req.validatedQuery` because `req.query`
- * is getter-only in Express 5 and must not be reassigned.
+ * Sanitized values are stored only under `req.validated[source]`.
+ * Native Express request properties are left untouched so controllers can
+ * explicitly choose validated input and avoid mutating framework-owned state.
  */
 export const validate = (schema, source = 'body') => {
     return (req, _res, next) => {
@@ -29,12 +29,6 @@ export const validate = (schema, source = 'body') => {
         }
 
         storeValidatedRequestData(req, source, value);
-
-        if (source !== 'query') {
-            // Preserve the existing controller contract for mutable request sources.
-            req[source] = value;
-        }
-
         next();
     };
 };

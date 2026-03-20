@@ -5,7 +5,8 @@ import { getValidatedRequestData } from '../../utils/request-validation.utils.js
 
 export const getShopInfo = async (req, res, next) => {
     try {
-        const result = await shopService.getShopInfoForCustomer(req.params.id);
+        const params = getValidatedRequestData(req, 'params');
+        const result = await shopService.getShopInfoForCustomer(params.id);
         return res.status(200).json(ApiResponse.success(result, 'Shop info fetched'));
     } catch (err) {
         next(err);

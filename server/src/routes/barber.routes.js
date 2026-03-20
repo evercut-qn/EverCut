@@ -14,7 +14,7 @@ import {
     bookingStatusSchema,
     bookingsByStatusQuerySchema,
 } from '../validators/booking.validator.js';
-import { objectIdParamSchema } from '../validators/common.validator.js';
+import { objectIdParamSchema, paginationSchema } from '../validators/common.validator.js';
 import {
     addEmployeeSchema,
     employeeIdParamSchema,
@@ -59,7 +59,7 @@ router.post('/profile/sign-out-everywhere', profileCtrl.signOutEverywhere);
 router.delete('/profile', validate(deleteBarberAccountSchema, 'body'), profileCtrl.deleteAccount);
 
 // Employees
-router.get('/employees', employeeCtrl.getEmployees);
+router.get('/employees', validate(paginationSchema, 'query'), employeeCtrl.getEmployees);
 router.post('/employees', uploadEmployeePhoto, validate(addEmployeeSchema, 'body'), employeeCtrl.addEmployee);
 router.put('/employees/:id', validate(employeeIdParamSchema, 'params'), uploadEmployeePhoto, validate(updateEmployeeSchema, 'body'), employeeCtrl.updateEmployee);
 router.delete('/employees/:id', validate(employeeIdParamSchema, 'params'), employeeCtrl.deleteEmployee);
@@ -71,7 +71,7 @@ router.put('/services/:id', validate(objectIdParamSchema, 'params'), validate(up
 router.delete('/services/:id', validate(objectIdParamSchema, 'params'), serviceCtrl.deleteService);
 
 // Bookings
-router.get('/bookings', bookingCtrl.getBookings);
+router.get('/bookings', validate(paginationSchema, 'query'), bookingCtrl.getBookings);
 router.get('/bookings/stats', bookingCtrl.getBookingStats);
 router.get('/bookings/status', validate(bookingsByStatusQuerySchema, 'query'), bookingCtrl.getBookingsByStatus);
 router.put('/bookings/:id/status', validate(bookingIdParamSchema, 'params'), validate(bookingStatusSchema, 'body'), bookingCtrl.updateBookingStatus);
@@ -88,7 +88,7 @@ router.delete('/photos/:id', validate(objectIdParamSchema, 'params'), photoCtrl.
 router.get('/earnings', earningsCtrl.getEarnings);
 
 // Ratings
-router.get('/ratings', ratingCtrl.getRatings);
+router.get('/ratings', validate(paginationSchema, 'query'), ratingCtrl.getRatings);
 router.post('/ratings/:id/reply', validate(objectIdParamSchema, 'params'), validate(addReplySchema, 'body'), ratingCtrl.addReply);
 router.put('/ratings/:id/reply', validate(objectIdParamSchema, 'params'), validate(addReplySchema, 'body'), ratingCtrl.updateReply);
 router.delete('/ratings/:id/reply', validate(objectIdParamSchema, 'params'), ratingCtrl.deleteReply);

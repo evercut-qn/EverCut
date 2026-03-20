@@ -1,5 +1,5 @@
 import Joi from 'joi';
-import { objectId, dateString, timeString } from './common.validator.js';
+import { objectId, dateString, timeString, paginationSchema } from './common.validator.js';
 
 export const bookSalonSchema = Joi.object({
     shopId: objectId.required(),
@@ -32,7 +32,7 @@ export const bookingStatusSchema = Joi.object({
     status: Joi.string().valid('confirmed', 'completed', 'cancelled').required(),
 });
 
-export const customerBookingsQuerySchema = Joi.object({
+export const customerBookingsQuerySchema = paginationSchema.keys({
     type: Joi.string().valid('past', 'upcoming', 'favorites').required(),
 });
 
@@ -49,6 +49,6 @@ export const employeeCalendarQuerySchema = Joi.object({
     date: dateString.required(),
 });
 
-export const bookingsByStatusQuerySchema = Joi.object({
+export const bookingsByStatusQuerySchema = paginationSchema.keys({
     status: Joi.string().valid('pending', 'confirmed', 'completed', 'cancelled').required(),
 });
