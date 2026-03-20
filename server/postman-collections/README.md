@@ -104,7 +104,7 @@ Validation and field-level failures are returned inside `data.errors`.
 
 | # | Method | Endpoint | Description |
 |---|---|---|---|
-| 1 | GET | `/api/v1/customer/shops/nearby` | Bootstrap: get shop ID for the rating |
+| 1 | GET | `/api/v1/customer/bookings?type=past&limit=100` | Bootstrap: capture a shop ID from a completed past booking |
 | 2 | POST | `/api/v1/customer/ratings` | Submit a rating *(once per customer/shop - returns 409 on rerun)* |
 | 3 | GET | `/api/v1/customer/shops/{{shop_id}}/ratings` | List shop ratings |
 | 4 | GET | `/api/v1/customer/shops/{{shop_id}}/ratings/summary` | Get rating summary |
@@ -174,7 +174,7 @@ Validation and field-level failures are returned inside `data.errors`.
 | # | Method | Endpoint | Description |
 |---|---|---|---|
 | 1 | GET | `/api/v1/barber/ratings` | List ratings - captures seeded IDs for reply/remove operations |
-| 2 | POST | `/api/v1/barber/ratings/{{rating_id_add_reply}}/reply` | Add reply to a rating |
+| 2 | POST | `/api/v1/barber/ratings/{{rating_id_add_reply}}/reply` | Add reply to a rating *(returns 409 on rerun once a reply exists)* |
 | 3 | PUT | `/api/v1/barber/ratings/{{rating_id_update_reply}}/reply` | Update an existing reply |
 | 4 | DELETE | `/api/v1/barber/ratings/{{rating_id_update_reply}}/reply` | Delete a reply |
 | 5 | DELETE | `/api/v1/barber/ratings/{{rating_id_remove_rating}}` | Remove a rating |
@@ -283,7 +283,13 @@ node scripts/seed-barber-rating-mock-data.js
 
 ### `06-customer-ratings.json` — Add Rating (Request 2)
 
-This succeeds once per customer/shop pair. It returns `409 Conflict` on subsequent runs because the API allows only one rating per customer per shop.
+This collection now captures `shop_id` from `GET /customer/bookings?type=past`, not from nearby shop discovery. The authenticated customer must already have at least one completed past booking, otherwise request 1 fails intentionally because the backend now allows ratings only for shops the customer has actually completed a booking with.
+
+Request 2 succeeds once per customer/shop pair. It returns `409 Conflict` on subsequent runs because the API allows only one rating per customer per shop.
+
+### `13-barber-ratings.json` — Add Reply (Request 2)
+
+This succeeds once for the seeded no-reply fixture. It returns `409 Conflict` on subsequent runs because `POST /barber/ratings/:id/reply` no longer overwrites an existing reply.
 
 ### `10-barber-bookings.json` — Delete Paid Booking (Request 5)
 

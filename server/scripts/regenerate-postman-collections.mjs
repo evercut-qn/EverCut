@@ -965,34 +965,32 @@ const customerShopDiscoveryCollection = {
 const customerRatingsCollection = {
   info: {
     name: 'EverCut - Customer Ratings',
-    description: 'Customer rating flow with a bootstrap request that captures the nearby Postman shop ID before submitting the rating.',
+    description: 'Customer rating flow that captures a shop ID from the authenticated customer\'s completed booking history before submitting a rating.',
     schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
   },
   auth: bearerAuth('customer_access_token'),
-  event: collectionPreRequest({
-    syncPairs: [['shared_shop_id', 'shop_id']],
-  }),
+  event: collectionPreRequest(),
   variable: [
     ...baseVariables(
       ...accessTokenVariables(),
-      textVariable('coordinates', sharedCoordinates),
       textVariable('shop_id', ''),
-      textVariable('customer_email', 'test.customer@example.com'),
     ),
   ],
   item: [
     {
-      name: '1. Get Nearby Shops And Capture Shop ID',
+      name: '1. Get Past Bookings And Capture Completed Shop ID',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/customer/shops/nearby?coordinates={{coordinates}}',
-        description: 'Captures the nearby Postman shop ID so the rest of the rating flow is ready without manual copy-paste.',
+        url: '{{base_url}}/{{api_prefix}}/customer/bookings?type=past&limit=100',
+        description: 'Captures a shop ID from the authenticated customer\'s completed past bookings. This request fails the collection clearly when no eligible booking exists for rating.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           'const response = pm.response.json();',
-          'const shops = Array.isArray(response.data) ? response.data : [];',
-          "const preferredShop = shops.find((shop) => typeof shop.shopName === 'string' && shop.shopName.includes('Postman')) || shops[0];",
-          "if (preferredShop && preferredShop._id) { pm.collectionVariables.set('shop_id', preferredShop._id); pm.globals.set('shared_shop_id', preferredShop._id); }",
+          'const bookings = Array.isArray(response.data && response.data.items) ? response.data.items : [];',
+          "const completedBooking = bookings.find((booking) => booking && booking.status === 'completed' && booking.shopId);",
+          'const shopId = completedBooking && completedBooking.shopId && (completedBooking.shopId._id || completedBooking.shopId);',
+          "pm.test('completed booking exists for rating eligibility', function () { pm.expect(shopId, 'A completed past booking is required before submitting a rating.').to.be.ok; });",
+          "if (shopId) { pm.collectionVariables.set('shop_id', shopId); pm.globals.set('shared_shop_id', shopId); }",
         ),
       }),
     },
@@ -1007,7 +1005,7 @@ const customerRatingsCollection = {
   "rating": 5,
   "review": "Postman collection review for the OTP/JWT customer flow."
 }`),
-        description: 'Creates a new rating for the captured shop. The API allows only one rating per customer per shop, so reruns return 409 instead of 201 after the first success.',
+        description: 'Creates a new rating for the captured shop from the customer\'s completed booking history. The API allows only one rating per customer per shop, so reruns return 409 instead of 201 after the first success.',
         event: testEvent(
           "pm.test('status is 201 or 409', function () { pm.expect(pm.response.code).to.be.oneOf([201, 409]); });",
         ),
@@ -1675,8 +1673,10 @@ const barberRatingsCollection = {
         body: jsonBody(`{
   "replyText": "Thanks for the feedback. We appreciate your visit."
 }`),
-        description: 'Adds a reply to the seeded rating that has no reply yet.',
-        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
+        description: 'Adds a reply to the seeded rating that has no reply yet. Reruns return 409 once the reply already exists.',
+        event: testEvent(
+          "pm.test('status is 200 or 409', function () { pm.expect(pm.response.code).to.be.oneOf([200, 409]); });",
+        ),
       }),
     },
     {

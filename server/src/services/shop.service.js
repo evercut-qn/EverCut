@@ -6,6 +6,7 @@ import userRepository from '../repositories/user.repository.js';
 import { BadRequestError, NotFoundError } from '../utils/api-error.js';
 import { serializeBarberProfile, serializeUpiDetails } from '../utils/barber-profile.utils.js';
 import { escapeRegex } from '../utils/regex.utils.js';
+import { serializeRating } from '../utils/rating-response.utils.js';
 import { normalizeServicePricing } from '../utils/service-pricing.utils.js';
 import {
     ALL_SERVICE_FOR,
@@ -368,16 +369,7 @@ export const getShopInfoForCustomer = async (shopId) => {
     ]);
 
     const ratings = await ratingRepository.findByShop(shopId);
-    const formattedRatings = ratings.map((rating) => ({
-        ratingId: rating._id,
-        rating: rating.rating,
-        review: rating.review,
-        user: {
-            firstName: rating.customerId?.firstName || 'Unknown',
-            photoUrl: rating.customerId?.photoUrl || null,
-        },
-        createdAt: rating.createdAt,
-    }));
+    const formattedRatings = ratings.map(serializeRating);
 
     const safeShop = shop.toObject();
     delete safeShop.pinHash;

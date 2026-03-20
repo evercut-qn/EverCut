@@ -240,7 +240,7 @@ const createBookingsAndRatings = async (shop, barberUser, employee, service, cus
 
     for (const customer of customers) {
         const booking = await Booking.create({
-            customerId: customer.user._id,
+            customerId: customer.profile._id,
             shopId: shop._id,
             employeeId: employee._id,
             serviceIds: [service._id],
@@ -252,7 +252,7 @@ const createBookingsAndRatings = async (shop, barberUser, employee, service, cus
         });
 
         const ratingPayload = {
-            customerId: customer.user._id,
+            customerId: customer.profile._id,
             shopId: shop._id,
             rating: customer.fixture.rating.rating,
             review: customer.fixture.rating.review,
@@ -334,6 +334,7 @@ const main = async () => {
             customers: customers.map(({ fixture, user, profile }) => ({
                 key: fixture.key,
                 userId: user._id.toString(),
+                customerId: profile._id.toString(),
                 email: user.email,
                 phoneNumber: user.phoneNumber,
                 name: `${profile.firstName} ${profile.lastName}`,

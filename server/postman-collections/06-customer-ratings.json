@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "EverCut - Customer Ratings",
-    "description": "Customer rating flow with a bootstrap request that captures the nearby Postman shop ID before submitting the rating.",
+    "description": "Customer rating flow that captures a shop ID from the authenticated customer's completed booking history before submitting a rating.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -37,7 +37,6 @@
           "};",
           "syncScopedValue('base_url');",
           "syncScopedValue('api_prefix');",
-          "syncScopedValue('shared_shop_id', 'shop_id');",
           "const customerToken = readScopedValue('customer_access_token');",
           "if (customerToken) { pm.collectionVariables.set('customer_access_token', customerToken); }",
           "const barberToken = readScopedValue('barber_access_token');",
@@ -72,29 +71,19 @@
       "description": "JWT access token - auto-set by 01-authentication.json for returning users or by 02-onboarding.json after first-time signup"
     },
     {
-      "key": "coordinates",
-      "value": "77.5946,12.9716",
-      "type": "string"
-    },
-    {
       "key": "shop_id",
       "value": "",
-      "type": "string"
-    },
-    {
-      "key": "customer_email",
-      "value": "test.customer@example.com",
       "type": "string"
     }
   ],
   "item": [
     {
-      "name": "1. Get Nearby Shops And Capture Shop ID",
+      "name": "1. Get Past Bookings And Capture Completed Shop ID",
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/customer/shops/nearby?coordinates={{coordinates}}",
-        "description": "Captures the nearby Postman shop ID so the rest of the rating flow is ready without manual copy-paste."
+        "url": "{{base_url}}/{{api_prefix}}/customer/bookings?type=past&limit=100",
+        "description": "Captures a shop ID from the authenticated customer's completed past bookings. This request fails the collection clearly when no eligible booking exists for rating."
       },
       "event": [
         {
@@ -113,9 +102,11 @@
               "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
               "const response = pm.response.json();",
-              "const shops = Array.isArray(response.data) ? response.data : [];",
-              "const preferredShop = shops.find((shop) => typeof shop.shopName === 'string' && shop.shopName.includes('Postman')) || shops[0];",
-              "if (preferredShop && preferredShop._id) { pm.collectionVariables.set('shop_id', preferredShop._id); pm.globals.set('shared_shop_id', preferredShop._id); }"
+              "const bookings = Array.isArray(response.data && response.data.items) ? response.data.items : [];",
+              "const completedBooking = bookings.find((booking) => booking && booking.status === 'completed' && booking.shopId);",
+              "const shopId = completedBooking && completedBooking.shopId && (completedBooking.shopId._id || completedBooking.shopId);",
+              "pm.test('completed booking exists for rating eligibility', function () { pm.expect(shopId, 'A completed past booking is required before submitting a rating.').to.be.ok; });",
+              "if (shopId) { pm.collectionVariables.set('shop_id', shopId); pm.globals.set('shared_shop_id', shopId); }"
             ]
           }
         }
@@ -132,7 +123,7 @@
           }
         ],
         "url": "{{base_url}}/{{api_prefix}}/customer/ratings",
-        "description": "Creates a new rating for the captured shop. The API allows only one rating per customer per shop, so reruns return 409 instead of 201 after the first success.",
+        "description": "Creates a new rating for the captured shop from the customer's completed booking history. The API allows only one rating per customer per shop, so reruns return 409 instead of 201 after the first success.",
         "body": {
           "mode": "raw",
           "raw": "{\n  \"shopId\": \"{{shop_id}}\",\n  \"rating\": 5,\n  \"review\": \"Postman collection review for the OTP/JWT customer flow.\"\n}",

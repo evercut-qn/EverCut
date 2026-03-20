@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import express from 'express';
 import Joi from 'joi';
 
 import { validate } from '../validate.middleware.js';
@@ -12,120 +11,76 @@ import { addEmployeeSchema } from '../../validators/employee.validator.js';
 import { serviceListQuerySchema } from '../../validators/service.validator.js';
 import { getValidatedRequestData } from '../../utils/request-validation.utils.js';
 
-const startServer = (app) => new Promise((resolve) => {
-    const server = app.listen(0, () => resolve(server));
-});
+const runValidation = async (schema, source, value) => {
+    const req = { [source]: value };
+    let forwardedError = null;
+    let nextCalled = false;
 
-const stopServer = (server) => new Promise((resolve, reject) => {
-    server.close((error) => {
-        if (error) {
-            reject(error);
-            return;
-        }
-
-        resolve();
+    await validate(schema, source)(req, {}, (error) => {
+        forwardedError = error || null;
+        nextCalled = true;
     });
-});
+
+    return { req, forwardedError, nextCalled };
+};
 
 test('query validation stores sanitized data without mutating req.query', async () => {
-    const app = express();
+    const rawQuery = {
+        page: '2',
+        limit: '5',
+        serviceType: 'single',
+        extra: 'discard-me',
+    };
 
-    app.get('/services', validate(serviceListQuerySchema, 'query'), (req, res) => {
-        res.status(200).json({
-            validated: getValidatedRequestData(req, 'query'),
-            raw: req.query,
-        });
+    const { req, forwardedError, nextCalled } = await runValidation(serviceListQuerySchema, 'query', rawQuery);
+
+    assert.equal(forwardedError, null);
+    assert.equal(nextCalled, true);
+    assert.deepEqual(getValidatedRequestData(req, 'query'), {
+        page: 2,
+        limit: 5,
+        serviceType: 'single',
     });
-
-    const server = await startServer(app);
-
-    try {
-        const { port } = server.address();
-        const response = await fetch(`http://127.0.0.1:${port}/services?page=2&limit=5&serviceType=single&extra=discard-me`);
-        const body = await response.json();
-
-        assert.equal(response.status, 200);
-        assert.deepEqual(body.validated, {
-            page: 2,
-            limit: 5,
-            serviceType: 'single',
-        });
-        assert.deepEqual(body.raw, {
-            page: '2',
-            limit: '5',
-            serviceType: 'single',
-            extra: 'discard-me',
-        });
-    } finally {
-        await stopServer(server);
-    }
+    assert.deepEqual(req.query, {
+        page: '2',
+        limit: '5',
+        serviceType: 'single',
+        extra: 'discard-me',
+    });
 });
 
 test('body validation stores sanitized data without mutating req.body', async () => {
-    const app = express();
     const bodySchema = Joi.object({
         serviceName: Joi.string().trim().required(),
     });
+    const rawBody = {
+        serviceName: '  Haircut  ',
+        ignored: true,
+    };
 
-    app.use(express.json());
-    app.post('/services', validate(bodySchema, 'body'), (req, res) => {
-        res.status(200).json({
-            raw: req.body,
-            validated: getValidatedRequestData(req, 'body'),
-        });
+    const { req, forwardedError, nextCalled } = await runValidation(bodySchema, 'body', rawBody);
+
+    assert.equal(forwardedError, null);
+    assert.equal(nextCalled, true);
+    assert.deepEqual(req.body, {
+        serviceName: '  Haircut  ',
+        ignored: true,
     });
-
-    const server = await startServer(app);
-
-    try {
-        const { port } = server.address();
-        const response = await fetch(`http://127.0.0.1:${port}/services`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                serviceName: '  Haircut  ',
-                ignored: true,
-            }),
-        });
-        const body = await response.json();
-
-        assert.equal(response.status, 200);
-        assert.deepEqual(body.raw, {
-            serviceName: '  Haircut  ',
-            ignored: true,
-        });
-        assert.deepEqual(body.validated, { serviceName: 'Haircut' });
-    } finally {
-        await stopServer(server);
-    }
+    assert.deepEqual(getValidatedRequestData(req, 'body'), { serviceName: 'Haircut' });
 });
 
 test('params validation stores sanitized data without mutating req.params', async () => {
-    const app = express();
     const paramsSchema = Joi.object({
         id: Joi.string().lowercase().required(),
     });
+    const rawParams = { id: 'ABC123' };
 
-    app.get('/services/:id', validate(paramsSchema, 'params'), (req, res) => {
-        res.status(200).json({
-            raw: req.params,
-            validated: getValidatedRequestData(req, 'params'),
-        });
-    });
+    const { req, forwardedError, nextCalled } = await runValidation(paramsSchema, 'params', rawParams);
 
-    const server = await startServer(app);
-
-    try {
-        const { port } = server.address();
-        const response = await fetch(`http://127.0.0.1:${port}/services/ABC123`);
-        const body = await response.json();
-
-        assert.equal(response.status, 200);
-        assert.deepEqual(body.raw, { id: 'ABC123' });
-        assert.deepEqual(body.validated, { id: 'abc123' });
-    } finally {
-        await stopServer(server);
-    }
+    assert.equal(forwardedError, null);
+    assert.equal(nextCalled, true);
+    assert.deepEqual(req.params, { id: 'ABC123' });
+    assert.deepEqual(getValidatedRequestData(req, 'params'), { id: 'abc123' });
 });
 
 test('booking query schemas preserve pagination fields', () => {

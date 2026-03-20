@@ -210,6 +210,14 @@ class BookingRepository {
             .populate('shopId', 'shopName address');
     }
 
+    async hasCompletedBookingForCustomer(customerId, shopId) {
+        return Booking.exists(trustQueryOperators({
+            customerId,
+            shopId,
+            status: BOOKING_STATUS.COMPLETED,
+        }));
+    }
+
     async hasActiveBookingsForEmployee(shopId, employeeId, fromDate = new Date()) {
         const startOfToday = new Date(fromDate);
         startOfToday.setHours(0, 0, 0, 0);

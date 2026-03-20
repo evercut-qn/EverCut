@@ -139,7 +139,7 @@
           }
         ],
         "url": "{{base_url}}/{{api_prefix}}/barber/ratings/{{rating_id_add_reply}}/reply",
-        "description": "Adds a reply to the seeded rating that has no reply yet.",
+        "description": "Adds a reply to the seeded rating that has no reply yet. Reruns return 409 once the reply already exists.",
         "body": {
           "mode": "raw",
           "raw": "{\n  \"replyText\": \"Thanks for the feedback. We appreciate your visit.\"\n}",
@@ -165,7 +165,7 @@
               "  pm.expect(response.message).to.be.a('string');",
               "  pm.expect(response).to.have.property('data');",
               "});",
-              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+              "pm.test('status is 200 or 409', function () { pm.expect(pm.response.code).to.be.oneOf([200, 409]); });"
             ]
           }
         }
