@@ -15,7 +15,7 @@ class EmployeeRepository {
         
         if (options.skip !== undefined) query.skip(options.skip);
         if (options.limit !== undefined) query.limit(options.limit);
-        return query;
+        return query.sort({ createdAt: -1 });
     }
 
     async countByShopId(shopId) {
@@ -76,10 +76,14 @@ class EmployeeRepository {
         return employees.map((e) => e._id);
     }
 
-    async softDelete(id, shopId) {
+    async softDelete(id, shopId, deletionMarker) {
         return Employee.findOneAndUpdate(
             { _id: id, shopId },
-            { deletedAt: new Date(), isActive: false },
+            {
+                deletedAt: new Date(),
+                isActive: false,
+                phoneNumber: deletionMarker,
+            },
             { new: true },
         );
     }

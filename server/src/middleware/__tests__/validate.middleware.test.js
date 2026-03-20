@@ -109,21 +109,47 @@ test('employee creation schema accepts multipart string fields', () => {
     const employee = addEmployeeSchema.validate({
         firstName: 'Alex',
         lastName: 'Stylist',
-        phoneNumber: '9876543210',
+        phoneNumber: '+15551234567',
         gender: 'Male',
         dateOfBirth: '1994-04-12',
         workingHours: '{"start":"09:00","end":"18:00"}',
-        blockedDates: '[]',
+        blockedDates: '["2026-04-12"]',
     });
 
     assert.equal(employee.error, undefined);
     assert.deepEqual(employee.value, {
         firstName: 'Alex',
         lastName: 'Stylist',
-        phoneNumber: '9876543210',
+        phoneNumber: '+15551234567',
         gender: 'Male',
         dateOfBirth: new Date('1994-04-12T00:00:00.000Z'),
-        workingHours: '{"start":"09:00","end":"18:00"}',
-        blockedDates: '[]',
+        workingHours: {
+            start: '09:00',
+            end: '18:00',
+        },
+        blockedDates: [
+            new Date('2026-04-12T00:00:00.000Z'),
+        ],
     });
+});
+
+test('employee creation schema rejects invalid working hours and phone numbers', () => {
+    const invalidHours = addEmployeeSchema.validate({
+        firstName: 'Alex',
+        lastName: 'Stylist',
+        phoneNumber: '+15551234567',
+        gender: 'Male',
+        dateOfBirth: '1994-04-12',
+        workingHours: '{"start":"18:00","end":"09:00"}',
+    });
+    const invalidPhone = addEmployeeSchema.validate({
+        firstName: 'Alex',
+        lastName: 'Stylist',
+        phoneNumber: 'abc',
+        gender: 'Male',
+        dateOfBirth: '1994-04-12',
+    });
+
+    assert.match(invalidHours.error?.message || '', /workingHours\.start must be earlier than workingHours\.end/);
+    assert.match(invalidPhone.error?.message || '', /phoneNumber must be a valid international phone number/);
 });

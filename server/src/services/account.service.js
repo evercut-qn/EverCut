@@ -15,17 +15,6 @@ export const updateBarberProfilePicture = async (ownerId, file) => {
     const ownerPhotoUrl = file.path;
     const ownerPhotoCloudinaryId = file.public_id || file.filename;
 
-    if (shop.ownerPhotoCloudinaryId && shop.ownerPhotoCloudinaryId !== ownerPhotoCloudinaryId) {
-        try {
-            await cloudinary.uploader.destroy(shop.ownerPhotoCloudinaryId);
-        } catch (err) {
-            logger.warn('Failed to delete previous barber profile picture', {
-                ownerId,
-                error: err.message,
-            });
-        }
-    }
-
     let updated;
     try {
         updated = await shopRepository.updateByOwnerId(ownerId, {
@@ -44,6 +33,17 @@ export const updateBarberProfilePicture = async (ownerId, file) => {
             }
         }
         throw err;
+    }
+
+    if (shop.ownerPhotoCloudinaryId && shop.ownerPhotoCloudinaryId !== ownerPhotoCloudinaryId) {
+        try {
+            await cloudinary.uploader.destroy(shop.ownerPhotoCloudinaryId);
+        } catch (err) {
+            logger.warn('Failed to delete previous barber profile picture', {
+                ownerId,
+                error: err.message,
+            });
+        }
     }
 
     return {

@@ -28,21 +28,6 @@ export const updateProfile = async (userId, data, file) => {
     const profile = await customerRepository.findByUserId(userId);
     if (!profile) throw new NotFoundError('Customer');
 
-    // Handle photo replacement
-    if (file) {
-        // Delete old photo from Cloudinary
-        if (profile.cloudinaryId) {
-            try {
-                await cloudinary.uploader.destroy(profile.cloudinaryId);
-            } catch {
-                // Non-fatal — log but continue
-            }
-        }
-        data.photoUrl = file.path;
-        data.cloudinaryId = file.filename || file.public_id;
-    }
-
-    // Parse location if string
     if (data.location && typeof data.location === 'string') {
         try {
             data.location = JSON.parse(data.location);
@@ -51,10 +36,7 @@ export const updateProfile = async (userId, data, file) => {
         }
     }
 
-    // Update profile (only provided fields overwrite)
-    const updated = await customerRepository.updateByUserId(userId, data);
-
-    // Also update email on User model if changed
+    let emailToUpdate = null;
     if (data.email) {
         const currentUser = await userRepository.findById(userId);
         if (currentUser && currentUser.email !== data.email) {
@@ -62,10 +44,45 @@ export const updateProfile = async (userId, data, file) => {
             if (existingUser && existingUser._id.toString() !== userId.toString()) {
                 throw new BadRequestError('Email is already in use');
             }
-            await userRepository.updateById(userId, { 
-                email: data.email,
-                emailVerified: false 
+
+            emailToUpdate = data.email;
+        }
+    }
+
+    const nextPhotoCloudinaryId = file ? (file.filename || file.public_id) : null;
+    if (file) {
+        data.photoUrl = file.path;
+        data.cloudinaryId = nextPhotoCloudinaryId;
+    }
+
+    let updated;
+    let profileUpdated = false;
+    try {
+        updated = await customerRepository.updateByUserId(userId, data);
+        profileUpdated = true;
+
+        if (emailToUpdate) {
+            await userRepository.updateById(userId, {
+                email: emailToUpdate,
+                emailVerified: false,
             });
+        }
+    } catch (err) {
+        if (nextPhotoCloudinaryId && !profileUpdated) {
+            try {
+                await cloudinary.uploader.destroy(nextPhotoCloudinaryId);
+            } catch {
+                // Non-fatal; preserve the original error
+            }
+        }
+        throw err;
+    }
+
+    if (nextPhotoCloudinaryId && profile.cloudinaryId && profile.cloudinaryId !== nextPhotoCloudinaryId) {
+        try {
+            await cloudinary.uploader.destroy(profile.cloudinaryId);
+        } catch {
+            // Non-fatal; the new photo is already persisted
         }
     }
 

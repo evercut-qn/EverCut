@@ -2,6 +2,18 @@ import Booking from '../models/booking.model.js';
 import { BOOKING_STATUS } from '../utils/constants.js';
 import { trustQueryOperators } from '../utils/mongoose-query.utils.js';
 
+const EMPLOYEE_POPULATE = {
+    path: 'employeeId',
+    select: 'firstName lastName photoUrl',
+    options: { includeDeleted: true },
+};
+
+const EMPLOYEE_NAME_POPULATE = {
+    path: 'employeeId',
+    select: 'firstName lastName',
+    options: { includeDeleted: true },
+};
+
 class BookingRepository {
     async create(data, options = {}) {
         if (options.session) {
@@ -18,12 +30,12 @@ class BookingRepository {
     async findByIdPopulated(id) {
         return Booking.findById(id)
             .populate('shopId', 'shopName coverUrl address openTime closeTime')
-            .populate('employeeId', 'firstName lastName photoUrl')
+            .populate(EMPLOYEE_POPULATE)
             .populate({
                 path: 'customerId',
                 select: 'firstName lastName userId',
-                populate: { path: 'userId', select: 'email phoneNumber' }
-            })
+                populate: { path: 'userId', select: 'email phoneNumber' },
+            });
     }
 
     async updateById(id, data) {
@@ -32,7 +44,7 @@ class BookingRepository {
 
     async updateStatus(id, status) {
         const update = { status };
-        if (status === 'cancelled') update.cancelledAt = new Date();
+        if (status === BOOKING_STATUS.CANCELLED) update.cancelledAt = new Date();
         return Booking.findByIdAndUpdate(id, update, { new: true });
     }
 
@@ -40,12 +52,10 @@ class BookingRepository {
         return Booking.findByIdAndDelete(id);
     }
 
-    // ── Customer-side queries ──────────────────────────────────────────
-
     async findByCustomer(customerId, filters = {}) {
         return Booking.find(trustQueryOperators({ customerId, ...filters }))
             .populate('serviceIds')
-            .populate('employeeId', 'firstName lastName photoUrl')
+            .populate(EMPLOYEE_POPULATE)
             .populate('shopId', 'shopName address coverUrl')
             .sort({ date: -1 });
     }
@@ -56,10 +66,10 @@ class BookingRepository {
             date: { $gte: today },
         }))
             .populate('serviceIds')
-            .populate('employeeId', 'firstName lastName photoUrl')
+            .populate(EMPLOYEE_POPULATE)
             .populate('shopId', 'shopName address coverUrl')
             .sort({ date: 1 });
-            
+
         if (options.skip !== undefined) query.skip(options.skip);
         if (options.limit !== undefined) query.limit(options.limit);
         return query;
@@ -75,7 +85,7 @@ class BookingRepository {
             date: { $lt: today },
         }))
             .populate('serviceIds')
-            .populate('employeeId', 'firstName lastName photoUrl')
+            .populate(EMPLOYEE_POPULATE)
             .populate('shopId', 'shopName address coverUrl')
             .sort({ date: -1 });
 
@@ -88,18 +98,32 @@ class BookingRepository {
         return Booking.countDocuments(trustQueryOperators({ customerId, date: { $lt: today } }));
     }
 
-    // ── Shop/Barber-side queries ───────────────────────────────────────
-
     async findByEmployeeIds(employeeIds, filters = {}, options = {}) {
         const query = Booking.find(trustQueryOperators({ employeeId: { $in: employeeIds }, ...filters }))
             .populate({
                 path: 'customerId',
                 select: 'firstName lastName userId',
-                populate: { path: 'userId', select: 'phoneNumber' }
+                populate: { path: 'userId', select: 'phoneNumber' },
             })
-            .populate('employeeId', 'firstName lastName')
+            .populate(EMPLOYEE_NAME_POPULATE)
             .populate('serviceIds', 'serviceName offerPrice');
-            
+
+        if (options.skip !== undefined) query.skip(options.skip);
+        if (options.limit !== undefined) query.limit(options.limit);
+        return query;
+    }
+
+    async findByShopId(shopId, filters = {}, options = {}) {
+        const query = Booking.find(trustQueryOperators({ shopId, ...filters }))
+            .populate({
+                path: 'customerId',
+                select: 'firstName lastName userId',
+                populate: { path: 'userId', select: 'phoneNumber' },
+            })
+            .populate(EMPLOYEE_NAME_POPULATE)
+            .populate('serviceIds', 'serviceName offerPrice')
+            .sort({ date: -1, createdAt: -1 });
+
         if (options.skip !== undefined) query.skip(options.skip);
         if (options.limit !== undefined) query.limit(options.limit);
         return query;
@@ -116,12 +140,28 @@ class BookingRepository {
         }));
     }
 
+    async countByStatusForShop(shopId, status) {
+        return Booking.countDocuments(trustQueryOperators({ shopId, status }));
+    }
+
     async findByStatusPopulated(status, employeeIds, options = {}) {
         const query = Booking.find(trustQueryOperators({ status, employeeId: { $in: employeeIds } }))
             .populate('customerId', 'firstName lastName')
-            .populate('employeeId', 'firstName lastName')
+            .populate(EMPLOYEE_NAME_POPULATE)
             .lean();
-            
+
+        if (options.skip !== undefined) query.skip(options.skip);
+        if (options.limit !== undefined) query.limit(options.limit);
+        return query;
+    }
+
+    async findByStatusForShop(shopId, status, options = {}) {
+        const query = Booking.find(trustQueryOperators({ shopId, status }))
+            .populate('customerId', 'firstName lastName')
+            .populate(EMPLOYEE_NAME_POPULATE)
+            .sort({ date: -1, createdAt: -1 })
+            .lean();
+
         if (options.skip !== undefined) query.skip(options.skip);
         if (options.limit !== undefined) query.limit(options.limit);
         return query;
@@ -134,17 +174,31 @@ class BookingRepository {
         return ids.length;
     }
 
+    async getUniqueCustomerCountForShop(shopId) {
+        const ids = await Booking.distinct('customerId', trustQueryOperators({ shopId }));
+        return ids.length;
+    }
+
     async findByEmployeeAndDate(employeeId, date) {
-        return Booking.find({ employeeId, date }).lean();
+        return Booking.find({
+            employeeId,
+            date,
+            status: { $ne: BOOKING_STATUS.CANCELLED },
+        }).lean();
     }
 
     async findConflict(shopId, employeeId, date, time, excludeBookingId) {
-        const filter = { shopId, employeeId, date, time };
+        const filter = {
+            shopId,
+            employeeId,
+            date,
+            time,
+            status: { $ne: BOOKING_STATUS.CANCELLED },
+        };
+
         if (excludeBookingId) filter._id = { $ne: excludeBookingId };
         return Booking.findOne(trustQueryOperators(filter));
     }
-
-    // ── User booking detail queries ─────────────────────────────────────
 
     async findByCustomerWithDateRange(customerId, startDate, endDate) {
         return Booking.find(trustQueryOperators({
@@ -152,7 +206,7 @@ class BookingRepository {
             date: { $gte: startDate, $lte: endDate },
         }))
             .populate('serviceIds', 'serviceName offerPrice duration')
-            .populate('employeeId', 'firstName lastName')
+            .populate(EMPLOYEE_NAME_POPULATE)
             .populate('shopId', 'shopName address');
     }
 
@@ -167,13 +221,55 @@ class BookingRepository {
     }
 
     // ── Aggregations ───────────────────────────────────────────────────
+    async hasActiveBookingsForEmployee(shopId, employeeId, fromDate = new Date()) {
+        const startOfToday = new Date(fromDate);
+        startOfToday.setHours(0, 0, 0, 0);
+
+        return Booking.exists(trustQueryOperators({
+            shopId,
+            employeeId,
+            status: { $in: [BOOKING_STATUS.PENDING, BOOKING_STATUS.CONFIRMED] },
+            date: { $gte: startOfToday },
+        }));
+    }
 
     async getEarningsAggregation(employeeId, startOfToday, endOfToday, startOfLastMonth, endOfLastMonth) {
         return Booking.aggregate([
-            { $match: { status: 'completed', employeeId } },
+            { $match: { status: BOOKING_STATUS.COMPLETED, employeeId } },
             {
                 $group: {
                     _id: '$employeeId',
+                    totalEarning: { $sum: '$totalAmount' },
+                    lastMonthEarning: {
+                        $sum: {
+                            $cond: [
+                                { $and: [{ $gte: ['$date', startOfLastMonth] }, { $lte: ['$date', endOfLastMonth] }] },
+                                '$totalAmount',
+                                0,
+                            ],
+                        },
+                    },
+                    todayEarning: {
+                        $sum: {
+                            $cond: [
+                                { $and: [{ $gte: ['$date', startOfToday] }, { $lt: ['$date', endOfToday] }] },
+                                '$totalAmount',
+                                0,
+                            ],
+                        },
+                    },
+                },
+            },
+            { $project: { _id: 0, totalEarning: 1, lastMonthEarning: 1, todayEarning: 1 } },
+        ]);
+    }
+
+    async getEarningsAggregationForShop(shopId, startOfToday, endOfToday, startOfLastMonth, endOfLastMonth) {
+        return Booking.aggregate([
+            { $match: { status: BOOKING_STATUS.COMPLETED, shopId } },
+            {
+                $group: {
+                    _id: null,
                     totalEarning: { $sum: '$totalAmount' },
                     lastMonthEarning: {
                         $sum: {

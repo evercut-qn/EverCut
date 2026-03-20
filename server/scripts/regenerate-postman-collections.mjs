@@ -729,8 +729,7 @@ const customerBookingsCollection = {
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           'const response = pm.response.json();',
-          'const data = response.data || {};',
-          'const bookings = Array.isArray(data.items) ? data.items : [];',
+          'const bookings = Array.isArray(response.data && response.data.items) ? response.data.items : [];',
           'const firstBooking = bookings[0];',
           "if (firstBooking && firstBooking._id) { pm.collectionVariables.set('booking_id', firstBooking._id); pm.globals.set('shared_booking_id', firstBooking._id); }",
           'const firstService = firstBooking && Array.isArray(firstBooking.serviceIds) ? firstBooking.serviceIds[0] : null;',
@@ -1248,8 +1247,7 @@ const barberEmployeesCollection = {
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           'const response = pm.response.json();',
-          'const data = response.data || {};',
-          'const employees = Array.isArray(data.items) ? data.items : [];',
+          'const employees = Array.isArray(response.data && response.data.items) ? response.data.items : [];',
           "const preferredEmployee = employees.find((employee) => typeof employee.firstName === 'string' && employee.firstName.includes('Postman')) || employees[0];",
           "if (preferredEmployee && preferredEmployee._id) { pm.collectionVariables.set('employee_id', preferredEmployee._id); pm.globals.set('shared_employee_id', preferredEmployee._id); }",
         ),
@@ -1344,8 +1342,7 @@ const barberServicesCollection = {
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           'const response = pm.response.json();',
-          'const data = response.data || {};',
-          'const services = Array.isArray(data.items) ? data.items : [];',
+          'const services = Array.isArray(response.data && response.data.items) ? response.data.items : [];',
           "const preferredService = services.find((service) => typeof service.serviceName === 'string' && service.serviceName.includes('Postman')) || services[0];",
           "if (preferredService && preferredService._id) { pm.collectionVariables.set('service_id', preferredService._id); pm.globals.set('shared_service_id', preferredService._id); }",
         ),
@@ -1545,8 +1542,7 @@ const barberPhotosCollection = {
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           'const response = pm.response.json();',
-          'const data = response.data || {};',
-          'const photos = Array.isArray(data.items) ? data.items : [];',
+          'const photos = Array.isArray(response.data && response.data.items) ? response.data.items : [];',
           'const firstPhoto = photos[0];',
           "if (firstPhoto && firstPhoto._id) { pm.collectionVariables.set('photo_id', firstPhoto._id); pm.globals.set('shared_photo_id', firstPhoto._id); }",
         ),
@@ -1658,8 +1654,7 @@ const barberRatingsCollection = {
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           'const response = pm.response.json();',
-          'const data = response.data || {};',
-          'const ratings = Array.isArray(data.items) ? data.items : [];',
+          'const ratings = Array.isArray(response.data && response.data.items) ? response.data.items : [];',
           'const capture = (variableName, marker) => {',
           "  const match = ratings.find((item) => typeof item.review === 'string' && item.review.includes(marker));",
           "  if (match && match.ratingId) { pm.collectionVariables.set(variableName, match.ratingId); }",
