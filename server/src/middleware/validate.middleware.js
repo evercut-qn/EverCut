@@ -1,5 +1,6 @@
 import { BadRequestError } from '../utils/api-error.js';
 import { storeValidatedRequestData } from '../utils/request-validation.utils.js';
+import { cleanupUploadedAssets } from '../utils/upload-cleanup.utils.js';
 
 /**
  * Generic validation middleware factory.
@@ -16,7 +17,7 @@ import { storeValidatedRequestData } from '../utils/request-validation.utils.js'
  * explicitly choose validated input and avoid mutating framework-owned state.
  */
 export const validate = (schema, source = 'body') => {
-    return (req, _res, next) => {
+    return async (req, _res, next) => {
         const { error, value } = schema.validate(req[source], {
             abortEarly: false,
             allowUnknown: false,
@@ -25,6 +26,7 @@ export const validate = (schema, source = 'body') => {
 
         if (error) {
             const errors = error.details.map((d) => d.message);
+            await cleanupUploadedAssets(req, `validate:${source}`);
             return next(new BadRequestError('Validation failed', errors));
         }
 

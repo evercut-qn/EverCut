@@ -444,15 +444,16 @@ export const getBookingsByShop = async (ownerId, query = {}) => {
     const shop = await shopRepository.findByOwnerId(ownerId);
     if (!shop) throw new NotFoundError('Shop');
 
-    const employeeIds = await employeeRepository.getIdsForShop(shop._id);
-    
-    const total = await bookingRepository.countAll({ employeeId: { $in: employeeIds } });
+    const total = await bookingRepository.countAll({ shopId: shop._id });
     const { skip, limit, pagination } = buildPagination(query, total);
-    
-    const bookings = await bookingRepository.findByEmployeeIds(employeeIds, {}, { skip, limit });
-    const numCustomers = await bookingRepository.getUniqueCustomerCount(employeeIds);
 
-    return { items: bookings, pagination, numberOfEmployees: employeeIds.length, numberOfCustomers: numCustomers };
+    const [bookings, numCustomers, numberOfEmployees] = await Promise.all([
+        bookingRepository.findByShopId(shop._id, {}, { skip, limit }),
+        bookingRepository.getUniqueCustomerCountForShop(shop._id),
+        employeeRepository.countByShopId(shop._id),
+    ]);
+
+    return { items: bookings, pagination, numberOfEmployees, numberOfCustomers: numCustomers };
 };
 
 export const updateBookingStatus = async (bookingId, status, ownerId) => {
@@ -493,12 +494,11 @@ export const getBookingStats = async (ownerId) => {
     const shop = await shopRepository.findByOwnerId(ownerId);
     if (!shop) throw new NotFoundError('Shop');
 
-    const employeeIds = await employeeRepository.getIdsForShop(shop._id);
     const [total, pending, completed, cancelled] = await Promise.all([
-        bookingRepository.countAll({ employeeId: { $in: employeeIds } }),
-        bookingRepository.countByStatus('pending', employeeIds),
-        bookingRepository.countByStatus('completed', employeeIds),
-        bookingRepository.countByStatus('cancelled', employeeIds),
+        bookingRepository.countAll({ shopId: shop._id }),
+        bookingRepository.countByStatusForShop(shop._id, 'pending'),
+        bookingRepository.countByStatusForShop(shop._id, 'completed'),
+        bookingRepository.countByStatusForShop(shop._id, 'cancelled'),
     ]);
     return { total, pending, completed, cancelled };
 };
@@ -507,11 +507,9 @@ export const getBookingsByStatusDetailed = async (ownerId, status, query = {}) =
     const shop = await shopRepository.findByOwnerId(ownerId);
     if (!shop) throw new NotFoundError('Shop');
 
-    const employeeIds = await employeeRepository.getIdsForShop(shop._id);
-    
-    const total = await bookingRepository.countByStatus(status, employeeIds);
+    const total = await bookingRepository.countByStatusForShop(shop._id, status);
     const { skip, limit, pagination } = buildPagination(query, total);
-    
-    const items = await bookingRepository.findByStatusPopulated(status, employeeIds, { skip, limit });
+
+    const items = await bookingRepository.findByStatusForShop(shop._id, status, { skip, limit });
     return { items, pagination };
 };

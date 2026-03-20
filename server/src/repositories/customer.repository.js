@@ -42,7 +42,11 @@ class CustomerRepository {
             path: 'favoriteBookings',
             populate: [
                 { path: 'serviceIds' },
-                { path: 'employeeId', select: 'firstName lastName photoUrl' },
+                {
+                    path: 'employeeId',
+                    select: 'firstName lastName photoUrl',
+                    options: { includeDeleted: true },
+                },
                 { path: 'shopId', select: 'shopName address coverUrl' },
             ],
         });

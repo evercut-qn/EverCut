@@ -112,7 +112,7 @@
               "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
               "const response = pm.response.json();",
-              "const ratings = Array.isArray(response.data) ? response.data : [];",
+              "const ratings = Array.isArray(response.data && response.data.items) ? response.data.items : [];",
               "const capture = (variableName, marker) => {",
               "  const match = ratings.find((item) => typeof item.review === 'string' && item.review.includes(marker));",
               "  if (match && match.ratingId) { pm.collectionVariables.set(variableName, match.ratingId); }",

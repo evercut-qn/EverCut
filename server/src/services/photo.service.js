@@ -92,11 +92,17 @@ export const updateShopCover = async (ownerId, file) => {
     const coverUrl = file.path;
     const coverCloudinaryId = file.public_id || file.filename;
 
-    // Delete old cover images
+    let updated;
+    try {
+        updated = await shopRepository.updateByOwnerId(ownerId, { coverUrl, coverCloudinaryId });
+    } catch (err) {
+        try { await cloudinary.uploader.destroy(coverCloudinaryId); } catch { /* non-fatal */ }
+        throw err;
+    }
+
     if (shop.coverCloudinaryId && shop.coverCloudinaryId !== coverCloudinaryId) {
         try { await cloudinary.uploader.destroy(shop.coverCloudinaryId); } catch { /* non-fatal */ }
     }
 
-    const updated = await shopRepository.updateByOwnerId(ownerId, { coverUrl, coverCloudinaryId });
     return { coverUrl: updated.coverUrl, cloudinaryId: updated.coverCloudinaryId };
 };

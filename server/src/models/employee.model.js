@@ -71,7 +71,15 @@ const employeeSchema = new mongoose.Schema(
 // Indexes
 // ---------------------------------------------------------------------------
 employeeSchema.index({ shopId: 1, isActive: 1 });
-employeeSchema.index({ shopId: 1, phoneNumber: 1 }, { unique: true });
+employeeSchema.index(
+    { shopId: 1, phoneNumber: 1 },
+    {
+        unique: true,
+        partialFilterExpression: {
+            deletedAt: null,
+        },
+    },
+);
 
 // ---------------------------------------------------------------------------
 // Soft-delete query middleware
