@@ -1653,7 +1653,7 @@ const barberRatingsCollection = {
           'const ratings = Array.isArray(response.data && response.data.items) ? response.data.items : [];',
           'const capture = (variableName, marker) => {',
           "  const match = ratings.find((item) => typeof item.review === 'string' && item.review.includes(marker));",
-          "  if (match && match.ratingId) { pm.collectionVariables.set(variableName, match.ratingId); }",
+          "  if (match && match._id) { pm.collectionVariables.set(variableName, match._id); }",
           '};',
           "capture('rating_id_add_reply', '[ADD_REPLY_TARGET]');",
           "capture('rating_id_update_reply', '[UPDATE_REPLY_TARGET]');",
@@ -1775,7 +1775,7 @@ const environmentTemplate = {
   ],
   _postman_variable_scope: 'environment',
   _postman_exported_at: new Date().toISOString(),
-  _postman_exported_using: 'OpenAI Codex',
+  _postman_exported_using: 'regenerate-postman-collections.mjs',
 };
 
 writeCollection('01-authentication.json', authenticationCollection);
