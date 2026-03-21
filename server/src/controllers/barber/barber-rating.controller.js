@@ -12,6 +12,15 @@ export const getRatings = async (req, res, next) => {
     }
 };
 
+export const getRatingSummary = async (req, res, next) => {
+    try {
+        const summary = await ratingService.getRatingSummaryForBarber(req.user._id);
+        return res.status(200).json(ApiResponse.success(summary, 'Rating summary'));
+    } catch (err) {
+        next(err);
+    }
+};
+
 export const addReply = async (req, res, next) => {
     try {
         const params = getValidatedRequestData(req, 'params');

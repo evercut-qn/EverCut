@@ -89,6 +89,7 @@ router.get('/earnings', earningsCtrl.getEarnings);
 
 // Ratings
 router.get('/ratings', validate(paginationSchema, 'query'), ratingCtrl.getRatings);
+router.get('/ratings/summary', ratingCtrl.getRatingSummary);
 router.post('/ratings/:id/reply', validate(objectIdParamSchema, 'params'), validate(addReplySchema, 'body'), ratingCtrl.addReply);
 router.put('/ratings/:id/reply', validate(objectIdParamSchema, 'params'), validate(addReplySchema, 'body'), ratingCtrl.updateReply);
 router.delete('/ratings/:id/reply', validate(objectIdParamSchema, 'params'), ratingCtrl.deleteReply);

@@ -35,6 +35,7 @@ A new feature has been added to allow barbers/shop owners to reply to customer r
 
 **API Endpoints Added:**
 - `GET /api/v1/barber/ratings` - Get all ratings for barber's shop
+- `GET /api/v1/barber/ratings/summary` - Get the barber shop's rating summary
 - `POST /api/v1/barber/ratings/:id/reply` - Add reply to a rating
 - `PUT /api/v1/barber/ratings/:id/reply` - Update existing reply
 - `DELETE /api/v1/barber/ratings/:id/reply` - Delete reply
@@ -692,6 +693,8 @@ Thin controllers that:
 /api/v1/barber/photos/:id            GET, DELETE
 /api/v1/barber/photos/stats          GET
 /api/v1/barber/earnings              GET
+/api/v1/barber/ratings               GET
+/api/v1/barber/ratings/summary       GET
 /api/v1/barber/ratings/:id           DELETE
 ```
 

@@ -1653,7 +1653,8 @@ const barberRatingsCollection = {
           'const ratings = Array.isArray(response.data && response.data.items) ? response.data.items : [];',
           'const capture = (variableName, marker) => {',
           "  const match = ratings.find((item) => typeof item.review === 'string' && item.review.includes(marker));",
-          "  if (match && match._id) { pm.collectionVariables.set(variableName, match._id); }",
+          '  const ratingId = match && (match.ratingId || match._id);',
+          "  if (ratingId) { pm.collectionVariables.set(variableName, ratingId); }",
           '};',
           "capture('rating_id_add_reply', '[ADD_REPLY_TARGET]');",
           "capture('rating_id_update_reply', '[UPDATE_REPLY_TARGET]');",
@@ -1665,7 +1666,16 @@ const barberRatingsCollection = {
       }),
     },
     {
-      name: '2. Add Reply',
+      name: '2. Get Rating Summary',
+      ...request({
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/barber/ratings/summary',
+        description: 'Returns aggregate rating metrics for the authenticated barber shop.',
+        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
+      }),
+    },
+    {
+      name: '3. Add Reply',
       ...request({
         method: 'POST',
         url: '{{base_url}}/{{api_prefix}}/barber/ratings/{{rating_id_add_reply}}/reply',
@@ -1680,7 +1690,7 @@ const barberRatingsCollection = {
       }),
     },
     {
-      name: '3. Update Reply',
+      name: '4. Update Reply',
       ...request({
         method: 'PUT',
         url: '{{base_url}}/{{api_prefix}}/barber/ratings/{{rating_id_update_reply}}/reply',
@@ -1693,7 +1703,7 @@ const barberRatingsCollection = {
       }),
     },
     {
-      name: '4. Delete Reply',
+      name: '5. Delete Reply',
       ...request({
         method: 'DELETE',
         url: '{{base_url}}/{{api_prefix}}/barber/ratings/{{rating_id_update_reply}}/reply',
@@ -1702,7 +1712,7 @@ const barberRatingsCollection = {
       }),
     },
     {
-      name: '5. Remove Rating',
+      name: '6. Remove Rating',
       ...request({
         method: 'DELETE',
         url: '{{base_url}}/{{api_prefix}}/barber/ratings/{{rating_id_remove_rating}}',

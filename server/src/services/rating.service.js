@@ -119,6 +119,11 @@ export const getRatingSummary = async (shopId) => {
     return ratingRepository.getShopSummary(shopId);
 };
 
+export const getRatingSummaryForBarber = async (ownerId) => {
+    const shop = await getOwnedShop(ownerId);
+    return ratingRepository.getShopSummary(shop._id);
+};
+
 export const removeRating = async (ratingId, ownerId) => {
     const rating = await ratingRepository.findById(ratingId);
     if (!rating) throw new NotFoundError('Rating');

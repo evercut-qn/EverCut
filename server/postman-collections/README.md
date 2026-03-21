@@ -36,7 +36,7 @@ Validation and field-level failures are returned inside `data.errors`.
 | `10-barber-bookings.json` | EverCut - Barber Bookings | Booking administration: list, stats, status update, delete |
 | `11-barber-photos.json` | EverCut - Barber Photos | Shop gallery: upload, list, stats, delete |
 | `12-barber-earnings.json` | EverCut - Barber Earnings | Earnings summary (requires completed bookings for non-zero values) |
-| `13-barber-ratings.json` | EverCut - Barber Ratings | Rating reply management (add, update, delete) and rating removal |
+| `13-barber-ratings.json` | EverCut - Barber Ratings | Rating listing, summary, reply management, and rating removal |
 | `EverCut.postman_environment.json` | — | Active environment with OTP/JWT variables for local testing |
 | `assets/sample-upload.png` | — | Sample image pre-wired into file-upload requests |
 
@@ -178,10 +178,11 @@ Employee `workingHours.start` and `workingHours.end` remain `HH:MM` 24-hour valu
 | # | Method | Endpoint | Description |
 |---|---|---|---|
 | 1 | GET | `/api/v1/barber/ratings` | List ratings - captures seeded IDs for reply/remove operations |
-| 2 | POST | `/api/v1/barber/ratings/{{rating_id_add_reply}}/reply` | Add reply to a rating *(returns 409 on rerun once a reply exists)* |
-| 3 | PUT | `/api/v1/barber/ratings/{{rating_id_update_reply}}/reply` | Update an existing reply |
-| 4 | DELETE | `/api/v1/barber/ratings/{{rating_id_update_reply}}/reply` | Delete a reply |
-| 5 | DELETE | `/api/v1/barber/ratings/{{rating_id_remove_rating}}` | Remove a rating |
+| 2 | GET | `/api/v1/barber/ratings/summary` | Get the authenticated barber shop's rating summary |
+| 3 | POST | `/api/v1/barber/ratings/{{rating_id_add_reply}}/reply` | Add reply to a rating *(returns 409 on rerun once a reply exists)* |
+| 4 | PUT | `/api/v1/barber/ratings/{{rating_id_update_reply}}/reply` | Update an existing reply |
+| 5 | DELETE | `/api/v1/barber/ratings/{{rating_id_update_reply}}/reply` | Delete a reply |
+| 6 | DELETE | `/api/v1/barber/ratings/{{rating_id_remove_rating}}` | Remove a rating |
 
 ---
 
@@ -285,6 +286,8 @@ cd server
 node scripts/seed-barber-rating-mock-data.js
 ```
 
+Request 1 captures seeded IDs from the serialized `ratingId` field returned by the API.
+
 ### `06-customer-ratings.json` — Add Rating (Request 2)
 
 This collection now captures `shop_id` from `GET /customer/bookings?type=past`, not from nearby shop discovery. The authenticated customer must already have at least one completed past booking, otherwise request 1 fails intentionally because the backend now allows ratings only for shops the customer has actually completed a booking with.
@@ -296,6 +299,8 @@ Request 2 succeeds once per customer/shop pair. It returns `409 Conflict` on sub
 Barber onboarding and shop schedule updates accept either `HH:MM` or `hh:mm AM/PM` values for `openTime`, `closeTime`, and break times. The backend normalizes shop schedule storage to `HH:MM`, while employee working hours stay `HH:MM` and are validated against that normalized schedule.
 
 ### `13-barber-ratings.json` — Add Reply (Request 2)
+
+In the current collection this is request 3, because request 2 now fetches `GET /barber/ratings/summary`.
 
 This succeeds once for the seeded no-reply fixture. It returns `409 Conflict` on subsequent runs because `POST /barber/ratings/:id/reply` no longer overwrites an existing reply.
 
