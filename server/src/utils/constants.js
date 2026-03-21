@@ -29,6 +29,8 @@ export const BOOKING_STATUS = Object.freeze({
 
 export const ALL_BOOKING_STATUSES = Object.values(BOOKING_STATUS);
 
+export const BOOKING_MILESTONE_TARGETS = Object.freeze([500, 750, 1000]);
+
 // ---------------------------------------------------------------------------
 // Payment Statuses
 // ---------------------------------------------------------------------------

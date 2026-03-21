@@ -45,3 +45,83 @@ test('getBookingsByShop loads bookings by shopId so deleted employees do not dis
         numberOfCustomers: 2,
     });
 });
+
+test('getBookingMilestoneProgress returns the monthly completed-booking target state for the requested period', async (t) => {
+    t.mock.method(shopRepository, 'findByOwnerId', async () => ({ _id: 'shop-1' }));
+
+    let capturedArgs = null;
+    t.mock.method(bookingRepository, 'countCompletedForShopInDateRange', async (shopId, startDate, endDate) => {
+        capturedArgs = { shopId, startDate, endDate };
+        return 500;
+    });
+
+    const result = await bookingService.getBookingMilestoneProgress('owner-1', { month: 3, year: 2026 });
+
+    assert.deepEqual(capturedArgs, {
+        shopId: 'shop-1',
+        startDate: new Date('2026-03-01T00:00:00.000Z'),
+        endDate: new Date('2026-04-01T00:00:00.000Z'),
+    });
+    assert.deepEqual(result, {
+        period: {
+            month: 3,
+            year: 2026,
+            label: 'March 2026',
+        },
+        status: 'active',
+        completedBookings: 500,
+        progress: {
+            min: 0,
+            max: 1000,
+            value: 500,
+            percentage: 50,
+        },
+        milestones: [
+            {
+                targetBookings: 500,
+                label: '1st target',
+                isCompleted: true,
+                remainingBookings: 0,
+            },
+            {
+                targetBookings: 750,
+                label: '2nd target',
+                isCompleted: false,
+                remainingBookings: 250,
+            },
+            {
+                targetBookings: 1000,
+                label: '3rd target',
+                isCompleted: false,
+                remainingBookings: 500,
+            },
+        ],
+        currentMilestone: {
+            targetBookings: 500,
+            label: '1st target',
+            statusText: '1st target completed',
+        },
+        nextMilestone: {
+            targetBookings: 750,
+            label: '2nd target',
+            remainingBookings: 250,
+            rewardMessage: 'Just 250 more bookings to reach your next reward!',
+        },
+    });
+});
+
+test('getBookingMilestoneProgress returns no next milestone once all visible targets are completed', async (t) => {
+    t.mock.method(shopRepository, 'findByOwnerId', async () => ({ _id: 'shop-1' }));
+    t.mock.method(bookingRepository, 'countCompletedForShopInDateRange', async () => 1200);
+
+    const result = await bookingService.getBookingMilestoneProgress('owner-1', { month: 3, year: 2026 });
+
+    assert.equal(result.progress.value, 1000);
+    assert.equal(result.progress.percentage, 100);
+    assert.deepEqual(result.currentMilestone, {
+        targetBookings: 1000,
+        label: '3rd target',
+        statusText: '3rd target completed',
+    });
+    assert.equal(result.nextMilestone, null);
+});

@@ -30,6 +30,16 @@ export const getBookingStats = async (req, res, next) => {
     }
 };
 
+export const getBookingMilestoneProgress = async (req, res, next) => {
+    try {
+        const query = getValidatedRequestData(req, 'query');
+        const progress = await bookingService.getBookingMilestoneProgress(req.user._id, query);
+        return res.status(200).json(ApiResponse.success(progress, 'Booking milestone progress'));
+    } catch (err) {
+        next(err);
+    }
+};
+
 export const updateBookingStatus = async (req, res, next) => {
     try {
         const params = getValidatedRequestData(req, 'params');

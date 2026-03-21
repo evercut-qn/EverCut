@@ -33,7 +33,7 @@ Validation and field-level failures are returned inside `data.errors`.
 | `07-barber-profile-shop.json` | EverCut - Barber Profile & Shop | Shop management: info, UPI, status, images, PIN, and account actions |
 | `08-barber-employees.json` | EverCut - Barber Employees | Employee CRUD with optional photo upload and 24-hour employee schedule examples |
 | `09-barber-services.json` | EverCut - Barber Services | Service catalogue CRUD (single and bundled services) |
-| `10-barber-bookings.json` | EverCut - Barber Bookings | Booking administration: list, stats, status update, delete |
+| `10-barber-bookings.json` | EverCut - Barber Bookings | Booking administration: list, stats, monthly milestone progress, status update, delete |
 | `11-barber-photos.json` | EverCut - Barber Photos | Shop gallery: upload, list, stats, delete |
 | `12-barber-earnings.json` | EverCut - Barber Earnings | Earnings summary (requires completed bookings for non-zero values) |
 | `13-barber-ratings.json` | EverCut - Barber Ratings | Rating listing, summary, reply management, and rating removal |
@@ -153,9 +153,10 @@ Employee `workingHours.start` and `workingHours.end` remain `HH:MM` 24-hour valu
 |---|---|---|---|
 | 1 | GET | `/api/v1/barber/bookings` | List all bookings - captures IDs for status update and delete |
 | 2 | GET | `/api/v1/barber/bookings/stats` | Get booking stats |
-| 3 | GET | `/api/v1/barber/bookings/status?status=confirmed` | Filter bookings by status |
-| 4 | PUT | `/api/v1/barber/bookings/{{booking_id_status}}/status` | Update booking status |
-| 5 | DELETE | `/api/v1/barber/bookings/{{booking_id_delete}}` | Delete a paid booking *(Terminal)* |
+| 3 | GET | `/api/v1/barber/bookings/progress` | Get the monthly completed-booking milestone progress card data |
+| 4 | GET | `/api/v1/barber/bookings/status?status=confirmed` | Filter bookings by status |
+| 5 | PUT | `/api/v1/barber/bookings/{{booking_id_status}}/status` | Update booking status |
+| 6 | DELETE | `/api/v1/barber/bookings/{{booking_id_delete}}` | Delete a paid booking *(Terminal)* |
 
 ### `11-barber-photos.json`
 
@@ -304,6 +305,6 @@ In the current collection this is request 3, because request 2 now fetches `GET 
 
 This succeeds once for the seeded no-reply fixture. It returns `409 Conflict` on subsequent runs because `POST /barber/ratings/:id/reply` no longer overwrites an existing reply.
 
-### `10-barber-bookings.json` — Delete Paid Booking (Request 5)
+### `10-barber-bookings.json` — Delete Paid Booking (Request 6)
 
 This is destructive and should be left until the end of a test cycle, after any booking status, earnings, or customer confirmation checks are complete.

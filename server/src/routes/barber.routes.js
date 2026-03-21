@@ -11,6 +11,7 @@ import { validate } from '../middleware/validate.middleware.js';
 import { deleteBarberAccountSchema } from '../validators/account.validator.js';
 import {
     bookingIdParamSchema,
+    bookingMilestoneProgressQuerySchema,
     bookingStatusSchema,
     bookingsByStatusQuerySchema,
 } from '../validators/booking.validator.js';
@@ -73,6 +74,7 @@ router.delete('/services/:id', validate(objectIdParamSchema, 'params'), serviceC
 // Bookings
 router.get('/bookings', validate(paginationSchema, 'query'), bookingCtrl.getBookings);
 router.get('/bookings/stats', bookingCtrl.getBookingStats);
+router.get('/bookings/progress', validate(bookingMilestoneProgressQuerySchema, 'query'), bookingCtrl.getBookingMilestoneProgress);
 router.get('/bookings/status', validate(bookingsByStatusQuerySchema, 'query'), bookingCtrl.getBookingsByStatus);
 router.put('/bookings/:id/status', validate(bookingIdParamSchema, 'params'), validate(bookingStatusSchema, 'body'), bookingCtrl.updateBookingStatus);
 router.delete('/bookings/:id', validate(bookingIdParamSchema, 'params'), bookingCtrl.deleteBooking);

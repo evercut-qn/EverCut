@@ -52,3 +52,8 @@ export const employeeCalendarQuerySchema = Joi.object({
 export const bookingsByStatusQuerySchema = paginationSchema.keys({
     status: Joi.string().valid('pending', 'confirmed', 'completed', 'cancelled').required(),
 });
+
+export const bookingMilestoneProgressQuerySchema = Joi.object({
+    month: Joi.number().integer().min(1).max(12),
+    year: Joi.number().integer().min(2000).max(9999),
+}).and('month', 'year');

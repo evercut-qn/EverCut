@@ -1428,7 +1428,7 @@ const barberServicesCollection = {
 const barberBookingsCollection = {
   info: {
     name: 'EverCut - Barber Bookings',
-    description: 'Barber booking administration collection. It captures separate IDs for status updates and delete-after-payment so the limitations of the public API are explicit.',
+    description: 'Barber booking administration collection covering list, status stats, monthly milestone progress, status updates, and delete-after-payment.',
     schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
   },
   auth: bearerAuth('barber_access_token'),
@@ -1456,7 +1456,7 @@ const barberBookingsCollection = {
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           'const response = pm.response.json();',
           'const data = response.data || {};',
-          'const bookings = Array.isArray(data.bookings) ? data.bookings : [];',
+          'const bookings = Array.isArray(data.items) ? data.items : [];',
           "const statusBooking = bookings.find((booking) => ['pending', 'confirmed'].includes(booking.status)) || bookings[0];",
           "const deleteBooking = bookings.find((booking) => booking.paymentStatus === 'success') || statusBooking;",
           "const statusBookingId = statusBooking && (statusBooking._id || statusBooking.bookingId);",
@@ -1476,7 +1476,16 @@ const barberBookingsCollection = {
       }),
     },
     {
-      name: '3. Get Confirmed Bookings',
+      name: '3. Get Booking Milestone Progress',
+      ...request({
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/barber/bookings/progress',
+        description: 'Returns the current month completed-booking milestone progress card data, including the active status, completed count, visible targets, and next reward gap.',
+        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
+      }),
+    },
+    {
+      name: '4. Get Confirmed Bookings',
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/barber/bookings/status?status=confirmed',
@@ -1485,7 +1494,7 @@ const barberBookingsCollection = {
       }),
     },
     {
-      name: '4. Update Booking Status',
+      name: '5. Update Booking Status',
       ...request({
         method: 'PUT',
         url: '{{base_url}}/{{api_prefix}}/barber/bookings/{{booking_id_status}}/status',
@@ -1498,7 +1507,7 @@ const barberBookingsCollection = {
       }),
     },
     {
-      name: '5. Delete Paid Booking (Terminal)',
+      name: '6. Delete Paid Booking (Terminal)',
       ...request({
         method: 'DELETE',
         url: '{{base_url}}/{{api_prefix}}/barber/bookings/{{booking_id_delete}}',

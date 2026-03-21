@@ -144,6 +144,17 @@ class BookingRepository {
         return Booking.countDocuments(trustQueryOperators({ shopId, status }));
     }
 
+    async countCompletedForShopInDateRange(shopId, startDate, endDate) {
+        return Booking.countDocuments(trustQueryOperators({
+            shopId,
+            status: BOOKING_STATUS.COMPLETED,
+            date: {
+                $gte: startDate,
+                $lt: endDate,
+            },
+        }));
+    }
+
     async findByStatusPopulated(status, employeeIds, options = {}) {
         const query = Booking.find(trustQueryOperators({ status, employeeId: { $in: employeeIds } }))
             .populate('customerId', 'firstName lastName')

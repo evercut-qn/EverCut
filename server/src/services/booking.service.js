@@ -6,7 +6,12 @@ import customerRepository from '../repositories/customer.repository.js';
 import { NotFoundError, BadRequestError, ForbiddenError } from '../utils/api-error.js';
 import { isBookingInFuture, isWithinShopHours, getDayOfWeek, isWithinCancellationWindow } from '../utils/time.utils.js';
 import { buildPagination } from '../utils/pagination.utils.js';
-import { BOOKING_STATUS, MAX_RESCHEDULE_COUNT, CANCELLATION_WINDOW_HOURS } from '../utils/constants.js';
+import {
+    BOOKING_MILESTONE_TARGETS,
+    BOOKING_STATUS,
+    MAX_RESCHEDULE_COUNT,
+    CANCELLATION_WINDOW_HOURS,
+} from '../utils/constants.js';
 import { getEffectiveServicePrice, normalizeServicePricing } from '../utils/service-pricing.utils.js';
 
 /**
@@ -20,6 +25,31 @@ const sumServicePrices = (services = []) => services.reduce(
     (sum, service) => sum + (getEffectiveServicePrice(service) ?? 0),
     0,
 );
+const MONTH_LABEL_FORMATTER = new Intl.DateTimeFormat('en-US', {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+});
+
+const getOrdinalLabel = (index) => {
+    const ordinals = ['1st', '2nd', '3rd'];
+    return ordinals[index] || `${index + 1}th`;
+};
+
+const getTargetLabel = (index) => `${getOrdinalLabel(index)} target`;
+
+const getUtcMonthRange = (month, year) => ({
+    startDate: new Date(Date.UTC(year, month - 1, 1)),
+    endDate: new Date(Date.UTC(year, month, 1)),
+});
+
+const getDefaultProgressPeriod = () => {
+    const now = new Date();
+    return {
+        month: now.getUTCMonth() + 1,
+        year: now.getUTCFullYear(),
+    };
+};
 
 export const bookSalon = async (userId, data) => {
     const { serviceId, employeeId, shopId, date, time } = data;
@@ -501,6 +531,63 @@ export const getBookingStats = async (ownerId) => {
         bookingRepository.countByStatusForShop(shop._id, 'cancelled'),
     ]);
     return { total, pending, completed, cancelled };
+};
+
+export const getBookingMilestoneProgress = async (ownerId, query = {}) => {
+    const shop = await shopRepository.findByOwnerId(ownerId);
+    if (!shop) throw new NotFoundError('Shop');
+
+    const period = query.month && query.year
+        ? { month: query.month, year: query.year }
+        : getDefaultProgressPeriod();
+    const { startDate, endDate } = getUtcMonthRange(period.month, period.year);
+    const completedBookings = await bookingRepository.countCompletedForShopInDateRange(
+        shop._id,
+        startDate,
+        endDate,
+    );
+
+    const progressMax = BOOKING_MILESTONE_TARGETS[BOOKING_MILESTONE_TARGETS.length - 1] || 0;
+    const progressValue = progressMax > 0
+        ? Math.min(completedBookings, progressMax)
+        : completedBookings;
+    const milestones = BOOKING_MILESTONE_TARGETS.map((targetBookings, index) => ({
+        targetBookings,
+        label: getTargetLabel(index),
+        isCompleted: completedBookings >= targetBookings,
+        remainingBookings: Math.max(targetBookings - completedBookings, 0),
+    }));
+    const currentMilestone = milestones.filter((milestone) => milestone.isCompleted).at(-1) || null;
+    const nextMilestone = milestones.find((milestone) => !milestone.isCompleted) || null;
+
+    return {
+        period: {
+            ...period,
+            label: MONTH_LABEL_FORMATTER.format(new Date(Date.UTC(period.year, period.month - 1, 1))),
+        },
+        status: 'active',
+        completedBookings,
+        progress: {
+            min: 0,
+            max: progressMax,
+            value: progressValue,
+            percentage: progressMax > 0
+                ? Number(((progressValue / progressMax) * 100).toFixed(2))
+                : 0,
+        },
+        milestones,
+        currentMilestone: currentMilestone ? {
+            targetBookings: currentMilestone.targetBookings,
+            label: currentMilestone.label,
+            statusText: `${currentMilestone.label} completed`,
+        } : null,
+        nextMilestone: nextMilestone ? {
+            targetBookings: nextMilestone.targetBookings,
+            label: nextMilestone.label,
+            remainingBookings: nextMilestone.remainingBookings,
+            rewardMessage: `Just ${nextMilestone.remainingBookings} more bookings to reach your next reward!`,
+        } : null,
+    };
 };
 
 export const getBookingsByStatusDetailed = async (ownerId, status, query = {}) => {

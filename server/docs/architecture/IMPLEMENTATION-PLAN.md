@@ -594,7 +594,7 @@ Services contain ALL business rules. No HTTP context, no req/res. They throw dom
 - `src/services/shop.service.js` — CRUD shop profile, toggle open/closed, business updates
 - `src/services/employee.service.js` — CRUD employees
 - `src/services/service-catalog.service.js` — CRUD services (the salon services, not JS services)
-- `src/services/booking.service.js` — Book, cancel, reschedule, reorder, filter, calendar
+- `src/services/booking.service.js` — Book, cancel, reschedule, reorder, filter, calendar, monthly milestone progress
 - `src/services/rating.service.js` — Add/get/delete ratings, summaries
 - `src/services/photo.service.js` — Upload/get/delete photos, stats
 - `src/services/earnings.service.js` — Calculate barber earnings
@@ -686,6 +686,7 @@ Thin controllers that:
 /api/v1/barber/services/:id          PUT, DELETE
 /api/v1/barber/bookings              GET (all by shop)
 /api/v1/barber/bookings/stats        GET (counts by status)
+/api/v1/barber/bookings/progress     GET (monthly completed-booking milestone progress)
 /api/v1/barber/bookings/:id/status   PUT (update status)
 /api/v1/barber/bookings/:id          DELETE (after payment)
 /api/v1/barber/bookings/users/:id    GET (user booking details)
