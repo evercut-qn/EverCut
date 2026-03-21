@@ -76,3 +76,63 @@ test('addEmployee cleans up uploaded photo when a duplicate write slips past the
 
     assert.equal(destroyedPublicId, 'employee-photo-1');
 });
+
+test('addEmployee accepts 24-hour employee hours when legacy shop hours are stored in AM/PM format', async (t) => {
+    t.mock.method(shopRepository, 'findByOwnerId', async () => ({
+        _id: 'shop-1',
+        openTime: '09:00 AM',
+        closeTime: '08:00 PM',
+    }));
+    t.mock.method(employeeRepository, 'findByShopIdAndPhone', async () => null);
+
+    let createdPayload = null;
+    t.mock.method(employeeRepository, 'create', async (payload) => {
+        createdPayload = payload;
+        return payload;
+    });
+
+    const employee = await employeeService.addEmployee(
+        'owner-1',
+        {
+            firstName: 'Alex',
+            lastName: 'Stylist',
+            phoneNumber: '+15551234567',
+            gender: 'Male',
+            dateOfBirth: '1994-04-12',
+            workingHours: { start: '09:00', end: '18:00' },
+        },
+        null,
+    );
+
+    assert.deepEqual(createdPayload.workingHours, { start: '09:00', end: '18:00' });
+    assert.equal(employee.shopId, 'shop-1');
+});
+
+test('addEmployee defaults working hours to normalized 24-hour shop hours', async (t) => {
+    t.mock.method(shopRepository, 'findByOwnerId', async () => ({
+        _id: 'shop-1',
+        openTime: '09:00 AM',
+        closeTime: '08:00 PM',
+    }));
+    t.mock.method(employeeRepository, 'findByShopIdAndPhone', async () => null);
+
+    let createdPayload = null;
+    t.mock.method(employeeRepository, 'create', async (payload) => {
+        createdPayload = payload;
+        return payload;
+    });
+
+    await employeeService.addEmployee(
+        'owner-1',
+        {
+            firstName: 'Alex',
+            lastName: 'Stylist',
+            phoneNumber: '+15551234567',
+            gender: 'Male',
+            dateOfBirth: '1994-04-12',
+        },
+        null,
+    );
+
+    assert.deepEqual(createdPayload.workingHours, { start: '09:00', end: '20:00' });
+});

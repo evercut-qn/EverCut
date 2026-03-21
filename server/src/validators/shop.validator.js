@@ -7,6 +7,11 @@ import {
     DAYS_OF_WEEK,
     SECURITY_PIN_LENGTH,
 } from '../utils/constants.js';
+import {
+    normalizeBreakTimes as normalizeScheduleBreakTimes,
+    normalizeScheduleTime,
+    normalizeShopSchedule,
+} from '../utils/shop-schedule.utils.js';
 import { objectId } from './common.validator.js';
 
 const coordinatesPattern = /^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/;
@@ -56,13 +61,13 @@ const amenitiesSchema = Joi.alternatives().try(
 const breakTimesSchema = Joi.alternatives().try(
     Joi.array().items(
         Joi.object({
-            start: Joi.string(),
-            end: Joi.string(),
-            startsAt: Joi.string(),
-            endsAt: Joi.string(),
+            start: Joi.string().trim(),
+            end: Joi.string().trim(),
+            startsAt: Joi.string().trim(),
+            endsAt: Joi.string().trim(),
         }),
     ),
-    Joi.string(),
+    Joi.string().trim(),
 );
 
 const targetCustomersSchema = Joi.string().valid(...ALL_SERVICE_FOR, 'men', 'women');
@@ -97,18 +102,18 @@ export const updateBusinessSchema = Joi.object({
     amenities: amenitiesSchema,
     availableDays: daysSchema,
     workingDays: daysSchema,
-    openTime: Joi.string(),
-    closeTime: Joi.string(),
-    opensAt: Joi.string(),
-    closesAt: Joi.string(),
+    openTime: Joi.string().trim(),
+    closeTime: Joi.string().trim(),
+    opensAt: Joi.string().trim(),
+    closesAt: Joi.string().trim(),
     workingHours: Joi.alternatives().try(
         Joi.object({
-            openTime: Joi.string(),
-            closeTime: Joi.string(),
-            opensAt: Joi.string(),
-            closesAt: Joi.string(),
+            openTime: Joi.string().trim(),
+            closeTime: Joi.string().trim(),
+            opensAt: Joi.string().trim(),
+            closesAt: Joi.string().trim(),
         }),
-        Joi.string(),
+        Joi.string().trim(),
     ),
     breakTimes: breakTimesSchema,
     breakTimings: breakTimesSchema,
@@ -120,7 +125,7 @@ export const updateBusinessSchema = Joi.object({
         Joi.string(),
     ),
 })
-    .custom((value) => {
+    .custom((value, helpers) => {
         value.ownerName = value.ownerName || value.shopOwner;
         value.ownerFirstName = value.ownerFirstName || value.firstName;
         value.ownerLastName = value.ownerLastName || value.lastName;
@@ -154,7 +159,59 @@ export const updateBusinessSchema = Joi.object({
             value.closeTime = value.closeTime || value.closesAt;
         }
 
+        if (value.openTime !== undefined) {
+            const normalizedOpenTime = normalizeScheduleTime(value.openTime);
+            if (!normalizedOpenTime) {
+                return helpers.error('any.custom', {
+                    message: 'openTime must use HH:MM or hh:mm AM/PM format',
+                });
+            }
+            value.openTime = normalizedOpenTime;
+        }
+
+        if (value.closeTime !== undefined) {
+            const normalizedCloseTime = normalizeScheduleTime(value.closeTime);
+            if (!normalizedCloseTime) {
+                return helpers.error('any.custom', {
+                    message: 'closeTime must use HH:MM or hh:mm AM/PM format',
+                });
+            }
+            value.closeTime = normalizedCloseTime;
+        }
+
+        if (value.breakTimes !== undefined) {
+            const normalizedBreakTimes = normalizeScheduleBreakTimes(value.breakTimes);
+            if (normalizedBreakTimes.error) {
+                return helpers.error('any.custom', {
+                    message: normalizedBreakTimes.error,
+                });
+            }
+            value.breakTimes = normalizedBreakTimes.value;
+        }
+
+        if (value.openTime !== undefined && value.closeTime !== undefined) {
+            const normalizedSchedule = normalizeShopSchedule({
+                openTime: value.openTime,
+                closeTime: value.closeTime,
+                breakTimes: value.breakTimes ?? [],
+            });
+            if (normalizedSchedule.error) {
+                return helpers.error('any.custom', {
+                    message: normalizedSchedule.error,
+                });
+            }
+
+            value.openTime = normalizedSchedule.value.openTime;
+            value.closeTime = normalizedSchedule.value.closeTime;
+            if (value.breakTimes !== undefined) {
+                value.breakTimes = normalizedSchedule.value.breakTimes;
+            }
+        }
+
         return value;
+    })
+    .messages({
+        'any.custom': '{{#message}}',
     })
     .min(1);
 

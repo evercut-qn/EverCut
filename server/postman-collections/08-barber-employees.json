@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "EverCut - Barber Employees",
-    "description": "Employee CRUD collection with automatic ID capture and a prewired sample image for the optional employee photo.",
+    "description": "Employee CRUD collection with automatic ID capture and a prewired sample image for the optional employee photo. Employee working hours stay in HH:MM 24-hour format and are compared against normalized shop hours.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -122,7 +122,7 @@
         "method": "POST",
         "header": [],
         "url": "{{base_url}}/{{api_prefix}}/barber/employees",
-        "description": "Creates a new employee with a generated phone number so the request stays rerunnable.",
+        "description": "Creates a new employee with a generated phone number so the request stays rerunnable. Employee working hours remain HH:MM 24-hour values even when the shop was originally created with AM/PM schedule input.",
         "body": {
           "mode": "formdata",
           "formdata": [

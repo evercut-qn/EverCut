@@ -114,8 +114,8 @@ const EMPLOYEE_FIXTURE = {
     photoUrl: 'https://example.com/mock-employee-photo.jpg',
     cloudinaryId: 'mock-employee-photo',
     workingHours: {
-        start: '09:00 AM',
-        end: '08:00 PM',
+        start: '09:00',
+        end: '20:00',
     },
 };
 
@@ -186,9 +186,9 @@ const upsertShop = async (ownerId) => {
         yearsOfExperience: 8,
         facilities: ['Air Conditioning', 'Waiting Area'],
         availableDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
-        openTime: '09:00 AM',
-        closeTime: '08:00 PM',
-        breakTimes: [{ start: '01:00 PM', end: '02:00 PM' }],
+        openTime: '09:00',
+        closeTime: '20:00',
+        breakTimes: [{ start: '13:00', end: '14:00' }],
         coverUrl: 'https://example.com/mock-shop-cover.jpg',
         coverCloudinaryId: 'mock-shop-cover',
         pinHash,

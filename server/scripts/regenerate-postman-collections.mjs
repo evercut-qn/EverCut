@@ -504,7 +504,7 @@ const authenticationCollection = {
 const onboardingCollection = {
   info: {
     name: 'EverCut - Onboarding',
-    description: 'Customer and barber onboarding requests wired for the OTP test users and the local sample upload asset. Run 01-authentication.json first to populate onboarding tokens. Upon successful onboarding, access and refresh tokens are captured for the other collections.',
+    description: 'Customer and barber onboarding requests wired for the OTP test users and the local sample upload asset. Run 01-authentication.json first to populate onboarding tokens. Shop schedule fields accept HH:MM or hh:mm AM/PM input and are normalized to 24-hour storage. Upon successful onboarding, access and refresh tokens are captured for the other collections.',
     schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
   },
   variable: [
@@ -583,7 +583,7 @@ const onboardingCollection = {
           fileField('shopImages', 'Attach shop image 2 of 3 manually in Postman'),
           fileField('shopImages', 'Attach shop image 3 of 3 manually in Postman'),
         ]),
-        description: 'Creates the barber shop for the OTP-verified barber test user. The three shop image fields already point to the local sample file.',
+        description: 'Creates the barber shop for the OTP-verified barber test user. Shop schedule values can be sent in HH:MM or hh:mm AM/PM format and are normalized by the backend. The three shop image fields already point to the local sample file.',
         event: testEvent(
           "pm.test('status is 201 or 409', function () { pm.expect(pm.response.code).to.be.oneOf([201, 409]); });",
           'const response = pm.response.code === 201 ? pm.response.json() : null;',
@@ -1219,7 +1219,7 @@ const barberProfileCollection = {
 const barberEmployeesCollection = {
   info: {
     name: 'EverCut - Barber Employees',
-    description: 'Employee CRUD collection with automatic ID capture and a prewired sample image for the optional employee photo.',
+    description: 'Employee CRUD collection with automatic ID capture and a prewired sample image for the optional employee photo. Employee working hours stay in HH:MM 24-hour format and are compared against normalized shop hours.',
     schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
   },
   auth: bearerAuth('barber_access_token'),
@@ -1263,7 +1263,7 @@ const barberEmployeesCollection = {
           textField('workingHours', '{"start":"09:00","end":"18:00"}'),
           fileField('photo', 'Attach employee photo file manually in Postman (optional)'),
         ]),
-        description: 'Creates a new employee with a generated phone number so the request stays rerunnable.',
+        description: 'Creates a new employee with a generated phone number so the request stays rerunnable. Employee working hours remain HH:MM 24-hour values even when the shop was originally created with AM/PM schedule input.',
         event: [
           ...preRequestEvent(
             "const suffix = Date.now().toString().slice(-7);",

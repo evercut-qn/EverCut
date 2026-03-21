@@ -25,13 +25,13 @@ Validation and field-level failures are returned inside `data.errors`.
 | File | Collection name | Description |
 |---|---|---|
 | `01-authentication.json` | EverCut - Authentication | OTP authentication for customer and barber test users, token capture, and health check |
-| `02-onboarding.json` | EverCut - Onboarding | First-run customer and barber onboarding using onboarding JWTs |
+| `02-onboarding.json` | EverCut - Onboarding | First-run customer and barber onboarding using onboarding JWTs, with shop schedule normalization to 24-hour storage |
 | `03-customer-profile.json` | EverCut - Customer | Profile read/update and homepage endpoints |
 | `04-customer-bookings.json` | EverCut - Customer Bookings | Full booking lifecycle: create, update, reschedule, reorder, cancel |
 | `05-customer-shop-discovery.json` | EverCut - Customer Shop Discovery | Nearby shop/service search and keyword search |
 | `06-customer-ratings.json` | EverCut - Customer Ratings | Submit a rating and read shop rating data |
 | `07-barber-profile-shop.json` | EverCut - Barber Profile & Shop | Shop management: info, UPI, status, images, PIN, and account actions |
-| `08-barber-employees.json` | EverCut - Barber Employees | Employee CRUD with optional photo upload |
+| `08-barber-employees.json` | EverCut - Barber Employees | Employee CRUD with optional photo upload and 24-hour employee schedule examples |
 | `09-barber-services.json` | EverCut - Barber Services | Service catalogue CRUD (single and bundled services) |
 | `10-barber-bookings.json` | EverCut - Barber Bookings | Booking administration: list, stats, status update, delete |
 | `11-barber-photos.json` | EverCut - Barber Photos | Shop gallery: upload, list, stats, delete |
@@ -59,6 +59,8 @@ Validation and field-level failures are returned inside `data.errors`.
 | 9 | GET | `/api/v1/health` | Health check |
 
 ### `02-onboarding.json`
+
+Shop opening, closing, and break times may be sent as either `HH:MM` or `hh:mm AM/PM`. The backend normalizes those values to `HH:MM` before persisting the shop profile.
 
 | # | Method | Endpoint | Description |
 |---|---|---|---|
@@ -125,6 +127,8 @@ Validation and field-level failures are returned inside `data.errors`.
 | 9B | DELETE | `/api/v1/barber/profile` | Delete account *(Terminal)* |
 
 ### `08-barber-employees.json`
+
+Employee `workingHours.start` and `workingHours.end` remain `HH:MM` 24-hour values. Those hours are now compared against normalized shop hours, so legacy AM/PM shop schedules no longer cause false validation failures.
 
 | # | Method | Endpoint | Description |
 |---|---|---|---|
@@ -286,6 +290,10 @@ node scripts/seed-barber-rating-mock-data.js
 This collection now captures `shop_id` from `GET /customer/bookings?type=past`, not from nearby shop discovery. The authenticated customer must already have at least one completed past booking, otherwise request 1 fails intentionally because the backend now allows ratings only for shops the customer has actually completed a booking with.
 
 Request 2 succeeds once per customer/shop pair. It returns `409 Conflict` on subsequent runs because the API allows only one rating per customer per shop.
+
+### Shop Schedule Input
+
+Barber onboarding and shop schedule updates accept either `HH:MM` or `hh:mm AM/PM` values for `openTime`, `closeTime`, and break times. The backend normalizes shop schedule storage to `HH:MM`, while employee working hours stay `HH:MM` and are validated against that normalized schedule.
 
 ### `13-barber-ratings.json` — Add Reply (Request 2)
 

@@ -5,6 +5,8 @@ import logger from '../utils/logger.js';
 import { BadRequestError, NotFoundError, ConflictError } from '../utils/api-error.js';
 import cloudinary from '../config/cloudinary.config.js';
 import { buildPagination } from '../utils/pagination.utils.js';
+import { parseTimeToMinutes } from '../utils/time.utils.js';
+import { normalizeShopSchedule } from '../utils/shop-schedule.utils.js';
 
 /**
  * Employee service â€” CRUD operations for shop employees.
@@ -98,10 +100,38 @@ const normalizeBlockedDates = (value) => {
     }, []);
 };
 
+const getNormalizedShopWorkingHours = (shop) => {
+    const scheduleResult = normalizeShopSchedule({
+        openTime: shop?.openTime,
+        closeTime: shop?.closeTime,
+        breakTimes: [],
+    });
+
+    if (scheduleResult.error) {
+        throw new BadRequestError(`Shop hours are invalid. ${scheduleResult.error}`);
+    }
+
+    return {
+        start: scheduleResult.value.openTime,
+        end: scheduleResult.value.closeTime,
+    };
+};
+
 const assertWorkingHoursWithinShopHours = (workingHours, shop) => {
     if (!workingHours) return;
 
-    if (workingHours.start < shop.openTime || workingHours.end > shop.closeTime) {
+    const employeeStartMinutes = parseTimeToMinutes(workingHours.start);
+    const employeeEndMinutes = parseTimeToMinutes(workingHours.end);
+    const shopWorkingHours = getNormalizedShopWorkingHours(shop);
+    const shopStartMinutes = parseTimeToMinutes(shopWorkingHours.start);
+    const shopEndMinutes = parseTimeToMinutes(shopWorkingHours.end);
+
+    if (
+        employeeStartMinutes === null
+        || employeeEndMinutes === null
+        || employeeStartMinutes < shopStartMinutes
+        || employeeEndMinutes > shopEndMinutes
+    ) {
         throw new BadRequestError('Employee working hours must stay within shop hours');
     }
 };
@@ -176,7 +206,7 @@ export const addEmployee = async (ownerId, data, file) => {
         phoneNumber: normalizedData.phoneNumber,
         gender: normalizedData.gender,
         dateOfBirth: normalizedData.dateOfBirth,
-        workingHours: normalizedData.workingHours || { start: shop.openTime, end: shop.closeTime },
+        workingHours: normalizedData.workingHours || getNormalizedShopWorkingHours(shop),
         blockedDates: normalizedData.blockedDates || [],
     };
 

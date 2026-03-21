@@ -10,6 +10,7 @@ import {
     ROLES,
 } from '../utils/constants.js';
 import { BadRequestError, ConflictError } from '../utils/api-error.js';
+import { normalizeShopSchedule } from '../utils/shop-schedule.utils.js';
 import * as authService from './auth.service.js';
 import { hashPin, validatePinCreation } from './pin.service.js';
 
@@ -87,7 +88,7 @@ const normalizeLocation = (value) => {
     return parsed;
 };
 
-const normalizeBreakTimes = (value) => {
+const parseBreakTimes = (value) => {
     const times = toArray(value, 'breakTimes');
     return times.map((entry, index) => {
         const raw = parseJsonIfString(entry, `breakTimes[${index}]`);
@@ -162,7 +163,7 @@ const normalizeBarberOnboardingInput = (authUser, shopData) => {
     }
 
     const breakTimesInput = shopData.breakTimes ?? shopData.breakTimings ?? [];
-    const breakTimes = normalizeBreakTimes(breakTimesInput);
+    const breakTimes = parseBreakTimes(breakTimesInput);
 
     const targetCustomersRaw = String(shopData.targetCustomers || '').trim().toLowerCase();
     const targetCustomers = {
@@ -214,6 +215,11 @@ const normalizeBarberOnboardingInput = (authUser, shopData) => {
         throw new BadRequestError('accountHolderName and bankName are required');
     }
 
+    const normalizedSchedule = normalizeShopSchedule({ openTime, closeTime, breakTimes });
+    if (normalizedSchedule.error) {
+        throw new BadRequestError(normalizedSchedule.error);
+    }
+
     return {
         firstName,
         lastName,
@@ -235,9 +241,9 @@ const normalizeBarberOnboardingInput = (authUser, shopData) => {
         yearsOfExperience: toNonNegativeInteger(shopData.yearsOfExperience, 0),
         facilities,
         availableDays,
-        openTime,
-        closeTime,
-        breakTimes,
+        openTime: normalizedSchedule.value.openTime,
+        closeTime: normalizedSchedule.value.closeTime,
+        breakTimes: normalizedSchedule.value.breakTimes,
         pin: shopData.pin,
         confirmPin: shopData.confirmPin,
     };

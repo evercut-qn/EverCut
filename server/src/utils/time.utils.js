@@ -1,43 +1,61 @@
 /**
  * Time-related utility functions.
- *
- * Centralises the AM/PM ↔ 24 h parsing logic that was previously
- * copy-pasted in 4+ controller files.
  */
 
+const TWELVE_HOUR_TIME_PATTERN = /^(0?[1-9]|1[0-2]):([0-5]\d)\s*([AaPp][Mm])$/;
+const TWENTY_FOUR_HOUR_TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
+
+const toTwentyFourHourText = (totalMinutes) => {
+    const hours = String(Math.floor(totalMinutes / 60)).padStart(2, '0');
+    const minutes = String(totalMinutes % 60).padStart(2, '0');
+    return `${hours}:${minutes}`;
+};
+
 /**
- * Parse a 12-hour time string ("hh:mm AM/PM") into total minutes since midnight.
+ * Parse a supported time string into total minutes since midnight.
+ * Accepts "HH:MM" and "hh:mm AM/PM".
  *
- * @param   {string}      timeStr – e.g. "02:30 PM"
- * @returns {number|null}           minutes since midnight, or null if unparseable
+ * @param   {string}      timeStr
+ * @returns {number|null} minutes since midnight, or null if unparseable
  */
 export const parseTimeToMinutes = (timeStr) => {
     if (!timeStr || typeof timeStr !== 'string') return null;
 
-    const parts = timeStr.trim().split(' ');
-    if (parts.length !== 2) return null;
+    const normalized = timeStr.trim().replace(/\s+/g, ' ');
+    if (!normalized) return null;
 
-    const [timePart, meridiem] = parts;
-    const [hoursStr, minutesStr] = timePart.split(':');
+    const twentyFourHourMatch = normalized.match(TWENTY_FOUR_HOUR_TIME_PATTERN);
+    if (twentyFourHourMatch) {
+        const hours = Number.parseInt(twentyFourHourMatch[1], 10);
+        const minutes = Number.parseInt(twentyFourHourMatch[2], 10);
+        return (hours * 60) + minutes;
+    }
 
-    let hours = parseInt(hoursStr, 10);
-    const minutes = parseInt(minutesStr, 10);
+    const twelveHourMatch = normalized.match(TWELVE_HOUR_TIME_PATTERN);
+    if (!twelveHourMatch) return null;
 
-    if (Number.isNaN(hours) || Number.isNaN(minutes)) return null;
+    let hours = Number.parseInt(twelveHourMatch[1], 10);
+    const minutes = Number.parseInt(twelveHourMatch[2], 10);
+    const meridiem = twelveHourMatch[3].toUpperCase();
 
-    const upper = meridiem.toUpperCase();
-    if (upper === 'PM' && hours !== 12) hours += 12;
-    if (upper === 'AM' && hours === 12) hours = 0;
+    if (meridiem === 'PM' && hours !== 12) hours += 12;
+    if (meridiem === 'AM' && hours === 12) hours = 0;
 
-    return hours * 60 + minutes;
+    return (hours * 60) + minutes;
+};
+
+export const toTwentyFourHourTime = (timeStr) => {
+    const minutes = parseTimeToMinutes(timeStr);
+    if (minutes === null) return null;
+    return toTwentyFourHourText(minutes);
 };
 
 /**
  * Check whether a booking time is in the future compared to "now".
  *
- * @param   {string}  dateStr  – ISO date, e.g. "2025-08-03"
- * @param   {string}  timeStr  – 12-hour time, e.g. "02:30 PM"
- * @param   {Date}    [now]    – override for testing
+ * @param   {string}  dateStr
+ * @param   {string}  timeStr
+ * @param   {Date}    [now]
  * @returns {boolean}
  */
 export const isBookingInFuture = (dateStr, timeStr, now = new Date()) => {
@@ -46,43 +64,45 @@ export const isBookingInFuture = (dateStr, timeStr, now = new Date()) => {
 
     const bookingDate = new Date(dateStr);
     const todayStr = now.toISOString().slice(0, 10);
-    const bDateStr = bookingDate.toISOString().slice(0, 10);
+    const bookingDateStr = bookingDate.toISOString().slice(0, 10);
 
-    if (bDateStr > todayStr) return true;
-    if (bDateStr < todayStr) return false;
+    if (bookingDateStr > todayStr) return true;
+    if (bookingDateStr < todayStr) return false;
 
-    // Same day – compare minutes
     const currentMinutes = now.getHours() * 60 + now.getMinutes();
     return bookingMinutes > currentMinutes;
 };
 
 /**
  * Check whether a time string falls within a shop's open/close window.
- * Expects openTime / closeTime in "HH:MM" 24-hour format.
  *
- * @param   {string}  timeStr   – 12-hour booking time "hh:mm AM/PM"
- * @param   {string}  openTime  – "09:00"
- * @param   {string}  closeTime – "21:00"
+ * @param   {string}  timeStr
+ * @param   {string}  openTime
+ * @param   {string}  closeTime
  * @returns {boolean}
  */
 export const isWithinShopHours = (timeStr, openTime, closeTime) => {
-    const bookingMin = parseTimeToMinutes(timeStr);
-    if (bookingMin === null) return false;
+    const bookingMinutes = parseTimeToMinutes(timeStr);
+    const openMinutes = parseTimeToMinutes(openTime);
+    const closeMinutes = parseTimeToMinutes(closeTime);
 
-    const [openH, openM] = openTime.split(':').map(Number);
-    const [closeH, closeM] = closeTime.split(':').map(Number);
+    if (
+        bookingMinutes === null
+        || openMinutes === null
+        || closeMinutes === null
+        || openMinutes >= closeMinutes
+    ) {
+        return false;
+    }
 
-    const openMin = openH * 60 + openM;
-    const closeMin = closeH * 60 + closeM;
-
-    return bookingMin >= openMin && bookingMin < closeMin;
+    return bookingMinutes >= openMinutes && bookingMinutes < closeMinutes;
 };
 
 /**
  * Get the full weekday name for a given date string.
  *
- * @param   {string} dateStr – ISO date, e.g. "2025-08-03"
- * @returns {string}           e.g. "Sunday"
+ * @param   {string} dateStr
+ * @returns {string}
  */
 export const getDayOfWeek = (dateStr) => {
     return new Date(dateStr).toLocaleDateString('en-US', { weekday: 'long' });
@@ -92,10 +112,10 @@ export const getDayOfWeek = (dateStr) => {
  * Check if "now" is within `windowHours` before the appointment.
  *
  * @param   {Date}    appointmentDate
- * @param   {string}  appointmentTime – "hh:mm AM/PM"
- * @param   {number}  windowHours     – e.g. 2
+ * @param   {string}  appointmentTime
+ * @param   {number}  windowHours
  * @param   {Date}    [now]
- * @returns {boolean} true if we are WITHIN the blocking window (action not allowed)
+ * @returns {boolean}
  */
 export const isWithinCancellationWindow = (
     appointmentDate,
@@ -106,9 +126,9 @@ export const isWithinCancellationWindow = (
     const minutes = parseTimeToMinutes(appointmentTime);
     if (minutes === null) return false;
 
-    const appt = new Date(appointmentDate);
-    appt.setHours(Math.floor(minutes / 60), minutes % 60, 0, 0);
+    const appointment = new Date(appointmentDate);
+    appointment.setHours(Math.floor(minutes / 60), minutes % 60, 0, 0);
 
-    const windowStart = new Date(appt.getTime() - windowHours * 60 * 60 * 1000);
-    return now >= windowStart && now < appt;
+    const windowStart = new Date(appointment.getTime() - windowHours * 60 * 60 * 1000);
+    return now >= windowStart && now < appointment;
 };

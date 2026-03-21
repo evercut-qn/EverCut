@@ -8,6 +8,7 @@ import { serializeBarberProfile, serializeUpiDetails } from '../utils/barber-pro
 import { escapeRegex } from '../utils/regex.utils.js';
 import { serializeRating } from '../utils/rating-response.utils.js';
 import { normalizeServicePricing } from '../utils/service-pricing.utils.js';
+import { normalizeShopSchedule } from '../utils/shop-schedule.utils.js';
 import {
     ALL_SERVICE_FOR,
     ALL_SHOP_AMENITIES,
@@ -84,7 +85,9 @@ const parseArrayField = (value, fieldName) => {
     throw new Error(`${fieldName} must be an array`);
 };
 
-const normalizeBreakTimes = (value) => {
+const hasOwn = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
+
+const parseBreakTimes = (value) => {
     const rawBreakTimes = parseArrayField(value, 'breakTimes');
 
     return rawBreakTimes.map((entry, index) => {
@@ -216,7 +219,7 @@ const validateAndAssign = (key, value, updateData, errors) => {
 
         case 'breakTimes': {
             try {
-                updateData[key] = normalizeBreakTimes(value);
+                updateData[key] = parseBreakTimes(value);
             } catch (err) {
                 errors.push(err.message);
             }
@@ -290,6 +293,24 @@ export const updateBusinessInfo = async (ownerId, body, userContext) => {
         const firstName = updateData.ownerFirstName || shop.ownerFirstName;
         const lastName = updateData.ownerLastName || shop.ownerLastName;
         updateData.ownerName = `${firstName || ''} ${lastName || ''}`.trim();
+    }
+
+    const scheduleFieldsTouched = ['openTime', 'closeTime', 'breakTimes']
+        .some((field) => hasOwn(updateData, field));
+    if (scheduleFieldsTouched) {
+        const scheduleResult = normalizeShopSchedule({
+            openTime: updateData.openTime ?? shop.openTime,
+            closeTime: updateData.closeTime ?? shop.closeTime,
+            breakTimes: updateData.breakTimes ?? shop.breakTimes ?? [],
+        });
+
+        if (scheduleResult.error) {
+            errors.push(scheduleResult.error);
+        } else {
+            updateData.openTime = scheduleResult.value.openTime;
+            updateData.closeTime = scheduleResult.value.closeTime;
+            updateData.breakTimes = scheduleResult.value.breakTimes;
+        }
     }
 
     if (errors.length) throw new BadRequestError('Validation failed', errors);
