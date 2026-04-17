@@ -750,6 +750,8 @@ EverCut operates as a **marketplace platform** connecting customers with barber 
 | PhonePe MDR (UPI) | 0% | ₹0.00 |
 | Cashfree Payout Fee (UPI) | — | ₹3.00 (+GST) |
 
+> **GST Clarification:** The 18% GST (₹13.50 in this example) is EverCut's tax liability on the commission earned — it is paid by EverCut from the ₹75.00 commission, NOT deducted from the barber's ₹425.00 payout. The barber always receives exactly 85% of the booking amount.
+
 ### 10.3 Complete Lifecycle — Booking to Payout
 
 ```
@@ -1192,6 +1194,7 @@ x-api-version: 2025-01-01
 | `POST` | `/transfers` | Initiate barber payout |
 | `GET` | `/transfers/{transfer_id}` | Poll payout status |
 | `POST` | `/transfers/batch` | Batch payouts (future: daily settlement) |
+| `GET` | `/balance` | Check payout wallet balance (for low-balance alerts) |
 | Webhook | `POST /api/v1/payouts/webhook` | Receive Cashfree transfer events |
 
 ---
@@ -1580,7 +1583,7 @@ if (existingPayment) return res.status(200).json({ received: true });
 // Payout Webhook (Cashfree):
 const existingPayout = await PayoutTransaction.findOne({
   transferId: data.transfer_id,
-  status: { $in: ['SUCCESS', 'FAILED'] }  // Terminal states
+  status: { $in: ['SUCCESS', 'FAILED', 'REVERSED'] }  // Terminal states
 });
 if (existingPayout) return res.status(200).json({ received: true });
 
@@ -1779,7 +1782,7 @@ if (existingPayout && existingPayout.status !== 'FAILED') {
 
 1. [PhonePe Business Developer Documentation](https://developer.phonepe.com/payment-gateway)
 2. [PhonePe Business Dashboard](https://business.phonepe.com/dashboard)
-3. [PhonePe Node.js SDK (npm)](https://www.npmjs.com/package/pg-sdk-node)
+3. [PhonePe Node.js SDK (npm)](https://www.npmjs.com/package/@phonepe-pg/pg-sdk-node)
 4. [Cashfree Payouts Developer Documentation](https://docs.cashfree.com/)
 5. [Cashfree Payouts Product Page](https://www.cashfree.com/payouts/)
 6. [Cashfree Pricing](https://www.cashfree.com/payment-gateway-charges/)

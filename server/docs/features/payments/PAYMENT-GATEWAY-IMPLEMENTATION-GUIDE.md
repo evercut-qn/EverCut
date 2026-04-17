@@ -731,20 +731,20 @@ export const CASHFREE_WEBHOOK_EVENTS = Object.freeze({
     TRANSFER_REVERSED: 'TRANSFER_REVERSED',
 });
 
-export const PAYMENT_GATEWAYS = {
+export const PAYMENT_GATEWAYS = Object.freeze({
     PHONEPE: 'phonepe',
     RAZORPAY: 'razorpay',
     CASHFREE: 'cashfree',
     MANUAL: 'manual',
-};
+});
 
-export const PAYOUT_MODES = {
+export const PAYOUT_MODES = Object.freeze({
     UPI: 'UPI',
     IMPS: 'IMPS',
     NEFT: 'NEFT',
     BANK: 'BANK',
     RTGS: 'RTGS',
-};
+});
 ```
 
 ---
@@ -1690,7 +1690,7 @@ export const initiatePayment = async (userId, bookingId) => {
         await bookingRepository.updateById(bookingId, {
             paymentTransactionId: paymentTransaction._id,
             merchantOrderId,
-            paymentStatus: PAYMENT_STATUS.PENDING,
+            paymentStatus: PAYMENT_STATUS.INITIATED,
             paymentGateway: 'phonepe',
         });
 
@@ -1907,7 +1907,7 @@ async function _handleRefundSuccess(webhookData) {
     });
 
     await bookingRepository.updateById(payment.bookingId, {
-        paymentStatus: 'refunded',
+        paymentStatus: PAYMENT_STATUS.REFUNDED,
     });
 
     logger.info('[PaymentService] Refund completed', {
@@ -1929,6 +1929,10 @@ async function _handleRefundFailure(webhookData) {
         'refund.status': 'failed',
         errorCode: webhookData.errorCode,
         detailedErrorCode: webhookData.detailedErrorCode,
+    });
+
+    await bookingRepository.updateById(payment.bookingId, {
+        paymentStatus: PAYMENT_STATUS.REFUND_FAILED,
     });
 
     logger.warn('[PaymentService] Refund failed', {
@@ -1973,7 +1977,7 @@ export const initiateRefund = async (bookingId, reason) => {
     });
 
     await bookingRepository.updateById(bookingId, {
-        paymentStatus: 'refund_pending',
+        paymentStatus: PAYMENT_STATUS.REFUND_PENDING,
     });
 
     logger.info('[PaymentService] Refund initiated', {
@@ -2253,7 +2257,7 @@ export const handlePayoutWebhook = async (headers, rawBody, parsedBody) => {
     }
 
     // 4. Idempotency — skip if already in terminal state
-    if ([PAYOUT_TRANSACTION_STATUS.SUCCESS, PAYOUT_TRANSACTION_STATUS.FAILED].includes(payout.status)
+    if ([PAYOUT_TRANSACTION_STATUS.SUCCESS, PAYOUT_TRANSACTION_STATUS.FAILED, PAYOUT_TRANSACTION_STATUS.REVERSED].includes(payout.status)
         && payout.webhookProcessed) {
         logger.info('[PayoutService] Duplicate payout webhook', {
             transferId: webhookData.transferId,
@@ -2350,8 +2354,22 @@ export const retryPayout = async (payoutId) => {
     const barberPayoutInRupees = barberPayoutInPaisa / 100;
 
     try {
+        // Re-fetch barber/shop details for beneficiary verification
+        const retryBooking = await bookingRepository.findById(payout.bookingId);
+        const retryPopulated = await retryBooking.populate('shopId');
+        const retryShop = retryPopulated.shopId;
+        const retryOwner = await User.findById(retryShop.ownerId).select('phoneNumber email');
+
         await _ensureBeneficiary(
-            { _id: payout.barberId, fullName: '', phone: '', upiId: '', bankAccount: '', ifsc: '' },
+            {
+                _id: retryShop.ownerId || retryShop._id,
+                fullName: retryShop.accountHolderName || retryShop.ownerName || retryShop.shopName,
+                phone: retryOwner?.phoneNumber || '',
+                email: retryOwner?.email || '',
+                upiId: retryShop.upiId,
+                bankAccount: retryShop.payoutConfig?.bankAccount,
+                ifsc: retryShop.payoutConfig?.ifsc,
+            },
             payout.beneficiaryId,
         );
 
