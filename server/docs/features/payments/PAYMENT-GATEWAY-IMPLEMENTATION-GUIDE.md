@@ -226,9 +226,9 @@ server/src/
 │   ├── payment.service.js                  # Payment business logic
 │   └── payout.service.js                   # Payout business logic (Cashfree)
 │
-├── validations/
-│   ├── payment.validation.js               # Joi schemas for payment endpoints
-│   └── payout.validation.js                # Joi schemas for payout endpoints
+├── validators/
+│   ├── payment.validator.js                # Joi schemas for payment endpoints
+│   └── payout.validator.js                 # Joi schemas for payout endpoints
 │
 ├── jobs/
 │   ├── payment-poller.cron.js              # Cron: pending payment resolution
@@ -308,7 +308,7 @@ cashfree: {
             ? 'https://api.cashfree.com/payout'
             : 'https://sandbox.cashfree.com/payout';
     },
-    payoutApiVersion: '2024-01-01',
+    payoutApiVersion: '2025-01-01',
 },
 payment: {
     redirectBaseUrl: getEnvVar('PAYMENT_REDIRECT_BASE_URL', 'http://localhost:3000/api/v1/payments/redirect'),
@@ -341,7 +341,7 @@ const paymentTransactionSchema = new mongoose.Schema(
         },
         customerId: {
             type: mongoose.Schema.Types.ObjectId,
-            ref: 'User',
+            ref: 'Customer',
             required: true,
             index: true,
         },
@@ -663,7 +663,26 @@ barberUtr: {
 ```javascript
 // server/src/utils/constants.js — ADD
 
-export const PAYMENT_TRANSACTION_STATUS = {
+// ─── Payment Status (on Booking model — extends existing PAYMENT_STATUS) ───
+// NOTE: The existing PAYMENT_STATUS in constants.js has only ['pending', 'success', 'failed'].
+// We EXTEND it with these additional values for the payment + refund lifecycle.
+// Update the existing PAYMENT_STATUS and ALL_PAYMENT_STATUSES to include these.
+
+export const PAYMENT_STATUS = Object.freeze({
+    PENDING: 'pending',
+    INITIATED: 'initiated',
+    SUCCESS: 'success',
+    FAILED: 'failed',
+    REFUND_PENDING: 'refund_pending',
+    REFUNDED: 'refunded',
+    REFUND_FAILED: 'refund_failed',
+});
+
+export const ALL_PAYMENT_STATUSES = Object.values(PAYMENT_STATUS);
+
+// ─── Payment Transaction Status (on PaymentTransaction model — internal states) ───
+
+export const PAYMENT_TRANSACTION_STATUS = Object.freeze({
     INITIATED: 'initiated',
     PENDING: 'pending',
     COMPLETED: 'completed',
@@ -672,28 +691,45 @@ export const PAYMENT_TRANSACTION_STATUS = {
     REFUND_PENDING: 'refund_pending',
     REFUNDED: 'refunded',
     REFUND_FAILED: 'refund_failed',
-};
+});
 
-export const PAYOUT_TRANSACTION_STATUS = {
+// ─── Payout Status (on Booking model) ───
+
+export const PAYOUT_STATUS = Object.freeze({
+    NOT_INITIATED: 'not_initiated',
+    INITIATED: 'initiated',
+    PENDING: 'pending',
+    COMPLETED: 'completed',
+    FAILED: 'failed',
+    REVERSED: 'reversed',
+});
+
+export const ALL_PAYOUT_STATUSES = Object.values(PAYOUT_STATUS);
+
+// ─── Payout Transaction Status (on PayoutTransaction model — Cashfree states) ───
+
+export const PAYOUT_TRANSACTION_STATUS = Object.freeze({
     INITIATED: 'INITIATED',
     PENDING: 'PENDING',
     SUCCESS: 'SUCCESS',
     FAILED: 'FAILED',
     REVERSED: 'REVERSED',
-};
+});
 
-export const PHONEPE_WEBHOOK_EVENTS = {
+// ─── Webhook Events ───
+
+export const PHONEPE_WEBHOOK_EVENTS = Object.freeze({
     ORDER_COMPLETED: 'checkout.order.completed',
     ORDER_FAILED: 'checkout.order.failed',
     REFUND_COMPLETED: 'pg.refund.completed',
     REFUND_FAILED: 'pg.refund.failed',
-};
+});
 
-export const CASHFREE_WEBHOOK_EVENTS = {
+export const CASHFREE_WEBHOOK_EVENTS = Object.freeze({
     TRANSFER_SUCCESS: 'TRANSFER_SUCCESS',
     TRANSFER_FAILED: 'TRANSFER_FAILED',
     TRANSFER_REVERSED: 'TRANSFER_REVERSED',
-};
+});
 
 export const PAYMENT_GATEWAYS = {
     PHONEPE: 'phonepe',
@@ -1486,7 +1522,7 @@ class CashfreePayoutAdapter extends PayoutGatewayAdapter {
                 'Content-Type': 'application/json',
                 'x-client-id': config.cashfree.payoutClientId,
                 'x-client-secret': config.cashfree.payoutClientSecret,
-                'x-api-version': config.cashfree.payoutApiVersion,
+                'x-api-version': config.cashfree.payoutApiVersion, // '2025-01-01'
             },
         };
 
@@ -1597,8 +1633,8 @@ export const initiatePayment = async (userId, bookingId) => {
         await paymentRepository.updateStatus(existingPending._id, PAYMENT_TRANSACTION_STATUS.EXPIRED);
     }
 
-    // 4. Calculate amount
-    const amountInRupees = booking.totalAmount || booking.amount;
+    // 4. Calculate amount (booking.totalAmount is in rupees)
+    const amountInRupees = booking.totalAmount;
     if (!amountInRupees || amountInRupees <= 0) {
         throw new BadRequestError('Booking amount must be greater than zero');
     }
@@ -2084,7 +2120,10 @@ export const triggerBarberPayout = async (bookingId) => {
     const populatedBooking = await booking.populate('shopId');
     const shop = populatedBooking.shopId;
 
-    if (!shop?.payoutDetails?.upiId && !shop?.payoutDetails?.bankAccount) {
+    // Shop model has upiId, accountHolderName, bankName at ROOT level
+    // Additional payout config (bankAccount, ifsc, cashfreeBeneficiaryId)
+    // is in shop.payoutConfig (added during payment integration)
+    if (!shop?.upiId && !shop?.payoutConfig?.bankAccount) {
         logger.error('[PayoutService] No payout details for shop', {
             shopId: shop?._id,
         });
@@ -2093,12 +2132,12 @@ export const triggerBarberPayout = async (bookingId) => {
 
     const barber = {
         _id: shop.ownerId || shop._id,
-        fullName: shop.ownerName || shop.name,
+        fullName: shop.accountHolderName || shop.ownerName || shop.shopName,
         phone: shop.phone,
         email: shop.email,
-        upiId: shop.payoutDetails?.upiId,
-        bankAccount: shop.payoutDetails?.bankAccount,
-        ifsc: shop.payoutDetails?.ifsc,
+        upiId: shop.upiId,
+        bankAccount: shop.payoutConfig?.bankAccount,
+        ifsc: shop.payoutConfig?.ifsc,
     };
 
     // 5. Generate transfer ID
@@ -2282,8 +2321,9 @@ export const retryPayout = async (payoutId) => {
     }
 
     // Generate new transfer ID for retry
-    const newTransferId = `${payout.transferId}_R${payout.retryCount + 1}`;
+    const newTransferId = `${payout.transferId.split('_R')[0]}_R${payout.retryCount + 1}`;
 
+    // Update the existing record to reset state
     await payoutRepository.updateById(payout._id, {
         transferId: newTransferId,
         status: PAYOUT_TRANSACTION_STATUS.INITIATED,
@@ -2292,10 +2332,53 @@ export const retryPayout = async (payoutId) => {
         failureReason: null,
         errorCode: null,
         webhookProcessed: false,
+        cfTransferId: null,
+        utr: null,
     });
 
-    // Re-trigger the payout
-    return triggerBarberPayout(payout.bookingId);
+    // Re-initiate the transfer directly (not via triggerBarberPayout to avoid idempotency block)
+    const payment = await paymentRepository.findCompletedByBookingId(payout.bookingId);
+    const { barberPayout: barberPayoutInPaisa } = payment.settlement;
+    const barberPayoutInRupees = barberPayoutInPaisa / 100;
+
+    try {
+        await _ensureBeneficiary(
+            { _id: payout.barberId, fullName: '', phone: '', upiId: '', bankAccount: '', ifsc: '' },
+            payout.beneficiaryId,
+        );
+
+        const transferResponse = await cashfreePayoutAdapter.initiateTransfer({
+            transferId: newTransferId,
+            amountInRupees: barberPayoutInRupees,
+            beneficiaryId: payout.beneficiaryId,
+            transferMode: payout.transferMode,
+            remarks: payout.remarks || `EverCut - Booking ${payout.bookingId} (retry)`,
+        });
+
+        await payoutRepository.updateById(payout._id, {
+            status: PAYOUT_TRANSACTION_STATUS.PENDING,
+            cfTransferId: transferResponse.cfTransferId,
+        });
+
+        await bookingRepository.updateById(payout.bookingId, {
+            payoutStatus: 'pending',
+        });
+
+        logger.info('[PayoutService] Payout retry initiated', {
+            payoutId,
+            newTransferId,
+            retryCount: payout.retryCount + 1,
+        });
+
+        return payoutRepository.findById(payout._id);
+    } catch (error) {
+        await payoutRepository.updateById(payout._id, {
+            status: PAYOUT_TRANSACTION_STATUS.FAILED,
+            failureReason: error.message,
+            errorCode: error.code,
+        });
+        throw error;
+    }
 };
 
 /**
@@ -2569,7 +2652,7 @@ export const handleWebhook = async (req, res) => {
 import { Router } from 'express';
 import * as paymentController from '../controllers/payment/payment.controller.js';
 import * as webhookController from '../controllers/payment/webhook.controller.js';
-import { authenticate } from '../middleware/authenticate.middleware.js';
+import authenticate from '../middleware/authenticate.middleware.js';
 import { authorize } from '../middleware/authorize.middleware.js';
 import { validate } from '../middleware/validate.middleware.js';
 import {
@@ -2577,7 +2660,7 @@ import {
     paymentIdParamSchema,
     bookingIdParamSchema,
     refundSchema,
-} from '../validations/payment.validation.js';
+} from '../validators/payment.validator.js';
 import { ROLES } from '../utils/constants.js';
 
 const router = Router();
@@ -2629,10 +2712,10 @@ export default router;
 import { Router } from 'express';
 import * as payoutController from '../controllers/payout/payout.controller.js';
 import * as payoutWebhookController from '../controllers/payout/payout-webhook.controller.js';
-import { authenticate } from '../middleware/authenticate.middleware.js';
+import authenticate from '../middleware/authenticate.middleware.js';
 import { authorize } from '../middleware/authorize.middleware.js';
 import { validate } from '../middleware/validate.middleware.js';
-import { payoutIdParamSchema } from '../validations/payout.validation.js';
+import { payoutIdParamSchema } from '../validators/payout.validator.js';
 import { ROLES } from '../utils/constants.js';
 
 const router = Router();
@@ -2692,35 +2775,28 @@ app.use(express.json());
 ### 14.1 Payment Validation
 
 ```javascript
-// server/src/validations/payment.validation.js
+// server/src/validators/payment.validator.js
 
 import Joi from 'joi';
-
+import { objectId } from './common.validator.js';
 export const initiatePaymentSchema = Joi.object({
-    bookingId: Joi.string()
-        .pattern(/^[0-9a-fA-F]{24}$/)
-        .required()
+    bookingId: objectId.required()
         .messages({
-            'string.pattern.base': 'Invalid booking ID format',
             'any.required': 'Booking ID is required',
         }),
 });
 
 export const paymentIdParamSchema = Joi.object({
-    id: Joi.string()
-        .pattern(/^[0-9a-fA-F]{24}$/)
-        .required()
+    id: objectId.required()
         .messages({
-            'string.pattern.base': 'Invalid payment ID format',
+            'any.required': 'Payment ID is required',
         }),
 });
 
 export const bookingIdParamSchema = Joi.object({
-    bookingId: Joi.string()
-        .pattern(/^[0-9a-fA-F]{24}$/)
-        .required()
+    bookingId: objectId.required()
         .messages({
-            'string.pattern.base': 'Invalid booking ID format',
+            'any.required': 'Booking ID is required',
         }),
 });
 
@@ -2739,16 +2815,15 @@ export const refundSchema = Joi.object({
 ### 14.2 Payout Validation
 
 ```javascript
-// server/src/validations/payout.validation.js
+// server/src/validators/payout.validator.js
 
 import Joi from 'joi';
+import { objectId } from './common.validator.js';
 
 export const payoutIdParamSchema = Joi.object({
-    payoutId: Joi.string()
-        .pattern(/^[0-9a-fA-F]{24}$/)
-        .required()
+    payoutId: objectId.required()
         .messages({
-            'string.pattern.base': 'Invalid payout ID format',
+            'any.required': 'Payout ID is required',
         }),
 });
 ```
@@ -2884,7 +2959,96 @@ class PayoutRepository {
 export default new PayoutRepository();
 ```
 
-### 15.4 Register Both Pollers in Server Startup
+### 15.4 Payment Repository
+
+```javascript
+// server/src/repositories/payment.repository.js
+
+import PaymentTransaction from '../models/payment-transaction.model.js';
+import { PAYMENT_TRANSACTION_STATUS } from '../utils/constants.js';
+
+class PaymentRepository {
+    async create(data) {
+        return PaymentTransaction.create(data);
+    }
+
+    async findById(id) {
+        return PaymentTransaction.findById(id);
+    }
+
+    async findByMerchantOrderId(merchantOrderId) {
+        return PaymentTransaction.findOne({ merchantOrderId });
+    }
+
+    async findPendingByBookingId(bookingId) {
+        return PaymentTransaction.findOne({
+            bookingId,
+            status: { $in: [
+                PAYMENT_TRANSACTION_STATUS.INITIATED,
+                PAYMENT_TRANSACTION_STATUS.PENDING,
+            ] },
+        }).sort({ createdAt: -1 });
+    }
+
+    async findCompletedByBookingId(bookingId) {
+        return PaymentTransaction.findOne({
+            bookingId,
+            status: PAYMENT_TRANSACTION_STATUS.COMPLETED,
+        });
+    }
+
+    async findLatestByBookingId(bookingId) {
+        return PaymentTransaction.findOne({ bookingId })
+            .sort({ createdAt: -1 });
+    }
+
+    async updateById(id, updates) {
+        return PaymentTransaction.findByIdAndUpdate(id, updates, { new: true });
+    }
+
+    async updateStatus(id, status, additionalFields = {}) {
+        return PaymentTransaction.findByIdAndUpdate(
+            id,
+            { status, ...additionalFields },
+            { new: true },
+        );
+    }
+
+    /**
+     * Find payments stuck in PENDING state for polling.
+     * @param {Date} olderThan - Only poll payments older than this
+     * @param {Date} notOlderThan - Don't poll payments older than this (they'll be expired)
+     * @param {number} maxAttempts - Skip payments that exceeded max poll attempts
+     */
+    async findStalePayments(olderThan, notOlderThan, maxAttempts) {
+        return PaymentTransaction.find({
+            status: PAYMENT_TRANSACTION_STATUS.PENDING,
+            createdAt: { $lt: olderThan, $gt: notOlderThan },
+            pollAttempts: { $lt: maxAttempts },
+        }).limit(50);
+    }
+
+    /**
+     * Expire old pending payments that were never resolved.
+     * @param {Date} olderThan - Expire payments older than this date
+     * @returns {number} Number of expired payments
+     */
+    async expireOldPendingPayments(olderThan) {
+        const result = await PaymentTransaction.updateMany(
+            {
+                status: PAYMENT_TRANSACTION_STATUS.PENDING,
+                createdAt: { $lt: olderThan },
+            },
+            { status: PAYMENT_TRANSACTION_STATUS.EXPIRED },
+        );
+        return result.modifiedCount;
+    }
+}
+
+export default new PaymentRepository();
+```
+
+### 15.5 Register Both Pollers in Server Startup
 
 ```javascript
 // server/src/server.js — ADD to the startup sequence
@@ -3065,7 +3229,7 @@ stateDiagram-v2
 
 export class PaymentError extends AppError {
     constructor(message, gatewayCode = null, gatewayMessage = null) {
-        super(message, 502, 'PAYMENT_GATEWAY_ERROR');
+        super(message, 502);  // AppError(message, statusCode, errors, isOperational)
         this.gatewayCode = gatewayCode;
         this.gatewayMessage = gatewayMessage;
     }
@@ -3073,14 +3237,14 @@ export class PaymentError extends AppError {
 
 export class PaymentTimeoutError extends AppError {
     constructor(merchantOrderId) {
-        super(`Payment session expired for order ${merchantOrderId}`, 408, 'PAYMENT_TIMEOUT');
+        super(`Payment session expired for order ${merchantOrderId}`, 408);
         this.merchantOrderId = merchantOrderId;
     }
 }
 
 export class PayoutError extends AppError {
     constructor(message, providerCode = null, providerMessage = null) {
-        super(message, 502, 'PAYOUT_PROVIDER_ERROR');
+        super(message, 502);
         this.providerCode = providerCode;
         this.providerMessage = providerMessage;
     }
@@ -3088,7 +3252,7 @@ export class PayoutError extends AppError {
 
 export class InsufficientWalletBalanceError extends AppError {
     constructor() {
-        super('Payout wallet has insufficient balance', 503, 'INSUFFICIENT_PAYOUT_BALANCE');
+        super('Payout wallet has insufficient balance', 503);
     }
 }
 ```

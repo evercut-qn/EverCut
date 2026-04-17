@@ -544,10 +544,10 @@ Webhooks are configured via the **PhonePe Business Dashboard**:
 
 ### 7.5 Authentication & Verification
 
-PhonePe v2 webhooks use **Basic Authentication** with SHA256 hashing:
+PhonePe v2 webhooks use **SHA256 hash authentication**. The `Authorization` header value is the hex-encoded SHA256 hash of `username:password` (no `Basic` or `Bearer` prefix — the hash is sent directly):
 
 ```
-Authorization: SHA256(username:password)
+Authorization: <SHA256_HEX(username:password)>
 ```
 
 **Verification Algorithm:**
@@ -907,7 +907,16 @@ After Payouts activation, Cashfree creates a **virtual payout wallet**:
 | **Alerts** | Set low-balance alerts via dashboard |
 | **Dashboard** | Monitor via Payouts Dashboard → Fund Sources |
 
-> **Critical:** The payout wallet is separate from PG settlement. You must explicitly fund it. PhonePe settlement goes to your registered bank account, and you must transfer funds from that bank account to the Cashfree payout wallet.
+> **Critical:** The payout wallet is separate from PG settlement. You must explicitly fund it.
+>
+> **Funding Flow:**
+> ```
+> PhonePe PG → settles into EverCut's registered bank account (T+1)
+>     → You manually or via standing instruction transfer funds
+>     → From your bank account → to Cashfree Payout Virtual Account (NEFT/IMPS/RTGS)
+>     → Cashfree wallet now has balance for barber payouts
+> ```
+> This is a manual funding step that must be planned for. Set up low-balance alerts (Dashboard → Alerts) and maintain at least 2× expected daily payout volume.
 
 ### 12.4 API Key Generation
 
@@ -939,7 +948,7 @@ Cashfree Payouts V2 uses **direct API key authentication** on every request. Unl
 ```http
 x-client-id: <CASHFREE_PAYOUT_CLIENT_ID>
 x-client-secret: <CASHFREE_PAYOUT_CLIENT_SECRET>
-x-api-version: 2024-01-01
+x-api-version: 2025-01-01
 Content-Type: application/json
 ```
 
@@ -947,9 +956,9 @@ Content-Type: application/json
 |---|---|
 | `x-client-id` | Your Cashfree Payouts App ID |
 | `x-client-secret` | Your Cashfree Payouts Secret Key |
-| `x-api-version` | API version date string (e.g., `2024-01-01`) |
+| `x-api-version` | API version date string (e.g., `2025-01-01`) |
 
-> **⚠️ Important Correction:** Earlier research documents referenced a Bearer token flow via `POST /payout/v2/authorize`. The current Cashfree Payouts V2 API uses **direct header-based authentication** without a separate token step. The `x-client-id` and `x-client-secret` are sent in headers on every request. Always verify against the latest official Cashfree developer documentation.
+> **⚠️ Important Correction:** Earlier research documents referenced a Bearer token flow via `POST /payout/v2/authorize`. The current Cashfree Payouts V2 API uses **direct header-based authentication** without a separate token step. The `x-client-id` and `x-client-secret` are sent in headers on every request. The current recommended `x-api-version` is `2025-01-01`. Always verify against the latest official Cashfree developer documentation.
 
 ### 13.2 Security Requirements
 
@@ -973,7 +982,7 @@ Register a barber as a payout beneficiary before first transfer.
 POST {base_url}/beneficiary
 x-client-id: <CLIENT_ID>
 x-client-secret: <CLIENT_SECRET>
-x-api-version: 2024-01-01
+x-api-version: 2025-01-01
 Content-Type: application/json
 ```
 
@@ -1023,7 +1032,7 @@ Content-Type: application/json
 GET {base_url}/beneficiary/{beneficiary_id}
 x-client-id: <CLIENT_ID>
 x-client-secret: <CLIENT_SECRET>
-x-api-version: 2024-01-01
+x-api-version: 2025-01-01
 ```
 
 ### 14.3 Remove Beneficiary
@@ -1033,7 +1042,7 @@ x-api-version: 2024-01-01
 DELETE {base_url}/beneficiary/{beneficiary_id}
 x-client-id: <CLIENT_ID>
 x-client-secret: <CLIENT_SECRET>
-x-api-version: 2024-01-01
+x-api-version: 2025-01-01
 ```
 
 ### 14.4 Standard Transfer (Single Payout)
@@ -1045,7 +1054,7 @@ Initiate a payout to a registered beneficiary.
 POST {base_url}/transfers
 x-client-id: <CLIENT_ID>
 x-client-secret: <CLIENT_SECRET>
-x-api-version: 2024-01-01
+x-api-version: 2025-01-01
 Content-Type: application/json
 ```
 
@@ -1088,7 +1097,7 @@ Content-Type: application/json
 GET {base_url}/transfers/{transfer_id}
 x-client-id: <CLIENT_ID>
 x-client-secret: <CLIENT_SECRET>
-x-api-version: 2024-01-01
+x-api-version: 2025-01-01
 ```
 
 **Response:**
@@ -1119,7 +1128,7 @@ x-api-version: 2024-01-01
 POST {base_url}/transfers/batch
 x-client-id: <CLIENT_ID>
 x-client-secret: <CLIENT_SECRET>
-x-api-version: 2024-01-01
+x-api-version: 2025-01-01
 Content-Type: application/json
 ```
 
@@ -1146,7 +1155,7 @@ Content-Type: application/json
 GET {base_url}/validation/bankDetails?bankAccount={account}&ifsc={ifsc}&name={name}
 x-client-id: <CLIENT_ID>
 x-client-secret: <CLIENT_SECRET>
-x-api-version: 2024-01-01
+x-api-version: 2025-01-01
 ```
 
 **Response:**
@@ -1218,20 +1227,27 @@ flowchart TD
 | First payout to barber | Verify beneficiary exists (auto-create if missing) |
 | Barber deactivated / removed | Delete beneficiary from Cashfree |
 
-### 15.4 Data to Store on Barber Model
+### 15.4 Data to Store on Shop Model
+
+The Shop model **already has** `upiId`, `accountHolderName`, and `bankName` fields at the root level (collected during barber onboarding). For Cashfree Payouts, add the following **new fields**:
 
 ```javascript
-// Fields to add to the Barber/Shop model
-payoutDetails: {
-    upiId: String,              // Barber's UPI VPA (e.g., rahul@upi)
-    bankAccount: String,        // Encrypted bank account number
-    ifsc: String,               // IFSC code
+// Existing fields (already in shop.model.js) — NO changes needed:
+// upiId: String              → Barber's UPI VPA (e.g., rahul@upi)
+// accountHolderName: String  → Name as registered with bank
+// bankName: String           → Bank name
+
+// NEW fields to ADD to shop.model.js for Cashfree beneficiary tracking:
+payoutConfig: {
+    bankAccount: String,        // Encrypted bank account number (optional, for IMPS/NEFT)
+    ifsc: String,               // IFSC code (required if bankAccount provided)
     cashfreeBeneficiaryId: String,  // Cashfree beneficiary ID mapping
-    beneficiaryCreatedAt: Date,     // When beneficiary was registered
-    verifiedAt: Date,               // When bank/UPI was verified
+    beneficiaryCreatedAt: Date,     // When beneficiary was registered on Cashfree
+    verifiedAt: Date,               // When bank/UPI was last verified
     verificationStatus: {
         type: String,
         enum: ['pending', 'verified', 'failed'],
+        default: 'pending',
     },
 }
 ```
@@ -1260,7 +1276,7 @@ Configure webhook URL in **Cashfree Merchant Dashboard**:
 | `TRANSFER_FAILED` | Payout failed | Transfer could not be completed |
 | `TRANSFER_REVERSED` | Payout reversed | Funds returned to payout wallet |
 
-### 16.3 Webhook Payload
+### 16.3 Webhook Payload — Transfer Success
 
 ```json
 {
@@ -1272,6 +1288,38 @@ Configure webhook URL in **Cashfree Merchant Dashboard**:
     "transfer_utr": "424242424242",
     "transfer_amount": 425.00,
     "updated_at": "2026-04-17T10:30:00Z"
+  }
+}
+```
+
+### 16.3.1 Webhook Payload — Transfer Failed
+
+```json
+{
+  "event": "TRANSFER_FAILED",
+  "data": {
+    "transfer_id": "PAYOUT_BOOKING_456_1714000000",
+    "cf_transfer_id": "CF_123456",
+    "status": "FAILED",
+    "transfer_amount": 425.00,
+    "failure_reason": "INVALID_VPA",
+    "updated_at": "2026-04-17T10:30:00Z"
+  }
+}
+```
+
+### 16.3.2 Webhook Payload — Transfer Reversed
+
+```json
+{
+  "event": "TRANSFER_REVERSED",
+  "data": {
+    "transfer_id": "PAYOUT_BOOKING_456_1714000000",
+    "cf_transfer_id": "CF_123456",
+    "status": "REVERSED",
+    "transfer_amount": 425.00,
+    "failure_reason": "BENEFICIARY_BANK_RETURNED",
+    "updated_at": "2026-04-17T11:00:00Z"
   }
 }
 ```
