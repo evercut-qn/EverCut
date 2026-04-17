@@ -169,11 +169,11 @@ PhonePe PG v2 uses the **Standard Checkout** model:
 6. **Backend verifies** payment via Order Status API (fallback)
 
 ```
-┌──────────┐     ┌──────────────┐     ┌──────────────┐     ┌──────────┐
+┌──────────┐      ┌──────────────┐     ┌──────────────┐      ┌──────────┐
 │ EverCut  │────▶│ EverCut      │────▶│ PhonePe PG   │────▶│ Customer │
-│ Mobile   │     │ Backend      │     │ v2 API       │     │ Bank     │
+│ Mobile   │      │ Backend      │     │ v2 API       │      │ Bank     │
 │ App      │◀────│              │◀────│              │◀────│          │
-└──────────┘     └──────────────┘     └──────────────┘     └──────────┘
+└──────────┘      └──────────────┘     └──────────────┘      └──────────┘
      │                  ▲                    │
      │                  │                    │
      │            ┌─────┴─────┐              │
@@ -196,18 +196,23 @@ PhonePe PG v2 uses the **Standard Checkout** model:
 
 ```bash
 # Installation (official PhonePe SDK)
-npm install pg-sdk-node@2.0.3
-# OR direct from PhonePe repository:
-npm install https://phonepe.mycloudrepo.io/public/repositories/phonepe-pg-sdk-node/releases/v2/phonepe-pg-sdk-node-2.0.3.tgz
+npm install @phonepe-pg/pg-sdk-node
 ```
 
 **SDK Capabilities:**
-- `StandardCheckoutClient.getInstance()` — SDK initialization
+- `new StandardCheckoutClient(config)` — SDK initialization with credentials and environment
 - `client.pay(request)` — Create payment (returns `redirectUrl`)
 - `client.createSdkOrder(request)` — Create order token for mobile SDKs
 - `client.getOrderStatus(merchantOrderId)` — Check payment status
 - `client.refund(request)` — Initiate refund
 - `client.validateCallback(headers, body)` — Verify webhook authenticity
+
+> **Design Decision — SDK vs Direct HTTP:**
+> The Implementation Guide uses **direct HTTP calls** (`fetch()`) rather than the PhonePe SDK. This is a deliberate architectural choice for three reasons:
+> 1. **Transparency:** Direct calls make the exact request/response structure visible in code — critical for debugging payment issues.
+> 2. **No dependency lock-in:** Avoids coupling to a third-party SDK upgrade cycle.
+> 3. **Adapter control:** The adapter pattern requires full control over request construction, which SDK abstractions can obscure.
+> The SDK remains a valid alternative for teams preferring higher-level abstractions.
 
 ---
 
@@ -930,10 +935,19 @@ After Payouts activation, Cashfree creates a **virtual payout wallet**:
    - Click "Create Key" in Payouts section
    - Note the x-client-id (App ID) and x-client-secret (Secret Key)
 5. Store securely (never commit to version control)
-6. Whitelist your server IP addresses:
-   - Navigate to: Developers → Two-Factor Authentication → IP Whitelisting
-   - Add production server IP(s) — MANDATORY for production payout API calls
+6. Configure Two-Factor Authentication (2FA) — MANDATORY for production:
+    - **Option A — IP Whitelisting (recommended for static IPs):**
+      Navigate to: Developers → Two-Factor Authentication → IP Whitelisting
+      Add production server IP(s)
+    - **Option B — Public Key-based Signature (for dynamic IPs):**
+      Generate a Public Key pair in: Developers → Two-Factor Authentication
+      For every request, create `x-cf-signature` header:
+      Sign `client_id.unix_timestamp` with your RSA Private Key
+      Signatures are valid for 5 minutes in production
+    - At least one 2FA method is MANDATORY for production payout API calls
 ```
+
+> **EverCut Recommendation:** Use **IP Whitelisting** if deploying on a cloud server with a static IP (e.g., AWS EC2 with Elastic IP, DigitalOcean Droplet). Use **Public Key-based 2FA** if deploying on serverless or auto-scaling infrastructure where IPs change.
 
 ---
 
@@ -1407,18 +1421,24 @@ stateDiagram-v2
 stateDiagram-v2
     [*] --> PendingPayment : Customer creates booking
     PendingPayment --> PaymentPending : POST /payments/initiate
-    PaymentPending --> Confirmed : PhonePe webhook: COMPLETED
-    PaymentPending --> PaymentFailed : PhonePe webhook: FAILED
+    PaymentPending --> Confirmed : PhonePe webhook - COMPLETED
+    PaymentPending --> PaymentFailed : PhonePe webhook - FAILED
     PaymentFailed --> PaymentPending : Customer retries
     Confirmed --> InProgress : Barber starts service
+    note right of InProgress
+        Logical UX state, not a
+        separate DB status.
+        DB remains confirmed
+        until barber marks complete.
+    end note
     InProgress --> ServiceCompleted : Barber marks completed
     ServiceCompleted --> PayoutPending : Cashfree payout initiated
-    PayoutPending --> FullySettled : Cashfree webhook: SUCCESS
-    PayoutPending --> PayoutFailed : Cashfree webhook: FAILED
+    PayoutPending --> FullySettled : Cashfree webhook - SUCCESS
+    PayoutPending --> PayoutFailed : Cashfree webhook - FAILED
     PayoutFailed --> PayoutPending : Admin retries payout
     Confirmed --> Cancelled : Cancellation requested
     Cancelled --> RefundPending : PhonePe refund initiated
-    RefundPending --> Refunded : PhonePe webhook: refund completed
+    RefundPending --> Refunded : PhonePe webhook - refund completed
     FullySettled --> [*]
     Refunded --> [*]
 ```

@@ -230,12 +230,9 @@ server/src/
 │   ├── payment.validator.js                # Joi schemas for payment endpoints
 │   └── payout.validator.js                 # Joi schemas for payout endpoints
 │
-├── jobs/
-│   ├── payment-poller.cron.js              # Cron: pending payment resolution
-│   └── payout-poller.cron.js               # Cron: pending payout resolution
-│
-└── middleware/
-    └── webhook-auth.middleware.js           # Webhook verification utilities
+└── jobs/
+    ├── payment-poller.cron.js              # Cron: pending payment resolution
+    └── payout-poller.cron.js               # Cron: pending payout resolution
 ```
 
 ### 2.2 Files to Modify
@@ -284,40 +281,41 @@ PLATFORM_COMMISSION_PERCENT=15
 
 ```javascript
 // server/src/config/index.js — ADD to the config object
+// NOTE: The existing config uses Object.freeze() and requireEnv()/optionalEnv() helpers.
+// Add the following sections inside the config object BEFORE the freeze.
+// Do NOT use getter functions (get baseUrl()) — they don't work inside Object.freeze().
 
-phonepe: {
-    clientId: getEnvVar('PHONEPE_CLIENT_ID'),
-    clientSecret: getEnvVar('PHONEPE_CLIENT_SECRET'),
-    clientVersion: parseInt(getEnvVar('PHONEPE_CLIENT_VERSION', '1'), 10),
-    merchantId: getEnvVar('PHONEPE_MERCHANT_ID'),
-    env: getEnvVar('PHONEPE_ENV', 'SANDBOX'),
-    webhookUsername: getEnvVar('PHONEPE_WEBHOOK_USERNAME'),
-    webhookPassword: getEnvVar('PHONEPE_WEBHOOK_PASSWORD'),
-    get baseUrl() {
-        return this.env === 'PRODUCTION'
-            ? 'https://api.phonepe.com/apis/pg'
-            : 'https://api-preprod.phonepe.com/apis/pg-sandbox';
-    },
-},
-cashfree: {
-    payoutClientId: getEnvVar('CASHFREE_PAYOUT_CLIENT_ID'),
-    payoutClientSecret: getEnvVar('CASHFREE_PAYOUT_CLIENT_SECRET'),
-    payoutEnv: getEnvVar('CASHFREE_PAYOUT_ENV', 'TEST'),
-    get payoutBaseUrl() {
-        return this.payoutEnv === 'PRODUCTION'
-            ? 'https://api.cashfree.com/payout'
-            : 'https://sandbox.cashfree.com/payout';
-    },
+phonepe: Object.freeze({
+    clientId: requireEnv('PHONEPE_CLIENT_ID'),
+    clientSecret: requireEnv('PHONEPE_CLIENT_SECRET'),
+    clientVersion: parseInt(optionalEnv('PHONEPE_CLIENT_VERSION', '1'), 10),
+    merchantId: requireEnv('PHONEPE_MERCHANT_ID'),
+    env: optionalEnv('PHONEPE_ENV', 'SANDBOX'),
+    webhookUsername: requireEnv('PHONEPE_WEBHOOK_USERNAME'),
+    webhookPassword: requireEnv('PHONEPE_WEBHOOK_PASSWORD'),
+    baseUrl: optionalEnv('PHONEPE_ENV', 'SANDBOX') === 'PRODUCTION'
+        ? 'https://api.phonepe.com/apis/pg'
+        : 'https://api-preprod.phonepe.com/apis/pg-sandbox',
+}),
+cashfree: Object.freeze({
+    payoutClientId: requireEnv('CASHFREE_PAYOUT_CLIENT_ID'),
+    payoutClientSecret: requireEnv('CASHFREE_PAYOUT_CLIENT_SECRET'),
+    payoutEnv: optionalEnv('CASHFREE_PAYOUT_ENV', 'TEST'),
+    payoutBaseUrl: optionalEnv('CASHFREE_PAYOUT_ENV', 'TEST') === 'PRODUCTION'
+        ? 'https://api.cashfree.com/payout'
+        : 'https://sandbox.cashfree.com/payout',
     payoutApiVersion: '2025-01-01',
-},
-payment: {
-    redirectBaseUrl: getEnvVar('PAYMENT_REDIRECT_BASE_URL', 'http://localhost:3000/api/v1/payments/redirect'),
-    platformCommissionPercent: parseInt(getEnvVar('PLATFORM_COMMISSION_PERCENT', '15'), 10),
+}),
+payment: Object.freeze({
+    redirectBaseUrl: optionalEnv('PAYMENT_REDIRECT_BASE_URL', 'http://localhost:5001/api/v1/payments/redirect'),
+    platformCommissionPercent: parseInt(optionalEnv('PLATFORM_COMMISSION_PERCENT', '15'), 10),
     sessionExpirySeconds: 1200,       // 20 minutes
     maxPollAttempts: 10,
     pollIntervalBaseMs: 3000,         // 3 seconds, doubles each attempt
-},
+}),
 ```
+
+> **Alignment Note:** The existing config uses `Object.freeze()`, `requireEnv()`, and `optionalEnv()` — not `getEnvVar()`. URLs are computed at config creation time rather than using getter functions, because getters do not work inside `Object.freeze()`. The `redirectBaseUrl` default port is `5001` to match the existing `config.port` default.
 
 ---
 
@@ -614,6 +612,8 @@ export default PayoutTransaction;
 ### 4.3 Booking Model Additions
 
 Add the following fields to the existing `bookingSchema` in `booking.model.js`:
+
+> **⚠️ IMPORTANT:** You must ALSO update the `PAYMENT_STATUS` constant and `ALL_PAYMENT_STATUSES` in `constants.js` (see §4.4) to include the new values (`initiated`, `refund_pending`, `refunded`, `refund_failed`) BEFORE adding these fields. The booking model's `paymentStatus` enum references `ALL_PAYMENT_STATUSES`, so the constant must be extended first or the schema will reject the new values.
 
 ```javascript
 // ADD these fields to the existing bookingSchema
@@ -1609,7 +1609,7 @@ export const initiatePayment = async (userId, bookingId) => {
     // 1. Validate booking exists and belongs to user
     const booking = await bookingRepository.findById(bookingId);
     if (!booking) {
-        throw new NotFoundError('Booking not found');
+        throw new NotFoundError('Booking');
     }
     if (String(booking.customerId) !== String(userId)) {
         throw new BadRequestError('You can only pay for your own bookings');
@@ -1752,7 +1752,7 @@ export const handleWebhook = async (headers, body) => {
 export const getPaymentStatus = async (userId, paymentId) => {
     const payment = await paymentRepository.findById(paymentId);
     if (!payment) {
-        throw new NotFoundError('Payment not found');
+        throw new NotFoundError('Payment');
     }
     if (String(payment.customerId) !== String(userId)) {
         throw new BadRequestError('Unauthorized access to payment');
@@ -1805,7 +1805,7 @@ export const getPaymentStatus = async (userId, paymentId) => {
 export const getPaymentByBooking = async (userId, bookingId) => {
     const payment = await paymentRepository.findLatestByBookingId(bookingId);
     if (!payment) {
-        throw new NotFoundError('No payment found for this booking');
+        throw new NotFoundError('Payment for this booking');
     }
     if (String(payment.customerId) !== String(userId)) {
         throw new BadRequestError('Unauthorized');
@@ -1946,7 +1946,7 @@ async function _handleRefundFailure(webhookData) {
 export const initiateRefund = async (bookingId, reason) => {
     const payment = await paymentRepository.findCompletedByBookingId(bookingId);
     if (!payment) {
-        throw new NotFoundError('No completed payment found for this booking');
+        throw new NotFoundError('Completed payment for this booking');
     }
     if (payment.status !== PAYMENT_TRANSACTION_STATUS.COMPLETED) {
         throw new BadRequestError('Can only refund completed payments');
@@ -2055,6 +2055,7 @@ import logger from '../utils/logger.js';
 import config from '../config/index.js';
 import { NotFoundError, BadRequestError } from '../utils/api-error.js';
 import { PAYOUT_TRANSACTION_STATUS } from '../utils/constants.js';
+import User from '../models/user.model.js';
 import payoutRepository from '../repositories/payout.repository.js';
 import paymentRepository from '../repositories/payment.repository.js';
 import bookingRepository from '../repositories/booking.repository.js';
@@ -2086,7 +2087,7 @@ export const triggerBarberPayout = async (bookingId) => {
     const payment = await paymentRepository.findCompletedByBookingId(bookingId);
     if (!payment) {
         logger.error('[PayoutService] No completed payment found', { bookingId });
-        throw new NotFoundError('No completed payment found for this booking');
+        throw new NotFoundError('Completed payment for this booking');
     }
 
     // 2. Idempotency — check for existing payout
@@ -2113,7 +2114,7 @@ export const triggerBarberPayout = async (bookingId) => {
     // 4. Fetch barber/shop details
     const booking = await bookingRepository.findById(bookingId);
     if (!booking) {
-        throw new NotFoundError('Booking not found');
+        throw new NotFoundError('Booking');
     }
 
     // Populate shop for payout details
@@ -2123,6 +2124,10 @@ export const triggerBarberPayout = async (bookingId) => {
     // Shop model has upiId, accountHolderName, bankName at ROOT level
     // Additional payout config (bankAccount, ifsc, cashfreeBeneficiaryId)
     // is in shop.payoutConfig (added during payment integration)
+    //
+    // IMPORTANT: Shop model does NOT have phone/email fields.
+    // These live on the User model (accessed via shop.ownerId).
+    // We must populate the owner User to get phone and email for Cashfree beneficiary.
     if (!shop?.upiId && !shop?.payoutConfig?.bankAccount) {
         logger.error('[PayoutService] No payout details for shop', {
             shopId: shop?._id,
@@ -2130,11 +2135,14 @@ export const triggerBarberPayout = async (bookingId) => {
         throw new BadRequestError('Shop has no payout details configured');
     }
 
+    // Populate the owner User for phone and email
+    const ownerUser = await User.findById(shop.ownerId).select('phoneNumber email');
+
     const barber = {
         _id: shop.ownerId || shop._id,
         fullName: shop.accountHolderName || shop.ownerName || shop.shopName,
-        phone: shop.phone,
-        email: shop.email,
+        phone: ownerUser?.phoneNumber || '',   // User model field is 'phoneNumber'
+        email: ownerUser?.email || '',          // User model field is 'email'
         upiId: shop.upiId,
         bankAccount: shop.payoutConfig?.bankAccount,
         ifsc: shop.payoutConfig?.ifsc,
@@ -2311,7 +2319,7 @@ export const handlePayoutWebhook = async (headers, rawBody, parsedBody) => {
 export const retryPayout = async (payoutId) => {
     const payout = await payoutRepository.findById(payoutId);
     if (!payout) {
-        throw new NotFoundError('Payout not found');
+        throw new NotFoundError('Payout');
     }
     if (![PAYOUT_TRANSACTION_STATUS.FAILED, PAYOUT_TRANSACTION_STATUS.REVERSED].includes(payout.status)) {
         throw new BadRequestError('Can only retry failed or reversed payouts');
@@ -2695,7 +2703,7 @@ router.get(
 router.post(
     '/:bookingId/refund',
     authenticate,
-    authorize(ROLES.BARBER),
+    authorize(ROLES.ADMIN, ROLES.BARBER),
     validate(bookingIdParamSchema, 'params'),
     validate(refundSchema, 'body'),
     paymentController.initiateRefund,
@@ -2753,20 +2761,28 @@ router.use('/payouts', payoutRoutes);
 ### 13.4 Raw Body Middleware for Cashfree Webhooks
 
 ```javascript
-// In server.js or app.js — ADD before JSON parsing for payout webhook route
+// In app.js — Modify the createApp() factory to capture raw body for Cashfree webhook
+// The raw body middleware MUST be registered BEFORE express.json() to prevent
+// the body from being consumed before we can capture it.
+//
+// In the existing createApp() function in app.js, add this block
+// BEFORE the "── 3. Body parsing" section:
 
-import express from 'express';
+    // ── 2.5. Raw body capture for Cashfree payout webhook ──────────────────
+    // Cashfree webhook signature verification requires the raw (unparsed) body.
+    // This MUST be placed before express.json() so the body buffer is available.
+    app.use(`${config.apiPrefix}/payouts/webhook`, express.raw({ type: 'application/json' }), (req, _res, next) => {
+        req.rawBody = req.body.toString('utf8');
+        req.body = JSON.parse(req.rawBody);
+        next();
+    });
 
-// Capture raw body for Cashfree webhook signature verification
-app.use('/api/v1/payouts/webhook', express.raw({ type: 'application/json' }), (req, res, next) => {
-    req.rawBody = req.body.toString('utf8');
-    req.body = JSON.parse(req.rawBody);
-    next();
-});
-
-// Standard JSON parsing for all other routes
-app.use(express.json());
+    // ── 3. Body parsing (existing — no changes) ────────────────────────────
+    app.use(express.json({ limit: '10mb' }));
+    app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 ```
+
+> **⚠️ Critical Placement:** This middleware uses `config.apiPrefix` (which is `/api/v1`) to match the full route path. It MUST appear before `express.json()` in the middleware stack. If placed after, the body will already be parsed and `req.rawBody` will be undefined, causing webhook signature verification to fail silently.
 
 ---
 
@@ -3204,18 +3220,18 @@ stateDiagram-v2
     [*] --> PendingPayment : Customer creates booking
     PendingPayment --> PaymentInitiated : POST /payments/initiate
     PaymentInitiated --> PaymentPending : Redirected to PhonePe
-    PaymentPending --> Confirmed : Webhook: checkout.order.completed
-    PaymentPending --> PaymentFailed : Webhook: checkout.order.failed
+    PaymentPending --> Confirmed : Webhook - checkout.order.completed
+    PaymentPending --> PaymentFailed : Webhook - checkout.order.failed
     PaymentFailed --> PaymentInitiated : Customer retries
     Confirmed --> InProgress : Barber starts service
     InProgress --> Completed : Barber marks complete
     Completed --> PayoutPending : Cashfree payout initiated
-    PayoutPending --> PayoutCompleted : Webhook: TRANSFER_SUCCESS
-    PayoutPending --> PayoutFailed : Webhook: TRANSFER_FAILED
+    PayoutPending --> PayoutCompleted : Webhook - TRANSFER_SUCCESS
+    PayoutPending --> PayoutFailed : Webhook - TRANSFER_FAILED
     PayoutFailed --> PayoutPending : Admin retries
     Confirmed --> Cancelled : Cancellation requested
     Cancelled --> RefundPending : PhonePe refund initiated
-    RefundPending --> Refunded : Webhook: pg.refund.completed
+    RefundPending --> Refunded : Webhook - pg.refund.completed
 ```
 
 ---
@@ -3575,7 +3591,7 @@ export class MockCashfreePayoutAdapter extends PayoutGatewayAdapter {
 | `GET` | `/api/v1/payments/booking/:bookingId` | Customer | Get payment by booking |
 | `GET` | `/api/v1/payments/redirect` | Public | Handle post-payment redirect |
 | `POST` | `/api/v1/payments/webhook` | Public* | PhonePe webhook endpoint |
-| `POST` | `/api/v1/payments/:bookingId/refund` | Barber | Initiate refund |
+| `POST` | `/api/v1/payments/:bookingId/refund` | Admin/Barber | Initiate refund |
 
 ### Payout Endpoints (Cashfree Disbursement)
 
