@@ -52,18 +52,19 @@ PhonePe PG is optimal for collection (~50% UPI market share, 0% MDR on UPI), but
 ### End-to-End Money Flow
 
 ```
-Customer ──[pays]──▶ PhonePe PG ──[settles T+1]──▶ EverCut Platform Account
-                                                          │
-                                              ┌───────────┴───────────┐
-                                              │                       │
-                                       Platform Commission     Barber Payout
-                                          (15% retained)       (85% disbursed)
-                                                                      │
-                                              Cashfree Payouts ◀──────┘
-                                                    │
-                                                    ▼
-                                         Barber's UPI / Bank Account
-                                         (Real-time via UPI/IMPS)
+Customer ──[pays serviceAmount + platformFee]──▶ PhonePe PG ──[settles T+1]──▶ EverCut Platform Account
+                                                                                       │
+                                                                          ┌────────────┴────────────┐
+                                                                          │                         │
+                                                                   Platform Fee              Barber Payout
+                                                                   (₹3 single /             (exact service
+                                                                    ₹10 bundle)               amount)
+                                                                                                    │
+                                                                          Cashfree Payouts ◀────────┘
+                                                                                │
+                                                                                ▼
+                                                                     Barber's UPI / Bank Account
+                                                                     (End-of-day batch payout)
 ```
 
 ### Integration Scope
@@ -77,7 +78,7 @@ COLLECTION:
                              Order Status Polling (Fallback)
 
 DISBURSEMENT:
-  Booking Completed Event → EverCut Backend → Cashfree Payouts API → Barber's UPI/Bank
+  End-of-Day Batch Job → EverCut Backend → Cashfree Payouts API → Barber's UPI/Bank
                                                     ↕
                                               Webhook (S2S)
                                                     ↕
@@ -720,39 +721,92 @@ EverCut operates as a **marketplace platform** connecting customers with barber 
 ```
 ┌──────────┐         ┌──────────────┐         ┌──────────────┐
 │ Customer │──pay──▶ │   PhonePe    │──settle─▶│   EverCut    │
-│          │         │   PG Escrow  │  (T+1)   │   Platform   │
-│          │         │              │          │   Account    │
+│ (service │         │   PG Escrow  │  (T+1)   │   Platform   │
+│  + fee)  │         │              │          │   Account    │
 └──────────┘         └──────────────┘          └──────┬───────┘
                                                       │
                                           ┌───────────┴───────────┐
                                           │                       │
                                    ┌──────▼──────┐        ┌──────▼──────┐
                                    │  Platform    │        │  Cashfree   │
-                                   │  Commission  │        │  Payouts    │
-                                   │  (15%)       │        │  Wallet     │
+                                   │  Fee         │        │  Payouts    │
+                                   │  (₹3 / ₹10) │        │  Wallet     │
                                    └─────────────┘        └──────┬──────┘
                                                                   │
                                                            ┌──────▼──────┐
                                                            │   Barber    │
                                                            │   UPI/Bank  │
-                                                           │   (85%)     │
+                                                           │ (100% svc)  │
                                                            └─────────────┘
 ```
 
-### 10.2 Settlement Model
+### 10.2 Settlement Model — Fixed Platform Fee
 
-| Component | Percentage | Example (₹500 booking) |
+EverCut uses a **fixed platform fee** model (NOT a percentage-based commission).
+
+> **⚠️ Source of Truth:** See [Payment-Payout-Logic.md](./Payment-Payout-Logic.md) for canonical fee definitions.
+
+#### A. Single Service (e.g., Haircut)
+
+| Component | Amount | Notes |
 |---|---|---|
-| Total Collection | 100% | ₹500.00 |
-| Platform Commission | 15% | ₹75.00 |
-| GST on Commission (18%) | — | ₹13.50 |
-| Barber Payout | 85% | ₹425.00 |
-| PhonePe MDR (UPI) | 0% | ₹0.00 |
-| Cashfree Payout Fee (UPI) | — | ₹3.00 (+GST) |
+| Service Amount (barber's price) | ₹99 *(example)* | Set by barber; varies per service |
+| Platform Fee | **₹3** (fixed) | Added on top of service amount |
+| **Total Paid by Customer** | **₹102** | `serviceAmount + platformFee` |
+| Barber Payout | ₹99 | Exact service amount |
+| Cashfree Payout Fee (UPI) | ₹6 + ₹1.08 GST = ₹7.08 | Deducted from **platform account**, NOT from barber. Per-barber aggregation reduces to 1 fee/barber/day. |
+| PhonePe MDR (UPI) | ₹0 | Government mandate — zero MDR |
 
-> **GST Clarification:** The 18% GST (₹13.50 in this example) is EverCut's tax liability on the commission earned — it is paid by EverCut from the ₹75.00 commission, NOT deducted from the barber's ₹425.00 payout. The barber always receives exactly 85% of the booking amount.
+#### B. Bundle of Services (e.g., Haircut + Beard Trim + Additional)
 
-### 10.3 Complete Lifecycle — Booking to Payout
+| Component | Amount | Notes |
+|---|---|---|
+| Service Amount (total of all services) | ₹309 *(example, must be ≥ ₹300)* | Sum of all services in bundle |
+| Platform Fee | **₹10** (fixed) | Added on top of service amount |
+| **Total Paid by Customer** | **₹319** | `serviceAmount + platformFee` |
+| Barber Payout | ₹309 | Exact service amount |
+| Cashfree Payout Fee (UPI) | ₹6 + ₹1.08 GST = ₹7.08 | Deducted from **platform account**, NOT from barber. Per-barber aggregation reduces to 1 fee/barber/day. |
+| PhonePe MDR (UPI) | ₹0 | Government mandate — zero MDR |
+
+#### Pricing Rules
+
+- **Minimum bundle service amount:** ₹300 (enforced by platform)
+- **Platform fee:** ₹3 for single service, ₹10 for bundle
+- **Barber always receives 100% of the service amount** — platform fee and payout charges are borne by the platform
+- **Cashfree charges (₹6 + 18% GST = ₹7.08 for UPI ≤₹1,000)** are deducted from the platform's Cashfree wallet, separate from the barber's payout
+- **Per-barber aggregation:** The end-of-day batch groups all bookings by barber and sends ONE transfer per barber. This means the ₹7.08 fee applies once per barber per day, not once per booking.
+
+> **Revenue Clarification (per-booking, before aggregation):** EverCut's net revenue per transaction = `platformFee - (cashfreePayoutFee ÷ avgBookingsPerBarberPerDay)`. With per-barber aggregation, the Cashfree fee is amortized across all bookings for that barber. At 3 bookings/barber/day: effective fee = ₹7.08 ÷ 3 = **₹2.36/booking**. Single service: ₹3 - ₹2.36 = **₹0.64** (profitable). Bundle: ₹10 - ₹2.36 = **₹7.64** (highly profitable).
+
+### 10.3 Refund Model
+
+Refunds are only permitted **before payout is processed**. Once the end-of-day payout batch runs, the refund window closes.
+
+#### A. Single Service Refund
+
+| Component | Amount |
+|---|---|
+| Total Paid | ₹102 |
+| Refund Fee (fixed) | -₹7 |
+| Platform Fee (non-refundable) | -₹3 |
+| **Refund to Customer** | **₹92** |
+
+#### B. Bundle Refund
+
+| Component | Amount |
+|---|---|
+| Total Paid | ₹319 |
+| Refund Fee (fixed) | -₹15 |
+| Platform Fee (non-refundable) | -₹10 |
+| **Refund to Customer** | **₹294** |
+
+#### Refund Rules
+- Platform fee is **non-refundable**
+- Refund fee is **deducted before processing refund**
+- **No refunds after payout is processed** (end-of-day cutoff)
+- Refund formula: `refundAmount = totalPaid - refundFee - platformFee`
+
+### 10.4 Complete Lifecycle — Booking to Payout
 
 ```
 Step  1: Customer creates booking → status: pending, paymentStatus: pending
@@ -766,30 +820,42 @@ Step  8: Backend verifies webhook, updates PaymentTransaction (COMPLETED)
 Step  9: Booking → status: confirmed, paymentStatus: success
 Step 10: Barber performs service
 Step 11: Barber marks booking → status: completed
-Step 12: Backend calculates payout: ₹500 × 85% = ₹425
-Step 13: Backend ensures barber is Cashfree beneficiary (create if not)
-Step 14: Backend calls Cashfree POST /payout/transfers → payout initiated
-Step 15: PayoutTransaction created (PENDING)
-Step 16: Cashfree webhook → TRANSFER_SUCCESS
-Step 17: PayoutTransaction updated (SUCCESS), booking payoutStatus: completed
-Step 18: Barber receives ₹425 in their UPI/bank account (real-time for UPI)
+Step 12: End-of-day batch job collects all completed bookings with pending payouts
+Step 13: Group bookings by barber_id → aggregate service amounts per barber
+Step 14: For each barber: payout = SUM of all service amounts (e.g., ₹99 + ₹239 + ₹199 = ₹537)
+Step 15: Backend ensures barber is Cashfree beneficiary (create if not)
+Step 16: Backend calls Cashfree POST /payout/transfers → ONE transfer per barber
+Step 17: PayoutTransaction created (PENDING), linked to all booking IDs
+Step 18: Cashfree webhook → TRANSFER_SUCCESS
+Step 19: PayoutTransaction updated (SUCCESS), ALL linked bookings → payoutStatus: completed
+Step 20: Barber receives aggregated amount in their UPI/bank account (1 fee per barber)
 ```
 
-### 10.4 Payout Trigger Strategy
+### 10.5 Payout Trigger Strategy
 
-EverCut uses an **event-driven automated payout** approach:
+EverCut uses an **end-of-day batch payout with per-barber aggregation** approach:
 
-**Trigger:** When a barber marks a booking as `completed` in their app, the backend listens for this status change and immediately initiates a Cashfree payout.
+**Trigger:** A scheduled cron job runs at the end of each day (e.g., 11:00 PM IST). It collects all bookings marked `completed` that day with `payoutStatus: not_initiated`, **groups them by barber**, and initiates ONE Cashfree payout per barber with the aggregated service amount.
 
-**Why event-driven (not batched)?**
-- Barbers expect instant payment after service completion
-- UPI payouts are real-time — no reason to batch
-- Reduces support tickets about delayed payments
-- Matches gig-economy UX expectations
+**Why end-of-day batch (not instant)?**
+- Ensures the **refund window** remains open throughout the service day
+- Once payout is initiated, refunds are no longer possible — batching provides a safety buffer
+- **Per-barber aggregation** reduces Cashfree fees from 1-per-booking to 1-per-barber-per-day
+- Simplifies daily reconciliation and accounting
 
-**Fallback:** A cron job runs every 10 minutes to catch any payouts stuck in PENDING (webhook missed).
+**Per-Barber Aggregation Example:**
+```
+Barber A completed 4 bookings today: ₹99, ₹239, ₹199, ₹150
+  → Without aggregation: 4 transfers × ₹7.08 = ₹28.32 in fees
+  → With aggregation:    1 transfer of ₹687 × ₹7.08 = ₹7.08 in fees
+  → Savings: ₹21.24 per barber per day
+```
 
-### 10.5 Compliance Considerations & Trade-Offs
+**Refund Window:** From payment confirmation until the end-of-day payout batch runs. After payout initiation, refunds require manual admin intervention.
+
+**Fallback:** A secondary cron job runs every 10 minutes to poll any payouts stuck in PENDING (webhook missed).
+
+### 10.6 Compliance Considerations & Trade-Offs
 
 **The RBI Risk:**
 By using the Payout API approach, customer funds officially "pool" into EverCut's corporate bank accounts before being disbursed. Under RBI regulations, platforms that pool merchant funds are technically classified as **Payment Aggregators (PA)**, which theoretically requires a ₹15 crore net worth and an RBI license.
@@ -798,9 +864,9 @@ By using the Payout API approach, customer funds officially "pool" into EverCut'
 In practice, almost all early-stage Indian startups (from local marketplaces to gig platforms) begin by using a Payout/Nodal account structure because enforcing strict PA/Split-KYC drops their supply acquisition to zero. Starting with corporate payout APIs is the industry standard for early-stage platforms. When EverCut reaches substantial scale and transaction volume, it will need to transition to a fully vetted, compliant Escrow/TSP model or secure a PA license.
 
 **Mitigation Strategy:**
-- Disburse to barbers within 24 hours (preferably instantly)
+- Disburse to barbers by end of day (same day as service completion)
 - Maintain clear internal ledger showing every rupee collected and disbursed
-- Retain only the platform commission; do not hold barber funds excessively
+- Retain only the fixed platform fee; do not hold barber funds beyond the same day
 - Plan PA license application once transaction volume warrants it
 
 ---
@@ -1397,7 +1463,7 @@ function verifyCashfreeWebhook(rawBody, timestamp, receivedSignature, clientSecr
 
 ```mermaid
 stateDiagram-v2
-    [*] --> INITIATED : Booking marked completed
+    [*] --> INITIATED : End-of-day batch picks up completed booking
     INITIATED --> PENDING : Cashfree transfer API called
     PENDING --> SUCCESS : Webhook TRANSFER_SUCCESS
     PENDING --> FAILED : Webhook TRANSFER_FAILED
@@ -1411,8 +1477,8 @@ stateDiagram-v2
 
 | Booking Status | Payout Status | Condition |
 |---|---|---|
-| `completed` | `not_initiated` | Service done; payout not yet triggered |
-| `completed` | `initiated` | PayoutTransaction created; API not yet called |
+| `completed` | `not_initiated` | Service done; awaiting end-of-day batch |
+| `completed` | `initiated` | PayoutTransaction created by batch; API not yet called |
 | `completed` | `pending` | Cashfree API called; awaiting confirmation |
 | `completed` | `completed` | Cashfree webhook: TRANSFER_SUCCESS |
 | `completed` | `failed` | Cashfree webhook: TRANSFER_FAILED |
@@ -1435,16 +1501,23 @@ stateDiagram-v2
         until barber marks complete.
     end note
     InProgress --> ServiceCompleted : Barber marks completed
-    ServiceCompleted --> PayoutPending : Cashfree payout initiated
+    note right of ServiceCompleted
+        REFUND WINDOW OPEN
+        Until end-of-day batch runs.
+        After payout, refund window closes.
+    end note
+    ServiceCompleted --> PayoutPending : End-of-day batch initiates payout
     PayoutPending --> FullySettled : Cashfree webhook - SUCCESS
     PayoutPending --> PayoutFailed : Cashfree webhook - FAILED
     PayoutFailed --> PayoutPending : Admin retries payout
-    Confirmed --> Cancelled : Cancellation requested
-    Cancelled --> RefundPending : PhonePe refund initiated
+    Confirmed --> Cancelled : Cancellation before payout
+    Cancelled --> RefundPending : Refund initiated (minus fees)
     RefundPending --> Refunded : PhonePe webhook - refund completed
     FullySettled --> [*]
     Refunded --> [*]
 ```
+
+> **Refund Window:** Refunds can only be processed while `payoutStatus` is `not_initiated`. Once the end-of-day batch initiates the payout, the refund window closes. Post-payout refunds require manual admin reconciliation.
 
 ---
 
@@ -1546,10 +1619,12 @@ stateDiagram-v2
 | Scenario | Handling |
 |---|---|
 | **Payment succeeds, payout fails** | Payment remains COMPLETED; PayoutTransaction marked FAILED; admin alert for manual retry |
-| **Customer requests refund after payout** | Check payout status: if SUCCESS, refund requires manual reconciliation; if PENDING, cancel payout first |
+| **Customer requests refund before payout** | Refund allowed: `refundAmount = totalPaid - refundFee - platformFee`. Payout blocked for this booking. |
+| **Customer requests refund after payout** | Refund **not allowed** automatically. Flag for manual admin reconciliation — funds already disbursed to barber. |
 | **Booking cancelled after payout initiated** | If payout PENDING: attempt cancel; if SUCCESS: manual recovery |
 | **Payment collected via PhonePe, Cashfree wallet empty** | Payout queued; admin alerted to fund Cashfree wallet |
 | **Both webhooks arrive simultaneously** | Process independently; use database transactions for booking status |
+| **Refund requested for bundle below ₹300** | Should not occur — ₹300 minimum is enforced at booking creation. If it does, process refund with bundle fee schedule. |
 
 ### 19.4 Timeout Strategy
 
@@ -1690,39 +1765,57 @@ if (existingPayout && existingPayout.status !== 'FAILED') {
 | Credit Card | 1.5-2.0% | Varies by card network |
 | Net Banking | ₹3-15 flat | Per transaction |
 
-### 21.2 Cashfree Payouts — Disbursement Pricing
+### 21.2 Cashfree Payouts — Wallets Fee Structure
 
 **Per-transaction fees (exclusive of 18% GST):**
 
-| Transfer Mode | Up to ₹1,000 | ₹1,001–₹10,000 | Above ₹10,000 |
-|---|---|---|---|
-| **UPI** | ₹3.00 | ₹6.00 | ₹10.00 |
-| **IMPS** | ₹2.50 | ₹5.00 | ₹10.00 |
-| **NEFT** | ₹1.75 | ₹1.75 | ₹1.75 |
-| **Cards** | ₹10.00 | ₹10.00 | ₹10.00 |
+| Transaction Amount | NEFT | RTGS | IMPS / UPI / Amazon Pay | Pay to Phone / Pay to Phone + CC |
+|---|---|---|---|---|
+| Up to ₹1,000 | ₹3.00 | ₹4.00 | ₹6.00 | ₹7.00 |
+| ₹1,000 to ₹25,000 | ₹5.00 | ₹6.00 | ₹8.00 | ₹9.00 |
+| Above ₹25,000 | ₹8.00 | ₹10.00 | ₹15.00 | ₹18.00 |
 
-> **Source:** `cashfree.com/payment-gateway-charges` — verified April 2026. Pricing is subject to change. Volume-based custom pricing available via Cashfree sales for 10,000+ transactions/month.
+> **Source:** Cashfree Payouts Wallets pricing — verified April 2026. Pricing is subject to change. Volume-based custom pricing available via Cashfree sales for 10,000+ transactions/month.
+>
+> **EverCut's primary mode:** UPI payouts (falls under IMPS / UPI column). Most barber payouts will be ≤₹1,000 per barber per day, so the effective rate is **₹6 + GST = ₹7.08 per transfer**. With per-barber aggregation, this is 1 fee per barber per day.
 
 ### 21.3 Combined Cost Projection for EverCut
 
-**Assumptions:**
-- Average booking: ₹600
-- Barber payout: 85% = ₹510 (falls in ≤₹1,000 bracket)
+**Assumptions (per Payment-Payout-Logic.md):**
+- Booking mix: 40% single service (avg ₹150), 60% bundles (avg ₹400)
+- Platform fee: ₹3 (single) / ₹10 (bundle)
+- Barber payout: 100% of service amount
+- Cashfree payout fee: ₹6 + ₹1.08 GST = ₹7.08 per UPI transfer (≤₹1,000 slab)
+- **Per-barber aggregation:** avg 3 bookings/barber/day → 1 Cashfree fee per barber
+- Active barbers: ~110/day (1,000 bookings ÷ 3 avg/barber ÷ 30 days ≈ 11/day, scaled to ~110 unique barbers/month)
 - Payment mix: 90% UPI, 10% Card/Net Banking
-- Payout mix: 70% UPI, 30% NEFT
 - Monthly bookings: 1,000 (early growth stage)
+
+#### Without Per-Barber Aggregation (1 transfer per booking)
 
 | Cost Type | Calculation | Monthly Total |
 |---|---|---|
 | **Collection MDR (UPI)** | 900 × ₹0 | ₹0 |
-| **Collection MDR (Card/NB)** | 100 × ₹600 × 1.5% avg | ₹900 |
-| **Payout Fee (UPI)** | 700 × ₹3.00 | ₹2,100 |
-| **Payout Fee (NEFT)** | 300 × ₹1.75 | ₹525 |
-| **GST on Payouts (18%)** | (₹2,100 + ₹525) × 18% | ₹472.50 |
-| **Total Infrastructure Cost** | | **₹3,997.50** |
-| **Per Booking** | ₹3,997.50 ÷ 1,000 | **₹4.00** |
+| **Collection MDR (Card/NB)** | 100 × avg ₹300 × 1.5% | ₹450 |
+| **Payout Fee (Cashfree UPI)** | 1,000 × ₹7.08 | ₹7,080 |
+| **Total Infrastructure Cost** | | **₹7,530** |
+| **Per Booking** | ₹7,530 ÷ 1,000 | **₹7.53** |
 
-> **Key Insight:** With 90% UPI collection (0% MDR), EverCut's total payment + payout infrastructure cost is approximately **₹4 per booking** — well within the 15% platform commission.
+#### With Per-Barber Aggregation (1 transfer per barber per day) ✅
+
+| Cost Type | Calculation | Monthly Total |
+|---|---|---|
+| **Collection MDR (UPI)** | 900 × ₹0 | ₹0 |
+| **Collection MDR (Card/NB)** | 100 × avg ₹300 × 1.5% | ₹450 |
+| **Payout Fee (Cashfree UPI)** | ~330 transfers × ₹7.08 | ₹2,336 |
+| **Total Infrastructure Cost** | | **₹2,786** |
+| **Per Booking** | ₹2,786 ÷ 1,000 | **₹2.79** |
+| | | |
+| **Platform Fee Revenue** | 400 × ₹3 + 600 × ₹10 | **₹7,200** |
+| **Net Platform Revenue** | ₹7,200 - ₹2,786 | **₹4,414** |
+| **Savings from Aggregation** | ₹7,530 - ₹2,786 | **₹4,744/month (63% reduction)** |
+
+> **Key Insight:** Per-barber aggregation is critical for profitability. Without it, payout fees alone (₹7,080) would nearly consume the entire platform fee revenue (₹7,200). With aggregation, net revenue improves to **₹4.41/booking**, making even single-service bookings viable.
 
 ---
 

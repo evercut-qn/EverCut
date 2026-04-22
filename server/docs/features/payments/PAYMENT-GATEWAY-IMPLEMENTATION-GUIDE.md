@@ -274,8 +274,9 @@ CASHFREE_PAYOUT_ENV=TEST
 
 # ─── Payment Settings ───
 PAYMENT_REDIRECT_BASE_URL=https://api.evercut.in/api/v1/payments/redirect
-PLATFORM_COMMISSION_PERCENT=15
 ```
+
+> **Note:** Platform fees, refund fees, and bundle minimum are **not** environment variables. They are business constants hardcoded in the config module (see §3.2 below). Only credentials, secrets, and environment-specific URLs belong in `.env`.
 
 ### 3.2 Config Module Update
 
@@ -308,14 +309,24 @@ cashfree: Object.freeze({
 }),
 payment: Object.freeze({
     redirectBaseUrl: optionalEnv('PAYMENT_REDIRECT_BASE_URL', 'http://localhost:5001/api/v1/payments/redirect'),
-    platformCommissionPercent: parseInt(optionalEnv('PLATFORM_COMMISSION_PERCENT', '15'), 10),
+    // ─── Business Constants (hardcoded, NOT from .env) ───
+    // These are fixed pricing rules per Payment-Payout-Logic.md.
+    // Change here if business pricing changes — no deploy-time env override needed.
+    platformFeeSingle: 3,             // ₹3 platform fee for single service
+    platformFeeBundle: 10,            // ₹10 platform fee for bundle
+    refundFeeSingle: 7,               // ₹7 refund processing fee (single)
+    refundFeeBundle: 15,              // ₹15 refund processing fee (bundle)
+    minBundleServiceAmount: 300,      // ₹300 minimum service amount for bundles
     sessionExpirySeconds: 1200,       // 20 minutes
     maxPollAttempts: 10,
     pollIntervalBaseMs: 3000,         // 3 seconds, doubles each attempt
+    payoutBatchCronTime: '0 23 * * *', // 11:00 PM IST daily
 }),
 ```
 
 > **Alignment Note:** The existing config uses `Object.freeze()`, `requireEnv()`, and `optionalEnv()` — not `getEnvVar()`. URLs are computed at config creation time rather than using getter functions, because getters do not work inside `Object.freeze()`. The `redirectBaseUrl` default port is `5001` to match the existing `config.port` default.
+>
+> **Why hardcoded?** Platform fees, refund fees, and bundle minimums are **business constants**, not environment-specific configuration. They should be the same across dev/staging/production. Putting them in `.env` would risk inconsistent values across environments. If these values ever need to change, update them directly in `config/index.js` — see [Payment-Payout-Logic.md](./Payment-Payout-Logic.md) for the canonical definitions.
 
 ---
 
@@ -422,12 +433,16 @@ const paymentTransactionSchema = new mongoose.Schema(
 
         // ─── Settlement ───
         settlement: {
-            platformCommission: Number,   // Platform's share in paisa
-            barberPayout: Number,         // Barber's share in paisa
-            commissionPercent: Number,    // Commission percentage applied
+            serviceAmount: Number,        // Service amount in paisa (barber's price)
+            platformFee: Number,          // Fixed platform fee in paisa (₹3 or ₹10)
+            barberPayout: Number,         // = serviceAmount (barber gets 100%)
+            isBundle: Boolean,            // true if bundle (affects fee tiers)
             settled: { type: Boolean, default: false },
             settledAt: Date,
         },
+
+        // ─── Refund Details ───
+        refundFee: Number,                // Fixed refund fee in paisa (₹7 or ₹15)
 
         // ─── Error Tracking ───
         errorCode: String,
@@ -744,6 +759,26 @@ export const PAYOUT_MODES = Object.freeze({
     NEFT: 'NEFT',
     BANK: 'BANK',
     RTGS: 'RTGS',
+});
+
+// ─── Fixed Platform Fees (in rupees) — per Payment-Payout-Logic.md ───
+
+export const PLATFORM_FEES = Object.freeze({
+    SINGLE_SERVICE: 3,   // ₹3 fixed fee for single service
+    BUNDLE: 10,          // ₹10 fixed fee for bundle of services
+});
+
+// ─── Fixed Refund Fees (in rupees) — per Payment-Payout-Logic.md ───
+
+export const REFUND_FEES = Object.freeze({
+    SINGLE_SERVICE: 7,   // ₹7 refund processing fee
+    BUNDLE: 15,          // ₹15 refund processing fee
+});
+
+// ─── Bundle Pricing Rules ───
+
+export const BUNDLE_RULES = Object.freeze({
+    MIN_SERVICE_AMOUNT: 300,  // Minimum total service amount for bundles (₹300)
 });
 ```
 
@@ -1594,12 +1629,32 @@ const generateMerchantRefundId = (merchantOrderId) => {
     return `RF-${merchantOrderId}-${timestamp}`;
 };
 
-// ─── Helper: Calculate settlement split ───
-const calculateSettlement = (amountInPaisa) => {
-    const commissionPercent = config.payment.platformCommissionPercent;
-    const platformCommission = Math.round((amountInPaisa * commissionPercent) / 100);
-    const barberPayout = amountInPaisa - platformCommission;
-    return { platformCommission, barberPayout, commissionPercent };
+// ─── Helper: Calculate settlement split (fixed platform fee model) ───
+// Per Payment-Payout-Logic.md:
+//   - Single service: platform fee = ₹3, refund fee = ₹7
+//   - Bundle (≥2 services): platform fee = ₹10, refund fee = ₹15
+//   - Barber always gets 100% of service amount
+//   - Customer pays: serviceAmount + platformFee
+const calculateSettlement = (booking) => {
+    const isBundle = (booking.services?.length || 1) > 1;
+    const serviceAmountInRupees = booking.serviceAmount || booking.totalAmount;
+    const platformFeeInRupees = isBundle
+        ? config.payment.platformFeeBundle
+        : config.payment.platformFeeSingle;
+
+    const serviceAmountInPaisa = Math.round(serviceAmountInRupees * 100);
+    const platformFeeInPaisa = platformFeeInRupees * 100;
+    const totalAmountInPaisa = serviceAmountInPaisa + platformFeeInPaisa;
+    const barberPayoutInPaisa = serviceAmountInPaisa; // Barber gets 100% of service amount
+
+    return {
+        serviceAmount: serviceAmountInPaisa,
+        platformFee: platformFeeInPaisa,
+        barberPayout: barberPayoutInPaisa,
+        isBundle,
+        totalAmountInPaisa,
+        totalAmountInRupees: totalAmountInPaisa / 100,
+    };
 };
 
 /**
@@ -1633,28 +1688,36 @@ export const initiatePayment = async (userId, bookingId) => {
         await paymentRepository.updateStatus(existingPending._id, PAYMENT_TRANSACTION_STATUS.EXPIRED);
     }
 
-    // 4. Calculate amount (booking.totalAmount is in rupees)
-    const amountInRupees = booking.totalAmount;
-    if (!amountInRupees || amountInRupees <= 0) {
+    // 4. Calculate settlement using fixed platform fee model
+    const settlement = calculateSettlement(booking);
+    const { totalAmountInPaisa, totalAmountInRupees } = settlement;
+
+    if (!totalAmountInPaisa || totalAmountInPaisa <= 0) {
         throw new BadRequestError('Booking amount must be greater than zero');
     }
-    const amountInPaisa = Math.round(amountInRupees * 100);
 
-    // 5. Generate unique merchant order ID
+    // 5. Validate bundle minimum
+    if (settlement.isBundle && (settlement.serviceAmount / 100) < config.payment.minBundleServiceAmount) {
+        throw new BadRequestError(`Bundle service amount must be at least ₹${config.payment.minBundleServiceAmount}`);
+    }
+
+    // 6. Generate unique merchant order ID
     const merchantOrderId = generateMerchantOrderId(bookingId);
 
-    // 6. Create payment transaction record with settlement split
-    const settlement = calculateSettlement(amountInPaisa);
+    // 7. Create payment transaction record with settlement split
     const paymentTransaction = await paymentRepository.create({
         bookingId,
         customerId: userId,
         shopId: booking.shopId,
         merchantOrderId,
-        amount: amountInPaisa,
-        amountInRupees,
+        amount: totalAmountInPaisa,
+        amountInRupees: totalAmountInRupees,
         status: PAYMENT_TRANSACTION_STATUS.INITIATED,
         settlement: {
-            ...settlement,
+            serviceAmount: settlement.serviceAmount,
+            platformFee: settlement.platformFee,
+            barberPayout: settlement.barberPayout,
+            isBundle: settlement.isBundle,
             settled: false,
         },
     });
@@ -1946,6 +2009,12 @@ async function _handleRefundFailure(webhookData) {
 
 /**
  * Initiate a refund for a completed booking.
+ *
+ * Per Payment-Payout-Logic.md:
+ *   refundAmount = totalPaid - refundFee - platformFee
+ *   - Platform fee is non-refundable
+ *   - Refund fee: ₹7 (single) / ₹15 (bundle)
+ *   - No refunds after payout is processed
  */
 export const initiateRefund = async (bookingId, reason) => {
     const payment = await paymentRepository.findCompletedByBookingId(bookingId);
@@ -1956,20 +2025,41 @@ export const initiateRefund = async (bookingId, reason) => {
         throw new BadRequestError('Can only refund completed payments');
     }
 
+    // Check refund window — no refunds after payout is initiated
+    const booking = await bookingRepository.findById(bookingId);
+    if (booking?.payoutStatus && booking.payoutStatus !== 'not_initiated') {
+        throw new BadRequestError(
+            'Refund not allowed — payout has already been initiated. Contact admin for manual resolution.'
+        );
+    }
+
+    // Calculate refund amount with fee deductions
+    const isBundle = payment.settlement?.isBundle || false;
+    const refundFeeInPaisa = (isBundle
+        ? config.payment.refundFeeBundle
+        : config.payment.refundFeeSingle) * 100;
+    const platformFeeInPaisa = payment.settlement?.platformFee || 0;
+    const refundAmountInPaisa = payment.amount - refundFeeInPaisa - platformFeeInPaisa;
+
+    if (refundAmountInPaisa <= 0) {
+        throw new BadRequestError('Refund amount after fee deduction is zero or negative');
+    }
+
     const merchantRefundId = generateMerchantRefundId(payment.merchantOrderId);
 
     const refundResponse = await phonePeAdapter.initiateRefund({
         merchantRefundId,
         originalMerchantOrderId: payment.merchantOrderId,
-        amount: payment.amount,
+        amount: refundAmountInPaisa,   // Refund only the net amount (total - fees)
     });
 
     await paymentRepository.updateById(payment._id, {
         status: PAYMENT_TRANSACTION_STATUS.REFUND_PENDING,
+        refundFee: refundFeeInPaisa,
         refund: {
             merchantRefundId,
             gatewayRefundId: refundResponse.refundId,
-            amount: payment.amount,
+            amount: refundAmountInPaisa,
             status: 'pending',
             initiatedAt: new Date(),
             reason,
@@ -1983,13 +2073,21 @@ export const initiateRefund = async (bookingId, reason) => {
     logger.info('[PaymentService] Refund initiated', {
         bookingId,
         merchantRefundId,
-        amount: payment.amountInRupees,
+        originalAmount: payment.amountInRupees,
+        refundAmount: refundAmountInPaisa / 100,
+        refundFee: refundFeeInPaisa / 100,
+        platformFee: platformFeeInPaisa / 100,
     });
 
     return {
         merchantRefundId,
         refundId: refundResponse.refundId,
         state: refundResponse.state,
+        refundAmount: refundAmountInPaisa / 100,
+        deductions: {
+            refundFee: refundFeeInPaisa / 100,
+            platformFee: platformFeeInPaisa / 100,
+        },
     };
 };
 
@@ -2076,16 +2174,26 @@ const generateBeneficiaryId = (barberId) => {
 };
 
 /**
- * Trigger automated payout to barber after service completion.
+ * Trigger payout to barber for completed bookings.
  *
- * Called when barber marks booking as "completed".
- * Calculates the barber's 85% share and initiates Cashfree transfer.
+ * Called by the end-of-day batch payout job with AGGREGATED amount.
+ * Per Payment-Payout-Logic.md: barber receives 100% of service amount.
+ * Cashfree payout fees (₹6 + GST for UPI ≤₹1,000) are borne by the platform.
  *
- * @param {string} bookingId - The completed booking ID
+ * Per-barber aggregation: multiple bookings for the same barber are combined
+ * into a single Cashfree transfer to minimize payout fees.
+ *
+ * @param {string} barberId - The barber's user ID
+ * @param {Array<string>} bookingIds - All booking IDs being paid out
+ * @param {number} totalPayoutInPaisa - Aggregated service amount in paisa
  * @returns {Promise<Object>} PayoutTransaction record
  */
-export const triggerBarberPayout = async (bookingId) => {
-    logger.info('[PayoutService] Triggering payout for booking', { bookingId });
+export const triggerBarberPayout = async (barberId, bookingIds, totalPayoutInPaisa) => {
+    logger.info('[PayoutService] Triggering aggregated payout for barber', {
+        barberId,
+        bookingCount: bookingIds.length,
+        amountInRupees: totalPayoutInPaisa / 100,
+    });
 
     // 1. Verify completed payment exists
     const payment = await paymentRepository.findCompletedByBookingId(bookingId);
@@ -2108,8 +2216,9 @@ export const triggerBarberPayout = async (bookingId) => {
         // If FAILED or REVERSED — allow retry (handled below)
     }
 
-    // 3. Calculate payout amount
-    const { barberPayout: barberPayoutInPaisa } = payment.settlement;
+    // 3. Calculate payout amount (barber gets 100% of service amount)
+    const barberPayoutInPaisa = payment.settlement?.barberPayout
+        || payment.settlement?.serviceAmount;
     if (!barberPayoutInPaisa || barberPayoutInPaisa <= 0) {
         throw new BadRequestError('Invalid barber payout amount');
     }
@@ -2949,7 +3058,133 @@ export const stopPayoutPoller = () => {
 };
 ```
 
-### 15.3 Payout Repository
+### 15.3 End-of-Day Batch Payout Job
+
+```javascript
+// server/src/jobs/payout-batch.cron.js
+
+import cron from 'node-cron';
+import logger from '../utils/logger.js';
+import config from '../config/index.js';
+import { triggerBarberPayout } from '../services/payout.service.js';
+import bookingRepository from '../repositories/booking.repository.js';
+
+let cronJob = null;
+
+/**
+ * End-of-day batch payout job with per-barber aggregation.
+ *
+ * Per Payment-Payout-Logic.md:
+ * - Payouts are processed at end of day for completed services
+ * - Once payout is initiated, the refund window closes
+ *
+ * Per-barber aggregation:
+ * - Groups all completed bookings by barber_id
+ * - Sums service amounts per barber
+ * - Sends ONE Cashfree transfer per barber (not per booking)
+ * - Cashfree fee (₹6 + GST = ₹7.08 for UPI ≤₹1,000) applies once per barber per day
+ *
+ * Runs daily at 11:00 PM IST (configurable via config.payment.payoutBatchCronTime).
+ */
+export const startPayoutBatchJob = () => {
+    const cronTime = config.payment.payoutBatchCronTime; // '0 23 * * *'
+
+    logger.info('[PayoutBatchJob] Scheduling end-of-day batch payout', {
+        cronTime,
+        timezone: 'Asia/Kolkata',
+    });
+
+    cronJob = cron.schedule(cronTime, async () => {
+        logger.info('[PayoutBatchJob] Starting end-of-day payout batch');
+
+        try {
+            // 1. Find all completed bookings with pending payouts
+            const pendingBookings = await bookingRepository.findCompletedWithPendingPayout();
+
+            if (pendingBookings.length === 0) {
+                logger.info('[PayoutBatchJob] No pending payouts');
+                return;
+            }
+
+            // 2. Group bookings by barber and aggregate service amounts
+            const barberPayouts = new Map();
+            for (const booking of pendingBookings) {
+                const barberId = String(booking.barberId || booking.shopId);
+                if (!barberPayouts.has(barberId)) {
+                    barberPayouts.set(barberId, { bookingIds: [], totalServiceAmountInPaisa: 0 });
+                }
+                const entry = barberPayouts.get(barberId);
+                entry.bookingIds.push(booking._id);
+                // Get service amount from the linked payment's settlement
+                const payment = await paymentRepository.findCompletedByBookingId(booking._id);
+                if (payment?.settlement?.serviceAmount) {
+                    entry.totalServiceAmountInPaisa += payment.settlement.serviceAmount;
+                }
+            }
+
+            logger.info('[PayoutBatchJob] Aggregated payouts', {
+                totalBookings: pendingBookings.length,
+                uniqueBarbers: barberPayouts.size,
+                feesSaved: `${pendingBookings.length - barberPayouts.size} transfers avoided`,
+            });
+
+            // 3. Initiate ONE Cashfree transfer per barber
+            let successCount = 0;
+            let failCount = 0;
+
+            for (const [barberId, { bookingIds, totalServiceAmountInPaisa }] of barberPayouts) {
+                try {
+                    await triggerBarberPayout(barberId, bookingIds, totalServiceAmountInPaisa);
+                    successCount++;
+                } catch (error) {
+                    failCount++;
+                    logger.error('[PayoutBatchJob] Payout failed for barber', {
+                        barberId,
+                        bookingCount: bookingIds.length,
+                        error: error.message,
+                    });
+                }
+            }
+
+            logger.info('[PayoutBatchJob] Batch completed', {
+                totalBookings: pendingBookings.length,
+                uniqueBarbers: barberPayouts.size,
+                success: successCount,
+                failed: failCount,
+            });
+        } catch (error) {
+            logger.error('[PayoutBatchJob] Batch job failed', {
+                error: error.message,
+            });
+        }
+    }, {
+        timezone: 'Asia/Kolkata',
+    });
+};
+
+export const stopPayoutBatchJob = () => {
+    if (cronJob) {
+        cronJob.stop();
+        cronJob = null;
+        logger.info('[PayoutBatchJob] Stopped');
+    }
+};
+```
+
+> **Dependency:** This job requires the `node-cron` package (`npm install node-cron`). Add it to `package.json`.
+>
+> **Repository Method Required:** Add `findCompletedWithPendingPayout()` to `booking.repository.js`:
+> ```javascript
+> async findCompletedWithPendingPayout() {
+>     return Booking.find({
+>         status: 'completed',
+>         payoutStatus: 'not_initiated',
+>         paymentStatus: 'success',
+>     });
+> }
+> ```
+
+### 15.4 Payout Repository
 
 ```javascript
 // server/src/repositories/payout.repository.js
@@ -3089,14 +3324,17 @@ export default new PaymentRepository();
 
 import { startPaymentPoller, stopPaymentPoller } from './jobs/payment-poller.cron.js';
 import { startPayoutPoller, stopPayoutPoller } from './jobs/payout-poller.cron.js';
+import { startPayoutBatchJob, stopPayoutBatchJob } from './jobs/payout-batch.cron.js';
 
 // After database connection is established:
-startPaymentPoller();
-startPayoutPoller();
+startPaymentPoller();         // Polls PhonePe for stuck payments (every 5 min)
+startPayoutPoller();          // Polls Cashfree for stuck payouts (every 10 min)
+startPayoutBatchJob();        // End-of-day batch payout (11 PM IST daily)
 
 // In graceful shutdown handler:
 stopPaymentPoller();
 stopPayoutPoller();
+stopPayoutBatchJob();
 ```
 
 ---
@@ -3114,22 +3352,26 @@ stopPayoutPoller();
 
 ### 16.2 Refund + Payout Interaction
 
-If a refund is requested **after a payout has been initiated**, the following logic applies:
+Per **Payment-Payout-Logic.md**, the refund window is strictly tied to payout status:
 
 ```
-IF payout.status === 'PENDING':
-    → Attempt to check payout status on Cashfree
-    → If still PENDING: proceed with refund (payout may fail)
-    → Alert admin for manual reconciliation
+IF payoutStatus === 'not_initiated':
+    → Refund ALLOWED
+    → Refund amount = totalPaid - refundFee - platformFee
+    → refundFee: ₹7 (single) / ₹15 (bundle)
+    → platformFee: ₹3 (single) / ₹10 (bundle) — non-refundable
 
-IF payout.status === 'SUCCESS':
-    → Refund CANNOT be automatically processed
+IF payoutStatus === 'initiated' OR 'pending' OR 'completed':
+    → Refund NOT ALLOWED automatically
+    → Return error: "Payout already initiated — contact admin"
     → Flag for manual reconciliation
-    → Admin must recover funds from barber
 
-IF payout.status === 'FAILED' or payout.status === 'not_initiated':
-    → Proceed with normal refund via PhonePe
+IF payoutStatus === 'failed' OR 'reversed':
+    → Refund ALLOWED (payout didn't go through)
+    → Same fee deduction formula applies
 ```
+
+> **Key Rule:** The end-of-day batch payout job (11 PM IST) is the cutoff. Once the batch runs, payoutStatus moves from `not_initiated` → `initiated`, and the refund window closes permanently for those bookings.
 
 ### 16.3 Integration with Booking Cancellation
 
@@ -3143,20 +3385,26 @@ export const cancelBooking = async (bookingId, userId) => {
     // ... existing validation ...
 
     // Check payout status before refunding
-    if (booking.payoutStatus === 'completed') {
-        logger.warn('[BookingService] Cannot auto-refund: payout already completed', { bookingId });
+    if (booking.payoutStatus && booking.payoutStatus !== 'not_initiated') {
+        logger.warn('[BookingService] Cannot auto-refund: payout already processed', { bookingId });
         // Mark for manual resolution
         await bookingRepository.updateById(bookingId, {
             status: 'cancelled',
-            cancellationNote: 'Refund requires manual resolution — payout already disbursed',
+            cancellationNote: 'Refund requires manual resolution — payout already initiated/completed',
         });
         return;
     }
 
-    // If payment was made, initiate refund
+    // If payment was made, initiate refund (with fee deductions)
+    // Refund amount = totalPaid - refundFee - platformFee
     if (booking.paymentStatus === PAYMENT_STATUS.SUCCESS) {
         try {
-            await initiateRefund(bookingId, 'Booking cancelled by customer');
+            const refundResult = await initiateRefund(bookingId, 'Booking cancelled by customer');
+            logger.info('[BookingService] Refund initiated with fee deductions', {
+                bookingId,
+                refundAmount: refundResult.refundAmount,
+                deductions: refundResult.deductions,
+            });
         } catch (refundError) {
             logger.error('[BookingService] Auto-refund failed', {
                 bookingId,
@@ -3182,54 +3430,51 @@ Current Flow:
   3. Create booking (status: confirmed)
   4. Return booking
 
-New Flow (with payment & automated payout):
-  1. Validate booking data
+New Flow (with payment & end-of-day batch payout):
+  1. Validate booking data (enforce ₹300 minimum for bundles)
   2. Check slot availability
   3. Create booking (status: pending, paymentStatus: pending, payoutStatus: not_initiated)
   4. Return booking with paymentRequired: true
   5. Client calls POST /payments/initiate with bookingId
-  6. Client redirects to PhonePe PayPage
+  6. Client redirects to PhonePe PayPage (customer pays serviceAmount + platformFee)
   7. Webhook confirms payment → booking status: confirmed
   8. Barber performs service
-  9. Barber marks booking completed → trigger payout.service.js
-  10. Cashfree transfers 85% to barber's UPI
-  11. Webhook confirms payout → booking payoutStatus: completed
+  9. Barber marks booking completed → payoutStatus remains not_initiated
+  10. REFUND WINDOW: Customer can request refund (minus refundFee + platformFee) until payout
+  11. End-of-day batch job (11 PM IST):
+      a. Groups all completed bookings by barber_id
+      b. Aggregates service amounts per barber
+      c. Sends ONE Cashfree transfer per barber (1 fee per barber, not per booking)
+  12. Cashfree transfers aggregated amount to barber's UPI/bank
+  13. Webhook confirms payout → ALL linked bookings → payoutStatus: completed
 ```
 
 ### 17.2 Booking Completion Handler (Payout Trigger)
 
 ```javascript
-// In booking.service.js — Add payout trigger to completeBooking
-
-import { triggerBarberPayout } from './payout.service.js';
+// In booking.service.js — Booking completion NO LONGER triggers payout directly.
+// Payout is handled by the end-of-day batch job (see §15.3).
 
 export const completeBooking = async (bookingId, barberId) => {
     const booking = await bookingRepository.findById(bookingId);
     // ... existing validation ...
 
     // Update booking status to completed
+    // payoutStatus remains 'not_initiated' — the end-of-day batch will pick it up
     await bookingRepository.updateById(bookingId, {
         status: BOOKING_STATUS.COMPLETED,
         completedAt: new Date(),
     });
 
-    // Trigger automated payout (non-blocking)
-    // Use setImmediate to not block the response
-    setImmediate(async () => {
-        try {
-            await triggerBarberPayout(bookingId);
-        } catch (error) {
-            logger.error('[BookingService] Auto-payout failed', {
-                bookingId,
-                error: error.message,
-            });
-            // Payout will be retried via cron or admin action
-        }
+    logger.info('[BookingService] Booking completed — payout queued for end-of-day batch', {
+        bookingId,
     });
 
     return booking;
 };
 ```
+
+> **⚠️ Design Change:** In the previous version, payout was triggered immediately via `setImmediate()` on booking completion. Per Payment-Payout-Logic.md, payouts are now processed at end-of-day to keep the refund window open. The booking simply transitions to `completed` status with `payoutStatus: not_initiated`, and the nightly batch job (§15.3) initiates all pending payouts.
 
 ### 17.3 Complete Booking State Machine
 
@@ -3243,12 +3488,13 @@ stateDiagram-v2
     PaymentFailed --> PaymentInitiated : Customer retries
     Confirmed --> InProgress : Barber starts service
     InProgress --> Completed : Barber marks complete
-    Completed --> PayoutPending : Cashfree payout initiated
+    note right of Completed : REFUND WINDOW OPEN until EOD batch
+    Completed --> PayoutPending : End-of-day batch initiates payout
     PayoutPending --> PayoutCompleted : Webhook - TRANSFER_SUCCESS
     PayoutPending --> PayoutFailed : Webhook - TRANSFER_FAILED
     PayoutFailed --> PayoutPending : Admin retries
-    Confirmed --> Cancelled : Cancellation requested
-    Cancelled --> RefundPending : PhonePe refund initiated
+    Confirmed --> Cancelled : Cancellation before payout
+    Cancelled --> RefundPending : Refund minus fees
     RefundPending --> Refunded : Webhook - pg.refund.completed
 ```
 
