@@ -6,7 +6,6 @@ import { uploadCustomerPhoto } from '../middleware/upload.middleware.js';
 import {
     bookSalonSchema,
     bookingIdParamSchema,
-    bookingServiceParamsSchema,
     customerBookingsQuerySchema,
     employeeCalendarQuerySchema,
     reorderSchema,
@@ -55,7 +54,6 @@ router.post('/bookings/:id/reorder', validate(bookingIdParamSchema, 'params'), v
 router.put('/bookings/:id/favorite', validate(bookingIdParamSchema, 'params'), bookingCtrl.toggleFavorite);
 router.get('/bookings/:id/confirmation', validate(bookingIdParamSchema, 'params'), bookingCtrl.getBookingConfirmation);
 router.put('/bookings/:id', validate(bookingIdParamSchema, 'params'), validate(updateBookingSchema, 'body'), bookingCtrl.updateBooking);
-router.delete('/bookings/:id/services/:serviceId', validate(bookingServiceParamsSchema, 'params'), bookingCtrl.deleteServiceFromBooking);
 
 // Shop discovery
 router.get('/shops/nearby', validate(nearbyShopsQuerySchema, 'query'), shopCtrl.getNearbyShops);

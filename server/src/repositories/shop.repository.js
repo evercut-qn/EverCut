@@ -20,12 +20,12 @@ class ShopRepository {
         return Shop.findOneAndUpdate(
             { ownerId },
             { $set: data },
-            { new: true, runValidators: true },
+            { returnDocument: 'after', runValidators: true },
         );
     }
 
     async updateById(id, data) {
-        return Shop.findByIdAndUpdate(id, { $set: data }, { new: true, runValidators: true });
+        return Shop.findByIdAndUpdate(id, { $set: data }, { returnDocument: 'after', runValidators: true });
     }
 
     async findNearby(coordinates, maxDistance = NEARBY_DISTANCE_METERS, selectFields) {

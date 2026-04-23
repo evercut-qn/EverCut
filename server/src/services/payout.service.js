@@ -26,6 +26,11 @@ const NON_RETRYABLE_ERROR_CODES = new Set([
 ]);
 
 const toObjectIdString = (value) => String(value?._id || value || '');
+const getSettledBarberPayout = (payment) => (
+    payment?.settlement?.barberPayout
+    || payment?.settlement?.serviceAmount
+    || 0
+);
 
 const generateTransferId = (barberId) => `PAYOUT_${barberId}_${Date.now()}`;
 const generateBeneficiaryId = (barberId) => `BARBER_${barberId}`;
@@ -97,7 +102,17 @@ const applyPayoutFailure = async (payout, status, { failureReason, errorCode = n
 
     await bookingRepository.updateManyByIds(payout.bookingIds, {
         payoutStatus: bookingPayoutStatus,
+        payoutCompletedAt: null,
+        barberUtr: null,
     });
+
+    if (
+        status === PAYOUT_TRANSACTION_STATUS.REVERSED
+        && Array.isArray(payout.paymentTransactionIds)
+        && payout.paymentTransactionIds.length > 0
+    ) {
+        await paymentRepository.markUnsettledByIds(payout.paymentTransactionIds);
+    }
 };
 
 const ensureRetryable = (error) => !NON_RETRYABLE_ERROR_CODES.has(error?.providerCode || error?.code);
@@ -186,24 +201,22 @@ export const triggerBarberPayout = async (barberId, bookingIds, totalPayoutInPai
 
     const computedTotalPayout = bookingIds.reduce((sum, bookingId) => {
         const payment = paymentMap.get(toObjectIdString(bookingId));
-        return sum + (payment?.settlement?.barberPayout || payment?.settlement?.serviceAmount || 0);
+        return sum + getSettledBarberPayout(payment);
     }, 0);
 
-    const payoutAmountInPaisa = totalPayoutInPaisa && totalPayoutInPaisa > 0
-        ? totalPayoutInPaisa
-        : computedTotalPayout;
+    if (
+        totalPayoutInPaisa
+        && totalPayoutInPaisa > 0
+        && computedTotalPayout > 0
+        && totalPayoutInPaisa !== computedTotalPayout
+    ) {
+        throw new BadRequestError('Provided payout amount does not match settled payment amounts');
+    }
+
+    const payoutAmountInPaisa = computedTotalPayout;
 
     if (payoutAmountInPaisa <= 0) {
         throw new BadRequestError('Invalid payout amount');
-    }
-
-    if (computedTotalPayout > 0 && payoutAmountInPaisa !== computedTotalPayout) {
-        logger.warn('[PayoutService] Aggregated payout amount mismatch, using supplied total', {
-            barberId: toObjectIdString(shop.ownerId),
-            bookingIds,
-            suppliedAmount: payoutAmountInPaisa,
-            computedAmount: computedTotalPayout,
-        });
     }
 
     const beneficiaryId = await ensureBeneficiary(
@@ -303,15 +316,22 @@ export const handlePayoutWebhook = async (headers, rawBody, parsedBody) => {
         return { processed: false, event: webhookData.event };
     }
 
-    if (
-        [PAYOUT_TRANSACTION_STATUS.SUCCESS, PAYOUT_TRANSACTION_STATUS.FAILED, PAYOUT_TRANSACTION_STATUS.REVERSED].includes(payout.status)
-        && payout.webhookProcessed
-    ) {
-        return { processed: true, event: webhookData.event };
-    }
-
     switch (webhookData.event) {
         case CASHFREE_WEBHOOK_EVENTS.TRANSFER_SUCCESS:
+            if (payout.status === PAYOUT_TRANSACTION_STATUS.SUCCESS && payout.webhookProcessed) {
+                return { processed: true, event: webhookData.event };
+            }
+            if (
+                [PAYOUT_TRANSACTION_STATUS.FAILED, PAYOUT_TRANSACTION_STATUS.REVERSED].includes(payout.status)
+                && payout.webhookProcessed
+            ) {
+                logger.warn('[PayoutService] Ignoring payout success for terminal state', {
+                    payoutId: payout._id,
+                    transferId: payout.transferId,
+                    currentStatus: payout.status,
+                });
+                return { processed: true, event: webhookData.event };
+            }
             await applyPayoutSuccess(payout, {
                 utr: webhookData.utr,
                 updatedAt: webhookData.updatedAt,
@@ -319,12 +339,25 @@ export const handlePayoutWebhook = async (headers, rawBody, parsedBody) => {
             break;
 
         case CASHFREE_WEBHOOK_EVENTS.TRANSFER_FAILED:
+            if (payout.status === PAYOUT_TRANSACTION_STATUS.FAILED && payout.webhookProcessed) {
+                return { processed: true, event: webhookData.event };
+            }
+            if (payout.status === PAYOUT_TRANSACTION_STATUS.SUCCESS && payout.webhookProcessed) {
+                logger.warn('[PayoutService] Ignoring payout failure after success', {
+                    payoutId: payout._id,
+                    transferId: payout.transferId,
+                });
+                return { processed: true, event: webhookData.event };
+            }
             await applyPayoutFailure(payout, PAYOUT_TRANSACTION_STATUS.FAILED, {
                 failureReason: webhookData.failureReason || webhookData.event,
             });
             break;
 
         case CASHFREE_WEBHOOK_EVENTS.TRANSFER_REVERSED:
+            if (payout.status === PAYOUT_TRANSACTION_STATUS.REVERSED && payout.webhookProcessed) {
+                return { processed: true, event: webhookData.event };
+            }
             await applyPayoutFailure(payout, PAYOUT_TRANSACTION_STATUS.REVERSED, {
                 failureReason: webhookData.failureReason || webhookData.event,
             });

@@ -89,7 +89,7 @@ class RatingRepository {
                     repliedBy,
                 },
             },
-            { new: true, runValidators: true },
+            { returnDocument: 'after', runValidators: true },
         ).populate(CUSTOMER_POPULATE);
     }
 
@@ -101,7 +101,7 @@ class RatingRepository {
                 'reply.repliedAt': new Date(),
                 'reply.repliedBy': repliedBy,
             },
-            { new: true, runValidators: true },
+            { returnDocument: 'after', runValidators: true },
         ).populate(CUSTOMER_POPULATE);
     }
 
@@ -109,7 +109,7 @@ class RatingRepository {
         return Rating.findByIdAndUpdate(
             ratingId,
             { $unset: { reply: '' } },
-            { new: true },
+            { returnDocument: 'after' },
         ).populate(CUSTOMER_POPULATE);
     }
 }

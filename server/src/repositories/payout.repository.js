@@ -1,5 +1,6 @@
 import PayoutTransaction from '../models/payout-transaction.model.js';
 import { PAYOUT_TRANSACTION_STATUS } from '../utils/constants.js';
+import { trustQueryOperators } from '../utils/mongoose-query.utils.js';
 
 class PayoutRepository {
     async create(data) {
@@ -21,14 +22,14 @@ class PayoutRepository {
     }
 
     async updateById(id, updates) {
-        return PayoutTransaction.findByIdAndUpdate(id, { $set: updates }, { new: true });
+        return PayoutTransaction.findByIdAndUpdate(id, { $set: updates }, { returnDocument: 'after' });
     }
 
     async findStuckPayouts(olderThan) {
-        return PayoutTransaction.find({
+        return PayoutTransaction.find(trustQueryOperators({
             status: PAYOUT_TRANSACTION_STATUS.PENDING,
             createdAt: { $lt: olderThan },
-        }).limit(50);
+        })).limit(50);
     }
 }
 

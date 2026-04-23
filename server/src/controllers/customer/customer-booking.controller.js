@@ -96,16 +96,6 @@ export const updateBooking = async (req, res, next) => {
     }
 };
 
-export const deleteServiceFromBooking = async (req, res, next) => {
-    try {
-        const params = getValidatedRequestData(req, 'params');
-        const result = await bookingService.deleteServiceFromBooking(params.id, req.user._id, params.serviceId);
-        return res.status(200).json(ApiResponse.success(result, 'Service removed from booking'));
-    } catch (err) {
-        next(err);
-    }
-};
-
 export const getEmployeeCalendar = async (req, res, next) => {
     try {
         const params = getValidatedRequestData(req, 'params');

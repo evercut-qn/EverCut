@@ -45,7 +45,10 @@ export const initiateRefund = async (req, res, next) => {
     try {
         const { bookingId } = getValidatedRequestData(req, 'params');
         const { reason } = getValidatedRequestData(req, 'body');
-        const result = await paymentService.initiateRefund(bookingId, reason);
+        const result = await paymentService.initiateRefund(bookingId, reason, {
+            role: req.user.role,
+            userId: req.user._id,
+        });
         return res.status(200).json(ApiResponse.success(result, 'Refund initiated'));
     } catch (error) {
         next(error);

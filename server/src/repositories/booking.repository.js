@@ -28,7 +28,7 @@ class BookingRepository {
     }
 
     async findByIds(ids, options = {}) {
-        return Booking.find({ _id: { $in: ids } })
+        return Booking.find(trustQueryOperators({ _id: { $in: ids } }))
             .session(options.session || null)
             .populate('shopId', 'ownerId upiId accountHolderName bankName payoutConfig ownerName shopName');
     }
@@ -45,12 +45,12 @@ class BookingRepository {
     }
 
     async updateById(id, data) {
-        return Booking.findByIdAndUpdate(id, { $set: data }, { new: true });
+        return Booking.findByIdAndUpdate(id, { $set: data }, { returnDocument: 'after' });
     }
 
     async updateManyByIds(ids, data) {
         return Booking.updateMany(
-            { _id: { $in: ids } },
+            trustQueryOperators({ _id: { $in: ids } }),
             { $set: data },
         );
     }
@@ -59,7 +59,7 @@ class BookingRepository {
         const update = { status };
         if (status === BOOKING_STATUS.CANCELLED) update.cancelledAt = new Date();
         if (status === BOOKING_STATUS.COMPLETED) update.completedAt = new Date();
-        return Booking.findByIdAndUpdate(id, update, { new: true });
+        return Booking.findByIdAndUpdate(id, update, { returnDocument: 'after' });
     }
 
     async deleteById(id) {

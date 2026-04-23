@@ -40,11 +40,6 @@ export const bookingIdParamSchema = Joi.object({
     id: objectId.required(),
 });
 
-export const bookingServiceParamsSchema = Joi.object({
-    id: objectId.required(),
-    serviceId: objectId.required(),
-});
-
 export const employeeCalendarQuerySchema = Joi.object({
     date: dateString.required(),
 });

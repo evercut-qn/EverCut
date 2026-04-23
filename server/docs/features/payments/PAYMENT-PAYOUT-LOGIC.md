@@ -97,3 +97,10 @@ Payout fees and GST are **deducted separately by Cashfree from the platform acco
 - Platform fee is **non-refundable**.  
 - Refund fee is **deducted before processing refund**.  
 - No refunds are allowed **after payout is processed**.
+
+### Automatic Refund Rules
+- Automatic refunds are booking-level refunds only. Customers cannot delete individual services from paid bookings.
+- Customer booking cancellation refunds the service value. Platform fee is reported as non-refundable and the fixed refund fee is deducted.
+- Refund state is tracked on the latest `refund` object in the payment transaction.
+- Once payout status leaves `not_initiated`, `failed`, or `reversed`, automatic refunds close. Customer-facing responses should say: `Refund window has closed. Please request a manual refund.`
+- PhonePe refund requests must use compact `merchantRefundId` values under the 63-character gateway limit. EverCut uses `RF-<24-hex-seed>-<12-hex-random>`.

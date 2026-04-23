@@ -261,3 +261,35 @@ test('bookSalon rejects bundle bookings below the documented minimum service amo
         /at least ₹300/,
     );
 });
+
+test('cancelBooking returns a customer-friendly manual-refund message when payout has started', async (t) => {
+    t.mock.method(bookingRepository, 'findById', async () => ({
+        _id: 'booking-1',
+        customerId: 'customer-1',
+        employeeId: 'employee-1',
+        date: new Date('2099-01-01T00:00:00.000Z'),
+        time: '10:00 AM',
+        paymentStatus: 'success',
+        payoutStatus: 'pending',
+        status: 'confirmed',
+    }));
+    t.mock.method(customerRepository, 'findByUserId', async () => ({ _id: 'customer-1' }));
+    t.mock.method(employeeRepository, 'releaseSlot', async () => ({ acknowledged: true }));
+
+    let bookingUpdate = null;
+    t.mock.method(bookingRepository, 'updateById', async (id, updates) => {
+        bookingUpdate = updates;
+        return { _id: id, ...updates };
+    });
+
+    const result = await bookingService.cancelBooking('booking-1', 'user-1');
+
+    assert.equal(
+        bookingUpdate.cancellationNote,
+        'Refund window has closed. Please request a manual refund.',
+    );
+    assert.equal(
+        result.cancellationNote,
+        'Refund window has closed. Please request a manual refund.',
+    );
+});

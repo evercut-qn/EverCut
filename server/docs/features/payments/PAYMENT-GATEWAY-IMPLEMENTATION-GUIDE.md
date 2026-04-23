@@ -308,7 +308,7 @@ cashfree: Object.freeze({
     payoutApiVersion: '2025-01-01',
 }),
 payment: Object.freeze({
-    redirectBaseUrl: optionalEnv('PAYMENT_REDIRECT_BASE_URL', 'http://localhost:5001/api/v1/payments/redirect'),
+    redirectBaseUrl: optionalEnv('PAYMENT_REDIRECT_BASE_URL', 'http://localhost:5000/api/v1/payments/redirect'),
     // ─── Business Constants (hardcoded, NOT from .env) ───
     // These are fixed pricing rules per Payment-Payout-Logic.md.
     // Change here if business pricing changes — no deploy-time env override needed.
@@ -324,7 +324,7 @@ payment: Object.freeze({
 }),
 ```
 
-> **Alignment Note:** The existing config uses `Object.freeze()`, `requireEnv()`, and `optionalEnv()` — not `getEnvVar()`. URLs are computed at config creation time rather than using getter functions, because getters do not work inside `Object.freeze()`. The `redirectBaseUrl` default port is `5001` to match the existing `config.port` default.
+> **Alignment Note:** The existing config uses `Object.freeze()`, `requireEnv()`, and `optionalEnv()` — not `getEnvVar()`. URLs are computed at config creation time rather than using getter functions, because getters do not work inside `Object.freeze()`. The local defaults use port `5000` so runtime config, Postman, and webhook-testing docs stay aligned.
 >
 > **Why hardcoded?** Platform fees, refund fees, and bundle minimums are **business constants**, not environment-specific configuration. They should be the same across dev/staging/production. Putting them in `.env` would risk inconsistent values across environments. If these values ever need to change, update them directly in `config/index.js` — see [Payment-Payout-Logic.md](./Payment-Payout-Logic.md) for the canonical definitions.
 
@@ -1623,10 +1623,14 @@ const generateMerchantOrderId = (bookingId) => {
     return `EC-${bookingId}-${timestamp}-${random}`;
 };
 
-// ─── Helper: Generate unique refund ID ───
-const generateMerchantRefundId = (merchantOrderId) => {
-    const timestamp = Date.now();
-    return `RF-${merchantOrderId}-${timestamp}`;
+// ─── Helper: Generate PhonePe-safe refund ID ───
+// PhonePe rejects merchantRefundId values over 63 characters.
+// Use RF-<24-hex-seed>-<12-hex-random> instead of embedding the full merchantOrderId.
+const generateMerchantRefundId = ({ merchantOrderId, bookingId }) => {
+    const seed = String(bookingId || merchantOrderId || '')
+        .match(/[a-f0-9]{24}/i)?.[0]?.toLowerCase()
+        || crypto.createHash('sha256').update(String(merchantOrderId || bookingId)).digest('hex').slice(0, 24);
+    return `RF-${seed}-${crypto.randomBytes(6).toString('hex')}`;
 };
 
 // ─── Helper: Calculate settlement split (fixed platform fee model) ───
@@ -2028,9 +2032,7 @@ export const initiateRefund = async (bookingId, reason) => {
     // Check refund window — no refunds after payout is initiated
     const booking = await bookingRepository.findById(bookingId);
     if (booking?.payoutStatus && booking.payoutStatus !== 'not_initiated') {
-        throw new BadRequestError(
-            'Refund not allowed — payout has already been initiated. Contact admin for manual resolution.'
-        );
+        throw new BadRequestError('Refund window has closed. Please request a manual refund.');
     }
 
     // Calculate refund amount with fee deductions
@@ -2045,7 +2047,10 @@ export const initiateRefund = async (bookingId, reason) => {
         throw new BadRequestError('Refund amount after fee deduction is zero or negative');
     }
 
-    const merchantRefundId = generateMerchantRefundId(payment.merchantOrderId);
+    const merchantRefundId = generateMerchantRefundId({
+        merchantOrderId: payment.merchantOrderId,
+        bookingId,
+    });
 
     const refundResponse = await phonePeAdapter.initiateRefund({
         merchantRefundId,
@@ -3211,7 +3216,7 @@ class PayoutRepository {
     }
 
     async updateById(id, updates) {
-        return PayoutTransaction.findByIdAndUpdate(id, updates, { new: true });
+        return PayoutTransaction.findByIdAndUpdate(id, updates, { returnDocument: 'after' });
     }
 
     /**
@@ -3262,7 +3267,12 @@ class PaymentRepository {
     async findCompletedByBookingId(bookingId) {
         return PaymentTransaction.findOne({
             bookingId,
-            status: PAYMENT_TRANSACTION_STATUS.COMPLETED,
+            status: {
+                $in: [
+                    PAYMENT_TRANSACTION_STATUS.COMPLETED,
+                    PAYMENT_TRANSACTION_STATUS.REFUND_FAILED,
+                ],
+            },
         });
     }
 
@@ -3272,14 +3282,14 @@ class PaymentRepository {
     }
 
     async updateById(id, updates) {
-        return PaymentTransaction.findByIdAndUpdate(id, updates, { new: true });
+        return PaymentTransaction.findByIdAndUpdate(id, updates, { returnDocument: 'after' });
     }
 
     async updateStatus(id, status, additionalFields = {}) {
         return PaymentTransaction.findByIdAndUpdate(
             id,
             { status, ...additionalFields },
-            { new: true },
+            { returnDocument: 'after' },
         );
     }
 
@@ -3387,10 +3397,10 @@ export const cancelBooking = async (bookingId, userId) => {
     // Check payout status before refunding
     if (booking.payoutStatus && booking.payoutStatus !== 'not_initiated') {
         logger.warn('[BookingService] Cannot auto-refund: payout already processed', { bookingId });
-        // Mark for manual resolution
+        // Surface a customer-friendly manual refund message
         await bookingRepository.updateById(bookingId, {
             status: 'cancelled',
-            cancellationNote: 'Refund requires manual resolution — payout already initiated/completed',
+            cancellationNote: 'Refund window has closed. Please request a manual refund.',
         });
         return;
     }
@@ -3399,7 +3409,9 @@ export const cancelBooking = async (bookingId, userId) => {
     // Refund amount = totalPaid - refundFee - platformFee
     if (booking.paymentStatus === PAYMENT_STATUS.SUCCESS) {
         try {
-            const refundResult = await initiateRefund(bookingId, 'Booking cancelled by customer');
+            const refundResult = await initiateRefund(bookingId, 'Booking cancelled by customer', null, {
+                type: 'cancellation',
+            });
             logger.info('[BookingService] Refund initiated with fee deductions', {
                 bookingId,
                 refundAmount: refundResult.refundAmount,

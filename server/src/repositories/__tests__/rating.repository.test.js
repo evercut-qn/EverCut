@@ -22,7 +22,7 @@ test('addReply requests the updated document, runs validators, and populates cus
     const result = await ratingRepository.addReply('rating-1', 'Thanks', 'owner-1');
 
     assert.equal(result, 'populated-rating');
-    assert.deepEqual(updateArgs[2], { new: true, runValidators: true });
+    assert.deepEqual(updateArgs[2], { returnDocument: 'after', runValidators: true });
     assert.deepEqual(populateArg, {
         path: 'customerId',
         select: 'firstName lastName photoUrl',
@@ -51,5 +51,5 @@ test('updateReply keeps validators enabled and records the replying owner', asyn
         'reply.repliedBy': 'owner-1',
     });
     assert.equal(updateArgs[1]['reply.repliedAt'] instanceof Date, true);
-    assert.deepEqual(updateArgs[2], { new: true, runValidators: true });
+    assert.deepEqual(updateArgs[2], { returnDocument: 'after', runValidators: true });
 });

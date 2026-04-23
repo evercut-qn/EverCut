@@ -30,7 +30,7 @@ class EmployeeRepository {
         return Employee.findOneAndUpdate(
             { _id: id, shopId },
             { $set: data },
-            { new: true, runValidators: true },
+            { returnDocument: 'after', runValidators: true },
         );
     }
 
@@ -39,7 +39,7 @@ class EmployeeRepository {
      * Returns null if the slot is already taken or the date is blocked.
      */
     async claimSlot(employeeId, date, time, options = {}) {
-        const queryOptions = { new: true };
+        const queryOptions = { returnDocument: 'after' };
         if (options.session) queryOptions.session = options.session;
 
         const query = {
@@ -84,7 +84,7 @@ class EmployeeRepository {
                 isActive: false,
                 phoneNumber: deletionMarker,
             },
-            { new: true },
+            { returnDocument: 'after' },
         );
     }
 

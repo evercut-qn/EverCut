@@ -2,6 +2,63 @@ import mongoose from 'mongoose';
 
 import { ALL_PAYMENT_TRANSACTION_STATUSES } from '../utils/constants.js';
 
+const refundRecordSchema = new mongoose.Schema(
+    {
+        merchantRefundId: {
+            type: String,
+            default: null,
+            maxlength: 63,
+        },
+        gatewayRefundId: {
+            type: String,
+            default: null,
+        },
+        amount: {
+            type: Number,
+            default: null,
+        },
+        refundFee: {
+            type: Number,
+            default: null,
+        },
+        platformFee: {
+            type: Number,
+            default: null,
+        },
+        status: {
+            type: String,
+            enum: ['pending', 'completed', 'failed'],
+            default: null,
+        },
+        type: {
+            type: String,
+            enum: ['cancellation', 'manual'],
+            default: 'cancellation',
+        },
+        initiatedAt: {
+            type: Date,
+            default: null,
+        },
+        completedAt: {
+            type: Date,
+            default: null,
+        },
+        reason: {
+            type: String,
+            default: null,
+        },
+        failureReason: {
+            type: String,
+            default: null,
+        },
+        manualResolutionRequired: {
+            type: Boolean,
+            default: false,
+        },
+    },
+    { _id: false },
+);
+
 const paymentTransactionSchema = new mongoose.Schema(
     {
         bookingId: {
@@ -76,36 +133,8 @@ const paymentTransactionSchema = new mongoose.Schema(
             default: null,
         },
         refund: {
-            merchantRefundId: {
-                type: String,
-                default: null,
-            },
-            gatewayRefundId: {
-                type: String,
-                default: null,
-            },
-            amount: {
-                type: Number,
-                default: null,
-            },
-            status: {
-                type: String,
-                enum: ['pending', 'completed', 'failed'],
-                default: null,
-            },
-            initiatedAt: {
-                type: Date,
-                default: null,
-            },
-            completedAt: {
-                type: Date,
-                default: null,
-            },
-            reason: {
-                type: String,
-                default: null,
-            },
-            _id: false,
+            type: refundRecordSchema,
+            default: null,
         },
         settlement: {
             serviceAmount: {

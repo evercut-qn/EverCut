@@ -17,7 +17,7 @@ class CustomerRepository {
         return Customer.findOneAndUpdate(
             { userId },
             { $set: data },
-            { new: true, runValidators: true },
+            { returnDocument: 'after', runValidators: true },
         );
     }
 
@@ -25,7 +25,7 @@ class CustomerRepository {
         return Customer.findOneAndUpdate(
             { userId },
             { $addToSet: { favoriteBookings: bookingId } },
-            { new: true },
+            { returnDocument: 'after' },
         );
     }
 
@@ -33,7 +33,7 @@ class CustomerRepository {
         return Customer.findOneAndUpdate(
             { userId },
             { $pull: { favoriteBookings: bookingId } },
-            { new: true },
+            { returnDocument: 'after' },
         );
     }
 

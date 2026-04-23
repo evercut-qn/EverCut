@@ -1732,6 +1732,160 @@ const barberRatingsCollection = {
   ],
 };
 
+const paymentsPayoutsCollection = {
+  info: {
+    name: 'EverCut - Payments & Payouts',
+    description: 'Payment initiation, status checking, refund processing, and payout retry for the EverCut dual-provider payment system. PhonePe is used for customer collection; Cashfree Payouts is used for barber disbursement.',
+    schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
+  },
+  auth: bearerAuth('customer_access_token'),
+  event: collectionPreRequest({
+    syncPairs: [
+      ['shared_booking_id', 'payment_booking_id'],
+      ['payment_id', 'payment_id'],
+      ['merchant_order_id', 'merchant_order_id'],
+      ['merchant_refund_id', 'merchant_refund_id'],
+      ['refund_id', 'refund_id'],
+      ['payout_id', 'payout_id'],
+      ['admin_access_token', 'admin_access_token'],
+    ],
+    extra: [
+      "// Ensure payment_booking_id is set from shared_booking_id or booking_id",
+      "const bookingId = readScopedValue('shared_booking_id', 'booking_id', 'payment_booking_id');",
+      "if (bookingId) {",
+      "  pm.collectionVariables.set('payment_booking_id', bookingId);",
+      "  pm.environment.set('payment_booking_id', bookingId);",
+      "}",
+    ],
+  }),
+  variable: [
+    ...baseVariables(
+      ...accessTokenVariables(),
+      textVariable('admin_access_token', '', 'Required for payout retry. Use a JWT for a user whose role is ADMIN.'),
+      textVariable('payment_booking_id', '', 'Booking ID for payment - auto-synced from shared_booking_id or booking_id'),
+      textVariable('payment_id', '', 'Auto-captured from payment initiation'),
+      textVariable('merchant_order_id', '', 'Auto-captured from payment initiation'),
+      textVariable('merchant_refund_id', '', 'Auto-captured from refund initiation'),
+      textVariable('refund_id', '', 'Auto-captured from refund initiation'),
+      textVariable('payout_id', '', 'Payout ID for retry operations'),
+    ),
+  ],
+  item: [
+    {
+      name: '1. Initiate Payment',
+      ...request({
+        method: 'POST',
+        url: '{{base_url}}/{{api_prefix}}/payments/initiate',
+        auth: bearerAuth('customer_access_token'),
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{
+  "bookingId": "{{payment_booking_id}}"
+}`),
+        description: 'Creates a PhonePe checkout order for the authenticated customer\'s pending booking. The booking must be created first through 04-customer-bookings.json. The payment_booking_id is auto-synced from shared_booking_id captured during booking creation.',
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          "pm.test('captures payment references', function () {",
+          "  const response = pm.response.json();",
+          "  pm.expect(response.success).to.equal(true);",
+          "  pm.expect(response.data).to.have.property('paymentId');",
+          "  pm.expect(response.data).to.have.property('merchantOrderId');",
+          "  pm.collectionVariables.set('payment_id', response.data.paymentId);",
+          "  pm.collectionVariables.set('merchant_order_id', response.data.merchantOrderId);",
+          "  pm.environment.set('payment_id', response.data.paymentId);",
+          "  pm.environment.set('merchant_order_id', response.data.merchantOrderId);",
+          "  pm.globals.set('payment_id', response.data.paymentId);",
+          "  pm.globals.set('merchant_order_id', response.data.merchantOrderId);",
+          "});",
+        ),
+      }),
+    },
+    {
+      name: '2. Get Payment Status',
+      ...request({
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/payments/{{payment_id}}/status',
+        auth: bearerAuth('customer_access_token'),
+        description: 'Reads payment status and polls PhonePe once when the payment is still pending.',
+        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
+      }),
+    },
+    {
+      name: '3. Get Payment By Booking',
+      ...request({
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/payments/booking/{{payment_booking_id}}',
+        auth: bearerAuth('customer_access_token'),
+        description: 'Returns the latest payment transaction for the authenticated customer\'s booking.',
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          "const response = pm.response.json();",
+          "const data = response.data || {};",
+          "if (data._id) {",
+          "  pm.collectionVariables.set('payment_id', data._id);",
+          "  pm.environment.set('payment_id', data._id);",
+          "  pm.globals.set('payment_id', data._id);",
+          "}",
+          "if (data.merchantOrderId) {",
+          "  pm.collectionVariables.set('merchant_order_id', data.merchantOrderId);",
+          "  pm.environment.set('merchant_order_id', data.merchantOrderId);",
+          "  pm.globals.set('merchant_order_id', data.merchantOrderId);",
+          "}",
+        ),
+      }),
+    },
+    {
+      name: '4. Initiate Refund',
+      ...request({
+        method: 'POST',
+        url: '{{base_url}}/{{api_prefix}}/payments/{{payment_booking_id}}/refund',
+        auth: bearerAuth('barber_access_token'),
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{
+  "reason": "Customer cancelled before payout batch"
+}`),
+        description: 'Initiates a refund for a completed payment when payout has not started. Allowed roles: BARBER or ADMIN.',
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          "pm.test('captures refund references', function () {",
+          "  const response = pm.response.json();",
+          "  pm.expect(response.success).to.equal(true);",
+          "  if (response.data?.merchantRefundId) {",
+          "    pm.collectionVariables.set('merchant_refund_id', response.data.merchantRefundId);",
+          "    pm.environment.set('merchant_refund_id', response.data.merchantRefundId);",
+          "    pm.globals.set('merchant_refund_id', response.data.merchantRefundId);",
+          "  }",
+          "  if (response.data?.refundId) {",
+          "    pm.collectionVariables.set('refund_id', response.data.refundId);",
+          "    pm.environment.set('refund_id', response.data.refundId);",
+          "    pm.globals.set('refund_id', response.data.refundId);",
+          "  }",
+          "});",
+        ),
+      }),
+    },
+    {
+      name: '5. Retry Failed Payout',
+      ...request({
+        method: 'POST',
+        url: '{{base_url}}/{{api_prefix}}/payouts/{{payout_id}}/retry',
+        auth: bearerAuth('admin_access_token'),
+        description: 'Retries a failed or reversed payout. Requires an ADMIN token and a payout ID from MongoDB.',
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          "pm.test('captures retry payout references when present', function () {",
+          "  const response = pm.response.json();",
+          "  if (response.data?._id) {",
+          "    pm.collectionVariables.set('payout_id', response.data._id);",
+          "    pm.environment.set('payout_id', response.data._id);",
+          "    pm.globals.set('payout_id', response.data._id);",
+          "  }",
+          "});",
+        ),
+      }),
+    },
+  ],
+};
+
 const environmentTemplate = {
   id: 'evercut-local-environment',
   name: 'EverCut Local',
@@ -1791,6 +1945,41 @@ const environmentTemplate = {
       value: '',
       enabled: true,
     },
+    {
+      key: 'admin_access_token',
+      value: '',
+      enabled: true,
+    },
+    {
+      key: 'payment_booking_id',
+      value: '',
+      enabled: true,
+    },
+    {
+      key: 'payment_id',
+      value: '',
+      enabled: true,
+    },
+    {
+      key: 'merchant_order_id',
+      value: '',
+      enabled: true,
+    },
+    {
+      key: 'merchant_refund_id',
+      value: '',
+      enabled: true,
+    },
+    {
+      key: 'refund_id',
+      value: '',
+      enabled: true,
+    },
+    {
+      key: 'payout_id',
+      value: '',
+      enabled: true,
+    },
   ],
   _postman_variable_scope: 'environment',
   _postman_exported_at: new Date().toISOString(),
@@ -1810,4 +1999,5 @@ writeCollection('10-barber-bookings.json', barberBookingsCollection);
 writeCollection('11-barber-photos.json', barberPhotosCollection);
 writeCollection('12-barber-earnings.json', barberEarningsCollection);
 writeCollection('13-barber-ratings.json', barberRatingsCollection);
+writeCollection('14-payments-payouts.json', paymentsPayoutsCollection);
 writeFileSync(resolve(COLLECTIONS_DIR, 'EverCut.postman_environment.json'), `${JSON.stringify(environmentTemplate, null, 2)}\n`);

@@ -79,7 +79,11 @@ export const runPayoutBatchNow = async ({
         group.bookingIds.push(String(booking._id));
 
         const payment = paymentByBookingId.get(String(booking._id));
-        group.totalPayoutInPaisa += payment?.settlement?.serviceAmount || 0;
+        group.totalPayoutInPaisa += (
+            payment?.settlement?.barberPayout
+            || payment?.settlement?.serviceAmount
+            || 0
+        );
     }
 
     let success = 0;

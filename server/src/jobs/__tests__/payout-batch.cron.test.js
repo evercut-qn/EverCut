@@ -75,3 +75,35 @@ test('runPayoutBatchNow groups completed bookings by barber and creates one payo
         failed: 0,
     });
 });
+
+test('runPayoutBatchNow prefers barberPayout when settlement values diverge from serviceAmount', async (t) => {
+    t.mock.method(bookingRepository, 'findCompletedWithPendingPayout', async () => ([
+        { _id: 'booking-1', shopId: { _id: 'shop-1', ownerId: 'barber-1' } },
+    ]));
+
+    t.mock.method(paymentRepository, 'findCompletedByBookingIds', async () => ([
+        {
+            bookingId: 'booking-1',
+            settlement: {
+                serviceAmount: 12000,
+                barberPayout: 9900,
+            },
+        },
+    ]));
+
+    const triggerCalls = [];
+    const triggerBarberPayout = async (barberId, bookingIds, totalPayoutInPaisa) => {
+        triggerCalls.push({ barberId, bookingIds, totalPayoutInPaisa });
+        return { barberId, bookingIds, totalPayoutInPaisa };
+    };
+
+    await payoutBatchJob.runPayoutBatchNow({ triggerBarberPayout });
+
+    assert.deepEqual(triggerCalls, [
+        {
+            barberId: 'barber-1',
+            bookingIds: ['booking-1'],
+            totalPayoutInPaisa: 9900,
+        },
+    ]);
+});

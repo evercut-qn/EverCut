@@ -1,5 +1,6 @@
 import PaymentTransaction from '../models/payment-transaction.model.js';
 import { PAYMENT_TRANSACTION_STATUS } from '../utils/constants.js';
+import { trustQueryOperators } from '../utils/mongoose-query.utils.js';
 
 class PaymentRepository {
     async create(data) {
@@ -15,7 +16,7 @@ class PaymentRepository {
     }
 
     async findPendingByBookingId(bookingId) {
-        return PaymentTransaction.findOne({
+        return PaymentTransaction.findOne(trustQueryOperators({
             bookingId,
             status: {
                 $in: [
@@ -23,21 +24,26 @@ class PaymentRepository {
                     PAYMENT_TRANSACTION_STATUS.PENDING,
                 ],
             },
-        }).sort({ createdAt: -1 });
+        })).sort({ createdAt: -1 });
     }
 
     async findCompletedByBookingId(bookingId) {
-        return PaymentTransaction.findOne({
+        return PaymentTransaction.findOne(trustQueryOperators({
             bookingId,
-            status: PAYMENT_TRANSACTION_STATUS.COMPLETED,
-        }).sort({ createdAt: -1 });
+            status: {
+                $in: [
+                    PAYMENT_TRANSACTION_STATUS.COMPLETED,
+                    PAYMENT_TRANSACTION_STATUS.REFUND_FAILED,
+                ],
+            },
+        })).sort({ createdAt: -1 });
     }
 
     async findCompletedByBookingIds(bookingIds) {
-        return PaymentTransaction.find({
+        return PaymentTransaction.find(trustQueryOperators({
             bookingId: { $in: bookingIds },
             status: PAYMENT_TRANSACTION_STATUS.COMPLETED,
-        });
+        }));
     }
 
     async findLatestByBookingId(bookingId) {
@@ -45,20 +51,20 @@ class PaymentRepository {
     }
 
     async updateById(id, updates) {
-        return PaymentTransaction.findByIdAndUpdate(id, { $set: updates }, { new: true });
+        return PaymentTransaction.findByIdAndUpdate(id, { $set: updates }, { returnDocument: 'after' });
     }
 
     async updateStatus(id, status, additionalFields = {}) {
         return PaymentTransaction.findByIdAndUpdate(
             id,
             { $set: { status, ...additionalFields } },
-            { new: true },
+            { returnDocument: 'after' },
         );
     }
 
     async markSettledByIds(ids, settledAt = new Date()) {
         return PaymentTransaction.updateMany(
-            { _id: { $in: ids } },
+            trustQueryOperators({ _id: { $in: ids } }),
             {
                 $set: {
                     'settlement.settled': true,
@@ -68,24 +74,42 @@ class PaymentRepository {
         );
     }
 
+    async markUnsettledByIds(ids) {
+        return PaymentTransaction.updateMany(
+            trustQueryOperators({ _id: { $in: ids } }),
+            {
+                $set: {
+                    'settlement.settled': false,
+                    'settlement.settledAt': null,
+                },
+            },
+        );
+    }
+
     async findStalePayments(olderThan, notOlderThan, maxAttempts) {
-        return PaymentTransaction.find({
+        return PaymentTransaction.find(trustQueryOperators({
             status: PAYMENT_TRANSACTION_STATUS.PENDING,
             createdAt: { $lt: olderThan, $gt: notOlderThan },
             pollAttempts: { $lt: maxAttempts },
-        }).limit(50);
+        })).limit(50);
     }
 
-    async findExpirablePendingPayments(olderThan) {
-        return PaymentTransaction.find({
+    async findExpirablePendingPayments(expiresBefore, fallbackCreatedBefore = expiresBefore) {
+        return PaymentTransaction.find(trustQueryOperators({
             status: {
                 $in: [
                     PAYMENT_TRANSACTION_STATUS.INITIATED,
                     PAYMENT_TRANSACTION_STATUS.PENDING,
                 ],
             },
-            createdAt: { $lt: olderThan },
-        }).limit(50);
+            $or: [
+                { expiresAt: { $lte: expiresBefore } },
+                {
+                    expiresAt: null,
+                    createdAt: { $lt: fallbackCreatedBefore },
+                },
+            ],
+        })).limit(50);
     }
 }
 

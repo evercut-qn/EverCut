@@ -77,7 +77,7 @@ class ServiceRepository {
         return Service.findOneAndUpdate(
             { _id: id, shopId },
             { $set: data },
-            { new: true, runValidators: true },
+            { returnDocument: 'after', runValidators: true },
         );
     }
 
@@ -85,7 +85,7 @@ class ServiceRepository {
         return Service.findOneAndUpdate(
             { _id: id, shopId },
             { deletedAt: new Date(), isActive: false },
-            { new: true },
+            { returnDocument: 'after' },
         );
     }
 }

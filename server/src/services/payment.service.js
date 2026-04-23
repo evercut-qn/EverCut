@@ -5,6 +5,7 @@ import customerRepository from '../repositories/customer.repository.js';
 import bookingRepository from '../repositories/booking.repository.js';
 import paymentRepository from '../repositories/payment.repository.js';
 import serviceRepository from '../repositories/service.repository.js';
+import shopRepository from '../repositories/shop.repository.js';
 import phonePeAdapter from '../adapters/phonepe/phonepe.adapter.js';
 import logger from '../utils/logger.js';
 import {
@@ -22,6 +23,7 @@ import {
     PAYMENT_TRANSACTION_STATUS,
     PHONEPE_WEBHOOK_EVENTS,
     REFUND_FEES,
+    ROLES,
     SERVICE_TYPE,
 } from '../utils/constants.js';
 import {
@@ -36,12 +38,108 @@ const generateMerchantOrderId = (bookingId) => {
     return `EC-${bookingId}-${Date.now()}-${random}`;
 };
 
-const generateMerchantRefundId = (merchantOrderId) => `RF-${merchantOrderId}-${Date.now()}`;
+const REFUND_TYPE = Object.freeze({
+    CANCELLATION: 'cancellation',
+    MANUAL: 'manual',
+});
+
+const REFUND_MANUAL_MESSAGE = 'Refund could not be initiated. Please request a manual refund.';
+
+const getRefundSeed = (...values) => {
+    for (const value of values) {
+        const match = String(value || '').match(/[a-f0-9]{24}/i);
+        if (match) return match[0].toLowerCase();
+    }
+
+    return crypto
+        .createHash('sha256')
+        .update(values.map((value) => String(value || '')).join(':'))
+        .digest('hex')
+        .slice(0, 24);
+};
+
+const generateMerchantRefundId = ({ merchantOrderId, bookingId }) => {
+    const seed = getRefundSeed(bookingId, merchantOrderId);
+    const random = crypto.randomBytes(6).toString('hex');
+    return `RF-${seed}-${random}`;
+};
+
+const getRefundFeeInPaisa = (payment) => (
+    payment.settlement?.isBundle ? REFUND_FEES.BUNDLE : REFUND_FEES.SINGLE_SERVICE
+) * 100;
+
+const toPositivePaisa = (value) => {
+    const numericValue = Number(value);
+    return Number.isFinite(numericValue) && numericValue > 0
+        ? Math.round(numericValue)
+        : 0;
+};
+
+const getRefundGrossAmountInPaisa = (payment, booking, platformFeeInPaisa) => {
+    if (payment.settlement?.serviceAmount !== undefined && payment.settlement.serviceAmount !== null) {
+        return toPositivePaisa(payment.settlement.serviceAmount);
+    }
+
+    const bookingTotalInPaisa = Number.isFinite(Number(booking.totalAmount))
+        ? Math.round(Number(booking.totalAmount) * 100)
+        : 0;
+
+    if (bookingTotalInPaisa > 0) {
+        return bookingTotalInPaisa;
+    }
+
+    return Math.max(0, toPositivePaisa(payment.amount) - platformFeeInPaisa);
+};
+
+const createRefundRecord = ({
+    merchantRefundId,
+    refundResponse = null,
+    amount,
+    refundFee,
+    platformFee,
+    status,
+    type,
+    reason,
+    failureReason = null,
+    manualResolutionRequired,
+}) => {
+    const record = {
+        merchantRefundId,
+        gatewayRefundId: refundResponse?.refundId || null,
+        amount,
+        refundFee,
+        platformFee,
+        status,
+        type,
+        reason,
+        initiatedAt: new Date(),
+        completedAt: null,
+        failureReason,
+    };
+
+    if (manualResolutionRequired !== undefined) {
+        record.manualResolutionRequired = manualResolutionRequired;
+    }
+
+    return record;
+};
 
 const sumServiceAmounts = (services = []) => services.reduce(
     (sum, service) => sum + (getEffectiveServicePrice(service) ?? 0),
     0,
 );
+
+const MUTABLE_PAYMENT_STATUSES = new Set([
+    PAYMENT_TRANSACTION_STATUS.INITIATED,
+    PAYMENT_TRANSACTION_STATUS.PENDING,
+]);
+
+const SUCCESSFUL_PAYMENT_LIFECYCLE_STATUSES = new Set([
+    PAYMENT_TRANSACTION_STATUS.COMPLETED,
+    PAYMENT_TRANSACTION_STATUS.REFUND_PENDING,
+    PAYMENT_TRANSACTION_STATUS.REFUNDED,
+    PAYMENT_TRANSACTION_STATUS.REFUND_FAILED,
+]);
 
 const loadBookingWithCustomerAccess = async (userId, bookingId) => {
     const [customer, booking] = await Promise.all([
@@ -126,6 +224,35 @@ const verifyOrderFromGateway = async (webhookData) => {
             error: error.message,
         });
         return webhookData;
+    }
+};
+
+const logIgnoredPaymentTransition = (message, payment, nextState) => {
+    logger.warn(message, {
+        paymentId: payment._id,
+        bookingId: payment.bookingId,
+        merchantOrderId: payment.merchantOrderId,
+        currentStatus: payment.status,
+        nextState,
+    });
+};
+
+const assertRefundPermission = async (actor, booking) => {
+    if (!actor?.role) {
+        return;
+    }
+
+    if (actor.role === ROLES.ADMIN) {
+        return;
+    }
+
+    if (actor.role !== ROLES.BARBER) {
+        throw new ForbiddenError('You are not allowed to initiate refunds');
+    }
+
+    const actorShop = await shopRepository.findByOwnerId(actor.userId || actor._id);
+    if (!actorShop || toObjectIdString(actorShop._id) !== toObjectIdString(booking.shopId)) {
+        throw new ForbiddenError('Barbers can only refund bookings for their own shop');
     }
 };
 
@@ -370,6 +497,15 @@ async function handlePaymentSuccess(webhookData) {
         return { processed: true, event: PHONEPE_WEBHOOK_EVENTS.ORDER_COMPLETED };
     }
 
+    if (!MUTABLE_PAYMENT_STATUSES.has(payment.status)) {
+        logIgnoredPaymentTransition(
+            '[PaymentService] Ignoring payment success for terminal state',
+            payment,
+            PAYMENT_TRANSACTION_STATUS.COMPLETED,
+        );
+        return { processed: true, event: PHONEPE_WEBHOOK_EVENTS.ORDER_COMPLETED };
+    }
+
     const firstPayment = webhookData.paymentDetails?.[0] || null;
 
     await paymentRepository.updateById(payment._id, {
@@ -414,6 +550,27 @@ async function handlePaymentFailure(webhookData) {
         return { processed: true, event: PHONEPE_WEBHOOK_EVENTS.ORDER_FAILED };
     }
 
+    if (
+        payment.status === PAYMENT_TRANSACTION_STATUS.EXPIRED
+        || SUCCESSFUL_PAYMENT_LIFECYCLE_STATUSES.has(payment.status)
+    ) {
+        logIgnoredPaymentTransition(
+            '[PaymentService] Ignoring payment failure for terminal state',
+            payment,
+            PAYMENT_TRANSACTION_STATUS.FAILED,
+        );
+        return { processed: true, event: PHONEPE_WEBHOOK_EVENTS.ORDER_FAILED };
+    }
+
+    if (!MUTABLE_PAYMENT_STATUSES.has(payment.status)) {
+        logIgnoredPaymentTransition(
+            '[PaymentService] Ignoring unexpected payment failure transition',
+            payment,
+            PAYMENT_TRANSACTION_STATUS.FAILED,
+        );
+        return { processed: true, event: PHONEPE_WEBHOOK_EVENTS.ORDER_FAILED };
+    }
+
     await paymentRepository.updateById(payment._id, {
         status: PAYMENT_TRANSACTION_STATUS.FAILED,
         gatewayState: webhookData.state,
@@ -445,13 +602,35 @@ async function handleRefundSuccess(webhookData) {
         return { processed: false, event: PHONEPE_WEBHOOK_EVENTS.REFUND_COMPLETED };
     }
 
+    if (payment.status === PAYMENT_TRANSACTION_STATUS.REFUNDED) {
+        return { processed: true, event: PHONEPE_WEBHOOK_EVENTS.REFUND_COMPLETED };
+    }
+
+    if (
+        ![
+            PAYMENT_TRANSACTION_STATUS.COMPLETED,
+            PAYMENT_TRANSACTION_STATUS.REFUND_PENDING,
+            PAYMENT_TRANSACTION_STATUS.REFUND_FAILED,
+        ].includes(payment.status)
+    ) {
+        logIgnoredPaymentTransition(
+            '[PaymentService] Ignoring refund success for incompatible payment state',
+            payment,
+            PAYMENT_TRANSACTION_STATUS.REFUNDED,
+        );
+        return { processed: true, event: PHONEPE_WEBHOOK_EVENTS.REFUND_COMPLETED };
+    }
+
     await paymentRepository.updateById(payment._id, {
         status: PAYMENT_TRANSACTION_STATUS.REFUNDED,
         refund: {
             ...(payment.refund || {}),
+            merchantRefundId: webhookData.merchantRefundId || payment.refund?.merchantRefundId || null,
+            gatewayRefundId: webhookData.refundId || payment.refund?.gatewayRefundId || null,
             status: 'completed',
             completedAt: new Date(),
-            gatewayRefundId: webhookData.refundId || payment.refund?.gatewayRefundId || null,
+            failureReason: null,
+            manualResolutionRequired: false,
         },
         webhookReceivedAt: new Date(),
         webhookProcessed: true,
@@ -470,11 +649,42 @@ async function handleRefundFailure(webhookData) {
         return { processed: false, event: PHONEPE_WEBHOOK_EVENTS.REFUND_FAILED };
     }
 
+    if (payment.status === PAYMENT_TRANSACTION_STATUS.REFUND_FAILED) {
+        return { processed: true, event: PHONEPE_WEBHOOK_EVENTS.REFUND_FAILED };
+    }
+
+    if (payment.status === PAYMENT_TRANSACTION_STATUS.REFUNDED) {
+        logIgnoredPaymentTransition(
+            '[PaymentService] Ignoring refund failure after refund completion',
+            payment,
+            PAYMENT_TRANSACTION_STATUS.REFUND_FAILED,
+        );
+        return { processed: true, event: PHONEPE_WEBHOOK_EVENTS.REFUND_FAILED };
+    }
+
+    if (
+        ![
+            PAYMENT_TRANSACTION_STATUS.COMPLETED,
+            PAYMENT_TRANSACTION_STATUS.REFUND_PENDING,
+        ].includes(payment.status)
+    ) {
+        logIgnoredPaymentTransition(
+            '[PaymentService] Ignoring refund failure for incompatible payment state',
+            payment,
+            PAYMENT_TRANSACTION_STATUS.REFUND_FAILED,
+        );
+        return { processed: true, event: PHONEPE_WEBHOOK_EVENTS.REFUND_FAILED };
+    }
+
     await paymentRepository.updateById(payment._id, {
         status: PAYMENT_TRANSACTION_STATUS.REFUND_FAILED,
         refund: {
             ...(payment.refund || {}),
+            merchantRefundId: webhookData.merchantRefundId || payment.refund?.merchantRefundId || null,
+            gatewayRefundId: webhookData.refundId || payment.refund?.gatewayRefundId || null,
             status: 'failed',
+            failureReason: webhookData.detailedErrorCode || webhookData.errorCode || 'Refund failed at payment gateway',
+            manualResolutionRequired: true,
         },
         errorCode: webhookData.errorCode || null,
         detailedErrorCode: webhookData.detailedErrorCode || null,
@@ -489,13 +699,13 @@ async function handleRefundFailure(webhookData) {
     return { processed: true, event: PHONEPE_WEBHOOK_EVENTS.REFUND_FAILED };
 }
 
-export const initiateRefund = async (bookingId, reason) => {
+export const initiateRefund = async (bookingId, reason, actor = null) => {
     const payment = await paymentRepository.findCompletedByBookingId(bookingId);
     if (!payment) {
         throw new NotFoundError('Completed payment for this booking');
     }
 
-    if (payment.status !== PAYMENT_TRANSACTION_STATUS.COMPLETED) {
+    if (![PAYMENT_TRANSACTION_STATUS.COMPLETED, PAYMENT_TRANSACTION_STATUS.REFUND_FAILED].includes(payment.status)) {
         throw new BadRequestError('Can only refund completed payments');
     }
 
@@ -504,44 +714,86 @@ export const initiateRefund = async (bookingId, reason) => {
         throw new NotFoundError('Booking');
     }
 
+    await assertRefundPermission(actor, booking);
+
     if (
         booking.payoutStatus
         && !['not_initiated', 'failed', 'reversed'].includes(booking.payoutStatus)
     ) {
-        throw new BadRequestError(
-            'Refund not allowed — payout has already been initiated. Contact admin for manual resolution.',
-        );
+        throw new BadRequestError('Refund window has closed. Please request a manual refund.');
     }
 
-    const refundFeeInPaisa = (
-        payment.settlement?.isBundle ? REFUND_FEES.BUNDLE : REFUND_FEES.SINGLE_SERVICE
-    ) * 100;
-    const platformFeeInPaisa = payment.settlement?.platformFee || 0;
-    const refundAmountInPaisa = payment.amount - refundFeeInPaisa - platformFeeInPaisa;
+    const refundType = REFUND_TYPE.CANCELLATION;
+    const refundFeeInPaisa = getRefundFeeInPaisa(payment);
+    const platformFeeInPaisa = toPositivePaisa(payment.settlement?.platformFee || 0);
+    const grossAmountInPaisa = getRefundGrossAmountInPaisa(payment, booking, platformFeeInPaisa);
+    const refundAmountInPaisa = grossAmountInPaisa - refundFeeInPaisa;
 
     if (refundAmountInPaisa <= 0) {
         throw new BadRequestError('Refund amount after fee deduction is zero or negative');
     }
 
-    const merchantRefundId = generateMerchantRefundId(payment.merchantOrderId);
-    const refundResponse = await phonePeAdapter.initiateRefund({
+    const merchantRefundId = generateMerchantRefundId({
+        merchantOrderId: payment.merchantOrderId,
+        bookingId,
+    });
+    let refundResponse;
+
+    try {
+        refundResponse = await phonePeAdapter.initiateRefund({
+            merchantRefundId,
+            originalMerchantOrderId: payment.merchantOrderId,
+            amount: refundAmountInPaisa,
+        });
+    } catch (error) {
+        const failedRefund = createRefundRecord({
+            merchantRefundId,
+            amount: refundAmountInPaisa,
+            refundFee: refundFeeInPaisa,
+            platformFee: platformFeeInPaisa,
+            status: 'failed',
+            type: refundType,
+            reason,
+            failureReason: error.message,
+            manualResolutionRequired: true,
+        });
+
+        await paymentRepository.updateById(payment._id, {
+            status: PAYMENT_TRANSACTION_STATUS.REFUND_FAILED,
+            refundFee: refundFeeInPaisa,
+            refund: failedRefund,
+            errorDescription: error.message,
+        });
+
+        await bookingRepository.updateById(bookingId, {
+            paymentStatus: PAYMENT_STATUS.REFUND_FAILED,
+        });
+
+        logger.error('[PaymentService] Refund initiation failed', {
+            bookingId,
+            merchantRefundId,
+            refundType,
+            error: error.message,
+        });
+
+        throw new PaymentError(REFUND_MANUAL_MESSAGE, error.code || null, error.message);
+    }
+
+    const refundRecord = createRefundRecord({
         merchantRefundId,
-        originalMerchantOrderId: payment.merchantOrderId,
+        refundResponse,
         amount: refundAmountInPaisa,
+        refundFee: refundFeeInPaisa,
+        platformFee: platformFeeInPaisa,
+        status: 'pending',
+        type: refundType,
+        reason,
     });
 
     await paymentRepository.updateById(payment._id, {
         status: PAYMENT_TRANSACTION_STATUS.REFUND_PENDING,
         refundFee: refundFeeInPaisa,
-        refund: {
-            merchantRefundId,
-            gatewayRefundId: refundResponse.refundId,
-            amount: refundAmountInPaisa,
-            status: 'pending',
-            initiatedAt: new Date(),
-            completedAt: null,
-            reason,
-        },
+        refund: refundRecord,
     });
 
     await bookingRepository.updateById(bookingId, {
@@ -551,6 +803,7 @@ export const initiateRefund = async (bookingId, reason) => {
     logger.info('[PaymentService] Refund initiated', {
         bookingId,
         merchantRefundId,
+        refundType,
         refundAmount: refundAmountInPaisa / 100,
         deductions: {
             refundFee: refundFeeInPaisa / 100,
@@ -563,6 +816,7 @@ export const initiateRefund = async (bookingId, reason) => {
         refundId: refundResponse.refundId,
         state: refundResponse.state,
         refundAmount: refundAmountInPaisa / 100,
+        refundType,
         deductions: {
             refundFee: refundFeeInPaisa / 100,
             platformFee: platformFeeInPaisa / 100,
@@ -574,6 +828,8 @@ export const pollPendingPayments = async () => {
     const now = Date.now();
     const thirtyMinutesAgo = new Date(now - 30 * 60 * 1000);
     const twentyFourHoursAgo = new Date(now - 24 * 60 * 60 * 1000);
+    const expiresBefore = new Date(now);
+    const fallbackCreatedBefore = new Date(now - config.payment.sessionExpirySeconds * 1000);
 
     const pendingPayments = await paymentRepository.findStalePayments(
         thirtyMinutesAgo,
@@ -625,7 +881,10 @@ export const pollPendingPayments = async () => {
         }
     }
 
-    const expirablePayments = await paymentRepository.findExpirablePendingPayments(twentyFourHoursAgo);
+    const expirablePayments = await paymentRepository.findExpirablePendingPayments(
+        expiresBefore,
+        fallbackCreatedBefore,
+    );
     for (const payment of expirablePayments) {
         await paymentRepository.updateById(payment._id, {
             status: PAYMENT_TRANSACTION_STATUS.EXPIRED,

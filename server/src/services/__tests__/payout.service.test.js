@@ -125,3 +125,128 @@ test('triggerBarberPayout stores generic beneficiary and gateway transfer identi
     );
     assert.equal(result.gatewayTransferId, 'provider-transfer-1');
 });
+
+test('triggerBarberPayout rejects caller-supplied payout totals that do not match settled payment amounts', async (t) => {
+    t.mock.method(bookingRepository, 'findByIds', async () => ([
+        {
+            _id: 'booking-1',
+            shopId: 'shop-1',
+            status: 'completed',
+            paymentStatus: 'success',
+            payoutStatus: 'not_initiated',
+        },
+    ]));
+
+    const shop = {
+        _id: 'shop-1',
+        ownerId: 'barber-1',
+        shopName: 'Trim Studio',
+        ownerName: 'Barber One',
+        accountHolderName: 'Barber One',
+        upiId: 'barber@upi',
+        payoutConfig: {
+            beneficiaryId: 'BARBER_barber-1',
+        },
+    };
+
+    t.mock.method(shopRepository, 'findById', async () => shop);
+    t.mock.method(userRepository, 'findById', async () => ({
+        _id: 'barber-1',
+        phoneNumber: '9999999999',
+        email: 'barber@example.com',
+    }));
+
+    t.mock.method(paymentRepository, 'findCompletedByBookingIds', async () => ([
+        {
+            _id: 'payment-1',
+            bookingId: 'booking-1',
+            settlement: {
+                barberPayout: 9900,
+            },
+        },
+    ]));
+
+    t.mock.method(cashfreePayoutAdapter, 'getBeneficiary', async () => ({
+        beneficiary_id: 'BARBER_barber-1',
+    }));
+    t.mock.method(payoutRepository, 'create', async () => ({
+        _id: 'payout-1',
+    }));
+    t.mock.method(bookingRepository, 'updateManyByIds', async () => ({ acknowledged: true }));
+    const transferMock = t.mock.method(cashfreePayoutAdapter, 'initiateTransfer', async () => ({
+        gatewayTransferId: 'provider-transfer-1',
+        transferId: 'PAYOUT_barber-1_1',
+        status: 'PENDING',
+    }));
+
+    await assert.rejects(
+        payoutService.triggerBarberPayout('barber-1', ['booking-1'], 5000),
+        /does not match/i,
+    );
+
+    assert.equal(transferMock.mock.calls.length, 0);
+});
+
+test('handlePayoutWebhook processes reversals even after a prior payout success', async (t) => {
+    t.mock.method(cashfreePayoutAdapter, 'verifyWebhook', () => true);
+    t.mock.method(cashfreePayoutAdapter, 'parseWebhookPayload', () => ({
+        event: 'TRANSFER_REVERSED',
+        transferId: 'PAYOUT_barber-1_1',
+        updatedAt: '2026-04-23T10:30:00.000Z',
+        failureReason: 'BENEFICIARY_BANK_REVERSAL',
+    }));
+
+    const payout = {
+        _id: 'payout-1',
+        transferId: 'PAYOUT_barber-1_1',
+        status: 'SUCCESS',
+        webhookProcessed: true,
+        bookingIds: ['booking-1'],
+        paymentTransactionIds: ['payment-1'],
+    };
+
+    t.mock.method(payoutRepository, 'findByTransferId', async () => payout);
+
+    const payoutUpdates = [];
+    t.mock.method(payoutRepository, 'updateById', async (id, updates) => {
+        payoutUpdates.push({ id, updates });
+        return { _id: id, ...updates };
+    });
+
+    const bookingUpdates = [];
+    t.mock.method(bookingRepository, 'updateManyByIds', async (ids, updates) => {
+        bookingUpdates.push({ ids, updates });
+        return { acknowledged: true };
+    });
+
+    paymentRepository.markUnsettledByIds ??= async () => ({ acknowledged: true });
+    const unsettledCalls = [];
+    t.mock.method(paymentRepository, 'markUnsettledByIds', async (ids) => {
+        unsettledCalls.push(ids);
+        return { acknowledged: true };
+    });
+
+    const result = await payoutService.handlePayoutWebhook(
+        { 'x-webhook-signature': 'valid', 'x-webhook-timestamp': '1713850000' },
+        '{"event":"TRANSFER_REVERSED"}',
+        {},
+    );
+
+    assert.deepEqual(result, {
+        processed: true,
+        event: 'TRANSFER_REVERSED',
+    });
+    assert.equal(
+        payoutUpdates.some(({ updates }) => updates.status === 'REVERSED'),
+        true,
+    );
+    assert.deepEqual(bookingUpdates[0], {
+        ids: ['booking-1'],
+        updates: {
+            payoutStatus: 'reversed',
+            payoutCompletedAt: null,
+            barberUtr: null,
+        },
+    });
+    assert.deepEqual(unsettledCalls, [['payment-1']]);
+});

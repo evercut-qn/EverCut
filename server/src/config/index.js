@@ -41,7 +41,7 @@ const providerEnv = (key, fallback) => {
 const config = Object.freeze({
   /** Application */
   env: optionalEnv('NODE_ENV', 'development'),
-  port: parseInt(optionalEnv('PORT', '5001'), 10),
+  port: parseInt(optionalEnv('PORT', '5000'), 10),
   apiPrefix: '/api/v1',
 
   /** MongoDB */
@@ -137,7 +137,7 @@ const config = Object.freeze({
 
   /** Payment + Payout business rules */
   payment: Object.freeze({
-    redirectBaseUrl: optionalEnv('PAYMENT_REDIRECT_BASE_URL', 'http://localhost:5001/api/v1/payments/redirect'),
+    redirectBaseUrl: optionalEnv('PAYMENT_REDIRECT_BASE_URL', 'http://localhost:5000/api/v1/payments/redirect'),
     platformFeeSingle: 3,
     platformFeeBundle: 10,
     refundFeeSingle: 7,

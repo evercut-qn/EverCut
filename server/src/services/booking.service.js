@@ -222,7 +222,7 @@ export const cancelBooking = async (bookingId, userId) => {
     if (booking.paymentStatus === PAYMENT_STATUS.SUCCESS) {
         if (![PAYOUT_STATUS.NOT_INITIATED, PAYOUT_STATUS.FAILED, PAYOUT_STATUS.REVERSED].includes(booking.payoutStatus)) {
             logger.warn('[BookingService] Cannot auto-refund cancelled booking after payout started', { bookingId });
-            cancellationNote = 'Refund requires manual resolution — payout already initiated or completed';
+            cancellationNote = 'Refund window has closed. Please request a manual refund.';
         } else {
             try {
                 const { initiateRefund } = await import('./payment.service.js');
@@ -238,7 +238,7 @@ export const cancelBooking = async (bookingId, userId) => {
                     bookingId,
                     error: error.message,
                 });
-                cancellationNote = 'Auto-refund failed — manual follow-up required';
+                cancellationNote = 'Refund could not be initiated automatically. Please request a manual refund.';
             }
         }
     }
@@ -473,35 +473,6 @@ export const updateBooking = async (bookingId, userId, { employeeId, date, time 
     await booking.save();
 
     return booking;
-};
-
-// ── Customer: delete service from booking ────────────────────────────────
-
-export const deleteServiceFromBooking = async (bookingId, userId, serviceId) => {
-    const booking = await bookingRepository.findById(bookingId);
-    if (!booking) throw new NotFoundError('Booking');
-
-    const customer = await customerRepository.findByUserId(userId);
-    if (!customer || (booking.customerId._id || booking.customerId).toString() !== customer._id.toString()) {
-        throw new ForbiddenError('You can only retrieve from your own bookings');
-    }
-
-    booking.serviceIds = booking.serviceIds.filter((id) => id.toString() !== serviceId);
-
-    if (booking.serviceIds.length === 0) {
-        booking.totalAmount = 0;
-    } else {
-        const remaining = normalizeBookedServices(
-            await serviceRepository.findByIds(
-                booking.serviceIds,
-                'finalPrice totalPrice actualPrice offerPrice serviceType',
-            ),
-        );
-        booking.totalAmount = sumServicePrices(remaining);
-    }
-
-    await booking.save();
-    return { remainingServices: booking.serviceIds, totalAmount: booking.totalAmount };
 };
 
 // ── Customer: employee calendar ──────────────────────────────────────────
