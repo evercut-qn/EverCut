@@ -71,6 +71,8 @@ const breakTimesSchema = Joi.alternatives().try(
 );
 
 const targetCustomersSchema = Joi.string().valid(...ALL_SERVICE_FOR, 'men', 'women');
+const ifscSchema = Joi.string().trim().pattern(/^[A-Z]{4}0[A-Z0-9]{6}$/i);
+const bankAccountSchema = Joi.string().trim().min(6).max(34);
 
 export const updateBusinessSchema = Joi.object({
     email: Joi.string().email(),
@@ -91,6 +93,8 @@ export const updateBusinessSchema = Joi.object({
     upiAddress: Joi.string(),
     accountHolderName: Joi.string().trim().min(1).max(100),
     bankName: Joi.string().trim().min(1).max(120),
+    bankAccount: bankAccountSchema,
+    ifsc: ifscSchema,
     bio: Joi.string().max(500).allow(''),
     address: Joi.string().trim(),
     shopLocation: Joi.string().trim(),
@@ -220,8 +224,11 @@ export const updateUpiDetailsSchema = Joi.object({
     upiAddress: Joi.string().trim(),
     accountHolderName: Joi.string().trim().min(1).max(100),
     bankName: Joi.string().trim().min(1).max(120),
+    bankAccount: bankAccountSchema,
+    ifsc: ifscSchema,
     isVerified: Joi.any().strip(),
     verificationStatus: Joi.any().strip(),
+    beneficiaryId: Joi.any().strip(),
 })
     .custom((value) => {
         value.upiId = value.upiId || value.upiAddress;

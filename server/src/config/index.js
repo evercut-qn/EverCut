@@ -26,6 +26,13 @@ const requireEnv = (key) => {
  * Read an optional env var with a default.
  */
 const optionalEnv = (key, fallback) => process.env[key] || fallback;
+const providerEnv = (key, fallback) => {
+  const value = process.env[key];
+  if (!value && process.env.NODE_ENV === 'production') {
+    throw new Error(`Missing required environment variable: ${key}`);
+  }
+  return value || fallback;
+};
 
 // ---------------------------------------------------------------------------
 // Config Object
@@ -101,6 +108,46 @@ const config = Object.freeze({
     defaultPage: 1,
     defaultLimit: 20,
     maxLimit: 100,
+  }),
+
+  /** PhonePe Payment Gateway */
+  phonepe: Object.freeze({
+    clientId: providerEnv('PHONEPE_CLIENT_ID', 'test-phonepe-client-id'),
+    clientSecret: providerEnv('PHONEPE_CLIENT_SECRET', 'test-phonepe-client-secret'),
+    clientVersion: parseInt(optionalEnv('PHONEPE_CLIENT_VERSION', '1'), 10),
+    merchantId: providerEnv('PHONEPE_MERCHANT_ID', 'test-phonepe-merchant-id'),
+    env: optionalEnv('PHONEPE_ENV', 'SANDBOX'),
+    webhookUsername: providerEnv('PHONEPE_WEBHOOK_USERNAME', 'test-phonepe-webhook-user'),
+    webhookPassword: providerEnv('PHONEPE_WEBHOOK_PASSWORD', 'test-phonepe-webhook-password'),
+    baseUrl: optionalEnv('PHONEPE_ENV', 'SANDBOX') === 'PRODUCTION'
+      ? 'https://api.phonepe.com/apis/pg'
+      : 'https://api-preprod.phonepe.com/apis/pg-sandbox',
+  }),
+
+  /** Cashfree Payouts */
+  cashfree: Object.freeze({
+    payoutClientId: providerEnv('CASHFREE_PAYOUT_CLIENT_ID', 'test-cashfree-client-id'),
+    payoutClientSecret: providerEnv('CASHFREE_PAYOUT_CLIENT_SECRET', 'test-cashfree-client-secret'),
+    payoutEnv: optionalEnv('CASHFREE_PAYOUT_ENV', 'TEST'),
+    payoutBaseUrl: optionalEnv('CASHFREE_PAYOUT_ENV', 'TEST') === 'PRODUCTION'
+      ? 'https://api.cashfree.com/payout'
+      : 'https://sandbox.cashfree.com/payout',
+    payoutApiVersion: '2025-01-01',
+  }),
+
+  /** Payment + Payout business rules */
+  payment: Object.freeze({
+    redirectBaseUrl: optionalEnv('PAYMENT_REDIRECT_BASE_URL', 'http://localhost:5001/api/v1/payments/redirect'),
+    platformFeeSingle: 3,
+    platformFeeBundle: 10,
+    refundFeeSingle: 7,
+    refundFeeBundle: 15,
+    minBundleServiceAmount: 300,
+    sessionExpirySeconds: 1200,
+    maxPollAttempts: 10,
+    pollIntervalBaseMs: 3000,
+    payoutBatchCronTime: '0 23 * * *',
+    payoutBatchTimezone: 'Asia/Kolkata',
   }),
 });
 

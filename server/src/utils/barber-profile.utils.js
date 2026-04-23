@@ -37,20 +37,43 @@ const toShopImages = (photos = []) => {
         .filter(Boolean);
 };
 
+const maskBankAccount = (bankAccount) => {
+    if (!bankAccount) return null;
+    const digits = String(bankAccount).replace(/\D/g, '');
+    if (digits.length <= 4) return digits || null;
+    return `******${digits.slice(-4)}`;
+};
+
+const serializePayoutConfig = (payoutConfig = {}) => ({
+    bankAccountLast4: maskBankAccount(payoutConfig.bankAccount),
+    ifsc: payoutConfig.ifsc || null,
+    beneficiaryId: payoutConfig.beneficiaryId || null,
+    beneficiaryCreatedAt: payoutConfig.beneficiaryCreatedAt || null,
+    verifiedAt: payoutConfig.verifiedAt || null,
+    verificationStatus: payoutConfig.verificationStatus || 'unverified',
+});
+
 export const serializeUpiDetails = (shop) => {
     const plainShop = toPlainObject(shop);
     if (!plainShop) return null;
 
     const upiAddress = plainShop.upiId || null;
-    const isVerified = Boolean(upiAddress && plainShop.accountHolderName);
+    const payoutConfig = plainShop.payoutConfig || {};
+    const verificationStatus = payoutConfig.verificationStatus
+        || (upiAddress && plainShop.accountHolderName ? 'verified' : 'unverified');
+    const isVerified = verificationStatus === 'verified';
 
     return {
         accountHolderName: plainShop.accountHolderName || null,
         bankName: plainShop.bankName || null,
         upiId: upiAddress,
         upiAddress,
+        bankAccountLast4: maskBankAccount(payoutConfig.bankAccount),
+        ifsc: payoutConfig.ifsc || null,
         isVerified,
-        verificationStatus: isVerified ? 'verified' : 'unverified',
+        verificationStatus,
+        beneficiaryCreatedAt: payoutConfig.beneficiaryCreatedAt || null,
+        verifiedAt: payoutConfig.verifiedAt || null,
     };
 };
 
@@ -69,6 +92,7 @@ export const serializeBarberProfile = (shop, userContext = {}, { photos } = {}) 
     for (const field of LEGACY_SHOP_CONTACT_FIELDS) {
         delete safeShop[field];
     }
+    safeShop.payoutConfig = serializePayoutConfig(safeShop.payoutConfig);
 
     return {
         ...safeShop,

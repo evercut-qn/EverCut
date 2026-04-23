@@ -6,7 +6,7 @@ export const bookSalon = async (req, res, next) => {
     try {
         const body = getValidatedRequestData(req, 'body');
         const result = await bookingService.bookSalon(req.user._id, body);
-        return res.status(201).json(ApiResponse.success(result, 'Booking confirmed'));
+        return res.status(201).json(ApiResponse.success(result, 'Booking created'));
     } catch (err) {
         next(err);
     }

@@ -1,0 +1,448 @@
+import bookingRepository from '../repositories/booking.repository.js';
+import paymentRepository from '../repositories/payment.repository.js';
+import payoutRepository from '../repositories/payout.repository.js';
+import shopRepository from '../repositories/shop.repository.js';
+import userRepository from '../repositories/user.repository.js';
+import cashfreePayoutAdapter from '../adapters/cashfree/cashfree-payout.adapter.js';
+import logger from '../utils/logger.js';
+import {
+    BadRequestError,
+    NotFoundError,
+    PayoutError,
+} from '../utils/api-error.js';
+import {
+    CASHFREE_WEBHOOK_EVENTS,
+    PAYOUT_MODES,
+    PAYOUT_STATUS,
+    PAYOUT_TRANSACTION_STATUS,
+} from '../utils/constants.js';
+
+const NON_RETRYABLE_ERROR_CODES = new Set([
+    'INSUFFICIENT_BALANCE',
+    'INVALID_VPA',
+    'INVALID_ACCOUNT',
+    'IP_NOT_WHITELISTED',
+    'INVALID_CREDENTIALS',
+]);
+
+const toObjectIdString = (value) => String(value?._id || value || '');
+
+const generateTransferId = (barberId) => `PAYOUT_${barberId}_${Date.now()}`;
+const generateBeneficiaryId = (barberId) => `BARBER_${barberId}`;
+
+const buildShopPayoutConfig = (shop, updates = {}) => ({
+    ...(shop.payoutConfig || {}),
+    ...updates,
+});
+
+const getShopAndBarber = async (shopId) => {
+    const shop = await shopRepository.findById(shopId);
+    if (!shop) {
+        throw new NotFoundError('Shop');
+    }
+
+    const owner = await userRepository.findById(shop.ownerId);
+    if (!owner) {
+        throw new NotFoundError('Barber owner');
+    }
+
+    return {
+        shop,
+        barber: {
+            _id: shop.ownerId,
+            fullName: shop.accountHolderName || shop.ownerName || shop.shopName,
+            phone: owner.phoneNumber,
+            email: owner.email,
+            upiId: shop.upiId,
+            bankAccount: shop.payoutConfig?.bankAccount || null,
+            ifsc: shop.payoutConfig?.ifsc || null,
+        },
+    };
+};
+
+const applyPayoutSuccess = async (payout, { utr, updatedAt }) => {
+    const processedAt = updatedAt ? new Date(updatedAt) : new Date();
+
+    await payoutRepository.updateById(payout._id, {
+        status: PAYOUT_TRANSACTION_STATUS.SUCCESS,
+        utr: utr || null,
+        processedAt,
+        webhookReceivedAt: new Date(),
+        webhookProcessed: true,
+        failureReason: null,
+        errorCode: null,
+    });
+
+    await bookingRepository.updateManyByIds(payout.bookingIds, {
+        payoutStatus: PAYOUT_STATUS.COMPLETED,
+        payoutCompletedAt: processedAt,
+        barberUtr: utr || null,
+    });
+
+    await paymentRepository.markSettledByIds(payout.paymentTransactionIds, processedAt);
+};
+
+const applyPayoutFailure = async (payout, status, { failureReason, errorCode = null }) => {
+    const bookingPayoutStatus = status === PAYOUT_TRANSACTION_STATUS.REVERSED
+        ? PAYOUT_STATUS.REVERSED
+        : PAYOUT_STATUS.FAILED;
+
+    await payoutRepository.updateById(payout._id, {
+        status,
+        failureReason: failureReason || status,
+        errorCode,
+        webhookReceivedAt: new Date(),
+        webhookProcessed: true,
+    });
+
+    await bookingRepository.updateManyByIds(payout.bookingIds, {
+        payoutStatus: bookingPayoutStatus,
+    });
+};
+
+const ensureRetryable = (error) => !NON_RETRYABLE_ERROR_CODES.has(error?.providerCode || error?.code);
+
+async function ensureBeneficiary(shop, barber, beneficiaryId) {
+    const existingBeneficiaryId = shop.payoutConfig?.beneficiaryId || beneficiaryId;
+    const existing = await cashfreePayoutAdapter.getBeneficiary(existingBeneficiaryId);
+
+    if (existing) {
+        if (shop.payoutConfig?.beneficiaryId !== existingBeneficiaryId) {
+            await shopRepository.updateById(shop._id, {
+                payoutConfig: buildShopPayoutConfig(shop, {
+                    beneficiaryId: existingBeneficiaryId,
+                    beneficiaryCreatedAt: shop.payoutConfig?.beneficiaryCreatedAt || new Date(),
+                    verifiedAt: new Date(),
+                    verificationStatus: 'verified',
+                }),
+            });
+        }
+
+        return existingBeneficiaryId;
+    }
+
+    await cashfreePayoutAdapter.createBeneficiary({
+        beneficiaryId,
+        name: barber.fullName,
+        phone: barber.phone,
+        email: barber.email,
+        vpa: barber.upiId,
+        bankAccount: barber.bankAccount,
+        ifsc: barber.ifsc,
+    });
+
+    await shopRepository.updateById(shop._id, {
+        payoutConfig: buildShopPayoutConfig(shop, {
+            beneficiaryId,
+            beneficiaryCreatedAt: new Date(),
+            verifiedAt: new Date(),
+            verificationStatus: 'verified',
+        }),
+    });
+
+    return beneficiaryId;
+}
+
+export const triggerBarberPayout = async (barberId, bookingIds, totalPayoutInPaisa = null) => {
+    if (!Array.isArray(bookingIds) || bookingIds.length === 0) {
+        throw new BadRequestError('At least one booking is required for payout');
+    }
+
+    const bookings = await bookingRepository.findByIds(bookingIds);
+    if (bookings.length !== bookingIds.length) {
+        throw new NotFoundError('One or more bookings');
+    }
+
+    for (const booking of bookings) {
+        if (booking.status !== 'completed') {
+            throw new BadRequestError('All bookings must be completed before payout');
+        }
+        if (booking.paymentStatus !== 'success') {
+            throw new BadRequestError('All bookings must have successful payments before payout');
+        }
+        if (![PAYOUT_STATUS.NOT_INITIATED, PAYOUT_STATUS.FAILED, PAYOUT_STATUS.REVERSED].includes(booking.payoutStatus)) {
+            throw new BadRequestError('One or more bookings already has an active payout');
+        }
+    }
+
+    const firstBooking = bookings[0];
+    const { shop, barber } = await getShopAndBarber(firstBooking.shopId?._id || firstBooking.shopId);
+    if (barberId && toObjectIdString(shop.ownerId) !== toObjectIdString(barberId)) {
+        throw new BadRequestError('Bookings do not belong to the requested barber');
+    }
+
+    if (!barber.upiId && !(barber.bankAccount && barber.ifsc)) {
+        throw new BadRequestError('Shop has no payout destination configured');
+    }
+
+    const paymentTransactions = await paymentRepository.findCompletedByBookingIds(bookingIds);
+    if (paymentTransactions.length !== bookingIds.length) {
+        throw new NotFoundError('Completed payment for one or more bookings');
+    }
+
+    const paymentMap = new Map(
+        paymentTransactions.map((payment) => [toObjectIdString(payment.bookingId), payment]),
+    );
+
+    const computedTotalPayout = bookingIds.reduce((sum, bookingId) => {
+        const payment = paymentMap.get(toObjectIdString(bookingId));
+        return sum + (payment?.settlement?.barberPayout || payment?.settlement?.serviceAmount || 0);
+    }, 0);
+
+    const payoutAmountInPaisa = totalPayoutInPaisa && totalPayoutInPaisa > 0
+        ? totalPayoutInPaisa
+        : computedTotalPayout;
+
+    if (payoutAmountInPaisa <= 0) {
+        throw new BadRequestError('Invalid payout amount');
+    }
+
+    if (computedTotalPayout > 0 && payoutAmountInPaisa !== computedTotalPayout) {
+        logger.warn('[PayoutService] Aggregated payout amount mismatch, using supplied total', {
+            barberId: toObjectIdString(shop.ownerId),
+            bookingIds,
+            suppliedAmount: payoutAmountInPaisa,
+            computedAmount: computedTotalPayout,
+        });
+    }
+
+    const beneficiaryId = await ensureBeneficiary(
+        shop,
+        barber,
+        shop.payoutConfig?.beneficiaryId || generateBeneficiaryId(shop.ownerId),
+    );
+
+    const transferId = generateTransferId(shop.ownerId);
+    const amountInRupees = payoutAmountInPaisa / 100;
+    const paymentTransactionIds = paymentTransactions.map((payment) => payment._id);
+
+    const payoutTransaction = await payoutRepository.create({
+        bookingIds,
+        barberId: shop.ownerId,
+        shopId: shop._id,
+        paymentTransactionIds,
+        transferId,
+        beneficiaryId,
+        amount: payoutAmountInPaisa,
+        amountInRupees,
+        transferMode: barber.upiId ? PAYOUT_MODES.UPI : PAYOUT_MODES.BANK,
+        status: PAYOUT_TRANSACTION_STATUS.INITIATED,
+        remarks: `EverCut EOD payout for ${bookingIds.length} booking(s)`,
+    });
+
+    await bookingRepository.updateManyByIds(bookingIds, {
+        payoutTransactionId: payoutTransaction._id,
+        payoutStatus: PAYOUT_STATUS.INITIATED,
+    });
+
+    try {
+        const transferResponse = await cashfreePayoutAdapter.initiateTransfer({
+            transferId,
+            amountInRupees,
+            beneficiaryId,
+            transferMode: barber.upiId ? PAYOUT_MODES.UPI : PAYOUT_MODES.BANK,
+            remarks: payoutTransaction.remarks,
+        });
+
+        await payoutRepository.updateById(payoutTransaction._id, {
+            status: PAYOUT_TRANSACTION_STATUS.PENDING,
+            gatewayTransferId: transferResponse.gatewayTransferId,
+        });
+
+        await bookingRepository.updateManyByIds(bookingIds, {
+            payoutStatus: PAYOUT_STATUS.PENDING,
+        });
+
+        logger.info('[PayoutService] Aggregated payout initiated', {
+            payoutId: payoutTransaction._id,
+            barberId: toObjectIdString(shop.ownerId),
+            bookingCount: bookingIds.length,
+            amountInRupees,
+            transferId,
+        });
+
+        return payoutRepository.updateById(payoutTransaction._id, {
+            gatewayTransferId: transferResponse.gatewayTransferId,
+        });
+    } catch (error) {
+        await payoutRepository.updateById(payoutTransaction._id, {
+            status: PAYOUT_TRANSACTION_STATUS.FAILED,
+            failureReason: error.message,
+            errorCode: error.providerCode || error.code || null,
+        });
+
+        await bookingRepository.updateManyByIds(bookingIds, {
+            payoutStatus: PAYOUT_STATUS.FAILED,
+        });
+
+        throw error instanceof PayoutError
+            ? error
+            : new PayoutError(error.message || 'Failed to initiate payout', error.code || null);
+    }
+};
+
+export const handlePayoutWebhook = async (headers, rawBody, parsedBody) => {
+    if (!cashfreePayoutAdapter.verifyWebhook(headers, rawBody)) {
+        logger.warn('[PayoutService] Invalid Cashfree webhook signature');
+        throw new BadRequestError('Invalid webhook signature');
+    }
+
+    const webhookData = cashfreePayoutAdapter.parseWebhookPayload(parsedBody);
+
+    logger.info('[PayoutService] Payout webhook received', {
+        event: webhookData.event,
+        transferId: webhookData.transferId,
+        status: webhookData.status,
+    });
+
+    const payout = await payoutRepository.findByTransferId(webhookData.transferId);
+    if (!payout) {
+        logger.warn('[PayoutService] Payout not found for webhook', {
+            transferId: webhookData.transferId,
+        });
+        return { processed: false, event: webhookData.event };
+    }
+
+    if (
+        [PAYOUT_TRANSACTION_STATUS.SUCCESS, PAYOUT_TRANSACTION_STATUS.FAILED, PAYOUT_TRANSACTION_STATUS.REVERSED].includes(payout.status)
+        && payout.webhookProcessed
+    ) {
+        return { processed: true, event: webhookData.event };
+    }
+
+    switch (webhookData.event) {
+        case CASHFREE_WEBHOOK_EVENTS.TRANSFER_SUCCESS:
+            await applyPayoutSuccess(payout, {
+                utr: webhookData.utr,
+                updatedAt: webhookData.updatedAt,
+            });
+            break;
+
+        case CASHFREE_WEBHOOK_EVENTS.TRANSFER_FAILED:
+            await applyPayoutFailure(payout, PAYOUT_TRANSACTION_STATUS.FAILED, {
+                failureReason: webhookData.failureReason || webhookData.event,
+            });
+            break;
+
+        case CASHFREE_WEBHOOK_EVENTS.TRANSFER_REVERSED:
+            await applyPayoutFailure(payout, PAYOUT_TRANSACTION_STATUS.REVERSED, {
+                failureReason: webhookData.failureReason || webhookData.event,
+            });
+            break;
+
+        default:
+            logger.warn('[PayoutService] Unknown Cashfree payout event', {
+                event: webhookData.event,
+            });
+            return { processed: false, event: webhookData.event };
+    }
+
+    return { processed: true, event: webhookData.event };
+};
+
+export const retryPayout = async (payoutId) => {
+    const payout = await payoutRepository.findById(payoutId);
+    if (!payout) {
+        throw new NotFoundError('Payout');
+    }
+
+    if (![PAYOUT_TRANSACTION_STATUS.FAILED, PAYOUT_TRANSACTION_STATUS.REVERSED].includes(payout.status)) {
+        throw new BadRequestError('Can only retry failed or reversed payouts');
+    }
+
+    if (payout.retryCount >= payout.maxRetries) {
+        throw new BadRequestError('Maximum retry attempts exceeded');
+    }
+
+    const { shop, barber } = await getShopAndBarber(payout.shopId);
+    const beneficiaryId = await ensureBeneficiary(
+        shop,
+        barber,
+        payout.beneficiaryId || shop.payoutConfig?.beneficiaryId || generateBeneficiaryId(shop.ownerId),
+    );
+    const newTransferId = `${payout.transferId.split('_R')[0]}_R${payout.retryCount + 1}`;
+
+    await payoutRepository.updateById(payout._id, {
+        transferId: newTransferId,
+        beneficiaryId,
+        status: PAYOUT_TRANSACTION_STATUS.INITIATED,
+        retryCount: payout.retryCount + 1,
+        lastRetryAt: new Date(),
+        failureReason: null,
+        errorCode: null,
+        gatewayTransferId: null,
+        utr: null,
+        webhookProcessed: false,
+    });
+
+    try {
+        const transferResponse = await cashfreePayoutAdapter.initiateTransfer({
+            transferId: newTransferId,
+            amountInRupees: payout.amountInRupees,
+            beneficiaryId,
+            transferMode: payout.transferMode,
+            remarks: payout.remarks || `EverCut payout retry for ${payout.bookingIds.length} booking(s)`,
+        });
+
+        await payoutRepository.updateById(payout._id, {
+            status: PAYOUT_TRANSACTION_STATUS.PENDING,
+            gatewayTransferId: transferResponse.gatewayTransferId,
+        });
+
+        await bookingRepository.updateManyByIds(payout.bookingIds, {
+            payoutStatus: PAYOUT_STATUS.PENDING,
+        });
+
+        return payoutRepository.findById(payout._id);
+    } catch (error) {
+        await payoutRepository.updateById(payout._id, {
+            status: PAYOUT_TRANSACTION_STATUS.FAILED,
+            failureReason: error.message,
+            errorCode: error.providerCode || error.code || null,
+        });
+
+        if (!ensureRetryable(error)) {
+            throw error;
+        }
+
+        throw error instanceof PayoutError
+            ? error
+            : new PayoutError(error.message || 'Failed to retry payout', error.code || null);
+    }
+};
+
+export const pollPendingPayouts = async () => {
+    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+    const stuckPayouts = await payoutRepository.findStuckPayouts(tenMinutesAgo);
+
+    logger.info('[PayoutService] Polling stuck payouts', {
+        count: stuckPayouts.length,
+    });
+
+    for (const payout of stuckPayouts) {
+        try {
+            const statusResponse = await cashfreePayoutAdapter.getTransferStatus(payout.transferId);
+
+            if (statusResponse.status === PAYOUT_TRANSACTION_STATUS.SUCCESS) {
+                await applyPayoutSuccess(payout, {
+                    utr: statusResponse.utr,
+                    updatedAt: statusResponse.updatedAt,
+                });
+            } else if (statusResponse.status === PAYOUT_TRANSACTION_STATUS.FAILED) {
+                await applyPayoutFailure(payout, PAYOUT_TRANSACTION_STATUS.FAILED, {
+                    failureReason: statusResponse.failureReason || 'TRANSFER_FAILED',
+                });
+            } else if (statusResponse.status === PAYOUT_TRANSACTION_STATUS.REVERSED) {
+                await applyPayoutFailure(payout, PAYOUT_TRANSACTION_STATUS.REVERSED, {
+                    failureReason: statusResponse.failureReason || 'TRANSFER_REVERSED',
+                });
+            }
+        } catch (error) {
+            logger.error('[PayoutService] Payout poll failed', {
+                payoutId: payout._id,
+                transferId: payout.transferId,
+                error: error.message,
+            });
+        }
+    }
+};

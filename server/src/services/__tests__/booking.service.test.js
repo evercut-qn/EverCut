@@ -1,10 +1,42 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import bookingRepository from '../../repositories/booking.repository.js';
-import employeeRepository from '../../repositories/employee.repository.js';
-import shopRepository from '../../repositories/shop.repository.js';
-import * as bookingService from '../booking.service.js';
+const ensureRequiredEnv = () => {
+    const defaults = {
+        MONGODB_URI: 'mongodb://localhost:27017/evercut-test',
+        FIREBASE_PROJECT_ID: 'evercut-test',
+        FIREBASE_CLIENT_EMAIL: 'firebase@example.com',
+        FIREBASE_PRIVATE_KEY: '-----BEGIN PRIVATE KEY-----\\nabc\\n-----END PRIVATE KEY-----',
+        CLOUDINARY_CLOUD_NAME: 'evercut',
+        CLOUDINARY_API_KEY: 'cloudinary-key',
+        CLOUDINARY_API_SECRET: 'cloudinary-secret',
+        MSG91_AUTH_KEY: 'msg91-auth',
+        MSG91_OTP_TEMPLATE_ID: 'msg91-template',
+        JWT_ACCESS_SECRET: 'access-secret',
+        JWT_REFRESH_SECRET: 'refresh-secret',
+        PHONEPE_CLIENT_ID: 'phonepe-client',
+        PHONEPE_CLIENT_SECRET: 'phonepe-secret',
+        PHONEPE_CLIENT_VERSION: '1',
+        PHONEPE_MERCHANT_ID: 'merchant-id',
+        PHONEPE_WEBHOOK_USERNAME: 'webhook-user',
+        PHONEPE_WEBHOOK_PASSWORD: 'webhook-pass',
+        CASHFREE_PAYOUT_CLIENT_ID: 'cashfree-client',
+        CASHFREE_PAYOUT_CLIENT_SECRET: 'cashfree-secret',
+    };
+
+    for (const [key, value] of Object.entries(defaults)) {
+        process.env[key] ??= value;
+    }
+};
+
+ensureRequiredEnv();
+
+const bookingRepository = (await import('../../repositories/booking.repository.js')).default;
+const employeeRepository = (await import('../../repositories/employee.repository.js')).default;
+const shopRepository = (await import('../../repositories/shop.repository.js')).default;
+const customerRepository = (await import('../../repositories/customer.repository.js')).default;
+const serviceRepository = (await import('../../repositories/service.repository.js')).default;
+const bookingService = await import('../booking.service.js');
 
 test('getBookingsByShop loads bookings by shopId so deleted employees do not disappear from history', async (t) => {
     t.mock.method(shopRepository, 'findByOwnerId', async () => ({ _id: 'shop-1' }));
@@ -124,4 +156,108 @@ test('getBookingMilestoneProgress returns no next milestone once all visible tar
         statusText: '3rd target completed',
     });
     assert.equal(result.nextMilestone, null);
+});
+
+test('bookSalon creates a pending booking that requires payment before confirmation', async (t) => {
+    t.mock.method(customerRepository, 'findByUserId', async () => ({ _id: 'customer-1' }));
+
+    t.mock.method(shopRepository, 'findByIdWithFields', async () => ({
+        _id: 'shop-1',
+        isOpen: true,
+        openTime: '09:00',
+        closeTime: '21:00',
+        availableDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
+    }));
+
+    t.mock.method(serviceRepository, 'findByIds', async () => ([
+        {
+            _id: 'service-1',
+            shopId: 'shop-1',
+            finalPrice: 120,
+            serviceType: 'single',
+        },
+    ]));
+
+    t.mock.method(employeeRepository, 'claimSlot', async () => ({
+        _id: 'employee-1',
+    }));
+
+    let createdBookingPayload = null;
+    t.mock.method(bookingRepository, 'create', async (payload) => {
+        createdBookingPayload = payload;
+        return {
+            _id: 'booking-1',
+            ...payload,
+            status: payload.status,
+            paymentStatus: payload.paymentStatus,
+            payoutStatus: payload.payoutStatus,
+        };
+    });
+
+    const result = await bookingService.bookSalon('user-1', {
+        shopId: 'shop-1',
+        employeeId: 'employee-1',
+        serviceId: 'service-1',
+        date: '2099-01-01',
+        time: '10:00 AM',
+    });
+
+    assert.deepEqual(createdBookingPayload, {
+        customerId: 'customer-1',
+        serviceIds: ['service-1'],
+        employeeId: 'employee-1',
+        shopId: 'shop-1',
+        date: '2099-01-01',
+        time: '10:00 AM',
+        totalAmount: 120,
+        status: 'pending',
+        paymentStatus: 'pending',
+        payoutStatus: 'not_initiated',
+    });
+    assert.equal(result.status, 'pending');
+    assert.equal(result.paymentRequired, true);
+    assert.equal(result.paymentStatus, 'pending');
+    assert.equal(result.payoutStatus, 'not_initiated');
+});
+
+test('bookSalon rejects bundle bookings below the documented minimum service amount', async (t) => {
+    t.mock.method(customerRepository, 'findByUserId', async () => ({ _id: 'customer-1' }));
+
+    t.mock.method(shopRepository, 'findByIdWithFields', async () => ({
+        _id: 'shop-1',
+        isOpen: true,
+        openTime: '09:00',
+        closeTime: '21:00',
+        availableDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
+    }));
+
+    t.mock.method(serviceRepository, 'findByIds', async () => ([
+        {
+            _id: 'bundle-1',
+            shopId: 'shop-1',
+            finalPrice: 250,
+            totalPrice: 250,
+            serviceType: 'bundled',
+        },
+    ]));
+
+    t.mock.method(employeeRepository, 'claimSlot', async () => ({
+        _id: 'employee-1',
+    }));
+
+    t.mock.method(bookingRepository, 'create', async (payload) => ({
+        _id: 'booking-2',
+        ...payload,
+    }));
+
+    await assert.rejects(
+        bookingService.bookSalon('user-1', {
+            shopId: 'shop-1',
+            employeeId: 'employee-1',
+            serviceId: 'bundle-1',
+            date: '2099-01-02',
+            time: '10:00 AM',
+        }),
+        /at least ₹300/,
+    );
 });

@@ -37,6 +37,7 @@ Validation and field-level failures are returned inside `data.errors`.
 | `11-barber-photos.json` | EverCut - Barber Photos | Shop gallery: upload, list, stats, delete |
 | `12-barber-earnings.json` | EverCut - Barber Earnings | Earnings summary (requires completed bookings for non-zero values) |
 | `13-barber-ratings.json` | EverCut - Barber Ratings | Rating listing, summary, reply management, and rating removal |
+| `14-payments-payouts.json` | EverCut - Payments & Payouts | PhonePe payment initiation/status/refund requests, Cashfree payout retry, and webhook simulation |
 | `EverCut.postman_environment.json` | — | Active environment with OTP/JWT variables for local testing |
 | `assets/sample-upload.png` | — | Sample image pre-wired into file-upload requests |
 
@@ -185,6 +186,22 @@ Employee `workingHours.start` and `workingHours.end` remain `HH:MM` 24-hour valu
 | 5 | DELETE | `/api/v1/barber/ratings/{{rating_id_update_reply}}/reply` | Delete a reply |
 | 6 | DELETE | `/api/v1/barber/ratings/{{rating_id_remove_rating}}` | Remove a rating |
 
+### `14-payments-payouts.json`
+
+| # | Method | Endpoint | Description |
+|---|---|---|---|
+| 1 | POST | `/api/v1/payments/initiate` | Initiate PhonePe payment for a pending customer booking |
+| 2 | GET | `/api/v1/payments/{{payment_id}}/status` | Read and poll payment status |
+| 3 | GET | `/api/v1/payments/booking/{{payment_booking_id}}` | Get latest payment for a booking |
+| 4 | GET | `/api/v1/payments/redirect` | PhonePe redirect/deep-link handler |
+| 5 | POST | `/api/v1/payments/{{payment_booking_id}}/refund` | Initiate refund before payout starts |
+| 6 | POST | `/api/v1/payouts/{{payout_id}}/retry` | Retry failed or reversed payout as admin |
+| 7 | POST | `/api/v1/payments/webhook` | Simulate PhonePe payment success webhook |
+| 8 | POST | `/api/v1/payments/webhook` | Simulate PhonePe payment failed webhook |
+| 9 | POST | `/api/v1/payments/webhook` | Simulate PhonePe refund completed webhook |
+| 10 | POST | `/api/v1/payouts/webhook` | Simulate Cashfree payout success webhook with HMAC signature |
+| 11 | POST | `/api/v1/payouts/webhook` | Simulate Cashfree payout failed webhook with HMAC signature |
+
 ---
 
 ### Prerequisites
@@ -228,6 +245,18 @@ No manual token generation needed - the authentication and onboarding collection
 | `barber_refresh_token` | *(auto-set by 01-authentication.json for returning users or by 02-onboarding.json after first-time signup)* |
 | `customer_onboarding_token` | *(auto-set by 01-authentication.json)* |
 | `barber_onboarding_token` | *(auto-set by 01-authentication.json)* |
+| `admin_access_token` | Manual ADMIN JWT for payout retry |
+| `payment_booking_id` | Booking ID to pay for; can be copied from `shared_booking_id` |
+| `payment_id` | Auto-set by `14-payments-payouts.json` request 1 |
+| `merchant_order_id` | Auto-set by `14-payments-payouts.json` request 1 |
+| `merchant_refund_id` | Auto-set by `14-payments-payouts.json` request 5 |
+| `refund_id` | Auto-set by `14-payments-payouts.json` request 5 |
+| `payout_id` | Manual payout transaction ID for retry tests |
+| `payout_transfer_id` | Manual app transfer ID from a payout transaction for Cashfree webhook tests |
+| `gateway_transfer_id` | Provider transfer ID used in Cashfree webhook samples |
+| `phonepe_webhook_username` | Must match `PHONEPE_WEBHOOK_USERNAME`; defaults to local fallback |
+| `phonepe_webhook_password` | Must match `PHONEPE_WEBHOOK_PASSWORD`; defaults to local fallback |
+| `cashfree_webhook_secret` | Must match `CASHFREE_PAYOUT_CLIENT_SECRET`; defaults to local fallback |
 
 ### Auth Collection Requests
 
@@ -256,6 +285,7 @@ No manual token generation needed - the authentication and onboarding collection
 1. `01-authentication.json` → **1. Send Customer OTP** → **2. Verify Customer OTP**
 2. `02-onboarding.json` → **1. Complete Customer** *(first run only)*
 3. Continue with customer collections in order.
+4. Run `14-payments-payouts.json` after a pending booking has been created. Request 1 captures the payment references needed by the status, refund, and webhook requests.
 
 > Requests marked ***(Terminal)*** are destructive. Run them last within their collection and avoid them if you still need the related account or data for later requests.
 

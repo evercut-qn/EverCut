@@ -76,6 +76,37 @@ const shopSchema = new mongoose.Schema(
             required: true,
             trim: true,
         },
+        payoutConfig: {
+            bankAccount: {
+                type: String,
+                default: null,
+                trim: true,
+            },
+            ifsc: {
+                type: String,
+                default: null,
+                trim: true,
+            },
+            beneficiaryId: {
+                type: String,
+                default: null,
+                index: true,
+            },
+            beneficiaryCreatedAt: {
+                type: Date,
+                default: null,
+            },
+            verifiedAt: {
+                type: Date,
+                default: null,
+            },
+            verificationStatus: {
+                type: String,
+                enum: ['pending', 'verified', 'failed'],
+                default: 'pending',
+            },
+            _id: false,
+        },
         bio: {
             type: String,
             default: '',

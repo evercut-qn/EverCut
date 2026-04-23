@@ -529,7 +529,7 @@ const payoutTransactionSchema = new mongoose.Schema(
             unique: true,
             index: true,
         },
-        cfTransferId: {
+        gatewayTransferId: {
             type: String,       // Cashfree's internal transfer ID
             index: true,
         },
@@ -897,7 +897,7 @@ export class PayoutGatewayAdapter {
      * @param {string} params.beneficiaryId - Registered beneficiary ID
      * @param {string} [params.transferMode] - UPI, IMPS, NEFT, BANK
      * @param {string} [params.remarks] - Transfer remarks
-     * @returns {Promise<{cfTransferId: string, transferId: string, status: string}>}
+     * @returns {Promise<{gatewayTransferId: string, transferId: string, status: string}>}
      */
     async initiateTransfer(params) {
         throw new Error('initiateTransfer() must be implemented');
@@ -1454,12 +1454,12 @@ class CashfreePayoutAdapter extends PayoutGatewayAdapter {
 
         logger.info('[CashfreePayoutAdapter] Transfer initiated', {
             transferId,
-            cfTransferId: data.cf_transfer_id,
+            gatewayTransferId: data.cf_transfer_id,
             status: data.status,
         });
 
         return {
-            cfTransferId: data.cf_transfer_id,
+            gatewayTransferId: data.cf_transfer_id,
             transferId: data.transfer_id,
             status: data.status,
         };
@@ -1472,7 +1472,7 @@ class CashfreePayoutAdapter extends PayoutGatewayAdapter {
         );
 
         return {
-            cfTransferId: data.cf_transfer_id,
+            gatewayTransferId: data.cf_transfer_id,
             transferId: data.transfer_id,
             status: data.status,
             utr: data.transfer_utr,
@@ -1537,7 +1537,7 @@ class CashfreePayoutAdapter extends PayoutGatewayAdapter {
         return {
             event,
             transferId: data?.transfer_id,
-            cfTransferId: data?.cf_transfer_id,
+            gatewayTransferId: data?.cf_transfer_id,
             status: data?.status,
             utr: data?.transfer_utr,
             amount: data?.transfer_amount,
@@ -2235,7 +2235,7 @@ export const triggerBarberPayout = async (barberId, bookingIds, totalPayoutInPai
     const shop = populatedBooking.shopId;
 
     // Shop model has upiId, accountHolderName, bankName at ROOT level
-    // Additional payout config (bankAccount, ifsc, cashfreeBeneficiaryId)
+    // Additional payout config (bankAccount, ifsc, beneficiaryId)
     // is in shop.payoutConfig (added during payment integration)
     //
     // IMPORTANT: Shop model does NOT have phone/email fields.
@@ -2296,7 +2296,7 @@ export const triggerBarberPayout = async (barberId, bookingIds, totalPayoutInPai
         // 9. Update PayoutTransaction to PENDING
         await payoutRepository.updateById(payoutTxn._id, {
             status: PAYOUT_TRANSACTION_STATUS.PENDING,
-            cfTransferId: transferResponse.cfTransferId,
+            gatewayTransferId: transferResponse.gatewayTransferId,
         });
 
         // 10. Update booking payout status
@@ -2453,7 +2453,7 @@ export const retryPayout = async (payoutId) => {
         failureReason: null,
         errorCode: null,
         webhookProcessed: false,
-        cfTransferId: null,
+        gatewayTransferId: null,
         utr: null,
     });
 
@@ -2492,7 +2492,7 @@ export const retryPayout = async (payoutId) => {
 
         await payoutRepository.updateById(payout._id, {
             status: PAYOUT_TRANSACTION_STATUS.PENDING,
-            cfTransferId: transferResponse.cfTransferId,
+            gatewayTransferId: transferResponse.gatewayTransferId,
         });
 
         await bookingRepository.updateById(payout.bookingId, {
@@ -3702,7 +3702,7 @@ export class MockCashfreePayoutAdapter extends PayoutGatewayAdapter {
 
     async initiateTransfer({ transferId, amountInRupees }) {
         return {
-            cfTransferId: `MOCK-CF-${Date.now()}`,
+            gatewayTransferId: `MOCK-CF-${Date.now()}`,
             transferId,
             status: 'PENDING',
         };

@@ -43,6 +43,8 @@ const ALLOWED_UPDATE_FIELDS = [
     'upiId',
     'accountHolderName',
     'bankName',
+    'bankAccount',
+    'ifsc',
     'location',
     'bio',
     'address',
@@ -254,6 +256,32 @@ const validateAndAssign = (key, value, updateData, errors) => {
             return;
         }
 
+        case 'bankAccount': {
+            const bankAccount = String(value).replace(/\s+/g, '');
+            if (bankAccount.length < 6) {
+                errors.push('bankAccount must be at least 6 digits');
+                return;
+            }
+            updateData.payoutConfig = {
+                ...(updateData.payoutConfig || {}),
+                bankAccount,
+            };
+            return;
+        }
+
+        case 'ifsc': {
+            const ifsc = String(value).trim().toUpperCase();
+            if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc)) {
+                errors.push('ifsc must be a valid IFSC code');
+                return;
+            }
+            updateData.payoutConfig = {
+                ...(updateData.payoutConfig || {}),
+                ifsc,
+            };
+            return;
+        }
+
         default:
             updateData[key] = value;
     }
@@ -293,6 +321,13 @@ export const updateBusinessInfo = async (ownerId, body, userContext) => {
         const firstName = updateData.ownerFirstName || shop.ownerFirstName;
         const lastName = updateData.ownerLastName || shop.ownerLastName;
         updateData.ownerName = `${firstName || ''} ${lastName || ''}`.trim();
+    }
+
+    if (updateData.payoutConfig) {
+        updateData.payoutConfig = {
+            ...(shop.payoutConfig || {}),
+            ...updateData.payoutConfig,
+        };
     }
 
     const scheduleFieldsTouched = ['openTime', 'closeTime', 'breakTimes']
@@ -396,6 +431,10 @@ export const getShopInfoForCustomer = async (shopId) => {
     delete safeShop.pinHash;
     delete safeShop.coverCloudinaryId;
     delete safeShop.ownerPhotoCloudinaryId;
+    delete safeShop.upiId;
+    delete safeShop.accountHolderName;
+    delete safeShop.bankName;
+    delete safeShop.payoutConfig;
     for (const field of LEGACY_SHOP_CONTACT_FIELDS) {
         delete safeShop[field];
     }

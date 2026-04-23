@@ -37,11 +37,91 @@ export const BOOKING_MILESTONE_TARGETS = Object.freeze([500, 750, 1000]);
 
 export const PAYMENT_STATUS = Object.freeze({
     PENDING: 'pending',
+    INITIATED: 'initiated',
     SUCCESS: 'success',
     FAILED: 'failed',
+    REFUND_PENDING: 'refund_pending',
+    REFUNDED: 'refunded',
+    REFUND_FAILED: 'refund_failed',
 });
 
 export const ALL_PAYMENT_STATUSES = Object.values(PAYMENT_STATUS);
+
+export const PAYMENT_TRANSACTION_STATUS = Object.freeze({
+    INITIATED: 'initiated',
+    PENDING: 'pending',
+    COMPLETED: 'completed',
+    FAILED: 'failed',
+    EXPIRED: 'expired',
+    REFUND_PENDING: 'refund_pending',
+    REFUNDED: 'refunded',
+    REFUND_FAILED: 'refund_failed',
+});
+
+export const ALL_PAYMENT_TRANSACTION_STATUSES = Object.values(PAYMENT_TRANSACTION_STATUS);
+
+export const PAYOUT_STATUS = Object.freeze({
+    NOT_INITIATED: 'not_initiated',
+    INITIATED: 'initiated',
+    PENDING: 'pending',
+    COMPLETED: 'completed',
+    FAILED: 'failed',
+    REVERSED: 'reversed',
+});
+
+export const ALL_PAYOUT_STATUSES = Object.values(PAYOUT_STATUS);
+
+export const PAYOUT_TRANSACTION_STATUS = Object.freeze({
+    INITIATED: 'INITIATED',
+    PENDING: 'PENDING',
+    SUCCESS: 'SUCCESS',
+    FAILED: 'FAILED',
+    REVERSED: 'REVERSED',
+});
+
+export const ALL_PAYOUT_TRANSACTION_STATUSES = Object.values(PAYOUT_TRANSACTION_STATUS);
+
+export const PHONEPE_WEBHOOK_EVENTS = Object.freeze({
+    ORDER_COMPLETED: 'checkout.order.completed',
+    ORDER_FAILED: 'checkout.order.failed',
+    REFUND_COMPLETED: 'pg.refund.completed',
+    REFUND_FAILED: 'pg.refund.failed',
+});
+
+export const CASHFREE_WEBHOOK_EVENTS = Object.freeze({
+    TRANSFER_SUCCESS: 'TRANSFER_SUCCESS',
+    TRANSFER_FAILED: 'TRANSFER_FAILED',
+    TRANSFER_REVERSED: 'TRANSFER_REVERSED',
+});
+
+export const PAYMENT_GATEWAYS = Object.freeze({
+    PHONEPE: 'phonepe',
+    RAZORPAY: 'razorpay',
+    CASHFREE: 'cashfree',
+    MANUAL: 'manual',
+});
+
+export const PAYOUT_MODES = Object.freeze({
+    UPI: 'UPI',
+    IMPS: 'IMPS',
+    NEFT: 'NEFT',
+    RTGS: 'RTGS',
+    BANK: 'BANK',
+});
+
+export const PLATFORM_FEES = Object.freeze({
+    SINGLE_SERVICE: 3,
+    BUNDLE: 10,
+});
+
+export const REFUND_FEES = Object.freeze({
+    SINGLE_SERVICE: 7,
+    BUNDLE: 15,
+});
+
+export const BUNDLE_RULES = Object.freeze({
+    MIN_SERVICE_AMOUNT: 300,
+});
 
 // ---------------------------------------------------------------------------
 // Shop Categories

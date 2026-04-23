@@ -9,10 +9,15 @@ import { buildPagination } from '../utils/pagination.utils.js';
 import {
     BOOKING_MILESTONE_TARGETS,
     BOOKING_STATUS,
+    BUNDLE_RULES,
     MAX_RESCHEDULE_COUNT,
     CANCELLATION_WINDOW_HOURS,
+    PAYMENT_STATUS,
+    PAYOUT_STATUS,
+    SERVICE_TYPE,
 } from '../utils/constants.js';
 import { getEffectiveServicePrice, normalizeServicePricing } from '../utils/service-pricing.utils.js';
+import logger from '../utils/logger.js';
 
 /**
  * Booking service — all booking business logic.
@@ -25,6 +30,16 @@ const sumServicePrices = (services = []) => services.reduce(
     (sum, service) => sum + (getEffectiveServicePrice(service) ?? 0),
     0,
 );
+const isBundleSelection = (services = []) => (
+    services.length > 1
+    || services.some((service) => service.serviceType === SERVICE_TYPE.BUNDLED)
+);
+const assertBundleMinimum = (services = [], totalAmount = 0) => {
+    if (!isBundleSelection(services)) return;
+    if (totalAmount >= BUNDLE_RULES.MIN_SERVICE_AMOUNT) return;
+
+    throw new BadRequestError(`Bundle service amount must be at least ₹${BUNDLE_RULES.MIN_SERVICE_AMOUNT}`);
+};
 const MONTH_LABEL_FORMATTER = new Intl.DateTimeFormat('en-US', {
     month: 'long',
     year: 'numeric',
@@ -102,18 +117,26 @@ export const bookSalon = async (userId, data) => {
     if (!employee) throw new BadRequestError('Employee not available at this date/time');
 
     const totalAmount = sumServicePrices(services);
+    assertBundleMinimum(services, totalAmount);
 
-    // Create booking
-    const booking = await bookingRepository.create({
-        customerId,
-        serviceIds,
-        employeeId,
-        shopId,
-        date,
-        time,
-        totalAmount,
-        status: BOOKING_STATUS.CONFIRMED,
-    });
+    let booking;
+    try {
+        booking = await bookingRepository.create({
+            customerId,
+            serviceIds,
+            employeeId,
+            shopId,
+            date,
+            time,
+            totalAmount,
+            status: BOOKING_STATUS.PENDING,
+            paymentStatus: PAYMENT_STATUS.PENDING,
+            payoutStatus: PAYOUT_STATUS.NOT_INITIATED,
+        });
+    } catch (error) {
+        await employeeRepository.releaseSlot(employeeId, date, time);
+        throw error;
+    }
 
     return {
         bookingId: booking._id,
@@ -125,6 +148,9 @@ export const bookSalon = async (userId, data) => {
         time,
         totalAmount,
         status: booking.status,
+        paymentStatus: booking.paymentStatus,
+        payoutStatus: booking.payoutStatus,
+        paymentRequired: true,
     };
 };
 
@@ -159,6 +185,9 @@ export const getBookingDetails = async (bookingId, userId) => {
         totalServices: services.length,
         status: booking.status,
         paymentStatus: booking.paymentStatus,
+        payoutStatus: booking.payoutStatus,
+        paymentTransactionId: booking.paymentTransactionId,
+        merchantOrderId: booking.merchantOrderId,
     };
 };
 
@@ -173,8 +202,8 @@ export const cancelBooking = async (bookingId, userId) => {
         throw new ForbiddenError('You can only cancel your own bookings');
     }
 
-    if (booking.status === 'cancelled') throw new BadRequestError('Booking is already cancelled');
-    if (booking.status === 'completed') throw new BadRequestError('Cannot cancel a completed booking');
+    if (booking.status === BOOKING_STATUS.CANCELLED) throw new BadRequestError('Booking is already cancelled');
+    if (booking.status === BOOKING_STATUS.COMPLETED) throw new BadRequestError('Cannot cancel a completed booking');
 
     // Check if past
     if (!isBookingInFuture(booking.date.toISOString().split('T')[0], booking.time)) {
@@ -188,8 +217,37 @@ export const cancelBooking = async (bookingId, userId) => {
 
     // Release employee slot
     await employeeRepository.releaseSlot(booking.employeeId, booking.date.toISOString().split('T')[0], booking.time);
+    let cancellationNote = null;
 
-    return bookingRepository.updateStatus(bookingId, BOOKING_STATUS.CANCELLED);
+    if (booking.paymentStatus === PAYMENT_STATUS.SUCCESS) {
+        if (![PAYOUT_STATUS.NOT_INITIATED, PAYOUT_STATUS.FAILED, PAYOUT_STATUS.REVERSED].includes(booking.payoutStatus)) {
+            logger.warn('[BookingService] Cannot auto-refund cancelled booking after payout started', { bookingId });
+            cancellationNote = 'Refund requires manual resolution — payout already initiated or completed';
+        } else {
+            try {
+                const { initiateRefund } = await import('./payment.service.js');
+                const refundResult = await initiateRefund(bookingId, 'Booking cancelled by customer');
+
+                logger.info('[BookingService] Auto-refund initiated for cancelled booking', {
+                    bookingId,
+                    refundAmount: refundResult.refundAmount,
+                    deductions: refundResult.deductions,
+                });
+            } catch (error) {
+                logger.error('[BookingService] Auto-refund failed for cancelled booking', {
+                    bookingId,
+                    error: error.message,
+                });
+                cancellationNote = 'Auto-refund failed — manual follow-up required';
+            }
+        }
+    }
+
+    return bookingRepository.updateById(bookingId, {
+        status: BOOKING_STATUS.CANCELLED,
+        cancelledAt: new Date(),
+        cancellationNote,
+    });
 };
 
 // ── Customer: reschedule booking ─────────────────────────────────────────
@@ -267,6 +325,7 @@ export const reorderBooking = async (userId, bookingId, newDate, newTime) => {
         ),
     );
     const totalAmount = sumServicePrices(services);
+    assertBundleMinimum(services, totalAmount);
 
     const employee = await employeeRepository.claimSlot(existing.employeeId, newDate, newTime, {
         shopId: existing.shopId,
@@ -282,10 +341,21 @@ export const reorderBooking = async (userId, bookingId, newDate, newTime) => {
             date: newDate,
             time: newTime,
             totalAmount,
-            status: BOOKING_STATUS.CONFIRMED,
+            status: BOOKING_STATUS.PENDING,
+            paymentStatus: PAYMENT_STATUS.PENDING,
+            payoutStatus: PAYOUT_STATUS.NOT_INITIATED,
         });
 
-        return { bookingId: newBooking._id, employee, services, totalAmount };
+        return {
+            bookingId: newBooking._id,
+            employee,
+            services,
+            totalAmount,
+            status: newBooking.status,
+            paymentStatus: newBooking.paymentStatus,
+            payoutStatus: newBooking.payoutStatus,
+            paymentRequired: true,
+        };
     } catch (err) {
         await employeeRepository.releaseSlot(existing.employeeId, newDate, newTime);
         throw err;
@@ -498,7 +568,26 @@ export const updateBookingStatus = async (bookingId, status, ownerId) => {
         throw new ForbiddenError('You can only manage bookings for your own shop');
     }
 
-    const updated = await bookingRepository.updateStatus(bookingId, status);
+    if (status === BOOKING_STATUS.CONFIRMED && booking.paymentStatus !== PAYMENT_STATUS.SUCCESS) {
+        throw new BadRequestError('Cannot confirm a booking before payment succeeds');
+    }
+
+    if (status === BOOKING_STATUS.COMPLETED && booking.paymentStatus !== PAYMENT_STATUS.SUCCESS) {
+        throw new BadRequestError('Cannot complete a booking before payment succeeds');
+    }
+
+    if (status === BOOKING_STATUS.CANCELLED && booking.paymentStatus === PAYMENT_STATUS.SUCCESS) {
+        throw new BadRequestError('Paid bookings must be refunded through the payment refund flow');
+    }
+
+    const updated = await bookingRepository.updateById(bookingId, {
+        status,
+        cancelledAt: status === BOOKING_STATUS.CANCELLED ? new Date() : booking.cancelledAt,
+        completedAt: status === BOOKING_STATUS.COMPLETED ? new Date() : booking.completedAt,
+        payoutStatus: status === BOOKING_STATUS.COMPLETED
+            ? (booking.payoutStatus || PAYOUT_STATUS.NOT_INITIATED)
+            : booking.payoutStatus,
+    });
     if (!updated) throw new NotFoundError('Booking');
     return updated;
 };
@@ -513,7 +602,9 @@ export const deleteBookingAfterPayment = async (bookingId, ownerId) => {
         throw new ForbiddenError('You can only manage bookings for your own shop');
     }
 
-    if (booking.paymentStatus !== 'success') throw new BadRequestError('Cannot delete unpaid booking');
+    if (booking.paymentStatus === PAYMENT_STATUS.SUCCESS || booking.paymentTransactionId) {
+        throw new BadRequestError('Paid bookings cannot be deleted. Cancel and refund them instead.');
+    }
 
     await employeeRepository.releaseSlot(booking.employeeId, booking.date.toISOString().split('T')[0], booking.time);
     await bookingRepository.deleteById(bookingId);

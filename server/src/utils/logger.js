@@ -43,6 +43,35 @@ export const maskPhoneNumber = (value) => {
         .join('');
 };
 
+export const maskBankAccount = (value) => {
+    if (value === null || value === undefined) return value;
+
+    const raw = String(value).trim();
+    if (!raw) return raw;
+
+    const digits = raw.replace(/\D/g, '');
+    if (digits.length <= 4) return raw;
+
+    const lastFour = digits.slice(-4);
+    return `******${lastFour}`;
+};
+
+export const maskUpiId = (value) => {
+    if (value === null || value === undefined) return value;
+
+    const raw = String(value).trim();
+    if (!raw || !raw.includes('@')) return raw;
+
+    const [handle, domain] = raw.split('@');
+    if (!handle) return raw;
+
+    const visiblePrefix = handle.slice(0, 2);
+    const visibleSuffix = handle.length > 4 ? handle.slice(-2) : '';
+    const maskedMiddle = '*'.repeat(Math.max(handle.length - (visiblePrefix.length + visibleSuffix.length), 2));
+
+    return `${visiblePrefix}${maskedMiddle}${visibleSuffix}@${domain}`;
+};
+
 // ---------------------------------------------------------------------------
 // Sensitive data redaction
 // ---------------------------------------------------------------------------
@@ -114,6 +143,28 @@ const deepRedact = (value) => {
                     cleaned[k] = deepRedact(v);
                 } else {
                     cleaned[k] = maskPhoneNumber(v);
+                }
+            } else if (
+                lowerKey === 'upiid'
+                || lowerKey === 'upi'
+                || lowerKey === 'vpa'
+                || lowerKey.includes('upi')
+                || lowerKey.includes('vpa')
+            ) {
+                if (Array.isArray(v)) {
+                    cleaned[k] = v.map(maskUpiId);
+                } else {
+                    cleaned[k] = maskUpiId(v);
+                }
+            } else if (
+                lowerKey === 'bankaccount'
+                || lowerKey.includes('bankaccount')
+                || lowerKey.includes('accountnumber')
+            ) {
+                if (Array.isArray(v)) {
+                    cleaned[k] = v.map(maskBankAccount);
+                } else {
+                    cleaned[k] = maskBankAccount(v);
                 }
             } else if (
                 lowerKey.includes('password') ||

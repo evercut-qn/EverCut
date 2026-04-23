@@ -1,5 +1,5 @@
 import Booking from '../models/booking.model.js';
-import { BOOKING_STATUS } from '../utils/constants.js';
+import { BOOKING_STATUS, PAYMENT_STATUS, PAYOUT_STATUS } from '../utils/constants.js';
 import { trustQueryOperators } from '../utils/mongoose-query.utils.js';
 
 const EMPLOYEE_POPULATE = {
@@ -27,6 +27,12 @@ class BookingRepository {
         return Booking.findById(id).session(options.session || null);
     }
 
+    async findByIds(ids, options = {}) {
+        return Booking.find({ _id: { $in: ids } })
+            .session(options.session || null)
+            .populate('shopId', 'ownerId upiId accountHolderName bankName payoutConfig ownerName shopName');
+    }
+
     async findByIdPopulated(id) {
         return Booking.findById(id)
             .populate('shopId', 'shopName coverUrl address openTime closeTime')
@@ -42,9 +48,17 @@ class BookingRepository {
         return Booking.findByIdAndUpdate(id, { $set: data }, { new: true });
     }
 
+    async updateManyByIds(ids, data) {
+        return Booking.updateMany(
+            { _id: { $in: ids } },
+            { $set: data },
+        );
+    }
+
     async updateStatus(id, status) {
         const update = { status };
         if (status === BOOKING_STATUS.CANCELLED) update.cancelledAt = new Date();
+        if (status === BOOKING_STATUS.COMPLETED) update.completedAt = new Date();
         return Booking.findByIdAndUpdate(id, update, { new: true });
     }
 
@@ -209,6 +223,14 @@ class BookingRepository {
 
         if (excludeBookingId) filter._id = { $ne: excludeBookingId };
         return Booking.findOne(trustQueryOperators(filter));
+    }
+
+    async findCompletedWithPendingPayout() {
+        return Booking.find(trustQueryOperators({
+            status: BOOKING_STATUS.COMPLETED,
+            payoutStatus: PAYOUT_STATUS.NOT_INITIATED,
+            paymentStatus: PAYMENT_STATUS.SUCCESS,
+        })).populate('shopId', 'ownerId upiId accountHolderName bankName payoutConfig ownerName shopName');
     }
 
     async findByCustomerWithDateRange(customerId, startDate, endDate) {
