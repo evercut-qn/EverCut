@@ -89,7 +89,7 @@
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/barber/bookings",
+        "url": "{{base_url}}/{{api_prefix}}/bookings",
         "description": "Reads the barber booking dashboard payload and captures one ID for status updates plus one paid booking ID for the delete route when available."
       },
       "event": [
@@ -127,7 +127,7 @@
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/barber/bookings/stats",
+        "url": "{{base_url}}/{{api_prefix}}/bookings/stats",
         "description": "Returns booking counts grouped by status."
       },
       "event": [
@@ -156,7 +156,7 @@
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/barber/bookings/progress",
+        "url": "{{base_url}}/{{api_prefix}}/bookings/progress",
         "description": "Returns the current month completed-booking milestone progress card data, including the active status, completed count, visible targets, and next reward gap."
       },
       "event": [
@@ -185,7 +185,7 @@
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/barber/bookings/status?status=confirmed",
+        "url": "{{base_url}}/{{api_prefix}}/bookings/status?status=confirmed",
         "description": "Lists confirmed bookings. `bookSalon` creates bookings in the confirmed state, so this matches the current backend behaviour."
       },
       "event": [
@@ -219,7 +219,7 @@
             "value": "application/json"
           }
         ],
-        "url": "{{base_url}}/{{api_prefix}}/barber/bookings/{{booking_id_status}}/status",
+        "url": "{{base_url}}/{{api_prefix}}/bookings/{{booking_id_status}}/status",
         "description": "Updates the captured booking status. Use `booking_id_status`, not the delete-only booking ID.",
         "body": {
           "mode": "raw",
@@ -257,7 +257,7 @@
       "request": {
         "method": "DELETE",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/barber/bookings/{{booking_id_delete}}",
+        "url": "{{base_url}}/{{api_prefix}}/bookings/{{booking_id_delete}}",
         "description": "Deletes a paid booking only. This succeeds when request 1 captures a booking with `paymentStatus: success`."
       },
       "event": [

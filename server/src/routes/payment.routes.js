@@ -3,8 +3,7 @@ import { Router } from 'express';
 import authenticate from '../middleware/authenticate.middleware.js';
 import { authorize } from '../middleware/authorize.middleware.js';
 import { validate } from '../middleware/validate.middleware.js';
-import * as paymentController from '../controllers/payment/payment.controller.js';
-import * as webhookController from '../controllers/payment/webhook.controller.js';
+import * as paymentController from '../controllers/payment.controller.js';
 import {
     bookingIdParamSchema,
     initiatePaymentSchema,
@@ -15,7 +14,7 @@ import { ROLES } from '../utils/constants.js';
 
 const router = Router();
 
-router.post('/webhook', webhookController.handleWebhook);
+router.post('/webhook', paymentController.handleWebhook);
 router.get('/redirect', paymentController.handleRedirect);
 
 router.post(

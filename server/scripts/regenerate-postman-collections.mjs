@@ -630,7 +630,7 @@ const customerCollection = {
       name: '1. Get Profile',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/customer/profile',
+        url: '{{base_url}}/{{api_prefix}}/customers/me',
         description: 'Returns the current customer data.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -639,7 +639,7 @@ const customerCollection = {
       name: '2. Update Profile',
       ...request({
         method: 'PUT',
-        url: '{{base_url}}/{{api_prefix}}/customer/profile',
+        url: '{{base_url}}/{{api_prefix}}/customers/me',
         description: 'Updates the customer data and reuses the sample image as an optional replacement photo.',
         body: formDataBody([
           textField('firstName', 'Test'),
@@ -656,7 +656,7 @@ const customerCollection = {
       name: '3. Get Homepage',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/customer/homepage',
+        url: '{{base_url}}/{{api_prefix}}/customers/me/home',
         description: 'Returns the compact home-screen payload.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -665,7 +665,7 @@ const customerCollection = {
       name: '4. Get Services By Gender And Capture IDs',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/customer/homepage/services?gender=male&coordinates={{coordinates}}',
+        url: '{{base_url}}/{{api_prefix}}/shops/nearby/services?gender=male&coordinates={{coordinates}}',
         description: 'Uses the shared Bengaluru coordinates so the response includes the barber shop created by onboarding. The script captures the first nearby Postman shop and service IDs.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
@@ -706,7 +706,6 @@ const customerBookingsCollection = {
       textVariable('employee_id', ''),
       textVariable('service_id', ''),
       textVariable('booking_id', ''),
-      textVariable('service_to_remove_id', ''),
       textVariable('booking_date', ''),
       textVariable('booking_update_date', ''),
       textVariable('booking_reschedule_date', ''),
@@ -724,7 +723,7 @@ const customerBookingsCollection = {
       name: '1. Get Upcoming Bookings And Capture IDs',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/customer/bookings?type=upcoming',
+        url: '{{base_url}}/{{api_prefix}}/bookings?type=upcoming',
         description: 'Lists upcoming bookings and captures the first booking ID and first service ID when they already exist.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
@@ -732,9 +731,6 @@ const customerBookingsCollection = {
           'const bookings = Array.isArray(response.data && response.data.items) ? response.data.items : [];',
           'const firstBooking = bookings[0];',
           "if (firstBooking && firstBooking._id) { pm.collectionVariables.set('booking_id', firstBooking._id); pm.globals.set('shared_booking_id', firstBooking._id); }",
-          'const firstService = firstBooking && Array.isArray(firstBooking.serviceIds) ? firstBooking.serviceIds[0] : null;',
-          "const firstServiceId = firstService && firstService._id ? firstService._id : '';",
-          "if (firstServiceId) { pm.collectionVariables.set('service_to_remove_id', firstServiceId); }",
         ),
       }),
     },
@@ -742,7 +738,7 @@ const customerBookingsCollection = {
       name: '2. Get Employee Calendar',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/customer/employees/{{employee_id}}/calendar?date={{calendar_date}}',
+        url: '{{base_url}}/{{api_prefix}}/employees/{{employee_id}}/calendar?date={{calendar_date}}',
         description: 'Checks the captured employee calendar for the generated booking date.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -751,7 +747,7 @@ const customerBookingsCollection = {
       name: '3. Book Salon',
       ...request({
         method: 'POST',
-        url: '{{base_url}}/{{api_prefix}}/customer/bookings',
+        url: '{{base_url}}/{{api_prefix}}/bookings',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
         body: jsonBody(`{
   "serviceId": ["{{service_id}}"],
@@ -766,9 +762,6 @@ const customerBookingsCollection = {
           'const response = pm.response.json();',
           'const bookingId = response.data && response.data.bookingId;',
           "if (bookingId) { pm.collectionVariables.set('booking_id', bookingId); pm.globals.set('shared_booking_id', bookingId); }",
-          'const services = response.data && Array.isArray(response.data.services) ? response.data.services : [];',
-          'const firstService = services[0];',
-          "if (firstService && firstService._id) { pm.collectionVariables.set('service_to_remove_id', firstService._id); }",
         ),
       }),
     },
@@ -776,22 +769,16 @@ const customerBookingsCollection = {
       name: '4. Get Booking Details',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/customer/bookings/{{booking_id}}',
+        url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id}}',
         description: 'Reads the full booking detail payload for the captured booking.',
-        event: testEvent(
-          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
-          'const response = pm.response.json();',
-          'const services = response.data && Array.isArray(response.data.services) ? response.data.services : [];',
-          'const firstService = services[0];',
-          "if (firstService && firstService._id) { pm.collectionVariables.set('service_to_remove_id', firstService._id); }",
-        ),
+        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
     },
     {
       name: '5. Get Booking Confirmation',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/customer/bookings/{{booking_id}}/confirmation',
+        url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id}}/confirmation',
         description: 'Returns the confirmation screen payload for the captured booking.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -800,7 +787,7 @@ const customerBookingsCollection = {
       name: '6. Toggle Favorite',
       ...request({
         method: 'PUT',
-        url: '{{base_url}}/{{api_prefix}}/customer/bookings/{{booking_id}}/favorite',
+        url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id}}/favorite',
         description: 'Adds or removes the current booking from the customer favourites list.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -809,7 +796,7 @@ const customerBookingsCollection = {
       name: '7. Update Booking',
       ...request({
         method: 'PUT',
-        url: '{{base_url}}/{{api_prefix}}/customer/bookings/{{booking_id}}',
+        url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id}}',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
         body: jsonBody(`{
   "employeeId": "{{employee_id}}",
@@ -824,7 +811,7 @@ const customerBookingsCollection = {
       name: '8. Reschedule Booking',
       ...request({
         method: 'PUT',
-        url: '{{base_url}}/{{api_prefix}}/customer/bookings/{{booking_id}}/reschedule',
+        url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id}}/reschedule',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
         body: jsonBody(`{
   "newDate": "{{booking_reschedule_date}}",
@@ -838,7 +825,7 @@ const customerBookingsCollection = {
       name: '9. Reorder Booking',
       ...request({
         method: 'POST',
-        url: '{{base_url}}/{{api_prefix}}/customer/bookings/{{booking_id}}/reorder',
+        url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id}}/reorder',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
         body: jsonBody(`{
   "date": "{{booking_reorder_date}}",
@@ -854,19 +841,10 @@ const customerBookingsCollection = {
       }),
     },
     {
-      name: '10. Delete Service From Booking',
+      name: '10. Cancel Booking',
       ...request({
         method: 'DELETE',
-        url: '{{base_url}}/{{api_prefix}}/customer/bookings/{{booking_id}}/services/{{service_to_remove_id}}',
-        description: 'Removes the captured service from the booking. There is no placeholder path segment left to edit manually.',
-        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
-      }),
-    },
-    {
-      name: '11. Cancel Booking',
-      ...request({
-        method: 'DELETE',
-        url: '{{base_url}}/{{api_prefix}}/customer/bookings/{{booking_id}}',
+        url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id}}',
         description: 'Cancels the currently captured booking. This stays last because it is destructive.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -902,7 +880,7 @@ const customerShopDiscoveryCollection = {
       name: '1. Get Nearby Shops And Capture Shop ID',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/customer/shops/nearby?coordinates={{coordinates}}',
+        url: '{{base_url}}/{{api_prefix}}/shops/nearby?coordinates={{coordinates}}',
         description: 'Finds nearby shops and captures the Postman barber shop ID when it is present.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
@@ -917,7 +895,7 @@ const customerShopDiscoveryCollection = {
       name: '2. Get Shop Info And Capture Service ID',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/customer/shops/{{shop_id}}',
+        url: '{{base_url}}/{{api_prefix}}/shops/{{shop_id}}',
         description: 'Returns the full customer-facing shop payload and captures the first Postman service ID from the embedded service lists.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
@@ -936,7 +914,7 @@ const customerShopDiscoveryCollection = {
       name: '3. Get Doorstep Shops',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/customer/shops/doorstep',
+        url: '{{base_url}}/{{api_prefix}}/shops/doorstep',
         description: 'Lists shops with the Door-Step category.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -945,7 +923,7 @@ const customerShopDiscoveryCollection = {
       name: '4. Search Services',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/customer/search/services?query={{service_search_query}}&gender=male',
+        url: '{{base_url}}/{{api_prefix}}/services/search?query={{service_search_query}}&gender=male',
         description: 'Searches the customer-visible service catalogue for the services created by the barber service collection.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -954,7 +932,7 @@ const customerShopDiscoveryCollection = {
       name: '5. Search Shops',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/customer/search/shops?query={{shop_search_query}}',
+        url: '{{base_url}}/{{api_prefix}}/shops/search?query={{shop_search_query}}',
         description: 'Searches the customer-visible shop catalogue for the Postman barber shop.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -981,7 +959,7 @@ const customerRatingsCollection = {
       name: '1. Get Past Bookings And Capture Completed Shop ID',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/customer/bookings?type=past&limit=100',
+        url: '{{base_url}}/{{api_prefix}}/bookings?type=past&limit=100',
         description: 'Captures a shop ID from the authenticated customer\'s completed past bookings. This request fails the collection clearly when no eligible booking exists for rating.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
@@ -998,7 +976,7 @@ const customerRatingsCollection = {
       name: '2. Add Rating',
       ...request({
         method: 'POST',
-        url: '{{base_url}}/{{api_prefix}}/customer/ratings',
+        url: '{{base_url}}/{{api_prefix}}/ratings',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
         body: jsonBody(`{
   "shopId": "{{shop_id}}",
@@ -1015,7 +993,7 @@ const customerRatingsCollection = {
       name: '3. Get Shop Ratings',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/customer/shops/{{shop_id}}/ratings',
+        url: '{{base_url}}/{{api_prefix}}/ratings/shop/{{shop_id}}',
         description: 'Lists all ratings for the captured shop, including barber replies.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -1024,7 +1002,7 @@ const customerRatingsCollection = {
       name: '4. Get Rating Summary',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/customer/shops/{{shop_id}}/ratings/summary',
+        url: '{{base_url}}/{{api_prefix}}/ratings/shop/{{shop_id}}/summary',
         description: 'Returns the rating summary payload for the captured shop.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -1058,7 +1036,7 @@ const barberProfileCollection = {
       name: '1. Get Profile And Capture Shop ID',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/barber/profile',
+        url: '{{base_url}}/{{api_prefix}}/shops/me',
         description: 'Reads the barber profile and stores the current shop ID for the dependent collections.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
@@ -1072,7 +1050,7 @@ const barberProfileCollection = {
       name: '2. Update Business Info',
       ...request({
         method: 'PUT',
-        url: '{{base_url}}/{{api_prefix}}/barber/profile',
+        url: '{{base_url}}/{{api_prefix}}/shops/me',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
         body: jsonBody(`{
   "email": "test.barber.updated@example.com",
@@ -1111,7 +1089,7 @@ const barberProfileCollection = {
       name: '3. Get UPI Details',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/barber/profile/upi',
+        url: '{{base_url}}/{{api_prefix}}/shops/me/upi',
         description: 'Reads the dedicated UPI payload.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -1120,7 +1098,7 @@ const barberProfileCollection = {
       name: '4. Update UPI Details',
       ...request({
         method: 'PUT',
-        url: '{{base_url}}/{{api_prefix}}/barber/profile/upi',
+        url: '{{base_url}}/{{api_prefix}}/shops/me/upi',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
         body: jsonBody(`{
   "accountHolderName": "Test Barber",
@@ -1135,7 +1113,7 @@ const barberProfileCollection = {
       name: '5. Ensure Shop Is Open',
       ...request({
         method: 'PUT',
-        url: '{{base_url}}/{{api_prefix}}/barber/profile/toggle-status',
+        url: '{{base_url}}/{{api_prefix}}/shops/me/status',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
         body: jsonBody(`{
   "status": true
@@ -1148,7 +1126,7 @@ const barberProfileCollection = {
       name: '6. Update Profile Picture',
       ...request({
         method: 'PUT',
-        url: '{{base_url}}/{{api_prefix}}/barber/profile/picture',
+        url: '{{base_url}}/{{api_prefix}}/shops/me/picture',
         body: formDataBody([fileField('photo', 'Attach profile picture file manually in Postman')]),
         description: 'Uploads or replaces the owner profile picture.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
@@ -1158,7 +1136,7 @@ const barberProfileCollection = {
       name: '7. Update Cover Image',
       ...request({
         method: 'PUT',
-        url: '{{base_url}}/{{api_prefix}}/barber/profile/cover',
+        url: '{{base_url}}/{{api_prefix}}/shops/me/cover',
         body: formDataBody([fileField('cover', 'Attach cover image file manually in Postman')]),
         description: 'Uploads or replaces the shop cover image.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
@@ -1168,7 +1146,7 @@ const barberProfileCollection = {
       name: '8. Update PIN',
       ...request({
         method: 'PUT',
-        url: '{{base_url}}/{{api_prefix}}/barber/profile/pin',
+        url: '{{base_url}}/{{api_prefix}}/shops/me/pin',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
         body: jsonBody(`{
   "currentPin": "{{barber_active_pin}}",
@@ -1195,7 +1173,7 @@ const barberProfileCollection = {
       name: '9A. Sign-Out Everywhere (Terminal)',
       ...request({
         method: 'POST',
-        url: '{{base_url}}/{{api_prefix}}/barber/profile/sign-out-everywhere',
+        url: '{{base_url}}/{{api_prefix}}/shops/me/sign-out-everywhere',
         description: 'Revokes the JWT refresh token, invalidating all sessions. Run this only when you are finished testing.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -1204,7 +1182,7 @@ const barberProfileCollection = {
       name: '9B. Delete Account (Terminal)',
       ...request({
         method: 'DELETE',
-        url: '{{base_url}}/{{api_prefix}}/barber/profile',
+        url: '{{base_url}}/{{api_prefix}}/shops/me',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
         body: jsonBody(`{
   "currentPin": "{{barber_active_pin}}"
@@ -1238,7 +1216,7 @@ const barberEmployeesCollection = {
       name: '1. Get Employees And Capture Existing ID',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/barber/employees',
+        url: '{{base_url}}/{{api_prefix}}/employees',
         description: 'Lists current employees and captures the first Postman employee ID when it already exists.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
@@ -1253,7 +1231,7 @@ const barberEmployeesCollection = {
       name: '2. Add Employee',
       ...request({
         method: 'POST',
-        url: '{{base_url}}/{{api_prefix}}/barber/employees',
+        url: '{{base_url}}/{{api_prefix}}/employees',
         body: formDataBody([
           textField('firstName', 'Postman'),
           textField('lastName', 'Automation'),
@@ -1282,7 +1260,7 @@ const barberEmployeesCollection = {
       name: '3. Update Employee',
       ...request({
         method: 'PUT',
-        url: '{{base_url}}/{{api_prefix}}/barber/employees/{{employee_id}}',
+        url: '{{base_url}}/{{api_prefix}}/employees/{{employee_id}}',
         body: formDataBody([
           textField('firstName', 'Postman'),
           textField('lastName', 'Automation Updated'),
@@ -1298,7 +1276,7 @@ const barberEmployeesCollection = {
       name: '4. Delete Employee (Terminal)',
       ...request({
         method: 'DELETE',
-        url: '{{base_url}}/{{api_prefix}}/barber/employees/{{employee_id}}',
+        url: '{{base_url}}/{{api_prefix}}/employees/{{employee_id}}',
         description: 'Soft-deletes the captured employee. Run this last because later collections may still need the shared employee ID.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
@@ -1333,7 +1311,7 @@ const barberServicesCollection = {
       name: '1. Get Services And Capture Existing ID',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/barber/services',
+        url: '{{base_url}}/{{api_prefix}}/services',
         description: 'Lists current services and captures the first Postman service ID when it already exists.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
@@ -1348,7 +1326,7 @@ const barberServicesCollection = {
       name: '2. Add Single Service',
       ...request({
         method: 'POST',
-        url: '{{base_url}}/{{api_prefix}}/barber/services',
+        url: '{{base_url}}/{{api_prefix}}/services',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
         body: jsonBody(`{
   "serviceName": "{{single_service_name}}",
@@ -1376,7 +1354,7 @@ const barberServicesCollection = {
       name: '3. Add Bundled Service',
       ...request({
         method: 'POST',
-        url: '{{base_url}}/{{api_prefix}}/barber/services',
+        url: '{{base_url}}/{{api_prefix}}/services',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
         body: jsonBody(`{
   "serviceName": "{{bundled_service_name}}",
@@ -1400,7 +1378,7 @@ const barberServicesCollection = {
       name: '4. Update Service',
       ...request({
         method: 'PUT',
-        url: '{{base_url}}/{{api_prefix}}/barber/services/{{service_id}}',
+        url: '{{base_url}}/{{api_prefix}}/services/{{service_id}}',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
         body: jsonBody(`{
   "serviceFor": "unisex"
@@ -1413,7 +1391,7 @@ const barberServicesCollection = {
       name: '5. Delete Service (Terminal)',
       ...request({
         method: 'DELETE',
-        url: '{{base_url}}/{{api_prefix}}/barber/services/{{service_id}}',
+        url: '{{base_url}}/{{api_prefix}}/services/{{service_id}}',
         description: 'Soft-deletes the captured service. Run this last because customer discovery and booking flows depend on the shared service ID.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
@@ -1450,7 +1428,7 @@ const barberBookingsCollection = {
       name: '1. Get All Bookings And Capture IDs',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/barber/bookings',
+        url: '{{base_url}}/{{api_prefix}}/bookings',
         description: 'Reads the barber booking dashboard payload and captures one ID for status updates plus one paid booking ID for the delete route when available.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
@@ -1470,7 +1448,7 @@ const barberBookingsCollection = {
       name: '2. Get Booking Stats',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/barber/bookings/stats',
+        url: '{{base_url}}/{{api_prefix}}/bookings/stats',
         description: 'Returns booking counts grouped by status.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -1479,7 +1457,7 @@ const barberBookingsCollection = {
       name: '3. Get Booking Milestone Progress',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/barber/bookings/progress',
+        url: '{{base_url}}/{{api_prefix}}/bookings/progress',
         description: 'Returns the current month completed-booking milestone progress card data, including the active status, completed count, visible targets, and next reward gap.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -1488,7 +1466,7 @@ const barberBookingsCollection = {
       name: '4. Get Confirmed Bookings',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/barber/bookings/status?status=confirmed',
+        url: '{{base_url}}/{{api_prefix}}/bookings/status?status=confirmed',
         description: 'Lists confirmed bookings. `bookSalon` creates bookings in the confirmed state, so this matches the current backend behaviour.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -1497,7 +1475,7 @@ const barberBookingsCollection = {
       name: '5. Update Booking Status',
       ...request({
         method: 'PUT',
-        url: '{{base_url}}/{{api_prefix}}/barber/bookings/{{booking_id_status}}/status',
+        url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id_status}}/status',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
         body: jsonBody(`{
   "status": "completed"
@@ -1510,7 +1488,7 @@ const barberBookingsCollection = {
       name: '6. Delete Paid Booking (Terminal)',
       ...request({
         method: 'DELETE',
-        url: '{{base_url}}/{{api_prefix}}/barber/bookings/{{booking_id_delete}}',
+        url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id_delete}}',
         description: 'Deletes a paid booking only. This succeeds when request 1 captures a booking with `paymentStatus: success`.',
         event: testEvent(
           "pm.test('status is 200 or 400', function () { pm.expect(pm.response.code).to.be.oneOf([200, 400]); });",
@@ -1542,7 +1520,7 @@ const barberPhotosCollection = {
       name: '1. Get All Photos And Capture Existing ID',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/barber/photos',
+        url: '{{base_url}}/{{api_prefix}}/photos',
         description: 'Lists the current gallery and captures the first photo ID. Barber onboarding already creates three gallery photos.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
@@ -1557,7 +1535,7 @@ const barberPhotosCollection = {
       name: '2. Upload Photos',
       ...request({
         method: 'POST',
-        url: '{{base_url}}/{{api_prefix}}/barber/photos',
+        url: '{{base_url}}/{{api_prefix}}/photos',
         body: formDataBody([
           fileField('photos', 'Attach photo file manually in Postman'),
           textField('photoType', 'shop_interior'),
@@ -1577,7 +1555,7 @@ const barberPhotosCollection = {
       name: '3. Get Photo Stats',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/barber/photos/stats',
+        url: '{{base_url}}/{{api_prefix}}/photos/stats',
         description: 'Returns photo counts and storage totals.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -1586,7 +1564,7 @@ const barberPhotosCollection = {
       name: '4. Get Photo By ID',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/barber/photos/{{photo_id}}',
+        url: '{{base_url}}/{{api_prefix}}/photos/{{photo_id}}',
         description: 'Reads the currently captured photo record.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -1595,7 +1573,7 @@ const barberPhotosCollection = {
       name: '5. Delete Photo (Terminal)',
       ...request({
         method: 'DELETE',
-        url: '{{base_url}}/{{api_prefix}}/barber/photos/{{photo_id}}',
+        url: '{{base_url}}/{{api_prefix}}/photos/{{photo_id}}',
         description: 'Deletes the captured photo from both MongoDB and Cloudinary. Run this last if later requests still need the shared photo ID.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
@@ -1625,7 +1603,7 @@ const barberEarningsCollection = {
       name: '1. Get Earnings',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/barber/earnings',
+        url: '{{base_url}}/{{api_prefix}}/earnings',
         description: 'Returns `totalEarning`, `lastMonthEarning`, and `todayEarning` across the barber shop employees.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -1654,7 +1632,7 @@ const barberRatingsCollection = {
       name: '1. Get Ratings And Capture Seeded IDs',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/barber/ratings',
+        url: '{{base_url}}/{{api_prefix}}/ratings',
         description: 'Run this first. It captures the three seeded rating IDs created by `node scripts/seed-barber-rating-mock-data.js`.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
@@ -1678,7 +1656,7 @@ const barberRatingsCollection = {
       name: '2. Get Rating Summary',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/barber/ratings/summary',
+        url: '{{base_url}}/{{api_prefix}}/ratings/summary',
         description: 'Returns aggregate rating metrics for the authenticated barber shop.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -1687,7 +1665,7 @@ const barberRatingsCollection = {
       name: '3. Add Reply',
       ...request({
         method: 'POST',
-        url: '{{base_url}}/{{api_prefix}}/barber/ratings/{{rating_id_add_reply}}/reply',
+        url: '{{base_url}}/{{api_prefix}}/ratings/{{rating_id_add_reply}}/reply',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
         body: jsonBody(`{
   "replyText": "Thanks for the feedback. We appreciate your visit."
@@ -1702,7 +1680,7 @@ const barberRatingsCollection = {
       name: '4. Update Reply',
       ...request({
         method: 'PUT',
-        url: '{{base_url}}/{{api_prefix}}/barber/ratings/{{rating_id_update_reply}}/reply',
+        url: '{{base_url}}/{{api_prefix}}/ratings/{{rating_id_update_reply}}/reply',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
         body: jsonBody(`{
   "replyText": "Updated reply from Postman for the seeded barber rating flow."
@@ -1715,7 +1693,7 @@ const barberRatingsCollection = {
       name: '5. Delete Reply',
       ...request({
         method: 'DELETE',
-        url: '{{base_url}}/{{api_prefix}}/barber/ratings/{{rating_id_update_reply}}/reply',
+        url: '{{base_url}}/{{api_prefix}}/ratings/{{rating_id_update_reply}}/reply',
         description: 'Deletes the reply from the same seeded rating used by the update step.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -1724,7 +1702,7 @@ const barberRatingsCollection = {
       name: '6. Remove Rating',
       ...request({
         method: 'DELETE',
-        url: '{{base_url}}/{{api_prefix}}/barber/ratings/{{rating_id_remove_rating}}',
+        url: '{{base_url}}/{{api_prefix}}/ratings/{{rating_id_remove_rating}}',
         description: 'Deletes the seeded rating dedicated to the remove-rating route.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -2001,3 +1979,4 @@ writeCollection('12-barber-earnings.json', barberEarningsCollection);
 writeCollection('13-barber-ratings.json', barberRatingsCollection);
 writeCollection('14-payments-payouts.json', paymentsPayoutsCollection);
 writeFileSync(resolve(COLLECTIONS_DIR, 'EverCut.postman_environment.json'), `${JSON.stringify(environmentTemplate, null, 2)}\n`);
+

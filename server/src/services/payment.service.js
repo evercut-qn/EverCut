@@ -238,15 +238,17 @@ const logIgnoredPaymentTransition = (message, payment, nextState) => {
 };
 
 const assertRefundPermission = async (actor, booking) => {
-    if (!actor?.role) {
+    const actorRole = actor?.roleType || actor?.role;
+
+    if (!actorRole) {
         return;
     }
 
-    if (actor.role === ROLES.ADMIN) {
+    if (actorRole === ROLES.ADMIN) {
         return;
     }
 
-    if (actor.role !== ROLES.BARBER) {
+    if (actorRole !== ROLES.BARBER) {
         throw new ForbiddenError('You are not allowed to initiate refunds');
     }
 

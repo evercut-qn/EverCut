@@ -82,7 +82,7 @@
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/customer/bookings?type=past&limit=100",
+        "url": "{{base_url}}/{{api_prefix}}/bookings?type=past&limit=100",
         "description": "Captures a shop ID from the authenticated customer's completed past bookings. This request fails the collection clearly when no eligible booking exists for rating."
       },
       "event": [
@@ -122,7 +122,7 @@
             "value": "application/json"
           }
         ],
-        "url": "{{base_url}}/{{api_prefix}}/customer/ratings",
+        "url": "{{base_url}}/{{api_prefix}}/ratings",
         "description": "Creates a new rating for the captured shop from the customer's completed booking history. The API allows only one rating per customer per shop, so reruns return 409 instead of 201 after the first success.",
         "body": {
           "mode": "raw",
@@ -160,7 +160,7 @@
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/customer/shops/{{shop_id}}/ratings",
+        "url": "{{base_url}}/{{api_prefix}}/ratings/shop/{{shop_id}}",
         "description": "Lists all ratings for the captured shop, including barber replies."
       },
       "event": [
@@ -189,7 +189,7 @@
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/customer/shops/{{shop_id}}/ratings/summary",
+        "url": "{{base_url}}/{{api_prefix}}/ratings/shop/{{shop_id}}/summary",
         "description": "Returns the rating summary payload for the captured shop."
       },
       "event": [

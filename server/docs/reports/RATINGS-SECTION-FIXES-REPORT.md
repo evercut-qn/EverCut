@@ -1,4 +1,6 @@
-# EverCut Backend - Ratings Section Fix Report
+﻿# Ratings Section Fixes Report
+
+> Legacy snapshot: This document records findings against the pre-2026-04-24 role-prefixed routing layout and removed `controllers/customer/*` / `controllers/barber/*` files. Treat route and file references here as historical unless explicitly updated. For the current API surface, see [ROUTING-STRATEGY-ANALYSIS](../architecture/ROUTING-STRATEGY-ANALYSIS.md).
 
 > **Generated:** 2026-03-20  
 > **Primary scope:** `server/src/routes/customer.routes.js` and `server/src/routes/barber.routes.js` rating endpoints, plus the connected rating data consumers.

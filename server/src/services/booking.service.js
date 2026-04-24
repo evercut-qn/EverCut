@@ -66,6 +66,33 @@ const getDefaultProgressPeriod = () => {
     };
 };
 
+const buildBookingDetailsPayload = async (booking) => {
+    const services = normalizeBookedServices(
+        await serviceRepository.findByIds(
+            booking.serviceIds,
+            'serviceName finalPrice totalPrice actualPrice offerPrice imageUrl serviceType',
+        ),
+    );
+    const totalAmount = sumServicePrices(services);
+
+    return {
+        bookingId: booking._id,
+        customer: booking.customerId,
+        employee: booking.employeeId,
+        shop: booking.shopId,
+        date: booking.date,
+        time: booking.time,
+        services,
+        totalAmount,
+        totalServices: services.length,
+        status: booking.status,
+        paymentStatus: booking.paymentStatus,
+        payoutStatus: booking.payoutStatus,
+        paymentTransactionId: booking.paymentTransactionId,
+        merchantOrderId: booking.merchantOrderId,
+    };
+};
+
 export const bookSalon = async (userId, data) => {
     const { serviceId, employeeId, shopId, date, time } = data;
 
@@ -165,30 +192,22 @@ export const getBookingDetails = async (bookingId, userId) => {
         throw new ForbiddenError('You can only access your own bookings');
     }
 
-    const services = normalizeBookedServices(
-        await serviceRepository.findByIds(
-            booking.serviceIds,
-            'serviceName finalPrice totalPrice actualPrice offerPrice imageUrl serviceType',
-        ),
-    );
-    const totalAmount = sumServicePrices(services);
+    return buildBookingDetailsPayload(booking);
+};
 
-    return {
-        bookingId: booking._id,
-        customer: booking.customerId,
-        employee: booking.employeeId,
-        shop: booking.shopId,
-        date: booking.date,
-        time: booking.time,
-        services,
-        totalAmount,
-        totalServices: services.length,
-        status: booking.status,
-        paymentStatus: booking.paymentStatus,
-        payoutStatus: booking.payoutStatus,
-        paymentTransactionId: booking.paymentTransactionId,
-        merchantOrderId: booking.merchantOrderId,
-    };
+export const getBookingDetailsForShopOwner = async (bookingId, ownerId) => {
+    const booking = await bookingRepository.findByIdPopulated(bookingId);
+    if (!booking) throw new NotFoundError('Booking');
+
+    const shop = await shopRepository.findByOwnerId(ownerId);
+    if (!shop) throw new NotFoundError('Shop');
+
+    const bookingShopId = booking.shopId?._id || booking.shopId;
+    if (bookingShopId.toString() !== shop._id.toString()) {
+        throw new ForbiddenError('You can only access bookings for your own shop');
+    }
+
+    return buildBookingDetailsPayload(booking);
 };
 
 // ── Customer: cancel booking ─────────────────────────────────────────────

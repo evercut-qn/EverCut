@@ -94,7 +94,7 @@
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/barber/profile",
+        "url": "{{base_url}}/{{api_prefix}}/shops/me",
         "description": "Reads the barber profile and stores the current shop ID for the dependent collections."
       },
       "event": [
@@ -131,7 +131,7 @@
             "value": "application/json"
           }
         ],
-        "url": "{{base_url}}/{{api_prefix}}/barber/profile",
+        "url": "{{base_url}}/{{api_prefix}}/shops/me",
         "description": "Updates the barber profile using the onboarding-friendly request shape that the backend validators actually accept.",
         "body": {
           "mode": "raw",
@@ -169,7 +169,7 @@
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/barber/profile/upi",
+        "url": "{{base_url}}/{{api_prefix}}/shops/me/upi",
         "description": "Reads the dedicated UPI payload."
       },
       "event": [
@@ -203,7 +203,7 @@
             "value": "application/json"
           }
         ],
-        "url": "{{base_url}}/{{api_prefix}}/barber/profile/upi",
+        "url": "{{base_url}}/{{api_prefix}}/shops/me/upi",
         "description": "Updates only the dedicated payment fields.",
         "body": {
           "mode": "raw",
@@ -246,7 +246,7 @@
             "value": "application/json"
           }
         ],
-        "url": "{{base_url}}/{{api_prefix}}/barber/profile/toggle-status",
+        "url": "{{base_url}}/{{api_prefix}}/shops/me/status",
         "description": "Explicitly opens the shop so customer discovery and bookings can run immediately after this collection.",
         "body": {
           "mode": "raw",
@@ -284,7 +284,7 @@
       "request": {
         "method": "PUT",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/barber/profile/picture",
+        "url": "{{base_url}}/{{api_prefix}}/shops/me/picture",
         "description": "Uploads or replaces the owner profile picture.",
         "body": {
           "mode": "formdata",
@@ -323,7 +323,7 @@
       "request": {
         "method": "PUT",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/barber/profile/cover",
+        "url": "{{base_url}}/{{api_prefix}}/shops/me/cover",
         "description": "Uploads or replaces the shop cover image.",
         "body": {
           "mode": "formdata",
@@ -367,7 +367,7 @@
             "value": "application/json"
           }
         ],
-        "url": "{{base_url}}/{{api_prefix}}/barber/profile/pin",
+        "url": "{{base_url}}/{{api_prefix}}/shops/me/pin",
         "description": "Flips the barber PIN between 1234 and 5678 so the request stays rerunnable.",
         "body": {
           "mode": "raw",
@@ -419,7 +419,7 @@
       "request": {
         "method": "POST",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/barber/profile/sign-out-everywhere",
+        "url": "{{base_url}}/{{api_prefix}}/shops/me/sign-out-everywhere",
         "description": "Revokes the JWT refresh token, invalidating all sessions. Run this only when you are finished testing."
       },
       "event": [
@@ -453,7 +453,7 @@
             "value": "application/json"
           }
         ],
-        "url": "{{base_url}}/{{api_prefix}}/barber/profile",
+        "url": "{{base_url}}/{{api_prefix}}/shops/me",
         "description": "Soft-deletes the barber account and revokes the JWT refresh token. Run this instead of the sign-out request when you want the account deleted.",
         "body": {
           "mode": "raw",

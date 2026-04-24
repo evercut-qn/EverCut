@@ -1,6 +1,6 @@
-import * as photoService from '../../services/photo.service.js';
-import { ApiResponse } from '../../utils/api-response.js';
-import { getValidatedRequestData } from '../../utils/request-validation.utils.js';
+import * as photoService from '../services/photo.service.js';
+import { ApiResponse } from '../utils/api-response.js';
+import { getValidatedRequestData } from '../utils/request-validation.utils.js';
 
 export const uploadPhotos = async (req, res, next) => {
     try {

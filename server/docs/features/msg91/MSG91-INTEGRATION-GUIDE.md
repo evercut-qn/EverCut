@@ -1394,9 +1394,9 @@ In the new design, `authenticate` is used only on routes that require a fully on
 
 > **Onboarding routes** use `authenticateOnboarding` and then read `req.onboardingContext`. Customer/barber route groups continue to use `authenticate` plus `authorize(ROLES.CUSTOMER)` or `authorize(ROLES.BARBER)`. Logged-in non-role routes such as logout use `authenticate` only.
 
-### 7.9 Update Barber Profile Controller & Clean Up Scripts
+### 7.9 Update Shop Account Controller & Clean Up Scripts
 
-**File:** `src/controllers/barber/barber-profile.controller.js`
+**Current file:** `src/controllers/shop.controller.js`
 
 ```diff
 - const result = await accountService.signOutEverywhere(req.user.firebaseUid);

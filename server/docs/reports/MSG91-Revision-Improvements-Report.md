@@ -1,4 +1,6 @@
-# MSG91 OTP Integration Guide — Revision Improvements Report
+﻿# Msg91 Revision Improvements Report
+
+> Legacy snapshot: This document records findings against the pre-2026-04-24 role-prefixed routing layout and removed `controllers/customer/*` / `controllers/barber/*` files. Treat route and file references here as historical unless explicitly updated. For the current API surface, see [ROUTING-STRATEGY-ANALYSIS](../architecture/ROUTING-STRATEGY-ANALYSIS.md).
 
 > **Project:** EverCut Backend — Firebase → MSG91 + JWT Migration
 > **Prepared:** March 16, 2026

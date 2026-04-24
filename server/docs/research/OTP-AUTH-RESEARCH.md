@@ -1034,7 +1034,7 @@ Given that EverCut is an **India-focused barbershop booking app** that already u
 │       ↓                                                            │
 │  Your Backend (EverCut API)                                        │
 │       ↓                                                            │
-│  2. Backend calls MSG91 Send OTP API  ←── ~₹0.21/SMS              │
+│  2. Backend calls MSG91 Send OTP API  ←── ~₹0.21/SMS               │
 │       ↓                                                            │
 │  MSG91 delivers OTP via SMS to user                                │
 │       ↓                                                            │
@@ -1052,7 +1052,7 @@ Given that EverCut is an **India-focused barbershop booking app** that already u
 │       ↓                                                            │
 │  Authenticate all subsequent requests with Access Token            │
 │                                                                    │
-│  Monthly savings vs Firebase: ~₹625/month (per 1,000 OTPs)        │
+│  Monthly savings vs Firebase: ~₹625/month (per 1,000 OTPs)         │
 │                 ~₹34,200/month (per 50,000 OTPs)                   │
 └────────────────────────────────────────────────────────────────────┘
 ```

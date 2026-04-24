@@ -11,8 +11,8 @@ const readSource = (relativePath) => readFile(path.join(srcDir, relativePath), '
 
 test('customer service-removal booking API and support symbols are removed', async () => {
     const files = [
-        'routes/customer.routes.js',
-        'controllers/customer/customer-booking.controller.js',
+        'routes/bookings.routes.js',
+        'controllers/booking.controller.js',
         'services/booking.service.js',
         'validators/booking.validator.js',
     ];

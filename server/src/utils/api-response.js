@@ -53,13 +53,14 @@ export class ApiResponse {
      * @param {Object} pagination
      * @param {string} message
      */
-    static paginated(items, pagination, message = 'Success') {
+    static paginated(items, pagination, message = 'Success', extraData = {}) {
         return {
             success: true,
             message,
             data: {
                 items,
                 pagination,
+                ...normalizeData(extraData),
             },
         };
     }

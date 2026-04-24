@@ -104,7 +104,7 @@
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/customer/shops/nearby?coordinates={{coordinates}}",
+        "url": "{{base_url}}/{{api_prefix}}/shops/nearby?coordinates={{coordinates}}",
         "description": "Finds nearby shops and captures the Postman barber shop ID when it is present."
       },
       "event": [
@@ -137,7 +137,7 @@
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/customer/shops/{{shop_id}}",
+        "url": "{{base_url}}/{{api_prefix}}/shops/{{shop_id}}",
         "description": "Returns the full customer-facing shop payload and captures the first Postman service ID from the embedded service lists."
       },
       "event": [
@@ -174,7 +174,7 @@
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/customer/shops/doorstep",
+        "url": "{{base_url}}/{{api_prefix}}/shops/doorstep",
         "description": "Lists shops with the Door-Step category."
       },
       "event": [
@@ -203,7 +203,7 @@
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/customer/search/services?query={{service_search_query}}&gender=male",
+        "url": "{{base_url}}/{{api_prefix}}/services/search?query={{service_search_query}}&gender=male",
         "description": "Searches the customer-visible service catalogue for the services created by the barber service collection."
       },
       "event": [
@@ -232,7 +232,7 @@
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/customer/search/shops?query={{shop_search_query}}",
+        "url": "{{base_url}}/{{api_prefix}}/shops/search?query={{shop_search_query}}",
         "description": "Searches the customer-visible shop catalogue for the Postman barber shop."
       },
       "event": [

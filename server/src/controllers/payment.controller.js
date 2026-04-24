@@ -1,6 +1,26 @@
-import * as paymentService from '../../services/payment.service.js';
-import { ApiResponse } from '../../utils/api-response.js';
-import { getValidatedRequestData } from '../../utils/request-validation.utils.js';
+import * as paymentService from '../services/payment.service.js';
+import { ApiResponse } from '../utils/api-response.js';
+import { getValidatedRequestData } from '../utils/request-validation.utils.js';
+import logger from '../utils/logger.js';
+
+export const handleWebhook = async (req, res) => {
+    try {
+        const result = await paymentService.handleWebhook(req.headers, req.body);
+
+        logger.info('[PaymentController] Webhook processed', {
+            event: result.event,
+            processed: result.processed,
+        });
+
+        return res.status(200).json({ received: true });
+    } catch (error) {
+        logger.error('[PaymentController] Webhook processing error', {
+            error: error.message,
+        });
+
+        return res.status(200).json({ received: true, error: 'processing_error' });
+    }
+};
 
 export const initiatePayment = async (req, res, next) => {
     try {
@@ -46,7 +66,7 @@ export const initiateRefund = async (req, res, next) => {
         const { bookingId } = getValidatedRequestData(req, 'params');
         const { reason } = getValidatedRequestData(req, 'body');
         const result = await paymentService.initiateRefund(bookingId, reason, {
-            role: req.user.role,
+            roleType: req.user.roleType,
             userId: req.user._id,
         });
         return res.status(200).json(ApiResponse.success(result, 'Refund initiated'));

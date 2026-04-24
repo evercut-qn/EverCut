@@ -1,5 +1,5 @@
-import * as earningsService from '../../services/earnings.service.js';
-import { ApiResponse } from '../../utils/api-response.js';
+import * as earningsService from '../services/earnings.service.js';
+import { ApiResponse } from '../utils/api-response.js';
 
 export const getEarnings = async (req, res, next) => {
     try {

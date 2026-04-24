@@ -1,4 +1,4 @@
-# Payment & Payout System — Implementation Guide
+﻿# Payment & Payout System — Implementation Guide
 
 > **EverCut Salon Booking Platform**
 > Version: 2.0 | Last Updated: April 2026
@@ -47,9 +47,9 @@ graph TB
     subgraph "EverCut Backend"
         RC[Route Layer<br/>payment.routes.js<br/>payout.routes.js]
         PC[Payment Controller<br/>payment.controller.js]
-        WC[Webhook Controller<br/>webhook.controller.js]
+        PCW[Payment Controller<br/>handleWebhook()]
         POC[Payout Controller<br/>payout.controller.js]
-        POWC[Payout Webhook<br/>payout-webhook.controller.js]
+        POCW[Payout Controller<br/>handlePayoutWebhook()]
         PS[Payment Service<br/>payment.service.js]
         POS[Payout Service<br/>payout.service.js]
         BS[Booking Service<br/>booking.service.js]
@@ -91,10 +91,10 @@ graph TB
     PR --> DB
     POR --> DB
     BR --> DB
-    PPE -->|"Webhook POST"| WC
-    CFE -->|"Webhook POST"| POWC
-    WC --> PS
-    POWC --> POS
+    PPE -->|"Webhook POST"| PCW
+    CFE -->|"Webhook POST"| POCW
+    PCW --> PS
+    POCW --> POS
     CRON1 --> PS
     CRON2 --> POS
 ```
@@ -203,12 +203,8 @@ server/src/
 │       └── cashfree.constants.js           # Cashfree-specific constants
 │
 ├── controllers/
-│   ├── payment/
-│   │   ├── payment.controller.js           # Customer-facing payment actions
-│   │   └── webhook.controller.js           # PhonePe webhook handler
-│   └── payout/
-│       ├── payout.controller.js            # Payout management actions
-│       └── payout-webhook.controller.js    # Cashfree webhook handler
+│   ├── payment.controller.js               # Payment actions + PhonePe webhook handler
+│   └── payout.controller.js                # Payout retry + Cashfree webhook handler
 │
 ├── models/
 │   ├── payment-transaction.model.js        # PaymentTransaction schema
@@ -2604,7 +2600,7 @@ async function _ensureBeneficiary(barber, beneficiaryId) {
 ## 10. Payment Controller
 
 ```javascript
-// server/src/controllers/payment/payment.controller.js
+// server/src/controllers/payment.controller.js
 
 import * as paymentService from '../../services/payment.service.js';
 import { ApiResponse } from '../../utils/api-response.js';
@@ -2669,7 +2665,7 @@ export const initiateRefund = async (req, res, next) => {
 ### 11.1 Payout Controller
 
 ```javascript
-// server/src/controllers/payout/payout.controller.js
+// server/src/controllers/payout.controller.js
 
 import * as payoutService from '../../services/payout.service.js';
 import { ApiResponse } from '../../utils/api-response.js';
@@ -2693,7 +2689,7 @@ export const retryPayout = async (req, res, next) => {
 ### 11.2 Payout Webhook Controller
 
 ```javascript
-// server/src/controllers/payout/payout-webhook.controller.js
+// server/src/controllers/payout.controller.js
 
 import * as payoutService from '../../services/payout.service.js';
 import logger from '../../utils/logger.js';
@@ -2744,7 +2740,7 @@ export const handlePayoutWebhook = async (req, res) => {
 ## 12. Webhook Controller — PhonePe
 
 ```javascript
-// server/src/controllers/payment/webhook.controller.js
+// server/src/controllers/payment.controller.js
 
 import * as paymentService from '../../services/payment.service.js';
 import logger from '../../utils/logger.js';
@@ -2790,8 +2786,7 @@ export const handleWebhook = async (req, res) => {
 // server/src/routes/payment.routes.js
 
 import { Router } from 'express';
-import * as paymentController from '../controllers/payment/payment.controller.js';
-import * as webhookController from '../controllers/payment/webhook.controller.js';
+import * as paymentController from '../controllers/payment.controller.js';
 import authenticate from '../middleware/authenticate.middleware.js';
 import { authorize } from '../middleware/authorize.middleware.js';
 import { validate } from '../middleware/validate.middleware.js';
@@ -2806,7 +2801,7 @@ import { ROLES } from '../utils/constants.js';
 const router = Router();
 
 // ─── Public Routes (No Auth) ───
-router.post('/webhook', webhookController.handleWebhook);
+router.post('/webhook', paymentController.handleWebhook);
 router.get('/redirect', paymentController.handleRedirect);
 
 // ─── Protected Routes ───
@@ -2850,8 +2845,7 @@ export default router;
 // server/src/routes/payout.routes.js
 
 import { Router } from 'express';
-import * as payoutController from '../controllers/payout/payout.controller.js';
-import * as payoutWebhookController from '../controllers/payout/payout-webhook.controller.js';
+import * as payoutController from '../controllers/payout.controller.js';
 import authenticate from '../middleware/authenticate.middleware.js';
 import { authorize } from '../middleware/authorize.middleware.js';
 import { validate } from '../middleware/validate.middleware.js';
@@ -2862,7 +2856,7 @@ const router = Router();
 
 // ─── Public Routes (No Auth) ───
 // Cashfree payout webhook — MUST be public, no auth middleware
-router.post('/webhook', payoutWebhookController.handlePayoutWebhook);
+router.post('/webhook', payoutController.handlePayoutWebhook);
 
 // ─── Protected Routes ───
 // Retry a failed payout (admin only)

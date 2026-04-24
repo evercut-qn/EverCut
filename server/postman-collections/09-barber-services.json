@@ -93,7 +93,7 @@
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/barber/services",
+        "url": "{{base_url}}/{{api_prefix}}/services",
         "description": "Lists current services and captures the first Postman service ID when it already exists."
       },
       "event": [
@@ -131,7 +131,7 @@
             "value": "application/json"
           }
         ],
-        "url": "{{base_url}}/{{api_prefix}}/barber/services",
+        "url": "{{base_url}}/{{api_prefix}}/services",
         "description": "Creates a single service using only fields that the API validator accepts.",
         "body": {
           "mode": "raw",
@@ -186,7 +186,7 @@
             "value": "application/json"
           }
         ],
-        "url": "{{base_url}}/{{api_prefix}}/barber/services",
+        "url": "{{base_url}}/{{api_prefix}}/services",
         "description": "Creates a bundled service using the fields required by the backend validator.",
         "body": {
           "mode": "raw",
@@ -238,7 +238,7 @@
             "value": "application/json"
           }
         ],
-        "url": "{{base_url}}/{{api_prefix}}/barber/services/{{service_id}}",
+        "url": "{{base_url}}/{{api_prefix}}/services/{{service_id}}",
         "description": "Updates the captured service with a validator-approved field.",
         "body": {
           "mode": "raw",
@@ -276,7 +276,7 @@
       "request": {
         "method": "DELETE",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/barber/services/{{service_id}}",
+        "url": "{{base_url}}/{{api_prefix}}/services/{{service_id}}",
         "description": "Soft-deletes the captured service. Run this last because customer discovery and booking flows depend on the shared service ID."
       },
       "event": [

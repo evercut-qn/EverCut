@@ -947,7 +947,7 @@ Events: All transfer events
 **Webhook handler:**
 
 ```javascript
-// server/src/controllers/payout/payout-webhook.controller.js
+// server/src/controllers/payout.controller.js
 
 import crypto from 'crypto';
 import { PayoutTransaction } from '../../models/payout-transaction.model.js';

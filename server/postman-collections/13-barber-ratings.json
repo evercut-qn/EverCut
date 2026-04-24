@@ -92,7 +92,7 @@
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/barber/ratings",
+        "url": "{{base_url}}/{{api_prefix}}/ratings",
         "description": "Run this first. It captures the three seeded rating IDs created by `node scripts/seed-barber-rating-mock-data.js`."
       },
       "event": [
@@ -134,7 +134,7 @@
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/barber/ratings/summary",
+        "url": "{{base_url}}/{{api_prefix}}/ratings/summary",
         "description": "Returns aggregate rating metrics for the authenticated barber shop."
       },
       "event": [
@@ -168,7 +168,7 @@
             "value": "application/json"
           }
         ],
-        "url": "{{base_url}}/{{api_prefix}}/barber/ratings/{{rating_id_add_reply}}/reply",
+        "url": "{{base_url}}/{{api_prefix}}/ratings/{{rating_id_add_reply}}/reply",
         "description": "Adds a reply to the seeded rating that has no reply yet. Reruns return 409 once the reply already exists.",
         "body": {
           "mode": "raw",
@@ -211,7 +211,7 @@
             "value": "application/json"
           }
         ],
-        "url": "{{base_url}}/{{api_prefix}}/barber/ratings/{{rating_id_update_reply}}/reply",
+        "url": "{{base_url}}/{{api_prefix}}/ratings/{{rating_id_update_reply}}/reply",
         "description": "Updates the seeded reply on the dedicated rating fixture.",
         "body": {
           "mode": "raw",
@@ -249,7 +249,7 @@
       "request": {
         "method": "DELETE",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/barber/ratings/{{rating_id_update_reply}}/reply",
+        "url": "{{base_url}}/{{api_prefix}}/ratings/{{rating_id_update_reply}}/reply",
         "description": "Deletes the reply from the same seeded rating used by the update step."
       },
       "event": [
@@ -278,7 +278,7 @@
       "request": {
         "method": "DELETE",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/barber/ratings/{{rating_id_remove_rating}}",
+        "url": "{{base_url}}/{{api_prefix}}/ratings/{{rating_id_remove_rating}}",
         "description": "Deletes the seeded rating dedicated to the remove-rating route."
       },
       "event": [

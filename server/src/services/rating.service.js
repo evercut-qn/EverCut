@@ -121,7 +121,7 @@ export const getRatingSummary = async (shopId) => {
 
 export const getRatingSummaryForBarber = async (ownerId) => {
     const shop = await getOwnedShop(ownerId);
-    return ratingRepository.getShopSummary(shop._id);
+    return getRatingSummary(shop._id);
 };
 
 export const removeRating = async (ratingId, ownerId) => {
@@ -185,14 +185,6 @@ export const deleteReplyFromRating = async (ratingId, ownerId) => {
 };
 
 export const getRatingsByShopForBarber = async (ownerId, query = {}) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
-    if (!shop) throw new NotFoundError('Shop');
-
-    const total = await ratingRepository.countByShop(shop._id);
-    const { skip, limit, pagination } = buildPagination(query, total);
-
-    const ratings = await ratingRepository.findByShop(shop._id, { skip, limit });
-    const items = ratings.map(serializeRating);
-
-    return { items, pagination };
+    const shop = await getOwnedShop(ownerId);
+    return getRatingsByShop(shop._id, query);
 };

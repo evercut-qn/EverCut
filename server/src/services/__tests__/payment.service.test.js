@@ -258,6 +258,54 @@ test('initiateRefund rejects barbers who do not own the booking shop', async (t)
     assert.equal(gatewayMock.mock.calls.length, 0);
 });
 
+test('initiateRefund enforces barber ownership when the actor uses req.user.roleType semantics', async (t) => {
+    t.mock.method(paymentRepository, 'findCompletedByBookingId', async () => ({
+        _id: 'payment-1',
+        bookingId: 'booking-1',
+        merchantOrderId: 'EC-booking-1',
+        amount: 10200,
+        status: 'completed',
+        settlement: {
+            isBundle: false,
+            platformFee: 300,
+        },
+    }));
+
+    t.mock.method(bookingRepository, 'findById', async () => ({
+        _id: 'booking-1',
+        shopId: 'shop-1',
+        payoutStatus: 'not_initiated',
+    }));
+
+    t.mock.method(shopRepository, 'findByOwnerId', async () => ({
+        _id: 'shop-2',
+    }));
+
+    const gatewayMock = t.mock.method(phonePeAdapter, 'initiateRefund', async () => ({
+        refundId: 'refund-1',
+        state: 'PENDING',
+    }));
+    t.mock.method(paymentRepository, 'updateById', async (id, updates) => ({
+        _id: id,
+        ...updates,
+    }));
+    t.mock.method(bookingRepository, 'updateById', async (id, updates) => ({
+        _id: id,
+        ...updates,
+    }));
+
+    await assert.rejects(
+        paymentService.initiateRefund(
+            'booking-1',
+            'Customer cancelled before service',
+            { roleType: 'BARBER', userId: 'barber-2' },
+        ),
+        /own shop/,
+    );
+
+    assert.equal(gatewayMock.mock.calls.length, 0);
+});
+
 test('handleWebhook ignores late payment failure events after a payment is already completed', async (t) => {
     t.mock.method(phonePeAdapter, 'verifyWebhook', () => true);
     t.mock.method(phonePeAdapter, 'parseWebhookPayload', () => ({

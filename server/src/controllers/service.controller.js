@@ -1,6 +1,6 @@
-import * as serviceCatalogService from '../../services/service-catalog.service.js';
-import { ApiResponse } from '../../utils/api-response.js';
-import { getValidatedRequestData } from '../../utils/request-validation.utils.js';
+import * as serviceCatalogService from '../services/service-catalog.service.js';
+import { ApiResponse } from '../utils/api-response.js';
+import { getValidatedRequestData } from '../utils/request-validation.utils.js';
 
 export const addService = async (req, res, next) => {
     try {
@@ -38,6 +38,16 @@ export const deleteService = async (req, res, next) => {
         const params = getValidatedRequestData(req, 'params');
         const result = await serviceCatalogService.deleteService(req.user._id, params.id);
         return res.status(200).json(ApiResponse.success(result, 'Service deleted'));
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const searchServices = async (req, res, next) => {
+    try {
+        const { query: q, gender } = getValidatedRequestData(req, 'query');
+        const results = await serviceCatalogService.searchServices(q, gender);
+        return res.status(200).json(ApiResponse.success(results, 'Search results'));
     } catch (err) {
         next(err);
     }

@@ -2,6 +2,18 @@
 
 This guide explains how to run, test, and troubleshoot the EverCut payment and payout system without guessing. It matches the current backend implementation in `server/src`.
 
+After the 2026-04-24 routing migration, all API examples in this guide follow the feature-based route layout:
+
+- `/api/v1/customers/me`
+- `/api/v1/shops/*`
+- `/api/v1/employees/*`
+- `/api/v1/services/*`
+- `/api/v1/bookings/*`
+- `/api/v1/ratings/*`
+- `/api/v1/earnings`
+- `/api/v1/payments/*`
+- `/api/v1/payouts/*`
+
 ## 1. Setup Instructions
 
 ### 1.1 Install Dependencies

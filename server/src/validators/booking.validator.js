@@ -36,6 +36,10 @@ export const customerBookingsQuerySchema = paginationSchema.keys({
     type: Joi.string().valid('past', 'upcoming', 'favorites').required(),
 });
 
+export const bookingListQuerySchema = paginationSchema.keys({
+    type: Joi.string().valid('past', 'upcoming', 'favorites'),
+});
+
 export const bookingIdParamSchema = Joi.object({
     id: objectId.required(),
 });

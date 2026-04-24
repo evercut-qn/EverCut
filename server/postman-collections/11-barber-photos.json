@@ -83,7 +83,7 @@
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/barber/photos",
+        "url": "{{base_url}}/{{api_prefix}}/photos",
         "description": "Lists the current gallery and captures the first photo ID. Barber onboarding already creates three gallery photos."
       },
       "event": [
@@ -116,7 +116,7 @@
       "request": {
         "method": "POST",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/barber/photos",
+        "url": "{{base_url}}/{{api_prefix}}/photos",
         "description": "Uploads one gallery image using the local sample file and captures the new photo ID.",
         "body": {
           "mode": "formdata",
@@ -169,7 +169,7 @@
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/barber/photos/stats",
+        "url": "{{base_url}}/{{api_prefix}}/photos/stats",
         "description": "Returns photo counts and storage totals."
       },
       "event": [
@@ -198,7 +198,7 @@
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/barber/photos/{{photo_id}}",
+        "url": "{{base_url}}/{{api_prefix}}/photos/{{photo_id}}",
         "description": "Reads the currently captured photo record."
       },
       "event": [
@@ -227,7 +227,7 @@
       "request": {
         "method": "DELETE",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/barber/photos/{{photo_id}}",
+        "url": "{{base_url}}/{{api_prefix}}/photos/{{photo_id}}",
         "description": "Deletes the captured photo from both MongoDB and Cloudinary. Run this last if later requests still need the shared photo ID."
       },
       "event": [

@@ -92,7 +92,7 @@
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/customer/profile",
+        "url": "{{base_url}}/{{api_prefix}}/customers/me",
         "description": "Returns the current customer data."
       },
       "event": [
@@ -121,7 +121,7 @@
       "request": {
         "method": "PUT",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/customer/profile",
+        "url": "{{base_url}}/{{api_prefix}}/customers/me",
         "description": "Updates the customer data and reuses the sample image as an optional replacement photo.",
         "body": {
           "mode": "formdata",
@@ -185,7 +185,7 @@
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/customer/homepage",
+        "url": "{{base_url}}/{{api_prefix}}/customers/me/home",
         "description": "Returns the compact home-screen payload."
       },
       "event": [
@@ -214,7 +214,7 @@
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/customer/homepage/services?gender=male&coordinates={{coordinates}}",
+        "url": "{{base_url}}/{{api_prefix}}/shops/nearby/services?gender=male&coordinates={{coordinates}}",
         "description": "Uses the shared Bengaluru coordinates so the response includes the barber shop created by onboarding. The script captures the first nearby Postman shop and service IDs."
       },
       "event": [

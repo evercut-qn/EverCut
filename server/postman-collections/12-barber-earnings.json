@@ -77,7 +77,7 @@
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/barber/earnings",
+        "url": "{{base_url}}/{{api_prefix}}/earnings",
         "description": "Returns `totalEarning`, `lastMonthEarning`, and `todayEarning` across the barber shop employees."
       },
       "event": [

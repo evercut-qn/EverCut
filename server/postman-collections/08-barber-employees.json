@@ -88,7 +88,7 @@
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/barber/employees",
+        "url": "{{base_url}}/{{api_prefix}}/employees",
         "description": "Lists current employees and captures the first Postman employee ID when it already exists."
       },
       "event": [
@@ -121,7 +121,7 @@
       "request": {
         "method": "POST",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/barber/employees",
+        "url": "{{base_url}}/{{api_prefix}}/employees",
         "description": "Creates a new employee with a generated phone number so the request stays rerunnable. Employee working hours remain HH:MM 24-hour values even when the shop was originally created with AM/PM schedule input.",
         "body": {
           "mode": "formdata",
@@ -203,7 +203,7 @@
       "request": {
         "method": "PUT",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/barber/employees/{{employee_id}}",
+        "url": "{{base_url}}/{{api_prefix}}/employees/{{employee_id}}",
         "description": "Updates the captured employee with only fields that the validator supports.",
         "body": {
           "mode": "formdata",
@@ -262,7 +262,7 @@
       "request": {
         "method": "DELETE",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/barber/employees/{{employee_id}}",
+        "url": "{{base_url}}/{{api_prefix}}/employees/{{employee_id}}",
         "description": "Soft-deletes the captured employee. Run this last because later collections may still need the shared employee ID."
       },
       "event": [

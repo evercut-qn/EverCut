@@ -1,6 +1,7 @@
-import * as employeeService from '../../services/employee.service.js';
-import { ApiResponse } from '../../utils/api-response.js';
-import { getValidatedRequestData } from '../../utils/request-validation.utils.js';
+import * as bookingService from '../services/booking.service.js';
+import * as employeeService from '../services/employee.service.js';
+import { ApiResponse } from '../utils/api-response.js';
+import { getValidatedRequestData } from '../utils/request-validation.utils.js';
 
 export const addEmployee = async (req, res, next) => {
     try {
@@ -38,6 +39,17 @@ export const deleteEmployee = async (req, res, next) => {
         const params = getValidatedRequestData(req, 'params');
         const result = await employeeService.deleteEmployee(req.user._id, params.id);
         return res.status(200).json(ApiResponse.success(result, 'Employee deleted'));
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const getEmployeeCalendar = async (req, res, next) => {
+    try {
+        const params = getValidatedRequestData(req, 'params');
+        const query = getValidatedRequestData(req, 'query');
+        const result = await bookingService.getEmployeeCalendar(params.id, query.date);
+        return res.status(200).json(ApiResponse.success(result, 'Calendar fetched'));
     } catch (err) {
         next(err);
     }
