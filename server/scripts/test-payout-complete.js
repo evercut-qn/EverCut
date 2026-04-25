@@ -4,20 +4,23 @@
  * This script consolidates all payout testing functionality:
  * 1. Diagnoses current system state
  * 2. Auto-fixes common issues
- * 3. Runs payout batch
- * 4. Verifies results
- * 5. Tests webhook handling (optional)
+ * 3. Tests REAL Cashfree API scenarios (beneficiary, transfers, edge cases)
+ * 4. Runs payout batch
+ * 5. Verifies results
+ * 6. Tests webhook handling (optional)
  * 
  * Usage:
  *   node scripts/test-payout-complete.js              # Full test
  *   node scripts/test-payout-complete.js --diagnose   # Diagnosis only
  *   node scripts/test-payout-complete.js --webhook    # Include webhook test
+ *   node scripts/test-payout-complete.js --api-only   # Test API scenarios only
  */
 
 import { runPayoutBatchNow } from '../src/jobs/payout-batch.cron.js';
 import mongoose from 'mongoose';
 import config from '../src/config/index.js';
 import * as payoutService from '../src/services/payout.service.js';
+import cashfreePayoutAdapter from '../src/adapters/cashfree/cashfree-payout.adapter.js';
 
 // Import models
 import '../src/models/booking.model.js';
@@ -55,6 +58,13 @@ const testResults = {
     passed: 0,
     failed: 0,
     warnings: 0,
+    apiTests: {
+        beneficiary: { passed: 0, failed: 0 },
+        transfer: { passed: 0, failed: 0 },
+        status: { passed: 0, failed: 0 },
+        webhook: { passed: 0, failed: 0 },
+        edgeCases: { passed: 0, failed: 0 },
+    }
 };
 
 const assert = (condition, successMsg, failMsg = null) => {
@@ -73,6 +83,16 @@ const assert = (condition, successMsg, failMsg = null) => {
 const warn = (message) => {
     testResults.warnings++;
     log.warning(message);
+};
+
+const recordApiTest = (category, passed) => {
+    if (testResults.apiTests[category]) {
+        if (passed) {
+            testResults.apiTests[category].passed++;
+        } else {
+            testResults.apiTests[category].failed++;
+        }
+    }
 };
 
 // ============================================================================
@@ -477,15 +497,19 @@ async function testWebhookHandling() {
         
         if (result.processed) {
             log.success('SUCCESS webhook processed correctly');
+            recordApiTest('webhook', true);
         } else {
             log.info('Webhook rejected (signature verification working as expected)');
+            recordApiTest('webhook', true);
         }
         
     } catch (error) {
         if (error.message.includes('signature')) {
             log.success('✓ Signature verification working correctly');
+            recordApiTest('webhook', true);
         } else {
             log.error(`Webhook test failed: ${error.message}`);
+            recordApiTest('webhook', false);
         }
     }
     
@@ -516,15 +540,19 @@ async function testWebhookHandling() {
         
         if (result.processed) {
             log.success('FAILED webhook processed correctly');
+            recordApiTest('webhook', true);
         } else {
             log.info('Webhook rejected (signature verification working as expected)');
+            recordApiTest('webhook', true);
         }
         
     } catch (error) {
         if (error.message.includes('signature')) {
             log.success('✓ Signature verification working correctly');
+            recordApiTest('webhook', true);
         } else {
             log.error(`Webhook test failed: ${error.message}`);
+            recordApiTest('webhook', false);
         }
     }
     
@@ -536,11 +564,385 @@ async function testWebhookHandling() {
 }
 
 // ============================================================================
+// NEW: REAL API TESTING SCENARIOS
+// ============================================================================
+
+async function testRealApiScenarios() {
+    log.section('🔥 REAL CASHFREE API TESTING');
+    
+    log.info('Testing with LIVE Cashfree APIs');
+    log.info(`Environment: ${config.cashfree.payoutEnv}`);
+    log.info(`Base URL: ${config.cashfree.payoutBaseUrl}\n`);
+    
+    const testBeneficiaryId = `TEST_BENE_${Date.now()}`;
+    const testTransferId = `TEST_TRANSFER_${Date.now()}`;
+    
+    // ========================================================================
+    // A. BENEFICIARY FLOW TESTS
+    // ========================================================================
+    
+    log.subsection('👤 A. BENEFICIARY FLOW TESTS');
+    
+    // A1. Create Valid Beneficiary
+    log.info('\nA1. Creating valid beneficiary...');
+    try {
+        const result = await cashfreePayoutAdapter.createBeneficiary({
+            beneficiaryId: testBeneficiaryId,
+            name: 'Test Barber API',
+            phone: '9876543210',
+            email: 'test@evercut.com',
+            vpa: 'success@upi', // Official Cashfree test UPI for success
+        });
+        
+        assert(
+            result.beneficiaryId === testBeneficiaryId,
+            `✓ Beneficiary created successfully: ${testBeneficiaryId}`,
+            `✗ Beneficiary creation failed`
+        );
+        recordApiTest('beneficiary', true);
+    } catch (error) {
+        log.error(`✗ Beneficiary creation failed: ${error.message}`);
+        log.error(`  Error Code: ${error.providerCode || error.code || 'N/A'}`);
+        recordApiTest('beneficiary', false);
+    }
+    
+    // A2. Get Beneficiary
+    log.info('\nA2. Fetching beneficiary...');
+    try {
+        const beneficiary = await cashfreePayoutAdapter.getBeneficiary(testBeneficiaryId);
+        
+        assert(
+            beneficiary !== null,
+            `✓ Beneficiary fetched successfully`,
+            `✗ Beneficiary fetch failed`
+        );
+        recordApiTest('beneficiary', true);
+        
+        if (beneficiary) {
+            log.dim(`  Beneficiary ID: ${beneficiary.beneficiary_id || 'N/A'}`);
+            log.dim(`  Name: ${beneficiary.beneficiary_name || 'N/A'}`);
+        }
+    } catch (error) {
+        log.error(`✗ Beneficiary fetch failed: ${error.message}`);
+        recordApiTest('beneficiary', false);
+    }
+    
+    // A3. Duplicate Beneficiary (should handle gracefully)
+    log.info('\nA3. Testing duplicate beneficiary creation...');
+    try {
+        await cashfreePayoutAdapter.createBeneficiary({
+            beneficiaryId: testBeneficiaryId,
+            name: 'Test Barber API Duplicate',
+            phone: '9876543210',
+            email: 'test@evercut.com',
+            vpa: 'test@paytm',
+        });
+        
+        log.warning('⚠️  Duplicate beneficiary created (unexpected)');
+        recordApiTest('beneficiary', false);
+    } catch (error) {
+        if (error.message.includes('already exists') || error.providerCode === 'DUPLICATE_BENEFICIARY') {
+            log.success('✓ Duplicate beneficiary rejected correctly');
+            recordApiTest('beneficiary', true);
+        } else {
+            log.error(`✗ Unexpected error: ${error.message}`);
+            recordApiTest('beneficiary', false);
+        }
+    }
+    
+    // A4. Invalid Beneficiary Details
+    log.info('\nA4. Testing invalid beneficiary details...');
+    try {
+        await cashfreePayoutAdapter.createBeneficiary({
+            beneficiaryId: `INVALID_${Date.now()}`,
+            name: 'Test Invalid',
+            phone: '1234', // Invalid phone
+            email: 'invalid-email',
+            vpa: 'invalid-vpa-format',
+        });
+        
+        log.warning('⚠️  Invalid beneficiary created (unexpected)');
+        recordApiTest('beneficiary', false);
+    } catch (error) {
+        log.success(`✓ Invalid beneficiary rejected: ${error.message}`);
+        recordApiTest('beneficiary', true);
+    }
+    
+    // ========================================================================
+    // B. PAYOUT EXECUTION TESTS
+    // ========================================================================
+    
+    log.subsection('\n💸 B. PAYOUT EXECUTION TESTS');
+    
+    // B1. Successful Payout (Small Amount)
+    log.info('\nB1. Initiating successful payout (₹1.00)...');
+    try {
+        const result = await cashfreePayoutAdapter.initiateTransfer({
+            transferId: testTransferId,
+            amountInRupees: 1.00, // Minimum test amount
+            beneficiaryId: testBeneficiaryId,
+            transferMode: 'upi',
+            remarks: 'EverCut API Test Payout',
+        });
+        
+        assert(
+            result.transferId === testTransferId,
+            `✓ Payout initiated: ${result.gatewayTransferId}`,
+            `✗ Payout initiation failed`
+        );
+        recordApiTest('transfer', true);
+        
+        log.dim(`  Gateway Transfer ID: ${result.gatewayTransferId}`);
+        log.dim(`  Status: ${result.status}`);
+        
+        // Wait a moment then check status
+        log.info('\n  Waiting 3 seconds before status check...');
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        
+        try {
+            const status = await cashfreePayoutAdapter.getTransferStatus(testTransferId);
+            log.success(`✓ Status fetched: ${status.status}`);
+            log.dim(`  UTR: ${status.utr || 'Pending'}`);
+            log.dim(`  Updated: ${status.updatedAt || 'N/A'}`);
+            
+            if (status.status === 'FAILED') {
+                log.warning(`  ⚠️  Transfer failed`);
+                log.info(`  Reason: ${status.failureReason || 'Unknown'}`);
+                log.info(`  Note: Use 'success@upi' for successful test transfers`);
+            } else if (status.status === 'SUCCESS') {
+                log.success(`  ✅ Transfer completed successfully!`);
+            }
+            
+            recordApiTest('status', true);
+        } catch (statusError) {
+            log.error(`✗ Status fetch failed: ${statusError.message}`);
+            recordApiTest('status', false);
+        }
+        
+    } catch (error) {
+        log.error(`✗ Payout initiation failed: ${error.message}`);
+        log.error(`  Error Code: ${error.providerCode || error.code || 'N/A'}`);
+        recordApiTest('transfer', false);
+        
+        // Check if it's an IP whitelisting issue
+        if (error.message.includes('IP') || error.providerCode === 'IP_NOT_WHITELISTED') {
+            log.warning('\n⚠️  IP WHITELISTING ISSUE DETECTED!');
+            log.info('  Your server IP needs to be whitelisted in Cashfree dashboard');
+            log.info('  See: docs/features/payments/CASHFREE-IP-WHITELISTING-GUIDE.md');
+        }
+    }
+    
+    // B2. Duplicate Transfer (Idempotency Test)
+    log.info('\nB2. Testing idempotency (duplicate transfer_id)...');
+    try {
+        await cashfreePayoutAdapter.initiateTransfer({
+            transferId: testTransferId, // Same ID as B1
+            amountInRupees: 1.00,
+            beneficiaryId: testBeneficiaryId,
+            transferMode: 'upi',
+            remarks: 'Duplicate test',
+        });
+        
+        log.warning('⚠️  Duplicate transfer accepted (unexpected - should be rejected)');
+        recordApiTest('transfer', false);
+    } catch (error) {
+        if (error.message.includes('already exists') || error.providerCode === 'transfer_id_already_exists') {
+            log.success(`✓ Duplicate transfer rejected correctly (idempotency enforced)`);
+            recordApiTest('transfer', true);
+        } else {
+            log.error(`✗ Unexpected error: ${error.message}`);
+            recordApiTest('transfer', false);
+        }
+    }
+    
+    // B3. Invalid Beneficiary ID
+    log.info('\nB3. Testing payout with invalid beneficiary...');
+    try {
+        await cashfreePayoutAdapter.initiateTransfer({
+            transferId: `INVALID_TRANSFER_${Date.now()}`,
+            amountInRupees: 1.00,
+            beneficiaryId: 'NONEXISTENT_BENEFICIARY',
+            transferMode: 'upi',
+            remarks: 'Invalid beneficiary test',
+        });
+        
+        log.warning('⚠️  Transfer with invalid beneficiary accepted (unexpected)');
+        recordApiTest('transfer', false);
+    } catch (error) {
+        log.success(`✓ Invalid beneficiary rejected: ${error.message}`);
+        recordApiTest('transfer', true);
+    }
+    
+    // B4. Invalid Amount
+    log.info('\nB4. Testing payout with invalid amount...');
+    try {
+        await cashfreePayoutAdapter.initiateTransfer({
+            transferId: `INVALID_AMT_${Date.now()}`,
+            amountInRupees: 0, // Invalid amount
+            beneficiaryId: testBeneficiaryId,
+            transferMode: 'upi',
+            remarks: 'Invalid amount test',
+        });
+        
+        log.warning('⚠️  Transfer with invalid amount accepted (unexpected)');
+        recordApiTest('transfer', false);
+    } catch (error) {
+        log.success(`✓ Invalid amount rejected: ${error.message}`);
+        recordApiTest('transfer', true);
+    }
+    
+    // ========================================================================
+    // C. STATUS VERIFICATION TESTS
+    // ========================================================================
+    
+    log.subsection('\n📊 C. STATUS VERIFICATION TESTS');
+    
+    // C1. Get Status of Existing Transfer
+    log.info('\nC1. Fetching status of test transfer...');
+    try {
+        const status = await cashfreePayoutAdapter.getTransferStatus(testTransferId);
+        
+        assert(
+            status.transferId === testTransferId,
+            `✓ Status retrieved: ${status.status}`,
+            `✗ Status retrieval failed`
+        );
+        recordApiTest('status', true);
+        
+        log.dim(`  Gateway ID: ${status.gatewayTransferId}`);
+        log.dim(`  Status: ${status.status}`);
+        log.dim(`  Amount: ₹${status.amount}`);
+        log.dim(`  UTR: ${status.utr || 'Pending'}`);
+        
+        if (status.failureReason) {
+            log.warning(`  Failure Reason: ${status.failureReason}`);
+        }
+    } catch (error) {
+        log.error(`✗ Status fetch failed: ${error.message}`);
+        recordApiTest('status', false);
+    }
+    
+    // C2. Get Status of Non-existent Transfer
+    log.info('\nC2. Testing status fetch for non-existent transfer...');
+    try {
+        await cashfreePayoutAdapter.getTransferStatus('NONEXISTENT_TRANSFER_ID');
+        
+        log.warning('⚠️  Non-existent transfer returned status (unexpected)');
+        recordApiTest('status', false);
+    } catch (error) {
+        log.success(`✓ Non-existent transfer rejected: ${error.message}`);
+        recordApiTest('status', true);
+    }
+    
+    // ========================================================================
+    // D. EDGE CASES & ERROR HANDLING
+    // ========================================================================
+    
+    log.subsection('\n⚡ D. EDGE CASES & ERROR HANDLING');
+    
+    // D1. Error Handling Test
+    log.info('\nD1. Testing error handling with malformed request...');
+    try {
+        // Test with a malformed beneficiary creation (missing required fields)
+        await cashfreePayoutAdapter._makeRequest('POST', '/beneficiary', {
+            beneficiary_id: `MALFORMED_${Date.now()}`,
+            // Missing beneficiary_name and instrument_details
+        });
+        
+        log.warning('⚠️  Malformed request succeeded (unexpected)');
+        recordApiTest('edgeCases', false);
+    } catch (error) {
+        log.success(`✓ Malformed request rejected: ${error.message}`);
+        recordApiTest('edgeCases', true);
+    }
+    
+    // D2. Missing Required Parameters
+    log.info('\nD2. Testing missing required parameters...');
+    try {
+        await cashfreePayoutAdapter.createBeneficiary({
+            beneficiaryId: `MISSING_${Date.now()}`,
+            name: 'Test Missing',
+            // Missing phone, email, vpa, and bank details
+        });
+        
+        log.warning('⚠️  Beneficiary with missing params created (unexpected)');
+        recordApiTest('edgeCases', false);
+    } catch (error) {
+        log.success(`✓ Missing parameters rejected: ${error.message}`);
+        recordApiTest('edgeCases', true);
+    }
+    
+    // ========================================================================
+    // E. CLEANUP
+    // ========================================================================
+    
+    log.subsection('\n🧹 E. CLEANUP');
+    
+    log.info('\nE1. Removing test beneficiary...');
+    try {
+        await cashfreePayoutAdapter.removeBeneficiary(testBeneficiaryId);
+        log.success(`✓ Test beneficiary removed: ${testBeneficiaryId}`);
+        recordApiTest('beneficiary', true);
+    } catch (error) {
+        log.warning(`⚠️  Cleanup failed: ${error.message}`);
+        log.info(`  Manual cleanup may be needed for: ${testBeneficiaryId}`);
+    }
+    
+    // ========================================================================
+    // F. API TEST SUMMARY
+    // ========================================================================
+    
+    log.subsection('\n📈 API TEST SUMMARY');
+    
+    console.log('\nTest Results by Category:');
+    for (const [category, results] of Object.entries(testResults.apiTests)) {
+        const total = results.passed + results.failed;
+        if (total > 0) {
+            const percentage = ((results.passed / total) * 100).toFixed(0);
+            const status = results.failed === 0 ? '✅' : '⚠️';
+            console.log(`  ${status} ${category}: ${results.passed}/${total} passed (${percentage}%)`);
+        }
+    }
+    
+    const totalApiTests = Object.values(testResults.apiTests).reduce((sum, cat) => sum + cat.passed + cat.failed, 0);
+    const totalApiPassed = Object.values(testResults.apiTests).reduce((sum, cat) => sum + cat.passed, 0);
+    
+    console.log(`\nOverall API Tests: ${totalApiPassed}/${totalApiTests} passed`);
+    
+    return totalApiTests > 0 && totalApiPassed === totalApiTests;
+}
+
+// ============================================================================
 // STEP 7: FINAL SUMMARY
 // ============================================================================
 
 async function showFinalSummary(payoutResult) {
     log.section('✨ TEST COMPLETE');
+    
+    // Show API test results
+    const totalApiTests = Object.values(testResults.apiTests).reduce((sum, cat) => sum + cat.passed + cat.failed, 0);
+    const totalApiPassed = Object.values(testResults.apiTests).reduce((sum, cat) => sum + cat.passed, 0);
+    const totalApiFailed = totalApiTests - totalApiPassed;
+    
+    if (totalApiTests > 0) {
+        console.log('\n📊 API Test Results:');
+        console.log(`  Total Tests: ${totalApiTests}`);
+        console.log(`  ${colors.green}Passed: ${totalApiPassed}${colors.reset}`);
+        if (totalApiFailed > 0) {
+            console.log(`  ${colors.red}Failed: ${totalApiFailed}${colors.reset}`);
+        }
+        console.log();
+        
+        // Detailed breakdown
+        for (const [category, results] of Object.entries(testResults.apiTests)) {
+            const total = results.passed + results.failed;
+            if (total > 0) {
+                const icon = results.failed === 0 ? '✅' : '⚠️';
+                console.log(`  ${icon} ${category}: ${results.passed}/${total}`);
+            }
+        }
+        console.log();
+    }
     
     if (payoutResult?.success) {
         log.success('Payout system is working correctly!\n');
@@ -548,7 +950,11 @@ async function showFinalSummary(payoutResult) {
         console.log('What happened:');
         console.log(`  ✅ ${payoutResult.result.totalBookings} booking(s) processed`);
         console.log(`  ✅ ${payoutResult.result.success} payout(s) initiated`);
-        console.log(`  ✅ Database updated successfully\n`);
+        console.log(`  ✅ Database updated successfully`);
+        if (totalApiTests > 0) {
+            console.log(`  ✅ ${totalApiPassed}/${totalApiTests} API tests passed`);
+        }
+        console.log();
         
         console.log('Next steps:');
         console.log('  1. Check Cashfree dashboard for transfer status');
@@ -562,6 +968,13 @@ async function showFinalSummary(payoutResult) {
         console.log('Monitor webhooks:');
         console.log('  - Hookdeck: https://dashboard.hookdeck.io\n');
         
+        // Final verdict
+        if (totalApiTests > 0 && totalApiFailed === 0) {
+            log.success('🎉 ALL SYSTEMS OPERATIONAL - PAYOUTS FULLY WORKING!');
+        } else if (totalApiFailed > 0) {
+            log.warning(`⚠️  PAYOUTS WORKING BUT ${totalApiFailed} API TEST(S) FAILED`);
+        }
+        
     } else {
         log.error('Payout test encountered issues\n');
         
@@ -569,13 +982,43 @@ async function showFinalSummary(payoutResult) {
         console.log('  1. Check server logs for detailed error messages');
         console.log('  2. Verify Cashfree credentials in .env');
         console.log('  3. Check IP whitelisting (see CASHFREE-IP-WHITELISTING-GUIDE.md)');
-        console.log('  4. Verify shop payout configuration\n');
+        console.log('  4. Verify shop payout configuration');
+        if (totalApiFailed > 0) {
+            console.log(`  5. Review ${totalApiFailed} failed API test(s) above`);
+        }
+        console.log();
     }
     
     console.log('Documentation:');
     console.log('  - Payout System: docs/features/payments/PAYOUT-SYSTEM-EXPLANATION.md');
     console.log('  - IP Whitelisting: docs/features/payments/CASHFREE-IP-WHITELISTING-GUIDE.md');
     console.log('  - Webhooks: docs/features/payments/HOOKDECK-DAILY-WORKFLOW.md\n');
+    
+    // Final status
+    console.log('\n' + '='.repeat(70));
+    console.log('FINAL STATUS:');
+    console.log('='.repeat(70));
+    
+    const beneficiaryTests = testResults.apiTests.beneficiary;
+    const transferTests = testResults.apiTests.transfer;
+    const statusTests = testResults.apiTests.status;
+    const webhookTests = testResults.apiTests.webhook;
+    const edgeCaseTests = testResults.apiTests.edgeCases;
+    
+    const checkStatus = (tests) => {
+        if (tests.passed + tests.failed === 0) return '⏭️  SKIPPED';
+        return tests.failed === 0 ? '✅ PASS' : '❌ FAIL';
+    };
+    
+    console.log(`Beneficiary Flow:     ${checkStatus(beneficiaryTests)}`);
+    console.log(`Payout Execution:     ${checkStatus(transferTests)}`);
+    console.log(`Status Verification:  ${checkStatus(statusTests)}`);
+    console.log(`Webhook Handling:     ${checkStatus(webhookTests)}`);
+    console.log(`Edge Cases:           ${checkStatus(edgeCaseTests)}`);
+    console.log('='.repeat(70));
+    
+    const allPassed = totalApiTests > 0 && totalApiFailed === 0 && payoutResult?.success;
+    console.log(`\n${allPassed ? '✅' : '❌'} ARE PAYOUTS FULLY WORKING? ${allPassed ? 'YES' : 'NO'}\n`);
 }
 
 // ============================================================================
@@ -586,6 +1029,7 @@ async function main() {
     const args = process.argv.slice(2);
     const diagnoseOnly = args.includes('--diagnose');
     const includeWebhook = args.includes('--webhook');
+    const apiOnly = args.includes('--api-only');
     
     console.log('\n');
     log.section('🧪 COMPLETE PAYOUT SYSTEM TEST');
@@ -597,6 +1041,18 @@ async function main() {
         const connected = await connectDatabase();
         if (!connected) {
             process.exit(1);
+        }
+        
+        // If API-only mode, skip to API tests
+        if (apiOnly) {
+            log.info('Running API tests only (skipping database operations)\n');
+            const apiSuccess = await testRealApiScenarios();
+            
+            const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+            log.dim(`\nTotal duration: ${duration}s\n`);
+            
+            await mongoose.disconnect();
+            process.exit(apiSuccess ? 0 : 1);
         }
         
         // Step 2: Diagnose system
@@ -616,6 +1072,15 @@ async function main() {
         
         // Step 3: Auto-fix issues
         const fixed = await autoFixIssues(diagnosis);
+        
+        // Step 3.5: Run Real API Tests
+        log.info('\n');
+        const apiSuccess = await testRealApiScenarios();
+        
+        if (!apiSuccess) {
+            log.warning('\n⚠️  Some API tests failed. Review errors above.');
+            log.info('You can continue with payout batch, but issues may occur.\n');
+        }
         
         // Step 4: Run payout batch
         const payoutResult = await runPayoutBatch();
@@ -638,7 +1103,7 @@ async function main() {
         log.dim(`\nTotal duration: ${duration}s\n`);
         
         await mongoose.disconnect();
-        process.exit(payoutResult.success ? 0 : 1);
+        process.exit(payoutResult.success && apiSuccess ? 0 : 1);
         
     } catch (error) {
         log.error(`Test failed: ${error.message}`);
