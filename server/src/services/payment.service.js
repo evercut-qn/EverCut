@@ -237,6 +237,42 @@ const logIgnoredPaymentTransition = (message, payment, nextState) => {
     });
 };
 
+const hasPaymentAmountMismatch = (payment, webhookData) => {
+    const storedAmount = Number(payment.amount);
+    const gatewayAmount = Number(webhookData.amount);
+
+    return Number.isFinite(storedAmount)
+        && Number.isFinite(gatewayAmount)
+        && storedAmount > 0
+        && gatewayAmount > 0
+        && Math.round(storedAmount) !== Math.round(gatewayAmount);
+};
+
+const rejectPaymentAmountMismatch = async (payment, webhookData) => {
+    await paymentRepository.updateById(payment._id, {
+        status: PAYMENT_TRANSACTION_STATUS.FAILED,
+        gatewayState: webhookData.state,
+        errorCode: 'AMOUNT_MISMATCH',
+        detailedErrorCode: 'PHONEPE_AMOUNT_MISMATCH',
+        errorSource: 'PHONEPE',
+        errorStage: 'VERIFICATION',
+        errorDescription: `PhonePe amount mismatch: expected ${payment.amount}, received ${webhookData.amount}`,
+        webhookReceivedAt: new Date(),
+        webhookProcessed: true,
+    });
+
+    await bookingRepository.updateById(payment.bookingId, {
+        paymentStatus: PAYMENT_STATUS.FAILED,
+    });
+
+    logger.error('[PaymentService] Payment amount mismatch', {
+        bookingId: payment.bookingId,
+        merchantOrderId: payment.merchantOrderId,
+        expectedAmount: payment.amount,
+        receivedAmount: webhookData.amount,
+    });
+};
+
 const assertRefundPermission = async (actor, booking) => {
     const actorRole = actor?.roleType || actor?.role;
 
@@ -505,6 +541,11 @@ async function handlePaymentSuccess(webhookData) {
             payment,
             PAYMENT_TRANSACTION_STATUS.COMPLETED,
         );
+        return { processed: true, event: PHONEPE_WEBHOOK_EVENTS.ORDER_COMPLETED };
+    }
+
+    if (hasPaymentAmountMismatch(payment, webhookData)) {
+        await rejectPaymentAmountMismatch(payment, webhookData);
         return { processed: true, event: PHONEPE_WEBHOOK_EVENTS.ORDER_COMPLETED };
     }
 

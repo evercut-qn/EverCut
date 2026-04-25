@@ -132,7 +132,7 @@ const config = Object.freeze({
     payoutBaseUrl: optionalEnv('CASHFREE_PAYOUT_ENV', 'TEST') === 'PRODUCTION'
       ? 'https://api.cashfree.com/payout'
       : 'https://sandbox.cashfree.com/payout',
-    payoutApiVersion: '2025-01-01',
+    payoutApiVersion: '2024-01-01',
   }),
 
   /** Payment + Payout business rules */

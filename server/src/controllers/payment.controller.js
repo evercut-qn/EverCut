@@ -18,7 +18,10 @@ export const handleWebhook = async (req, res) => {
             error: error.message,
         });
 
-        return res.status(200).json({ received: true, error: 'processing_error' });
+        return res.status(error.statusCode || 500).json({
+            received: false,
+            error: error.message || 'processing_error',
+        });
     }
 };
 

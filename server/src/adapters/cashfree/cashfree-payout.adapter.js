@@ -14,6 +14,27 @@ const safeReadJson = async (response) => {
     }
 };
 
+const buildBeneficiaryContactDetails = ({ phone, email }) => {
+    const details = {};
+    const digits = String(phone || '').replace(/\D/g, '');
+
+    if (digits.length === 12 && digits.startsWith('91')) {
+        details.beneficiary_phone = digits.slice(2);
+        details.beneficiary_country_code = '+91';
+    } else if (digits.length === 10) {
+        details.beneficiary_phone = digits;
+        details.beneficiary_country_code = '+91';
+    } else if (phone) {
+        details.beneficiary_phone = String(phone);
+    }
+
+    if (email) {
+        details.beneficiary_email = email;
+    }
+
+    return Object.keys(details).length > 0 ? details : null;
+};
+
 class CashfreePayoutAdapter extends PayoutGatewayAdapter {
     constructor() {
         super();
@@ -28,11 +49,11 @@ class CashfreePayoutAdapter extends PayoutGatewayAdapter {
         const requestBody = {
             beneficiary_id: beneficiaryId,
             beneficiary_name: name,
-            beneficiary_phone: phone,
         };
 
-        if (email) {
-            requestBody.beneficiary_email = email;
+        const contactDetails = buildBeneficiaryContactDetails({ phone, email });
+        if (contactDetails) {
+            requestBody.beneficiary_contact_details = contactDetails;
         }
 
         if (vpa) {
@@ -64,7 +85,11 @@ class CashfreePayoutAdapter extends PayoutGatewayAdapter {
         try {
             return await this._makeRequest('GET', CASHFREE_ENDPOINTS.GET_BENEFICIARY(beneficiaryId));
         } catch (error) {
-            if (error?.providerCode === 'BENE_NOT_FOUND' || error?.statusCode === 404) {
+            if (
+                error?.providerCode === 'BENE_NOT_FOUND'
+                || error?.providerCode === 'beneficiary_not_found'
+                || error?.statusCode === 404
+            ) {
                 return null;
             }
             throw error;
@@ -118,7 +143,7 @@ class CashfreePayoutAdapter extends PayoutGatewayAdapter {
             status: data.status,
             utr: data.transfer_utr,
             amount: data.transfer_amount,
-            updatedAt: data.updated_at,
+            updatedAt: data.updated_on || data.updated_at,
             failureReason: data.failure_reason || null,
         };
     }
@@ -164,8 +189,8 @@ class CashfreePayoutAdapter extends PayoutGatewayAdapter {
     }
 
     parseWebhookPayload(body = {}) {
-        const event = body.event || null;
-        const data = body.data || {};
+        const event = body.type || body.event || null;
+        const data = body.data?.transfer || body.data || {};
 
         return {
             event,
@@ -174,7 +199,7 @@ class CashfreePayoutAdapter extends PayoutGatewayAdapter {
             status: data.status || null,
             utr: data.transfer_utr || null,
             amount: data.transfer_amount || null,
-            updatedAt: data.updated_at || null,
+            updatedAt: data.updated_on || data.updated_at || data.processed_on || null,
             failureReason: data.failure_reason || null,
         };
     }

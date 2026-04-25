@@ -102,11 +102,11 @@ export const PAYMENT_GATEWAYS = Object.freeze({
 });
 
 export const PAYOUT_MODES = Object.freeze({
-    UPI: 'UPI',
-    IMPS: 'IMPS',
-    NEFT: 'NEFT',
-    RTGS: 'RTGS',
-    BANK: 'BANK',
+    UPI: 'upi',
+    IMPS: 'imps',
+    NEFT: 'neft',
+    RTGS: 'rtgs',
+    BANK: 'banktransfer',
 });
 
 export const PLATFORM_FEES = Object.freeze({

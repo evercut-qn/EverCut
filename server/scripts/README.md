@@ -107,6 +107,48 @@ node scripts/seed-barber-rating-mock-data.js
 
 ---
 
+## Payout Testing Scripts
+
+### `test-payout-complete.js` ⭐ **RECOMMENDED**
+
+**Complete payout system test** - All-in-one script that diagnoses, fixes, tests, and verifies the entire payout system including webhook handling.
+
+**Usage**:
+```bash
+# Full test (recommended)
+node scripts/test-payout-complete.js
+
+# Diagnosis only (no payout execution)
+node scripts/test-payout-complete.js --diagnose
+
+# Include webhook testing
+node scripts/test-payout-complete.js --webhook
+```
+
+**What it does**:
+1. ✅ Connects to MongoDB
+2. ✅ Diagnoses system state (bookings, payments, shops)
+3. ✅ Auto-fixes common issues (resets statuses, configures shops)
+4. ✅ Runs payout batch
+5. ✅ Verifies results (payout transactions, booking updates)
+6. ✅ Tests webhook handling (optional with --webhook flag)
+7. ✅ Shows comprehensive summary with next steps
+
+**When to use**: 
+- **First time testing payouts** - Complete walkthrough
+- **Daily development** - Quick verification
+- **After code changes** - Regression testing
+- **Debugging issues** - Detailed diagnostics
+
+**Features**:
+- 🔍 Comprehensive diagnosis
+- 🔧 Automatic issue fixing
+- 📊 Detailed status reporting
+- 🧪 Webhook simulation
+- 📝 Clear next steps
+
+---
+
 ## Generated files *(gitignored)*
 
 | File | Created by | Purpose |

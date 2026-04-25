@@ -353,6 +353,61 @@ test('handleWebhook ignores late payment failure events after a payment is alrea
     assert.equal(bookingUpdateMock.mock.calls.length, 0);
 });
 
+test('handleWebhook rejects completed payments when the verified PhonePe amount differs from the stored amount', async (t) => {
+    t.mock.method(phonePeAdapter, 'verifyWebhook', () => true);
+    t.mock.method(phonePeAdapter, 'parseWebhookPayload', () => ({
+        event: 'checkout.order.completed',
+        merchantOrderId: 'EC-booking-1',
+        state: 'COMPLETED',
+        amount: 10100,
+        paymentDetails: [],
+    }));
+    t.mock.method(phonePeAdapter, 'getOrderStatus', async () => ({
+        state: 'COMPLETED',
+        amount: 10100,
+        paymentDetails: [],
+    }));
+
+    t.mock.method(paymentRepository, 'findByMerchantOrderId', async () => ({
+        _id: 'payment-1',
+        bookingId: 'booking-1',
+        merchantOrderId: 'EC-booking-1',
+        status: 'pending',
+        amount: 10200,
+    }));
+
+    let paymentUpdate = null;
+    let bookingUpdate = null;
+    t.mock.method(paymentRepository, 'updateById', async (id, updates) => {
+        paymentUpdate = { id, updates };
+        return { _id: id, ...updates };
+    });
+    t.mock.method(bookingRepository, 'updateById', async (id, updates) => {
+        bookingUpdate = { id, updates };
+        return { _id: id, ...updates };
+    });
+
+    const result = await paymentService.handleWebhook(
+        { authorization: 'valid-webhook-auth' },
+        {},
+    );
+
+    assert.deepEqual(result, {
+        processed: true,
+        event: 'checkout.order.completed',
+    });
+    assert.equal(paymentUpdate.id, 'payment-1');
+    assert.equal(paymentUpdate.updates.status, 'failed');
+    assert.equal(paymentUpdate.updates.errorCode, 'AMOUNT_MISMATCH');
+    assert.match(paymentUpdate.updates.errorDescription, /amount mismatch/i);
+    assert.deepEqual(bookingUpdate, {
+        id: 'booking-1',
+        updates: {
+            paymentStatus: 'failed',
+        },
+    });
+});
+
 test('handleWebhook completes a cancellation refund and marks the booking refunded', async (t) => {
     t.mock.method(phonePeAdapter, 'verifyWebhook', () => true);
     t.mock.method(phonePeAdapter, 'parseWebhookPayload', () => ({
