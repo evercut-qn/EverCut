@@ -130,20 +130,55 @@ async function ensureBeneficiary(shop, barber, beneficiaryId) {
     const existing = await cashfreePayoutAdapter.getBeneficiary(existingBeneficiaryId);
 
     if (existing) {
-        if (shop.payoutConfig?.beneficiaryId !== existingBeneficiaryId) {
-            await shopRepository.updateById(shop._id, {
-                payoutConfig: buildShopPayoutConfig(shop, {
-                    beneficiaryId: existingBeneficiaryId,
-                    beneficiaryCreatedAt: shop.payoutConfig?.beneficiaryCreatedAt || new Date(),
-                    verifiedAt: new Date(),
-                    verificationStatus: 'verified',
-                }),
+        // Check if beneficiary details match current shop details
+        const beneficiaryVpa = existing.beneficiary_instrument_details?.vpa;
+        const beneficiaryBankAccount = existing.beneficiary_instrument_details?.bank_account_number;
+        
+        const vpaChanged = barber.upiId && beneficiaryVpa && barber.upiId !== beneficiaryVpa;
+        const bankAccountChanged = barber.bankAccount && beneficiaryBankAccount && barber.bankAccount !== beneficiaryBankAccount;
+        
+        if (vpaChanged || bankAccountChanged) {
+            // Payout details changed - remove old beneficiary and create new one
+            logger.warn('[PayoutService] Beneficiary details mismatch, recreating', {
+                shopId: shop._id,
+                oldBeneficiaryId: existingBeneficiaryId,
+                vpaChanged,
+                bankAccountChanged,
+                currentVpa: barber.upiId,
+                beneficiaryVpa,
             });
-        }
+            
+            try {
+                await cashfreePayoutAdapter.removeBeneficiary(existingBeneficiaryId);
+                logger.info('[PayoutService] Old beneficiary removed', { beneficiaryId: existingBeneficiaryId });
+            } catch (error) {
+                if (error.statusCode !== 404) {
+                    logger.error('[PayoutService] Failed to remove old beneficiary', {
+                        beneficiaryId: existingBeneficiaryId,
+                        error: error.message,
+                    });
+                }
+            }
+            
+            // Create new beneficiary with updated details (fall through to creation logic below)
+        } else {
+            // Beneficiary details match - use existing
+            if (shop.payoutConfig?.beneficiaryId !== existingBeneficiaryId) {
+                await shopRepository.updateById(shop._id, {
+                    payoutConfig: buildShopPayoutConfig(shop, {
+                        beneficiaryId: existingBeneficiaryId,
+                        beneficiaryCreatedAt: shop.payoutConfig?.beneficiaryCreatedAt || new Date(),
+                        verifiedAt: new Date(),
+                        verificationStatus: 'verified',
+                    }),
+                });
+            }
 
-        return existingBeneficiaryId;
+            return existingBeneficiaryId;
+        }
     }
 
+    // Create new beneficiary (either doesn't exist or was removed due to mismatch)
     await cashfreePayoutAdapter.createBeneficiary({
         beneficiaryId,
         name: barber.fullName,
@@ -161,6 +196,13 @@ async function ensureBeneficiary(shop, barber, beneficiaryId) {
             verifiedAt: new Date(),
             verificationStatus: 'verified',
         }),
+    });
+
+    logger.info('[PayoutService] Beneficiary created/recreated', {
+        shopId: shop._id,
+        beneficiaryId,
+        hasVpa: Boolean(barber.upiId),
+        hasBankAccount: Boolean(barber.bankAccount),
     });
 
     return beneficiaryId;
