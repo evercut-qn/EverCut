@@ -32,7 +32,15 @@ const getSettledBarberPayout = (payment) => (
     || 0
 );
 
-const generateTransferId = (barberId) => `PAYOUT_${barberId}_${Date.now()}`;
+const generateTransferId = (barberId) => {
+    // Cashfree requires transfer_id to be max 40 characters
+    // Format: PO_<last12CharsOfBarberId>_<last10DigitsOfTimestamp>
+    // Example: PO_940d358e7_7040473263 = 26 chars (well under 40 limit)
+    const barberIdStr = String(barberId);
+    const shortBarberId = barberIdStr.slice(-12);
+    const shortTimestamp = Date.now().toString().slice(-10);
+    return `PO_${shortBarberId}_${shortTimestamp}`;
+};
 const generateBeneficiaryId = (barberId) => `BARBER_${barberId}`;
 
 const buildShopPayoutConfig = (shop, updates = {}) => ({
@@ -308,10 +316,19 @@ export const handlePayoutWebhook = async (headers, rawBody, parsedBody) => {
         status: webhookData.status,
     });
 
+    // Handle non-transfer events (e.g., LOW_BALANCE_ALERT, BENEFICIARY_ADDED, etc.)
+    if (!webhookData.transferId) {
+        logger.info('[PayoutService] Non-transfer webhook event received', {
+            event: webhookData.event,
+        });
+        return { processed: true, event: webhookData.event, note: 'Non-transfer event' };
+    }
+
     const payout = await payoutRepository.findByTransferId(webhookData.transferId);
     if (!payout) {
         logger.warn('[PayoutService] Payout not found for webhook', {
             transferId: webhookData.transferId,
+            event: webhookData.event,
         });
         return { processed: false, event: webhookData.event };
     }
@@ -393,7 +410,14 @@ export const retryPayout = async (payoutId) => {
         barber,
         payout.beneficiaryId || shop.payoutConfig?.beneficiaryId || generateBeneficiaryId(shop.ownerId),
     );
-    const newTransferId = `${payout.transferId.split('_R')[0]}_R${payout.retryCount + 1}`;
+    // Extract base transfer ID (remove any existing retry suffix)
+    const baseTransferId = payout.transferId.split('_R')[0];
+    const newTransferId = `${baseTransferId}_R${payout.retryCount + 1}`;
+    
+    // Ensure retry transfer ID doesn't exceed 40 characters
+    if (newTransferId.length > 40) {
+        throw new BadRequestError('Transfer ID would exceed maximum length on retry');
+    }
 
     await payoutRepository.updateById(payout._id, {
         transferId: newTransferId,
