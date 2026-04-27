@@ -125,6 +125,14 @@ const bookingSchema = new mongoose.Schema(
             type: Date,
             default: null,
         },
+        barberCancelledAt: {
+            type: Date,
+            default: null,
+        },
+        barberConfirmedAt: {
+            type: Date,
+            default: null,
+        },
     },
     { timestamps: true },
 );

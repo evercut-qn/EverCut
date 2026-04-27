@@ -21,6 +21,7 @@ export const ALL_ROLES = Object.values(ROLES);
 
 export const BOOKING_STATUS = Object.freeze({
     PENDING: 'pending',
+    AWAITING_CONFIRMATION: 'awaiting_confirmation',
     CONFIRMED: 'confirmed',
     COMPLETED: 'completed',
     CANCELLED: 'cancelled',

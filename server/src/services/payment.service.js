@@ -569,7 +569,7 @@ async function handlePaymentSuccess(webhookData) {
 
     await bookingRepository.updateById(payment.bookingId, {
         paymentStatus: PAYMENT_STATUS.SUCCESS,
-        status: BOOKING_STATUS.CONFIRMED,
+        status: BOOKING_STATUS.AWAITING_CONFIRMATION,
         paidAt: new Date(),
         paymentMode: firstPayment?.paymentMode || webhookData.paymentMode || null,
     });
@@ -742,7 +742,7 @@ async function handleRefundFailure(webhookData) {
     return { processed: true, event: PHONEPE_WEBHOOK_EVENTS.REFUND_FAILED };
 }
 
-export const initiateRefund = async (bookingId, reason, actor = null) => {
+export const initiateRefund = async (bookingId, reason, actor = null, isBarberCancellation = false) => {
     const payment = await paymentRepository.findCompletedByBookingId(bookingId);
     if (!payment) {
         throw new NotFoundError('Completed payment for this booking');
@@ -767,10 +767,22 @@ export const initiateRefund = async (bookingId, reason, actor = null) => {
     }
 
     const refundType = REFUND_TYPE.CANCELLATION;
-    const refundFeeInPaisa = getRefundFeeInPaisa(payment);
     const platformFeeInPaisa = toPositivePaisa(payment.settlement?.platformFee || 0);
     const grossAmountInPaisa = getRefundGrossAmountInPaisa(payment, booking, platformFeeInPaisa);
-    const refundAmountInPaisa = grossAmountInPaisa - refundFeeInPaisa;
+
+    // Calculate refund amount based on cancellation type
+    let refundFeeInPaisa = 0;
+    let refundAmountInPaisa = 0;
+
+    if (isBarberCancellation) {
+        // Barber cancellation: Full refund (no deductions)
+        refundAmountInPaisa = toPositivePaisa(payment.amount);
+        refundFeeInPaisa = 0;
+    } else {
+        // Customer cancellation: Apply fee deductions
+        refundFeeInPaisa = getRefundFeeInPaisa(payment);
+        refundAmountInPaisa = grossAmountInPaisa - refundFeeInPaisa;
+    }
 
     if (refundAmountInPaisa <= 0) {
         throw new BadRequestError('Refund amount after fee deduction is zero or negative');
@@ -793,7 +805,7 @@ export const initiateRefund = async (bookingId, reason, actor = null) => {
             merchantRefundId,
             amount: refundAmountInPaisa,
             refundFee: refundFeeInPaisa,
-            platformFee: platformFeeInPaisa,
+            platformFee: isBarberCancellation ? 0 : platformFeeInPaisa,
             status: 'failed',
             type: refundType,
             reason,
@@ -816,6 +828,7 @@ export const initiateRefund = async (bookingId, reason, actor = null) => {
             bookingId,
             merchantRefundId,
             refundType,
+            isBarberCancellation,
             error: error.message,
         });
 
@@ -827,7 +840,7 @@ export const initiateRefund = async (bookingId, reason, actor = null) => {
         refundResponse,
         amount: refundAmountInPaisa,
         refundFee: refundFeeInPaisa,
-        platformFee: platformFeeInPaisa,
+        platformFee: isBarberCancellation ? 0 : platformFeeInPaisa,
         status: 'pending',
         type: refundType,
         reason,
@@ -847,10 +860,11 @@ export const initiateRefund = async (bookingId, reason, actor = null) => {
         bookingId,
         merchantRefundId,
         refundType,
+        isBarberCancellation,
         refundAmount: refundAmountInPaisa / 100,
         deductions: {
             refundFee: refundFeeInPaisa / 100,
-            platformFee: platformFeeInPaisa / 100,
+            platformFee: isBarberCancellation ? 0 : platformFeeInPaisa / 100,
         },
     });
 
@@ -862,7 +876,7 @@ export const initiateRefund = async (bookingId, reason, actor = null) => {
         refundType,
         deductions: {
             refundFee: refundFeeInPaisa / 100,
-            platformFee: platformFeeInPaisa / 100,
+            platformFee: isBarberCancellation ? 0 : platformFeeInPaisa / 100,
         },
     };
 };

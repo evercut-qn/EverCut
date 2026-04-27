@@ -10,6 +10,20 @@ const assertSupportedBookingRole = (roleType) => {
     }
 };
 
+// ============================================================================
+// Customer: Booking Management
+// ============================================================================
+
+export const createBooking = async (req, res, next) => {
+    try {
+        const body = getValidatedRequestData(req, 'body');
+        const result = await bookingService.bookSalon(req.user._id, body);
+        return res.status(201).json(ApiResponse.success(result, 'Booking created'));
+    } catch (err) {
+        next(err);
+    }
+};
+
 export const getBookings = async (req, res, next) => {
     try {
         const query = getValidatedRequestData(req, 'query');
@@ -37,16 +51,6 @@ export const getBookings = async (req, res, next) => {
     }
 };
 
-export const createBooking = async (req, res, next) => {
-    try {
-        const body = getValidatedRequestData(req, 'body');
-        const result = await bookingService.bookSalon(req.user._id, body);
-        return res.status(201).json(ApiResponse.success(result, 'Booking created'));
-    } catch (err) {
-        next(err);
-    }
-};
-
 export const getBookingById = async (req, res, next) => {
     try {
         const params = getValidatedRequestData(req, 'params');
@@ -67,21 +71,22 @@ export const getBookingById = async (req, res, next) => {
     }
 };
 
-export const deleteBooking = async (req, res, next) => {
+export const getBookingConfirmation = async (req, res, next) => {
     try {
         const params = getValidatedRequestData(req, 'params');
+        const result = await bookingService.getBookingConfirmation(params.id, req.user._id);
+        return res.status(200).json(ApiResponse.success(result, 'Confirmation fetched'));
+    } catch (err) {
+        next(err);
+    }
+};
 
-        if (req.user.roleType === ROLES.CUSTOMER) {
-            const result = await bookingService.cancelBooking(params.id, req.user._id);
-            return res.status(200).json(ApiResponse.success(result, 'Booking cancelled'));
-        }
-
-        if (req.user.roleType === ROLES.BARBER) {
-            const result = await bookingService.deleteBookingAfterPayment(params.id, req.user._id);
-            return res.status(200).json(ApiResponse.success(result, 'Booking deleted'));
-        }
-
-        throw new ForbiddenError('This endpoint is available only to customers and barbers');
+export const updateBooking = async (req, res, next) => {
+    try {
+        const params = getValidatedRequestData(req, 'params');
+        const body = getValidatedRequestData(req, 'body');
+        const result = await bookingService.updateBooking(params.id, req.user._id, body);
+        return res.status(200).json(ApiResponse.success(result, 'Booking updated'));
     } catch (err) {
         next(err);
     }
@@ -119,41 +124,45 @@ export const toggleFavorite = async (req, res, next) => {
     }
 };
 
-export const getBookingConfirmation = async (req, res, next) => {
+export const deleteBooking = async (req, res, next) => {
     try {
         const params = getValidatedRequestData(req, 'params');
-        const result = await bookingService.getBookingConfirmation(params.id, req.user._id);
-        return res.status(200).json(ApiResponse.success(result, 'Confirmation fetched'));
+
+        if (req.user.roleType === ROLES.CUSTOMER) {
+            const result = await bookingService.cancelBooking(params.id, req.user._id);
+            return res.status(200).json(ApiResponse.success(result, 'Booking cancelled'));
+        }
+
+        if (req.user.roleType === ROLES.BARBER) {
+            const result = await bookingService.cancelBookingByBarber(params.id, req.user._id);
+            return res.status(200).json(ApiResponse.success(result, 'Booking cancelled'));
+        }
+
+        throw new ForbiddenError('This endpoint is available only to customers and barbers');
     } catch (err) {
         next(err);
     }
 };
 
-export const updateBooking = async (req, res, next) => {
-    try {
-        const params = getValidatedRequestData(req, 'params');
-        const body = getValidatedRequestData(req, 'body');
-        const result = await bookingService.updateBooking(params.id, req.user._id, body);
-        return res.status(200).json(ApiResponse.success(result, 'Booking updated'));
-    } catch (err) {
-        next(err);
-    }
-};
+// ============================================================================
+// Barber: Booking Management
+// ============================================================================
 
-export const getBookingStats = async (req, res, next) => {
-    try {
-        const stats = await bookingService.getBookingStats(req.user._id);
-        return res.status(200).json(ApiResponse.success(stats, 'Booking stats'));
-    } catch (err) {
-        next(err);
-    }
-};
-
-export const getBookingMilestoneProgress = async (req, res, next) => {
+export const getPendingConfirmations = async (req, res, next) => {
     try {
         const query = getValidatedRequestData(req, 'query');
-        const progress = await bookingService.getBookingMilestoneProgress(req.user._id, query);
-        return res.status(200).json(ApiResponse.success(progress, 'Booking milestone progress'));
+        const result = await bookingService.getPendingConfirmations(req.user._id, query);
+        return res.status(200).json(ApiResponse.paginated(result.items, result.pagination, 'Pending confirmations fetched'));
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const confirmBookingByBarber = async (req, res, next) => {
+    try {
+        const params = getValidatedRequestData(req, 'params');
+        const result = await bookingService.confirmBookingByBarber(params.id, req.user._id);
+        return res.status(200).json(ApiResponse.success(result, 'Booking confirmed'));
     } catch (err) {
         next(err);
     }
@@ -176,6 +185,25 @@ export const getBookingsByStatus = async (req, res, next) => {
         const { status } = query;
         const result = await bookingService.getBookingsByStatusDetailed(req.user._id, status, query);
         return res.status(200).json(ApiResponse.paginated(result.items, result.pagination, `Bookings with status: ${status}`));
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const getBookingStats = async (req, res, next) => {
+    try {
+        const stats = await bookingService.getBookingStats(req.user._id);
+        return res.status(200).json(ApiResponse.success(stats, 'Booking stats'));
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const getBookingMilestoneProgress = async (req, res, next) => {
+    try {
+        const query = getValidatedRequestData(req, 'query');
+        const progress = await bookingService.getBookingMilestoneProgress(req.user._id, query);
+        return res.status(200).json(ApiResponse.success(progress, 'Booking milestone progress'));
     } catch (err) {
         next(err);
     }

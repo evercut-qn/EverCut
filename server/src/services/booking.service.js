@@ -245,7 +245,7 @@ export const cancelBooking = async (bookingId, userId) => {
         } else {
             try {
                 const { initiateRefund } = await import('./payment.service.js');
-                const refundResult = await initiateRefund(bookingId, 'Booking cancelled by customer');
+                const refundResult = await initiateRefund(bookingId, 'Booking cancelled by customer', null, false);
 
                 logger.info('[BookingService] Auto-refund initiated for cancelled booking', {
                     bookingId,
@@ -558,6 +558,11 @@ export const updateBookingStatus = async (bookingId, status, ownerId) => {
         throw new ForbiddenError('You can only manage bookings for your own shop');
     }
 
+    // Prevent manual status changes for bookings awaiting confirmation
+    if (booking.status === BOOKING_STATUS.AWAITING_CONFIRMATION) {
+        throw new BadRequestError('Use the confirm or cancel endpoints for bookings awaiting confirmation');
+    }
+
     if (status === BOOKING_STATUS.CONFIRMED && booking.paymentStatus !== PAYMENT_STATUS.SUCCESS) {
         throw new BadRequestError('Cannot confirm a booking before payment succeeds');
     }
@@ -582,36 +587,20 @@ export const updateBookingStatus = async (bookingId, status, ownerId) => {
     return updated;
 };
 
-export const deleteBookingAfterPayment = async (bookingId, ownerId) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
-    if (!shop) throw new NotFoundError('Shop');
-
-    const booking = await bookingRepository.findById(bookingId);
-    if (!booking) throw new NotFoundError('Booking');
-    if (booking.shopId.toString() !== shop._id.toString()) {
-        throw new ForbiddenError('You can only manage bookings for your own shop');
-    }
-
-    if (booking.paymentStatus === PAYMENT_STATUS.SUCCESS || booking.paymentTransactionId) {
-        throw new BadRequestError('Paid bookings cannot be deleted. Cancel and refund them instead.');
-    }
-
-    await employeeRepository.releaseSlot(booking.employeeId, booking.date.toISOString().split('T')[0], booking.time);
-    await bookingRepository.deleteById(bookingId);
-    return { message: 'Booking deleted and time slot freed' };
-};
+// Removed: deleteBookingAfterPayment - merged into cancelBookingByBarber
 
 export const getBookingStats = async (ownerId) => {
     const shop = await shopRepository.findByOwnerId(ownerId);
     if (!shop) throw new NotFoundError('Shop');
 
-    const [total, pending, completed, cancelled] = await Promise.all([
+    const [total, pending, awaitingConfirmation, completed, cancelled] = await Promise.all([
         bookingRepository.countAll({ shopId: shop._id }),
         bookingRepository.countByStatusForShop(shop._id, 'pending'),
+        bookingRepository.countByStatusForShop(shop._id, 'awaiting_confirmation'),
         bookingRepository.countByStatusForShop(shop._id, 'completed'),
         bookingRepository.countByStatusForShop(shop._id, 'cancelled'),
     ]);
-    return { total, pending, completed, cancelled };
+    return { total, pending, awaitingConfirmation, completed, cancelled };
 };
 
 export const getBookingMilestoneProgress = async (ownerId, query = {}) => {
@@ -680,4 +669,138 @@ export const getBookingsByStatusDetailed = async (ownerId, status, query = {}) =
 
     const items = await bookingRepository.findByStatusForShop(shop._id, status, { skip, limit });
     return { items, pagination };
+};
+
+// ── Barber: Get Pending Confirmations ────────────────────────────────────
+
+export const getPendingConfirmations = async (ownerId, query = {}) => {
+    const shop = await shopRepository.findByOwnerId(ownerId);
+    if (!shop) throw new NotFoundError('Shop');
+
+    const filter = {
+        shopId: shop._id,
+        status: BOOKING_STATUS.AWAITING_CONFIRMATION,
+        paymentStatus: PAYMENT_STATUS.SUCCESS,
+    };
+
+    const total = await bookingRepository.countAll(filter);
+    const { skip, limit, pagination } = buildPagination(query, total);
+
+    const items = await bookingRepository.findByShopId(
+        shop._id,
+        {
+            status: BOOKING_STATUS.AWAITING_CONFIRMATION,
+            paymentStatus: PAYMENT_STATUS.SUCCESS,
+        },
+        { skip, limit, sort: { paidAt: -1 } },
+    );
+
+    return { items, pagination };
+};
+
+// ── Barber: Confirm Booking ──────────────────────────────────────────────
+
+export const confirmBookingByBarber = async (bookingId, ownerId) => {
+    const booking = await bookingRepository.findById(bookingId);
+    if (!booking) throw new NotFoundError('Booking');
+
+    const shop = await shopRepository.findByOwnerId(ownerId);
+    if (!shop) throw new NotFoundError('Shop');
+
+    if (booking.shopId.toString() !== shop._id.toString()) {
+        throw new ForbiddenError('You can only confirm bookings for your own shop');
+    }
+
+    if (booking.status !== BOOKING_STATUS.AWAITING_CONFIRMATION) {
+        throw new BadRequestError('Booking is not awaiting confirmation');
+    }
+
+    if (booking.paymentStatus !== PAYMENT_STATUS.SUCCESS) {
+        throw new BadRequestError('Payment must be successful before confirming booking');
+    }
+
+    const updated = await bookingRepository.updateById(bookingId, {
+        status: BOOKING_STATUS.CONFIRMED,
+        barberConfirmedAt: new Date(),
+    });
+
+    logger.info('[BookingService] Booking confirmed by barber', {
+        bookingId,
+        shopId: shop._id,
+        ownerId,
+    });
+
+    return updated;
+};
+
+// ── Barber: Cancel Booking (Paid or Unpaid) ──────────────────────────────
+
+export const cancelBookingByBarber = async (bookingId, ownerId) => {
+    const booking = await bookingRepository.findById(bookingId);
+    if (!booking) throw new NotFoundError('Booking');
+
+    const shop = await shopRepository.findByOwnerId(ownerId);
+    if (!shop) throw new NotFoundError('Shop');
+
+    if (booking.shopId.toString() !== shop._id.toString()) {
+        throw new ForbiddenError('You can only cancel bookings for your own shop');
+    }
+
+    // Release employee slot
+    await employeeRepository.releaseSlot(
+        booking.employeeId,
+        booking.date.toISOString().split('T')[0],
+        booking.time,
+    );
+
+    // Handle PAID bookings
+    if (booking.paymentStatus === PAYMENT_STATUS.SUCCESS) {
+        // Only allow cancellation if awaiting confirmation
+        if (booking.status !== BOOKING_STATUS.AWAITING_CONFIRMATION) {
+            throw new BadRequestError('Can only cancel paid bookings that are awaiting confirmation');
+        }
+
+        // Initiate FULL refund (no deductions)
+        try {
+            const { initiateRefund } = await import('./payment.service.js');
+            await initiateRefund(bookingId, 'Barber cancelled booking', null, true);
+
+            logger.info('[BookingService] Full refund initiated for barber-cancelled booking', {
+                bookingId,
+                shopId: shop._id,
+                ownerId,
+            });
+        } catch (error) {
+            logger.error('[BookingService] Refund failed for barber-cancelled booking', {
+                bookingId,
+                error: error.message,
+            });
+            // Continue with cancellation even if refund fails
+        }
+
+        const updated = await bookingRepository.updateById(bookingId, {
+            status: BOOKING_STATUS.CANCELLED,
+            barberCancelledAt: new Date(),
+            cancelledAt: new Date(),
+        });
+
+        logger.info('[BookingService] Paid booking cancelled by barber', {
+            bookingId,
+            shopId: shop._id,
+            ownerId,
+        });
+
+        return updated;
+    }
+
+    // Handle UNPAID bookings - just delete
+    await bookingRepository.deleteById(bookingId);
+
+    logger.info('[BookingService] Unpaid booking deleted by barber', {
+        bookingId,
+        shopId: shop._id,
+        ownerId,
+    });
+
+    return { message: 'Booking deleted and time slot freed' };
 };

@@ -56,3 +56,8 @@ export const bookingMilestoneProgressQuerySchema = Joi.object({
     month: Joi.number().integer().min(1).max(12),
     year: Joi.number().integer().min(2000).max(9999),
 }).and('month', 'year');
+
+export const paginationQuerySchema = Joi.object({
+    page: Joi.number().integer().min(1).default(1),
+    limit: Joi.number().integer().min(1).max(100).default(10),
+});
