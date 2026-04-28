@@ -4,7 +4,7 @@
 
 ### 1. Get Shop Employees
 ```http
-GET /api/v1/bookings/shops/:shopId/employees
+GET /api/v1/shops/:shopId/employees
 ```
 
 **Purpose:** Get list of active employees for a shop
@@ -84,7 +84,7 @@ Authorization: Bearer <token>
 
 ### 3. Get Shop Availability
 ```http
-GET /api/v1/bookings/shops/:shopId/availability?date=2026-04-28&serviceId=service1
+GET /api/v1/shops/:shopId/availability?date=2026-04-28&serviceId=service1
 Authorization: Bearer <token>
 ```
 

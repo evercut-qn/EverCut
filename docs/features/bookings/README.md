@@ -55,11 +55,11 @@ CREATE → PENDING → PAYMENT → AWAITING_CONFIRMATION (24h max)
 - **Auto-cancel (24h no response):** FULL refund (no fees)
 - **Cannot cancel after confirm:** Not allowed
 
-### Discovery Endpoints (NEW)
+### Discovery Endpoints
 ```
-GET /bookings/shops/:id/employees           List employees
+GET /shops/:id/employees                    List employees
 GET /employees/:id/available-slots          Employee availability
-GET /bookings/shops/:id/availability        Shop-wide availability
+GET /shops/:id/availability                 Shop-wide availability
 ```
 
 ### Booking Endpoints

@@ -22,7 +22,7 @@ Successfully implemented a complete booking availability system with 3 new APIs,
 - **Features:** Service duration consideration, overlap detection, past slot filtering
 
 #### Employee List API
-- **Endpoint:** `GET /api/v1/bookings/shops/:id/employees`
+- **Endpoint:** `GET /api/v1/shops/:id/employees`
 - **Purpose:** List active employees for booking discovery
 - **Auth:** Public (no authentication required)
 
@@ -33,7 +33,7 @@ Successfully implemented a complete booking availability system with 3 new APIs,
 - **Features:** Service duration blocking, real-time availability
 
 #### Shop Availability API
-- **Endpoint:** `GET /api/v1/bookings/shops/:id/availability`
+- **Endpoint:** `GET /api/v1/shops/:id/availability`
 - **Purpose:** Get availability across all employees
 - **Auth:** Required
 - **Features:** First available suggestion, aggregated view
@@ -42,14 +42,15 @@ Successfully implemented a complete booking availability system with 3 new APIs,
 
 ### 2. Route Refactoring ✅
 
-**Moved Routes:**
-- Employee list: `/shops/:id/employees` → `/bookings/shops/:id/employees`
-- Shop availability: `/shops/:id/availability` → `/bookings/shops/:id/availability`
+**Routes Organization:**
+- Employee list: `/shops/:id/employees` (Shop resource)
+- Shop availability: `/shops/:id/availability` (Shop resource)
+- Employee slots: `/employees/:id/available-slots` (Employee resource)
 
 **Rationale:**
-- Better organization (booking-related endpoints grouped together)
-- Clearer responsibility separation
-- Improved API discoverability
+- Logical resource grouping
+- RESTful design principles
+- Clear API structure
 
 ---
 
@@ -122,19 +123,19 @@ server/postman-collections/05-customer-shop-discovery.json (regenerated)
 
 | Endpoint | Method | Auth | Purpose |
 |----------|--------|------|---------|
-| `/bookings/shops/:id/employees` | GET | No | List employees for booking |
+| `/shops/:id/employees` | GET | No | List employees for booking |
 | `/employees/:id/available-slots` | GET | Yes | Get employee availability |
-| `/bookings/shops/:id/availability` | GET | Yes | Get shop-wide availability |
+| `/shops/:id/availability` | GET | Yes | Get shop-wide availability |
 
 ### Complete Booking Flow
 
 ```
 1. GET /shops/nearby                           (Discover shops)
 2. GET /shops/:id                              (View shop details)
-3. GET /bookings/shops/:id/employees           (List employees)
-4. GET /employees/:id/available-slots          (Check availability)
+3. GET /shops/:id/employees                    (List employees)
+4. GET /employees/:id/available-slots          (Check employee availability)
    OR
-   GET /bookings/shops/:id/availability        (Check all employees)
+   GET /shops/:id/availability                 (Check all employees)
 5. POST /bookings                              (Create booking)
 ```
 
@@ -162,24 +163,23 @@ server/postman-collections/05-customer-shop-discovery.json (regenerated)
 
 ```
 /api/v1/
-├── bookings/
-│   ├── shops/:id/employees          (Discovery - Employee list)
-│   ├── shops/:id/availability       (Discovery - Shop availability)
-│   ├── /                            (Create booking)
-│   ├── /:id                         (Booking details)
-│   ├── /:id/confirm                 (Confirm booking)
-│   └── ...                          (Other booking operations)
+├── shops/
+│   ├── :id/employees                (Discovery - Employee list)
+│   ├── :id/availability             (Discovery - Shop availability)
+│   ├── nearby                       (Discovery - Find shops)
+│   ├── :id                          (Shop details)
+│   └── ...                          (Shop management)
 │
 ├── employees/
 │   ├── :id/available-slots          (Discovery - Employee availability)
 │   ├── :id/calendar                 (Employee calendar)
 │   └── ...                          (Employee management)
 │
-└── shops/
-    ├── nearby                       (Discovery - Find shops)
-    ├── :id                          (Shop details)
-    ├── search                       (Search shops)
-    └── ...                          (Shop management)
+└── bookings/
+    ├── /                            (Create booking)
+    ├── /:id                         (Booking details)
+    ├── /:id/confirm                 (Confirm booking)
+    └── ...                          (Other booking operations)
 ```
 
 ---
@@ -242,26 +242,21 @@ db.bookings.createIndex({ shopId: 1, date: 1 });
 
 **Update API Calls:**
 ```javascript
-// OLD (deprecated)
+// Employee list
 const employees = await fetch(`/api/v1/shops/${shopId}/employees`);
-const availability = await fetch(`/api/v1/shops/${shopId}/availability?...`);
 
-// NEW (current)
-const employees = await fetch(`/api/v1/bookings/shops/${shopId}/employees`);
-const availability = await fetch(`/api/v1/bookings/shops/${shopId}/availability?...`);
+// Employee availability
+const availability = await fetch(
+  `/api/v1/employees/${employeeId}/available-slots?date=${date}&serviceId=${serviceId}`,
+  { headers: { Authorization: `Bearer ${token}` } }
+);
+
+// Shop availability
+const shopAvailability = await fetch(
+  `/api/v1/shops/${shopId}/availability?date=${date}&serviceId=${serviceId}`,
+  { headers: { Authorization: `Bearer ${token}` } }
+);
 ```
-
-### Breaking Changes ⚠️
-
-**Route Changes:**
-- `/shops/:id/employees` → `/bookings/shops/:id/employees`
-- `/shops/:id/availability` → `/bookings/shops/:id/availability`
-
-**Action Required:**
-- Update all API clients
-- Update mobile apps
-- Update frontend applications
-- Notify all API consumers
 
 ---
 

@@ -14,10 +14,15 @@ Bookings now use normalized `HH:MM` time and an atomic multi-slot lock. If a 60-
 
 3. Select service from `data.services.single` or `data.services.bundled`.
 
-4. Select employee:
+4. Get employees:
    `GET /api/v1/shops/:id/employees`
 
-5. Check availability:
+5. Check availability (choose one):
+   
+   **Option A - Check specific employee:**
+   `GET /api/v1/employees/:id/available-slots?date=2099-01-01&serviceId=<service_id>`
+   
+   **Option B - Check all employees (shop-wide):**
    `GET /api/v1/shops/:id/availability?date=2099-01-01&serviceId=<service_id>`
 
 6. Create booking:
