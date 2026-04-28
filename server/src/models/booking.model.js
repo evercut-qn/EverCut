@@ -133,6 +133,10 @@ const bookingSchema = new mongoose.Schema(
             type: Date,
             default: null,
         },
+        autoCancelledAt: {
+            type: Date,
+            default: null,
+        },
     },
     { timestamps: true },
 );

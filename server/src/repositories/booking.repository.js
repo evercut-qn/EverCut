@@ -324,6 +324,16 @@ class BookingRepository {
             { $project: { _id: 0, totalEarning: 1, lastMonthEarning: 1, todayEarning: 1 } },
         ]);
     }
+
+    async findAwaitingConfirmationExpired(cutoffTime, limit = 100) {
+        return Booking.find(trustQueryOperators({
+            status: BOOKING_STATUS.AWAITING_CONFIRMATION,
+            paymentStatus: PAYMENT_STATUS.SUCCESS,
+            paidAt: { $lte: cutoffTime },
+        }))
+            .limit(limit)
+            .lean();
+    }
 }
 
 export default new BookingRepository();

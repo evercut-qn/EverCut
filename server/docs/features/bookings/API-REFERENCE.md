@@ -29,6 +29,8 @@ Authorization: Bearer <barber_token>
 
 **Response:** List of bookings awaiting barber confirmation
 
+**Note:** Bookings auto-cancel after 24 hours if not confirmed
+
 ---
 
 ### 3. Confirm Booking (Barber)
@@ -40,6 +42,7 @@ Authorization: Bearer <barber_token>
 **Requirements:**
 - Status must be `AWAITING_CONFIRMATION`
 - Payment must be `SUCCESS`
+- Must confirm within 24 hours (or booking auto-cancels)
 
 **Response:** Booking status changed to `CONFIRMED`
 
@@ -57,13 +60,17 @@ Authorization: Bearer <customer_token>
 - Unpaid: No refund
 - Paid: Partial refund (fees deducted)
 
-#### Barber Cancellation
+**Note:** Auto-cancelled bookings (24h no response) receive full refund
+
+#### Barber Cancellation (Deprecated)
 ```http
 DELETE /api/v1/bookings/:id
 Authorization: Bearer <barber_token>
 ```
 
-**Refund:**
+**Note:** Barber manual cancellation is no longer supported. Bookings auto-cancel after 24 hours if not confirmed.
+
+**Previous behavior:**
 - Unpaid: No refund (booking deleted)
 - Paid (awaiting confirmation): **FULL refund** (no fees)
 - Paid (confirmed): ❌ Not allowed
@@ -90,8 +97,8 @@ Content-Type: application/json
 | Scenario | Refund Amount | Example |
 |----------|---------------|---------|
 | Customer cancels | Total - Fees | ₹303 → ₹293 |
-| Barber cancels (before confirm) | Full amount | ₹303 → ₹303 |
-| Barber cancels (after confirm) | ❌ Not allowed | - |
+| Auto-cancel (24h no response) | Full amount | ₹303 → ₹303 |
+| After confirmation | ❌ Not allowed | - |
 
 ---
 
@@ -149,13 +156,13 @@ Content-Type: application/json
 ### Happy Path
 1. Customer creates booking → `POST /bookings`
 2. Customer pays → Payment webhook updates status to `AWAITING_CONFIRMATION`
-3. Barber confirms → `PATCH /bookings/:id/confirm`
+3. Barber confirms (within 24h) → `PATCH /bookings/:id/confirm`
 4. Service delivered → `PUT /bookings/:id/status` (status: completed)
 
-### Barber Cancellation Path
+### Auto-Cancel Path
 1. Customer creates booking → `POST /bookings`
 2. Customer pays → Status: `AWAITING_CONFIRMATION`
-3. Barber cancels → `DELETE /bookings/:id`
+3. Barber doesn't respond for 24 hours → System auto-cancels
 4. Customer receives full refund
 
 ### Customer Cancellation Path

@@ -804,3 +804,111 @@ export const cancelBookingByBarber = async (bookingId, ownerId) => {
 
     return { message: 'Booking deleted and time slot freed' };
 };
+
+// ── System: Auto-Cancel Awaiting Bookings ────────────────────────────────
+
+export const autoCancelAwaitingBookings = async () => {
+    const CONFIRMATION_TIMEOUT_HOURS = 24;
+    const cutoffTime = new Date(Date.now() - CONFIRMATION_TIMEOUT_HOURS * 60 * 60 * 1000);
+
+    logger.info('[BookingService] Starting auto-cancel job', {
+        cutoffTime,
+        timeoutHours: CONFIRMATION_TIMEOUT_HOURS,
+    });
+
+    // Find bookings awaiting confirmation for more than 24 hours
+    const expiredBookings = await bookingRepository.findAwaitingConfirmationExpired(cutoffTime, 100);
+
+    if (expiredBookings.length === 0) {
+        logger.info('[BookingService] No bookings to auto-cancel');
+        return { processed: 0, succeeded: 0, failed: 0 };
+    }
+
+    logger.info('[BookingService] Found bookings to auto-cancel', {
+        count: expiredBookings.length,
+    });
+
+    let succeeded = 0;
+    let failed = 0;
+
+    for (const booking of expiredBookings) {
+        try {
+            // Double-check status (prevent race conditions)
+            const currentBooking = await bookingRepository.findById(booking._id);
+            if (!currentBooking || currentBooking.status !== BOOKING_STATUS.AWAITING_CONFIRMATION) {
+                logger.warn('[BookingService] Booking status changed, skipping auto-cancel', {
+                    bookingId: booking._id,
+                    currentStatus: currentBooking?.status,
+                });
+                continue;
+            }
+
+            // Release employee slot
+            await employeeRepository.releaseSlot(
+                booking.employeeId,
+                booking.date.toISOString().split('T')[0],
+                booking.time,
+            );
+
+            // Initiate FULL refund (no deductions for auto-cancel)
+            try {
+                const { initiateRefund } = await import('./payment.service.js');
+                await initiateRefund(
+                    booking._id,
+                    'Booking auto-cancelled - Barber did not respond within 24 hours',
+                    null,
+                    true, // isBarberCancellation = true (full refund)
+                );
+
+                logger.info('[BookingService] Full refund initiated for auto-cancelled booking', {
+                    bookingId: booking._id,
+                    shopId: booking.shopId,
+                });
+            } catch (error) {
+                logger.error('[BookingService] Refund failed for auto-cancelled booking', {
+                    bookingId: booking._id,
+                    error: error.message,
+                });
+                // Continue with cancellation even if refund fails
+            }
+
+            // Update booking status
+            await bookingRepository.updateById(booking._id, {
+                status: BOOKING_STATUS.CANCELLED,
+                autoCancelledAt: new Date(),
+                cancelledAt: new Date(),
+            });
+
+            // Update shop stats (increment missed confirmation count)
+            await shopRepository.updateById(booking.shopId, {
+                $inc: { missedConfirmationCount: 1 },
+                lastMissedConfirmationAt: new Date(),
+            });
+
+            logger.info('[BookingService] Booking auto-cancelled successfully', {
+                bookingId: booking._id,
+                shopId: booking.shopId,
+                customerId: booking.customerId,
+            });
+
+            succeeded++;
+        } catch (error) {
+            logger.error('[BookingService] Failed to auto-cancel booking', {
+                bookingId: booking._id,
+                error: error.message,
+                stack: error.stack,
+            });
+            failed++;
+        }
+    }
+
+    const summary = {
+        processed: expiredBookings.length,
+        succeeded,
+        failed,
+    };
+
+    logger.info('[BookingService] Auto-cancel job completed', summary);
+
+    return summary;
+};

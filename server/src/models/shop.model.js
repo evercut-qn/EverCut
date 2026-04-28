@@ -196,6 +196,15 @@ const shopSchema = new mongoose.Schema(
             type: Date,
             default: null,
         },
+        missedConfirmationCount: {
+            type: Number,
+            default: 0,
+            min: 0,
+        },
+        lastMissedConfirmationAt: {
+            type: Date,
+            default: null,
+        },
     },
     { timestamps: true },
 );

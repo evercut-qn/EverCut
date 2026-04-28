@@ -4,7 +4,9 @@
 
 | File | Description |
 |------|-------------|
-| **BOOKING-FLOW.md** | Booking lifecycle and status flow |
+| **BOOKING-DISCOVERY-FLOW.md** | Complete end-to-end flow from shop discovery to booking creation |
+| **BOOKING-FLOW-DIAGRAM.md** | Visual diagrams and quick reference |
+| **BOOKING-FLOW.md** | Booking lifecycle, scenarios, and API reference |
 | **API-REFERENCE.md** | API endpoints with examples |
 
 ---
@@ -12,13 +14,13 @@
 ## 🔄 Booking Flow
 
 ```
-CREATE → PENDING → PAYMENT → AWAITING_CONFIRMATION
+CREATE → PENDING → PAYMENT → AWAITING_CONFIRMATION (24h max)
                                     ↓
                               BARBER DECISION
                                     ↓
                         ┌───────────┴───────────┐
                         ↓                       ↓
-                    CONFIRMED               CANCELLED
+                    CONFIRMED            AUTO-CANCELLED
                         ↓                  (full refund)
                     COMPLETED
 ```
@@ -36,8 +38,8 @@ CREATE → PENDING → PAYMENT → AWAITING_CONFIRMATION
 
 ### Refund Rules
 - **Customer cancels:** Partial refund (fees deducted)
-- **Barber cancels (before confirm):** FULL refund (no fees)
-- **Barber cancels (after confirm):** Not allowed
+- **Auto-cancel (24h no response):** FULL refund (no fees)
+- **Cannot cancel after confirm:** Not allowed
 
 ### Key Endpoints
 ```
@@ -62,19 +64,20 @@ DELETE /bookings/:id                    Cancel
 
 ### Key Changes
 1. ✅ Payment success → Status: `AWAITING_CONFIRMATION` (not auto-confirmed)
-2. ✅ Barber can confirm or cancel paid bookings
-3. ✅ Barber cancellation = FULL refund (customer protection)
-4. ✅ Single cancel endpoint: `DELETE /bookings/:id`
-5. ✅ Cannot cancel after confirmation (barber commitment)
+2. ✅ 24-hour auto-cancel if barber doesn't respond
+3. ✅ Auto-cancel = FULL refund (customer protection)
+4. ✅ Missed confirmations tracked per shop
+5. ✅ Single cancel endpoint: `DELETE /bookings/:id`
+6. ✅ Cannot cancel after confirmation (barber commitment)
 
 ---
 
 ## 🧪 Testing
 
 1. Create booking → Status: `PENDING`
-2. Pay for booking → Status: `AWAITING_CONFIRMATION`
+2. Pay for booking → Status: `AWAITING_CONFIRMATION` (24h countdown)
 3. Barber confirms → Status: `CONFIRMED`
-4. OR Barber cancels → Status: `CANCELLED` (full refund)
+4. OR System auto-cancels → Status: `CANCELLED` (full refund after 24h)
 
 ---
 
