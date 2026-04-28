@@ -60,10 +60,10 @@
           "pm.collectionVariables.set('booking_reschedule_date', toIsoDate(nextWorkingDay(4)));",
           "pm.collectionVariables.set('booking_reorder_date', toIsoDate(nextWorkingDay(5)));",
           "pm.collectionVariables.set('calendar_date', toIsoDate(nextWorkingDay(2)));",
-          "pm.collectionVariables.set('booking_time', '11:00 AM');",
-          "pm.collectionVariables.set('booking_update_time', '12:00 PM');",
-          "pm.collectionVariables.set('booking_reschedule_time', '01:00 PM');",
-          "pm.collectionVariables.set('booking_reorder_time', '02:00 PM');"
+          "pm.collectionVariables.set('booking_time', '11:00');",
+          "pm.collectionVariables.set('booking_update_time', '12:00');",
+          "pm.collectionVariables.set('booking_reschedule_time', '13:00');",
+          "pm.collectionVariables.set('booking_reorder_time', '14:00');"
         ]
       }
     }
@@ -495,10 +495,10 @@
     {
       "name": "10. Cancel Booking",
       "request": {
-        "method": "DELETE",
+        "method": "POST",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/bookings/{{booking_id}}",
-        "description": "Cancels the currently captured booking. This stays last because it is destructive."
+        "url": "{{base_url}}/{{api_prefix}}/bookings/{{booking_id}}/cancel",
+        "description": "Cancels the currently captured booking and releases its locked slot markers. This stays last because it is destructive."
       },
       "event": [
         {

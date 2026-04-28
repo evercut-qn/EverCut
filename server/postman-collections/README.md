@@ -33,7 +33,7 @@ Validation and field-level failures are returned inside `data.errors`.
 | `07-barber-profile-shop.json` | EverCut - Barber Profile & Shop | Shop management: info, UPI, status, images, PIN, and account actions |
 | `08-barber-employees.json` | EverCut - Barber Employees | Employee CRUD with optional photo upload and 24-hour employee schedule examples |
 | `09-barber-services.json` | EverCut - Barber Services | Service catalogue CRUD (single and bundled services) |
-| `10-barber-bookings.json` | EverCut - Barber Bookings | Booking administration: list, stats, monthly milestone progress, status update, delete |
+| `10-barber-bookings.json` | EverCut - Barber Bookings | Booking administration: list, stats, monthly milestone progress, status update, cancellation |
 | `11-barber-photos.json` | EverCut - Barber Photos | Shop gallery: upload, list, stats, delete |
 | `12-barber-earnings.json` | EverCut - Barber Earnings | Earnings summary (requires completed bookings for non-zero values) |
 | `13-barber-ratings.json` | EverCut - Barber Ratings | Rating listing, summary, reply management, and rating removal |
@@ -90,7 +90,7 @@ Shop opening, closing, and break times may be sent as either `HH:MM` or `hh:mm A
 | 7 | PUT | `/api/v1/bookings/{{booking_id}}` | Update booking |
 | 8 | PUT | `/api/v1/bookings/{{booking_id}}/reschedule` | Reschedule booking |
 | 9 | POST | `/api/v1/bookings/{{booking_id}}/reorder` | Reorder booking |
-| 10 | DELETE | `/api/v1/bookings/{{booking_id}}` | Cancel booking |
+| 10 | POST | `/api/v1/bookings/{{booking_id}}/cancel` | Cancel booking |
 
 ### `05-customer-shop-discovery.json`
 
@@ -98,9 +98,12 @@ Shop opening, closing, and break times may be sent as either `HH:MM` or `hh:mm A
 |---|---|---|---|
 | 1 | GET | `/api/v1/shops/nearby` | Get nearby shops - captures shop ID |
 | 2 | GET | `/api/v1/shops/{{shop_id}}` | Get shop details - captures service ID |
-| 3 | GET | `/api/v1/shops/doorstep` | Get doorstep shops |
-| 4 | GET | `/api/v1/services/search` | Search services by keyword and gender |
-| 5 | GET | `/api/v1/shops/search` | Search shops by keyword |
+| 3 | GET | `/api/v1/shops/{{shop_id}}/employees` | Get shop employees - captures employee ID |
+| 4 | GET | `/api/v1/employees/{{employee_id}}/available-slots` | Get employee available slots |
+| 5 | GET | `/api/v1/shops/{{shop_id}}/availability` | Get shop-wide availability |
+| 6 | GET | `/api/v1/shops/doorstep` | Get doorstep shops |
+| 7 | GET | `/api/v1/services/search` | Search services by keyword and gender |
+| 8 | GET | `/api/v1/shops/search` | Search shops by keyword |
 
 ### `06-customer-ratings.json`
 
@@ -151,12 +154,12 @@ Employee `workingHours.start` and `workingHours.end` remain `HH:MM` 24-hour valu
 
 | # | Method | Endpoint | Description |
 |---|---|---|---|
-| 1 | GET | `/api/v1/bookings` | List all bookings - captures IDs for status update and delete |
+| 1 | GET | `/api/v1/bookings` | List all bookings - captures IDs for status update and cancellation |
 | 2 | GET | `/api/v1/bookings/stats` | Get booking stats |
 | 3 | GET | `/api/v1/bookings/progress` | Get the monthly completed-booking milestone progress card data |
 | 4 | GET | `/api/v1/bookings/status?status=confirmed` | Filter bookings by status |
 | 5 | PUT | `/api/v1/bookings/{{booking_id_status}}/status` | Update booking status |
-| 6 | DELETE | `/api/v1/bookings/{{booking_id_delete}}` | Delete a paid booking *(Terminal)* |
+| 6 | POST | `/api/v1/bookings/{{booking_id_delete}}/cancel` | Cancel a paid booking *(Terminal)* |
 
 ### `11-barber-photos.json`
 
@@ -189,11 +192,11 @@ Employee `workingHours.start` and `workingHours.end` remain `HH:MM` 24-hour valu
 
 | # | Method | Endpoint | Description |
 |---|---|---|---|
-| 1 | POST | `/api/v1/payments/initiate` | Initiate PhonePe payment for a pending customer booking |
-| 2 | GET | `/api/v1/payments/{{payment_id}}/status` | Read and poll payment status |
-| 3 | GET | `/api/v1/payments/booking/{{payment_booking_id}}` | Get latest payment for a booking |
+| 1 | POST | `/api/v1/payments` | Initiate PhonePe payment for a pending customer booking |
+| 2 | GET | `/api/v1/payments/{{payment_id}}` | Read and poll payment status |
+| 3 | GET | `/api/v1/bookings/{{payment_booking_id}}/payment` | Get latest payment for a booking |
 | 4 | GET | `/api/v1/payments/redirect` | PhonePe redirect/deep-link handler |
-| 5 | POST | `/api/v1/payments/{{payment_booking_id}}/refund` | Initiate refund before payout starts |
+| 5 | POST | `/api/v1/bookings/{{payment_booking_id}}/refund` | Initiate refund before payout starts |
 | 6 | POST | `/api/v1/payouts/{{payout_id}}/retry` | Retry failed or reversed payout as admin |
 | 7 | POST | `/api/v1/payments/webhook` | Simulate PhonePe payment success webhook |
 | 8 | POST | `/api/v1/payments/webhook` | Simulate PhonePe payment failed webhook |
@@ -334,7 +337,7 @@ In the current collection this is request 3, because request 2 now fetches `GET 
 
 This succeeds once for the seeded no-reply fixture. It returns `409 Conflict` on subsequent runs because `POST /ratings/:id/reply` no longer overwrites an existing reply.
 
-### `10-barber-bookings.json` — Delete Paid Booking (Request 6)
+### `10-barber-bookings.json` — Cancel Paid Booking (Request 6)
 
 This is destructive and should be left until the end of a test cycle, after any booking status, earnings, or customer confirmation checks are complete.
 

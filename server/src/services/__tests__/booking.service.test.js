@@ -175,12 +175,44 @@ test('bookSalon creates a pending booking that requires payment before confirmat
             shopId: 'shop-1',
             finalPrice: 120,
             serviceType: 'single',
+            duration: 30,
         },
     ]));
 
-    t.mock.method(employeeRepository, 'claimSlot', async () => ({
-        _id: 'employee-1',
-    }));
+    const originalClaimSlots = employeeRepository.claimSlots;
+    if (!employeeRepository.claimSlots) employeeRepository.claimSlots = async () => null;
+    t.after(() => {
+        if (originalClaimSlots) employeeRepository.claimSlots = originalClaimSlots;
+        else delete employeeRepository.claimSlots;
+    });
+
+    let capturedClaim = null;
+    t.mock.method(employeeRepository, 'claimSlots', async (employeeId, date, times, options) => {
+        capturedClaim = { employeeId, date, times, options };
+        return {
+            _id: employeeId,
+        };
+    });
+    t.mock.method(employeeRepository, 'claimSlot', async () => {
+        throw new Error('bookSalon should claim normalized slot markers with claimSlots');
+    });
+
+    const originalReleaseSlots = employeeRepository.releaseSlots;
+    if (!employeeRepository.releaseSlots) employeeRepository.releaseSlots = async () => null;
+    t.after(() => {
+        if (originalReleaseSlots) employeeRepository.releaseSlots = originalReleaseSlots;
+        else delete employeeRepository.releaseSlots;
+    });
+
+    let capturedRelease = null;
+    t.mock.method(employeeRepository, 'releaseSlots', async (employeeId, date, times) => {
+        capturedRelease = { employeeId, date, times };
+        return { acknowledged: true };
+    });
+
+    t.mock.method(employeeRepository, 'releaseSlot', async () => {
+        throw new Error('bookSalon should release normalized slot markers with releaseSlots');
+    });
 
     let createdBookingPayload = null;
     t.mock.method(bookingRepository, 'create', async (payload) => {
@@ -202,14 +234,23 @@ test('bookSalon creates a pending booking that requires payment before confirmat
         time: '10:00 AM',
     });
 
+    assert.deepEqual(capturedClaim, {
+        employeeId: 'employee-1',
+        date: '2099-01-01',
+        times: ['10:00'],
+        options: { shopId: 'shop-1' },
+    });
+    assert.equal(capturedRelease, null);
     assert.deepEqual(createdBookingPayload, {
         customerId: 'customer-1',
         serviceIds: ['service-1'],
         employeeId: 'employee-1',
         shopId: 'shop-1',
         date: '2099-01-01',
-        time: '10:00 AM',
+        time: '10:00',
         totalAmount: 120,
+        durationMinutes: 30,
+        slotLockTimes: ['10:00'],
         status: 'pending',
         paymentStatus: 'pending',
         payoutStatus: 'not_initiated',
@@ -218,6 +259,91 @@ test('bookSalon creates a pending booking that requires payment before confirmat
     assert.equal(result.paymentRequired, true);
     assert.equal(result.paymentStatus, 'pending');
     assert.equal(result.payoutStatus, 'not_initiated');
+});
+
+test('bookSalon claims every slot marker covered by the selected service duration', async (t) => {
+    t.mock.method(customerRepository, 'findByUserId', async () => ({ _id: 'customer-1' }));
+
+    t.mock.method(shopRepository, 'findByIdWithFields', async () => ({
+        _id: 'shop-1',
+        isOpen: true,
+        openTime: '09:00',
+        closeTime: '21:00',
+        availableDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
+    }));
+
+    t.mock.method(serviceRepository, 'findByIds', async () => ([
+        {
+            _id: 'service-1',
+            shopId: 'shop-1',
+            finalPrice: 120,
+            serviceType: 'single',
+            duration: 60,
+        },
+    ]));
+
+    const originalClaimSlots = employeeRepository.claimSlots;
+    if (!employeeRepository.claimSlots) employeeRepository.claimSlots = async () => null;
+    t.after(() => {
+        if (originalClaimSlots) employeeRepository.claimSlots = originalClaimSlots;
+        else delete employeeRepository.claimSlots;
+    });
+
+    let claimedTimes = null;
+    t.mock.method(employeeRepository, 'claimSlots', async (_employeeId, _date, times) => {
+        claimedTimes = times;
+        return {
+            _id: 'employee-1',
+        };
+    });
+    t.mock.method(employeeRepository, 'claimSlot', async () => {
+        throw new Error('bookSalon should not use start-only claimSlot for duration-based bookings');
+    });
+
+    t.mock.method(bookingRepository, 'create', async (payload) => ({
+        _id: 'employee-1',
+        ...payload,
+    }));
+
+    await bookingService.bookSalon('user-1', {
+        shopId: 'shop-1',
+        employeeId: 'employee-1',
+        serviceId: 'service-1',
+        date: '2099-01-01',
+        time: '10:00',
+    });
+
+    assert.deepEqual(claimedTimes, ['10:00', '10:30']);
+});
+
+test('updateBooking rejects paid bookings before releasing the existing slot', async (t) => {
+    t.mock.method(bookingRepository, 'findById', async () => ({
+        _id: 'booking-1',
+        customerId: 'customer-1',
+        employeeId: 'employee-1',
+        shopId: 'shop-1',
+        date: new Date('2099-01-01T00:00:00.000Z'),
+        time: '10:00',
+        status: 'awaiting_confirmation',
+        paymentStatus: 'success',
+        slotLockTimes: ['10:00'],
+        durationMinutes: 30,
+    }));
+    t.mock.method(customerRepository, 'findByUserId', async () => ({ _id: 'customer-1' }));
+
+    const releaseMock = t.mock.method(employeeRepository, 'releaseSlot', async () => {
+        throw new Error('paid bookings should be rejected before releasing slots');
+    });
+
+    await assert.rejects(
+        bookingService.updateBooking('booking-1', 'user-1', {
+            employeeId: 'employee-1',
+            date: '2099-01-02',
+            time: '11:00',
+        }),
+        /cannot be changed after payment has started/i,
+    );
+    assert.equal(releaseMock.mock.calls.length, 0);
 });
 
 test('bookSalon rejects bundle bookings below the documented minimum service amount', async (t) => {
@@ -238,6 +364,7 @@ test('bookSalon rejects bundle bookings below the documented minimum service amo
             finalPrice: 250,
             totalPrice: 250,
             serviceType: 'bundled',
+            totalDuration: 90,
         },
     ]));
 
@@ -274,7 +401,8 @@ test('cancelBooking returns a customer-friendly manual-refund message when payou
         status: 'confirmed',
     }));
     t.mock.method(customerRepository, 'findByUserId', async () => ({ _id: 'customer-1' }));
-    t.mock.method(employeeRepository, 'releaseSlot', async () => ({ acknowledged: true }));
+
+    t.mock.method(employeeRepository, 'releaseSlots', async () => ({ acknowledged: true }));
 
     let bookingUpdate = null;
     t.mock.method(bookingRepository, 'updateById', async (id, updates) => {

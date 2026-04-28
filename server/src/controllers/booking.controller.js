@@ -124,7 +124,7 @@ export const toggleFavorite = async (req, res, next) => {
     }
 };
 
-export const deleteBooking = async (req, res, next) => {
+export const cancelBooking = async (req, res, next) => {
     try {
         const params = getValidatedRequestData(req, 'params');
 

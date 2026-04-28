@@ -56,6 +56,17 @@ const bookingSchema = new mongoose.Schema(
             type: Number,
             default: 0,
         },
+        durationMinutes: {
+            type: Number,
+            default: 0,
+            min: 0,
+        },
+        slotLockTimes: [
+            {
+                type: String,
+                trim: true,
+            },
+        ],
         status: {
             type: String,
             enum: ALL_BOOKING_STATUSES,
@@ -134,6 +145,10 @@ const bookingSchema = new mongoose.Schema(
             default: null,
         },
         autoCancelledAt: {
+            type: Date,
+            default: null,
+        },
+        noShowAt: {
             type: Date,
             default: null,
         },

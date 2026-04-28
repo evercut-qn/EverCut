@@ -70,9 +70,10 @@ const isSlotBlocked = (slotTime, bookedSlots, serviceDuration) => {
         const bookedMinutes = parseTimeToMinutes(booked.time);
         if (bookedMinutes === null) continue;
 
-        // Assume booked slot also has same service duration (conservative approach)
-        // In reality, we should get the actual duration from the booking
-        const bookedEndMinutes = bookedMinutes + serviceDuration;
+        const bookedDuration = Number(booked.durationMinutes) > 0
+            ? Number(booked.durationMinutes)
+            : serviceDuration;
+        const bookedEndMinutes = bookedMinutes + bookedDuration;
 
         // Check if slots overlap
         // Slot overlaps if: slotStart < bookedEnd AND slotEnd > bookedStart
@@ -238,4 +239,3 @@ export const findFirstAvailableSlot = (params) => {
     const firstAvailable = result.slots.find((slot) => slot.available);
     return firstAvailable ? firstAvailable.time : null;
 };
-

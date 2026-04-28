@@ -34,6 +34,7 @@ ensureRequiredEnv();
 const paymentService = await import('../payment.service.js');
 const paymentRepository = (await import('../../repositories/payment.repository.js')).default;
 const bookingRepository = (await import('../../repositories/booking.repository.js')).default;
+const employeeRepository = (await import('../../repositories/employee.repository.js')).default;
 const shopRepository = (await import('../../repositories/shop.repository.js')).default;
 const phonePeAdapter = (await import('../../adapters/phonepe/phonepe.adapter.js')).default;
 
@@ -376,6 +377,29 @@ test('handleWebhook rejects completed payments when the verified PhonePe amount 
         amount: 10200,
     }));
 
+    t.mock.method(bookingRepository, 'findById', async () => ({
+        _id: 'booking-1',
+        employeeId: 'employee-1',
+        date: new Date('2099-01-01T00:00:00.000Z'),
+        time: '10:00',
+        status: 'pending',
+        paymentStatus: 'initiated',
+        slotLockTimes: ['10:00'],
+    }));
+
+    const originalReleaseSlots = employeeRepository.releaseSlots;
+    if (!employeeRepository.releaseSlots) employeeRepository.releaseSlots = async () => null;
+    t.after(() => {
+        if (originalReleaseSlots) employeeRepository.releaseSlots = originalReleaseSlots;
+        else delete employeeRepository.releaseSlots;
+    });
+
+    let released = null;
+    t.mock.method(employeeRepository, 'releaseSlots', async (employeeId, date, times) => {
+        released = { employeeId, date, times };
+        return { acknowledged: true };
+    });
+
     let paymentUpdate = null;
     let bookingUpdate = null;
     t.mock.method(paymentRepository, 'updateById', async (id, updates) => {
@@ -400,12 +424,21 @@ test('handleWebhook rejects completed payments when the verified PhonePe amount 
     assert.equal(paymentUpdate.updates.status, 'failed');
     assert.equal(paymentUpdate.updates.errorCode, 'AMOUNT_MISMATCH');
     assert.match(paymentUpdate.updates.errorDescription, /amount mismatch/i);
+    assert.deepEqual(released, {
+        employeeId: 'employee-1',
+        date: '2099-01-01',
+        times: ['10:00'],
+    });
     assert.deepEqual(bookingUpdate, {
         id: 'booking-1',
         updates: {
+            status: 'cancelled',
             paymentStatus: 'failed',
+            cancelledAt: bookingUpdate.updates.cancelledAt,
+            cancellationNote: 'Payment verification failed. Please create a new booking.',
         },
     });
+    assert.ok(bookingUpdate.updates.cancelledAt instanceof Date);
 });
 
 test('handleWebhook completes a cancellation refund and marks the booking refunded', async (t) => {
@@ -472,4 +505,66 @@ test('pollPendingPayments expires checkout sessions based on current time, not 2
         Date.now() - capturedExpiryCutoff.getTime() < 60_000,
         'expected pollPendingPayments() to use the current time as the expiry cutoff',
     );
+});
+
+test('pollPendingPayments releases held booking slots when checkout sessions expire', async (t) => {
+    t.mock.method(paymentRepository, 'findStalePayments', async () => []);
+    t.mock.method(paymentRepository, 'findExpirablePendingPayments', async () => ([
+        {
+            _id: 'payment-1',
+            bookingId: 'booking-1',
+        },
+    ]));
+
+    t.mock.method(paymentRepository, 'updateById', async (id, updates) => ({
+        _id: id,
+        ...updates,
+    }));
+
+    t.mock.method(bookingRepository, 'findById', async () => ({
+        _id: 'booking-1',
+        employeeId: 'employee-1',
+        date: new Date('2099-01-01T00:00:00.000Z'),
+        time: '10:00',
+        status: 'pending',
+        paymentStatus: 'initiated',
+        slotLockTimes: ['10:00', '10:30'],
+    }));
+
+    const bookingUpdates = [];
+    t.mock.method(bookingRepository, 'updateById', async (id, updates) => {
+        bookingUpdates.push({ id, updates });
+        return { _id: id, ...updates };
+    });
+
+    const originalReleaseSlots = employeeRepository.releaseSlots;
+    if (!employeeRepository.releaseSlots) employeeRepository.releaseSlots = async () => null;
+    t.after(() => {
+        if (originalReleaseSlots) employeeRepository.releaseSlots = originalReleaseSlots;
+        else delete employeeRepository.releaseSlots;
+    });
+
+    let released = null;
+    t.mock.method(employeeRepository, 'releaseSlots', async (employeeId, date, times) => {
+        released = { employeeId, date, times };
+        return { acknowledged: true };
+    });
+
+    await paymentService.pollPendingPayments();
+
+    assert.deepEqual(released, {
+        employeeId: 'employee-1',
+        date: '2099-01-01',
+        times: ['10:00', '10:30'],
+    });
+    assert.deepEqual(bookingUpdates[0], {
+        id: 'booking-1',
+        updates: {
+            status: 'cancelled',
+            paymentStatus: 'failed',
+            cancelledAt: bookingUpdates[0].updates.cancelledAt,
+            cancellationNote: 'Payment session expired before confirmation. Please create a new booking.',
+        },
+    });
+    assert.ok(bookingUpdates[0].updates.cancelledAt instanceof Date);
 });

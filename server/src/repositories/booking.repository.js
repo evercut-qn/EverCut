@@ -208,7 +208,7 @@ class BookingRepository {
         return Booking.find({
             employeeId,
             date,
-            status: { $ne: BOOKING_STATUS.CANCELLED },
+            status: { $nin: [BOOKING_STATUS.CANCELLED] },
         }).lean();
     }
 
@@ -218,7 +218,7 @@ class BookingRepository {
             employeeId,
             date,
             time,
-            status: { $ne: BOOKING_STATUS.CANCELLED },
+            status: { $nin: [BOOKING_STATUS.CANCELLED] },
         };
 
         if (excludeBookingId) filter._id = { $ne: excludeBookingId };
@@ -227,7 +227,7 @@ class BookingRepository {
 
     async findCompletedWithPendingPayout() {
         return Booking.find(trustQueryOperators({
-            status: BOOKING_STATUS.COMPLETED,
+            status: { $in: [BOOKING_STATUS.COMPLETED, BOOKING_STATUS.NO_SHOW] },
             payoutStatus: PAYOUT_STATUS.NOT_INITIATED,
             paymentStatus: PAYMENT_STATUS.SUCCESS,
         })).populate('shopId', 'ownerId upiId accountHolderName bankName payoutConfig ownerName shopName');
@@ -258,14 +258,20 @@ class BookingRepository {
         return Booking.exists(trustQueryOperators({
             shopId,
             employeeId,
-            status: { $in: [BOOKING_STATUS.PENDING, BOOKING_STATUS.CONFIRMED] },
+            status: {
+                $in: [
+                    BOOKING_STATUS.PENDING,
+                    BOOKING_STATUS.AWAITING_CONFIRMATION,
+                    BOOKING_STATUS.CONFIRMED,
+                ],
+            },
             date: { $gte: startOfToday },
         }));
     }
 
     async getEarningsAggregation(employeeId, startOfToday, endOfToday, startOfLastMonth, endOfLastMonth) {
         return Booking.aggregate([
-            { $match: { status: BOOKING_STATUS.COMPLETED, employeeId } },
+            { $match: { status: { $in: [BOOKING_STATUS.COMPLETED, BOOKING_STATUS.NO_SHOW] }, employeeId } },
             {
                 $group: {
                     _id: '$employeeId',
@@ -296,7 +302,7 @@ class BookingRepository {
 
     async getEarningsAggregationForShop(shopId, startOfToday, endOfToday, startOfLastMonth, endOfLastMonth) {
         return Booking.aggregate([
-            { $match: { status: BOOKING_STATUS.COMPLETED, shopId } },
+            { $match: { status: { $in: [BOOKING_STATUS.COMPLETED, BOOKING_STATUS.NO_SHOW] }, shopId } },
             {
                 $group: {
                     _id: null,

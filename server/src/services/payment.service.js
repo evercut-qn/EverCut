@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import config from '../config/index.js';
 import customerRepository from '../repositories/customer.repository.js';
 import bookingRepository from '../repositories/booking.repository.js';
+import employeeRepository from '../repositories/employee.repository.js';
 import paymentRepository from '../repositories/payment.repository.js';
 import serviceRepository from '../repositories/service.repository.js';
 import shopRepository from '../repositories/shop.repository.js';
@@ -30,8 +31,17 @@ import {
     getEffectiveServicePrice,
     normalizeServicePricing,
 } from '../utils/service-pricing.utils.js';
+import { toDateOnlyString } from '../utils/slot-lock.utils.js';
 
 const toObjectIdString = (value) => String(value?._id || value || '');
+
+const getBookingSlotLockTimes = (booking) => {
+    if (Array.isArray(booking?.slotLockTimes) && booking.slotLockTimes.length > 0) {
+        return booking.slotLockTimes;
+    }
+
+    return [booking?.time].filter(Boolean);
+};
 
 const generateMerchantOrderId = (bookingId) => {
     const random = crypto.randomBytes(4).toString('hex');
@@ -261,15 +271,48 @@ const rejectPaymentAmountMismatch = async (payment, webhookData) => {
         webhookProcessed: true,
     });
 
-    await bookingRepository.updateById(payment.bookingId, {
-        paymentStatus: PAYMENT_STATUS.FAILED,
-    });
+    await cancelUnpaidBookingAndReleaseSlot(
+        payment.bookingId,
+        'Payment verification failed. Please create a new booking.',
+    );
 
     logger.error('[PaymentService] Payment amount mismatch', {
         bookingId: payment.bookingId,
         merchantOrderId: payment.merchantOrderId,
         expectedAmount: payment.amount,
         receivedAmount: webhookData.amount,
+    });
+};
+
+const releaseBookingSlot = async (booking) => {
+    if (!booking?.employeeId || !booking?.date) return;
+
+    await employeeRepository.releaseSlots(
+        booking.employeeId,
+        toDateOnlyString(booking.date),
+        getBookingSlotLockTimes(booking),
+    );
+};
+
+const cancelUnpaidBookingAndReleaseSlot = async (bookingId, cancellationNote) => {
+    const booking = await bookingRepository.findById(bookingId);
+    if (!booking) return null;
+
+    if (
+        booking.status === BOOKING_STATUS.CANCELLED
+        || booking.status === BOOKING_STATUS.COMPLETED
+        || booking.paymentStatus === PAYMENT_STATUS.SUCCESS
+    ) {
+        return booking;
+    }
+
+    await releaseBookingSlot(booking);
+
+    return bookingRepository.updateById(bookingId, {
+        status: BOOKING_STATUS.CANCELLED,
+        paymentStatus: PAYMENT_STATUS.FAILED,
+        cancelledAt: new Date(),
+        cancellationNote,
     });
 };
 
@@ -397,9 +440,10 @@ export const initiatePayment = async (userId, bookingId) => {
             status: PAYMENT_TRANSACTION_STATUS.FAILED,
             errorDescription: error.message,
         });
-        await bookingRepository.updateById(bookingId, {
-            paymentStatus: PAYMENT_STATUS.FAILED,
-        });
+        await cancelUnpaidBookingAndReleaseSlot(
+            bookingId,
+            'Payment could not be initiated. Please create a new booking.',
+        );
 
         throw error instanceof PaymentError
             ? error
@@ -626,9 +670,10 @@ async function handlePaymentFailure(webhookData) {
         webhookProcessed: true,
     });
 
-    await bookingRepository.updateById(payment.bookingId, {
-        paymentStatus: PAYMENT_STATUS.FAILED,
-    });
+    await cancelUnpaidBookingAndReleaseSlot(
+        payment.bookingId,
+        'Payment failed before confirmation. Please create a new booking.',
+    );
 
     logger.warn('[PaymentService] Payment failed', {
         bookingId: payment.bookingId,
@@ -946,9 +991,10 @@ export const pollPendingPayments = async () => {
         await paymentRepository.updateById(payment._id, {
             status: PAYMENT_TRANSACTION_STATUS.EXPIRED,
         });
-        await bookingRepository.updateById(payment.bookingId, {
-            paymentStatus: PAYMENT_STATUS.FAILED,
-        });
+        await cancelUnpaidBookingAndReleaseSlot(
+            payment.bookingId,
+            'Payment session expired before confirmation. Please create a new booking.',
+        );
     }
 
     if (expirablePayments.length > 0) {

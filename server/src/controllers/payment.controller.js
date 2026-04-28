@@ -47,8 +47,8 @@ export const getPaymentStatus = async (req, res, next) => {
 
 export const getPaymentByBooking = async (req, res, next) => {
     try {
-        const { bookingId } = getValidatedRequestData(req, 'params');
-        const result = await paymentService.getPaymentByBooking(req.user._id, bookingId);
+        const { id } = getValidatedRequestData(req, 'params');
+        const result = await paymentService.getPaymentByBooking(req.user._id, id);
         return res.status(200).json(ApiResponse.success(result, 'Payment details'));
     } catch (error) {
         next(error);
@@ -66,9 +66,9 @@ export const handleRedirect = async (req, res, next) => {
 
 export const initiateRefund = async (req, res, next) => {
     try {
-        const { bookingId } = getValidatedRequestData(req, 'params');
+        const { id } = getValidatedRequestData(req, 'params');
         const { reason } = getValidatedRequestData(req, 'body');
-        const result = await paymentService.initiateRefund(bookingId, reason, {
+        const result = await paymentService.initiateRefund(id, reason, {
             roleType: req.user.roleType,
             userId: req.user._id,
         });

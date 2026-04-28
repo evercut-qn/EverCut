@@ -29,7 +29,7 @@ export const updateBookingSchema = Joi.object({
 });
 
 export const bookingStatusSchema = Joi.object({
-    status: Joi.string().valid('confirmed', 'completed', 'cancelled').required(),
+    status: Joi.string().valid('confirmed', 'completed', 'cancelled', 'no-show').required(),
 });
 
 export const customerBookingsQuerySchema = paginationSchema.keys({
@@ -49,7 +49,7 @@ export const employeeCalendarQuerySchema = Joi.object({
 });
 
 export const bookingsByStatusQuerySchema = paginationSchema.keys({
-    status: Joi.string().valid('pending', 'confirmed', 'completed', 'cancelled').required(),
+    status: Joi.string().valid('pending', 'awaiting_confirmation', 'confirmed', 'completed', 'cancelled', 'no-show').required(),
 });
 
 export const bookingMilestoneProgressQuerySchema = Joi.object({

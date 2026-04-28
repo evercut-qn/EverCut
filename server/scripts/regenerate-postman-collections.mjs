@@ -193,10 +193,10 @@ const collectionPreRequest = ({
       "pm.collectionVariables.set('booking_reschedule_date', toIsoDate(nextWorkingDay(4)));",
       "pm.collectionVariables.set('booking_reorder_date', toIsoDate(nextWorkingDay(5)));",
       "pm.collectionVariables.set('calendar_date', toIsoDate(nextWorkingDay(2)));",
-      "pm.collectionVariables.set('booking_time', '11:00 AM');",
-      "pm.collectionVariables.set('booking_update_time', '12:00 PM');",
-      "pm.collectionVariables.set('booking_reschedule_time', '01:00 PM');",
-      "pm.collectionVariables.set('booking_reorder_time', '02:00 PM');",
+      "pm.collectionVariables.set('booking_time', '11:00');",
+      "pm.collectionVariables.set('booking_update_time', '12:00');",
+      "pm.collectionVariables.set('booking_reschedule_time', '13:00');",
+      "pm.collectionVariables.set('booking_reorder_time', '14:00');",
     );
   }
 
@@ -843,9 +843,9 @@ const customerBookingsCollection = {
     {
       name: '10. Cancel Booking',
       ...request({
-        method: 'DELETE',
-        url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id}}',
-        description: 'Cancels the currently captured booking. This stays last because it is destructive.',
+        method: 'POST',
+        url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id}}/cancel',
+        description: 'Cancels the currently captured booking and releases its locked slot markers. This stays last because it is destructive.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
     },
@@ -918,7 +918,7 @@ const customerShopDiscoveryCollection = {
       name: '3. Get Shop Employees And Capture Employee ID',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/bookings/shops/{{shop_id}}/employees',
+        url: '{{base_url}}/{{api_prefix}}/shops/{{shop_id}}/employees',
         description: 'Returns the list of active employees for the shop and captures the first employee ID.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
@@ -952,7 +952,7 @@ const customerShopDiscoveryCollection = {
       name: '5. Get Shop Availability',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/bookings/shops/{{shop_id}}/availability?date={{booking_date}}&serviceId={{service_id}}',
+        url: '{{base_url}}/{{api_prefix}}/shops/{{shop_id}}/availability?date={{booking_date}}&serviceId={{service_id}}',
         description: 'Returns availability across all employees for the shop, including first available slot suggestion.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
@@ -1461,7 +1461,7 @@ const barberServicesCollection = {
 const barberBookingsCollection = {
   info: {
     name: 'EverCut - Barber Bookings',
-    description: 'Barber booking administration collection covering list, status stats, monthly milestone progress, status updates, and delete-after-payment.',
+    description: 'Barber booking administration collection covering list, status stats, monthly milestone progress, status updates, and explicit booking cancellation.',
     schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
   },
   auth: bearerAuth('barber_access_token'),
@@ -1484,7 +1484,7 @@ const barberBookingsCollection = {
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/bookings',
-        description: 'Reads the barber booking dashboard payload and captures one ID for status updates plus one paid booking ID for the delete route when available.',
+        description: 'Reads the barber booking dashboard payload and captures one ID for status updates plus one paid booking ID for the cancellation route when available.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           'const response = pm.response.json();',
@@ -1522,7 +1522,7 @@ const barberBookingsCollection = {
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/bookings/status?status=confirmed',
-        description: 'Lists confirmed bookings. `bookSalon` creates bookings in the confirmed state, so this matches the current backend behaviour.',
+        description: 'Lists confirmed bookings. Paid bookings move through awaiting_confirmation before barber confirmation.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
     },
@@ -1540,11 +1540,11 @@ const barberBookingsCollection = {
       }),
     },
     {
-      name: '6. Delete Paid Booking (Terminal)',
+      name: '6. Cancel Paid Booking (Terminal)',
       ...request({
-        method: 'DELETE',
-        url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id_delete}}',
-        description: 'Deletes a paid booking only. This succeeds when request 1 captures a booking with `paymentStatus: success`.',
+        method: 'POST',
+        url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id_delete}}/cancel',
+        description: 'Cancels a paid booking only when the booking is still awaiting confirmation.',
         event: testEvent(
           "pm.test('status is 200 or 400', function () { pm.expect(pm.response.code).to.be.oneOf([200, 400]); });",
           "if (pm.response.code === 200) { pm.collectionVariables.unset('booking_id_delete'); }",
@@ -1808,7 +1808,7 @@ const paymentsPayoutsCollection = {
       name: '1. Initiate Payment',
       ...request({
         method: 'POST',
-        url: '{{base_url}}/{{api_prefix}}/payments/initiate',
+        url: '{{base_url}}/{{api_prefix}}/payments',
         auth: bearerAuth('customer_access_token'),
         headers: [{ key: 'Content-Type', value: 'application/json' }],
         body: jsonBody(`{
@@ -1833,12 +1833,12 @@ const paymentsPayoutsCollection = {
       }),
     },
     {
-      name: '2. Get Payment Status',
+      name: '2. Get Payment',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/payments/{{payment_id}}/status',
+        url: '{{base_url}}/{{api_prefix}}/payments/{{payment_id}}',
         auth: bearerAuth('customer_access_token'),
-        description: 'Reads payment status and polls PhonePe once when the payment is still pending.',
+        description: 'Reads payment details and polls PhonePe once when the payment is still pending.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
     },
@@ -1846,7 +1846,7 @@ const paymentsPayoutsCollection = {
       name: '3. Get Payment By Booking',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/payments/booking/{{payment_booking_id}}',
+        url: '{{base_url}}/{{api_prefix}}/bookings/{{payment_booking_id}}/payment',
         auth: bearerAuth('customer_access_token'),
         description: 'Returns the latest payment transaction for the authenticated customer\'s booking.',
         event: testEvent(
@@ -1870,7 +1870,7 @@ const paymentsPayoutsCollection = {
       name: '4. Initiate Refund',
       ...request({
         method: 'POST',
-        url: '{{base_url}}/{{api_prefix}}/payments/{{payment_booking_id}}/refund',
+        url: '{{base_url}}/{{api_prefix}}/bookings/{{payment_booking_id}}/refund',
         auth: bearerAuth('barber_access_token'),
         headers: [{ key: 'Content-Type', value: 'application/json' }],
         body: jsonBody(`{
@@ -2034,4 +2034,3 @@ writeCollection('12-barber-earnings.json', barberEarningsCollection);
 writeCollection('13-barber-ratings.json', barberRatingsCollection);
 writeCollection('14-payments-payouts.json', paymentsPayoutsCollection);
 writeFileSync(resolve(COLLECTIONS_DIR, 'EverCut.postman_environment.json'), `${JSON.stringify(environmentTemplate, null, 2)}\n`);
-

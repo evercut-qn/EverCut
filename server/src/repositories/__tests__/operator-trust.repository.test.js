@@ -3,9 +3,11 @@ import test from 'node:test';
 import mongoose from 'mongoose';
 
 import Booking from '../../models/booking.model.js';
+import Employee from '../../models/employee.model.js';
 import PaymentTransaction from '../../models/payment-transaction.model.js';
 import PayoutTransaction from '../../models/payout-transaction.model.js';
 import bookingRepository from '../booking.repository.js';
+import employeeRepository from '../employee.repository.js';
 import paymentRepository from '../payment.repository.js';
 import payoutRepository from '../payout.repository.js';
 
@@ -48,6 +50,44 @@ test('bookingRepository.updateManyByIds preserves the internal $in operator unde
     sanitize(capturedFilter);
 
     assert.deepEqual(capturedFilter._id.$in, ['booking-1', 'booking-2']);
+});
+
+test('employeeRepository.claimSlots atomically rejects any occupied slot marker', async (t) => {
+    let capturedFilter = null;
+    let capturedUpdate = null;
+    let capturedOptions = null;
+    let capturedSelect = null;
+    const query = {
+        select(fields) {
+            capturedSelect = fields;
+            return this;
+        },
+    };
+
+    t.mock.method(Employee, 'findOneAndUpdate', (filter, update, options) => {
+        capturedFilter = filter;
+        capturedUpdate = update;
+        capturedOptions = options;
+        return query;
+    });
+
+    await employeeRepository.claimSlots(
+        'employee-1',
+        '2099-01-01',
+        ['10:00', '10:30'],
+        { shopId: 'shop-1' },
+    );
+    sanitize(capturedFilter);
+
+    assert.equal(capturedFilter.bookedSlots.$not.$elemMatch.date, '2099-01-01');
+    assert.deepEqual(capturedFilter.bookedSlots.$not.$elemMatch.time.$in, ['10:00', '10:30']);
+    assert.deepEqual(capturedUpdate.$push.bookedSlots.$each, [
+        { date: '2099-01-01', time: '10:00' },
+        { date: '2099-01-01', time: '10:30' },
+    ]);
+    assert.equal(capturedFilter.shopId, 'shop-1');
+    assert.deepEqual(capturedOptions, { returnDocument: 'after' });
+    assert.equal(capturedSelect, 'firstName lastName photoUrl');
 });
 
 test('paymentRepository.findPendingByBookingId preserves its internal $in operator under sanitizeFilter', async (t) => {

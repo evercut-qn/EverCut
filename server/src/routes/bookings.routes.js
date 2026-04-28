@@ -1,7 +1,7 @@
 import { Router } from 'express';
 
 import * as bookingController from '../controllers/booking.controller.js';
-import * as shopController from '../controllers/shop.controller.js';
+import * as paymentController from '../controllers/payment.controller.js';
 import authenticate from '../middleware/authenticate.middleware.js';
 import { authorize } from '../middleware/authorize.middleware.js';
 import { validate } from '../middleware/validate.middleware.js';
@@ -18,19 +18,9 @@ import {
     updateBookingSchema,
     paginationQuerySchema,
 } from '../validators/booking.validator.js';
-import { shopIdParamSchema, shopAvailabilityQuerySchema } from '../validators/shop.validator.js';
+import { refundSchema } from '../validators/payment.validator.js';
 
 const router = Router();
-
-// ============================================================================
-// Discovery Routes (public/customer - for booking flow)
-// ============================================================================
-
-// Get employees for a shop (used in booking discovery)
-router.get('/shops/:id/employees', validate(shopIdParamSchema, 'params'), shopController.getShopEmployees);
-
-// Get shop availability (used in booking discovery)
-router.get('/shops/:id/availability', authenticate, validate(shopIdParamSchema, 'params'), validate(shopAvailabilityQuerySchema, 'query'), shopController.getShopAvailability);
 
 // ============================================================================
 // Authenticated Booking Routes
@@ -54,13 +44,15 @@ router.get('/progress', authorize(ROLES.BARBER), validate(bookingMilestoneProgre
 // ============================================================================
 
 router.get('/:id', authorize(ROLES.CUSTOMER, ROLES.BARBER), validate(bookingIdParamSchema, 'params'), bookingController.getBookingById);
+router.get('/:id/payment', authorize(ROLES.CUSTOMER), validate(bookingIdParamSchema, 'params'), paymentController.getPaymentByBooking);
 router.get('/:id/confirmation', authorize(ROLES.CUSTOMER), validate(bookingIdParamSchema, 'params'), bookingController.getBookingConfirmation);
 router.put('/:id', authorize(ROLES.CUSTOMER), validate(bookingIdParamSchema, 'params'), validate(updateBookingSchema, 'body'), bookingController.updateBooking);
 router.put('/:id/reschedule', authorize(ROLES.CUSTOMER), validate(bookingIdParamSchema, 'params'), validate(rescheduleSchema, 'body'), bookingController.rescheduleBooking);
 router.post('/:id/reorder', authorize(ROLES.CUSTOMER), validate(bookingIdParamSchema, 'params'), validate(reorderSchema, 'body'), bookingController.reorderBooking);
 router.put('/:id/favorite', authorize(ROLES.CUSTOMER), validate(bookingIdParamSchema, 'params'), bookingController.toggleFavorite);
 router.patch('/:id/confirm', authorize(ROLES.BARBER), validate(bookingIdParamSchema, 'params'), bookingController.confirmBookingByBarber);
-router.delete('/:id', authorize(ROLES.CUSTOMER, ROLES.BARBER), validate(bookingIdParamSchema, 'params'), bookingController.deleteBooking);
+router.post('/:id/cancel', authorize(ROLES.CUSTOMER, ROLES.BARBER), validate(bookingIdParamSchema, 'params'), bookingController.cancelBooking);
+router.post('/:id/refund', authorize(ROLES.ADMIN, ROLES.BARBER), validate(bookingIdParamSchema, 'params'), validate(refundSchema, 'body'), paymentController.initiateRefund);
 router.put('/:id/status', authorize(ROLES.BARBER), validate(bookingIdParamSchema, 'params'), validate(bookingStatusSchema, 'body'), bookingController.updateBookingStatus);
 
 export default router;

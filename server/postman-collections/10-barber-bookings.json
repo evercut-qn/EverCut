@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "EverCut - Barber Bookings",
-    "description": "Barber booking administration collection covering list, status stats, monthly milestone progress, status updates, and delete-after-payment.",
+    "description": "Barber booking administration collection covering list, status stats, monthly milestone progress, status updates, and explicit booking cancellation.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -90,7 +90,7 @@
         "method": "GET",
         "header": [],
         "url": "{{base_url}}/{{api_prefix}}/bookings",
-        "description": "Reads the barber booking dashboard payload and captures one ID for status updates plus one paid booking ID for the delete route when available."
+        "description": "Reads the barber booking dashboard payload and captures one ID for status updates plus one paid booking ID for the cancellation route when available."
       },
       "event": [
         {
@@ -186,7 +186,7 @@
         "method": "GET",
         "header": [],
         "url": "{{base_url}}/{{api_prefix}}/bookings/status?status=confirmed",
-        "description": "Lists confirmed bookings. `bookSalon` creates bookings in the confirmed state, so this matches the current backend behaviour."
+        "description": "Lists confirmed bookings. Paid bookings move through awaiting_confirmation before barber confirmation."
       },
       "event": [
         {
@@ -253,12 +253,12 @@
       ]
     },
     {
-      "name": "6. Delete Paid Booking (Terminal)",
+      "name": "6. Cancel Paid Booking (Terminal)",
       "request": {
-        "method": "DELETE",
+        "method": "POST",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/bookings/{{booking_id_delete}}",
-        "description": "Deletes a paid booking only. This succeeds when request 1 captures a booking with `paymentStatus: success`."
+        "url": "{{base_url}}/{{api_prefix}}/bookings/{{booking_id_delete}}/cancel",
+        "description": "Cancels a paid booking only when the booking is still awaiting confirmation."
       },
       "event": [
         {

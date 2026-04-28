@@ -137,7 +137,7 @@
             "value": "application/json"
           }
         ],
-        "url": "{{base_url}}/{{api_prefix}}/payments/initiate",
+        "url": "{{base_url}}/{{api_prefix}}/payments",
         "description": "Creates a PhonePe checkout order for the authenticated customer's pending booking. The booking must be created first through 04-customer-bookings.json. The payment_booking_id is auto-synced from shared_booking_id captured during booking creation.",
         "body": {
           "mode": "raw",
@@ -193,12 +193,12 @@
       ]
     },
     {
-      "name": "2. Get Payment Status",
+      "name": "2. Get Payment",
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/payments/{{payment_id}}/status",
-        "description": "Reads payment status and polls PhonePe once when the payment is still pending.",
+        "url": "{{base_url}}/{{api_prefix}}/payments/{{payment_id}}",
+        "description": "Reads payment details and polls PhonePe once when the payment is still pending.",
         "auth": {
           "type": "bearer",
           "bearer": [
@@ -236,7 +236,7 @@
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/payments/booking/{{payment_booking_id}}",
+        "url": "{{base_url}}/{{api_prefix}}/bookings/{{payment_booking_id}}/payment",
         "description": "Returns the latest payment transaction for the authenticated customer's booking.",
         "auth": {
           "type": "bearer",
@@ -292,7 +292,7 @@
             "value": "application/json"
           }
         ],
-        "url": "{{base_url}}/{{api_prefix}}/payments/{{payment_booking_id}}/refund",
+        "url": "{{base_url}}/{{api_prefix}}/bookings/{{payment_booking_id}}/refund",
         "description": "Initiates a refund for a completed payment when payout has not started. Allowed roles: BARBER or ADMIN.",
         "body": {
           "mode": "raw",

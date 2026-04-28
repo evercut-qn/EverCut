@@ -35,10 +35,11 @@ class EmployeeRepository {
     }
 
     /**
-     * Atomically claim a slot for a booking.
-     * Returns null if the slot is already taken or the date is blocked.
+     * Atomically claim every slot marker for a booking.
+     * Returns null if any marker is already taken or the date is blocked.
      */
-    async claimSlot(employeeId, date, time, options = {}) {
+    async claimSlots(employeeId, date, times, options = {}) {
+        const slotTimes = [...new Set(times)].filter(Boolean);
         const queryOptions = { returnDocument: 'after' };
         if (options.session) queryOptions.session = options.session;
 
@@ -46,7 +47,7 @@ class EmployeeRepository {
             _id: employeeId,
             isActive: true,
             deletedAt: null,
-            bookedSlots: { $not: { $elemMatch: { date, time } } },
+            bookedSlots: { $not: { $elemMatch: { date, time: { $in: slotTimes } } } },
             blockedDates: { $ne: new Date(date) },
         };
         if (options.shopId) query.shopId = options.shopId;
@@ -55,7 +56,9 @@ class EmployeeRepository {
             trustQueryOperators(query),
             {
                 $push: {
-                    bookedSlots: { date, time },
+                    bookedSlots: {
+                        $each: slotTimes.map((time) => ({ date, time })),
+                    },
                 },
             },
             queryOptions,
@@ -63,12 +66,32 @@ class EmployeeRepository {
     }
 
     /**
-     * Release a previously booked slot.
+     * Backward-compatible single-marker slot claim.
+     */
+    async claimSlot(employeeId, date, time, options = {}) {
+        return this.claimSlots(employeeId, date, [time], options);
+    }
+
+    /**
+     * Release previously booked slot markers.
+     */
+    async releaseSlots(employeeId, date, times) {
+        const slotTimes = [...new Set(times)].filter(Boolean);
+        return Employee.findByIdAndUpdate(employeeId, {
+            $pull: {
+                bookedSlots: {
+                    date,
+                    time: { $in: slotTimes },
+                },
+            },
+        });
+    }
+
+    /**
+     * Backward-compatible single-marker slot release.
      */
     async releaseSlot(employeeId, date, time) {
-        return Employee.findByIdAndUpdate(employeeId, {
-            $pull: { bookedSlots: { date, time } },
-        });
+        return this.releaseSlots(employeeId, date, [time]);
     }
 
     async getIdsForShop(shopId) {

@@ -59,10 +59,10 @@
           "pm.collectionVariables.set('booking_reschedule_date', toIsoDate(nextWorkingDay(4)));",
           "pm.collectionVariables.set('booking_reorder_date', toIsoDate(nextWorkingDay(5)));",
           "pm.collectionVariables.set('calendar_date', toIsoDate(nextWorkingDay(2)));",
-          "pm.collectionVariables.set('booking_time', '11:00 AM');",
-          "pm.collectionVariables.set('booking_update_time', '12:00 PM');",
-          "pm.collectionVariables.set('booking_reschedule_time', '01:00 PM');",
-          "pm.collectionVariables.set('booking_reorder_time', '02:00 PM');"
+          "pm.collectionVariables.set('booking_time', '11:00');",
+          "pm.collectionVariables.set('booking_update_time', '12:00');",
+          "pm.collectionVariables.set('booking_reschedule_time', '13:00');",
+          "pm.collectionVariables.set('booking_reorder_time', '14:00');"
         ]
       }
     }
@@ -204,7 +204,7 @@
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/bookings/shops/{{shop_id}}/employees",
+        "url": "{{base_url}}/{{api_prefix}}/shops/{{shop_id}}/employees",
         "description": "Returns the list of active employees for the shop and captures the first employee ID."
       },
       "event": [
@@ -274,7 +274,7 @@
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/bookings/shops/{{shop_id}}/availability?date={{booking_date}}&serviceId={{service_id}}",
+        "url": "{{base_url}}/{{api_prefix}}/shops/{{shop_id}}/availability?date={{booking_date}}&serviceId={{service_id}}",
         "description": "Returns availability across all employees for the shop, including first available slot suggestion."
       },
       "event": [

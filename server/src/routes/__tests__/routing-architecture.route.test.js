@@ -115,3 +115,32 @@ test('payment and payout controllers follow the same flat feature-controller str
     assert.match(payoutRoutes, /\.\.\/controllers\/payout\.controller\.js/);
     assert.doesNotMatch(payoutRoutes, /\.\.\/controllers\/payout\//);
 });
+
+test('booking discovery and payment routes use final resource-oriented URLs', async () => {
+    const bookingRoutes = await readSource('routes/bookings.routes.js');
+    const shopRoutes = await readSource('routes/shops.routes.js');
+    const paymentRoutes = await readSource('routes/payment.routes.js');
+    const postmanSource = await readFile(
+        path.join(serverDir, 'scripts', 'regenerate-postman-collections.mjs'),
+        'utf8',
+    );
+
+    assert.match(shopRoutes, /router\.get\('\/:id\/employees'/);
+    assert.match(shopRoutes, /router\.get\('\/:id\/availability'/);
+    assert.doesNotMatch(bookingRoutes, /\/shops\/:id\/availability/);
+    assert.doesNotMatch(bookingRoutes, /\/shops\/:id\/employees/);
+
+    assert.match(paymentRoutes, /router\.post\(\s*'\/'/);
+    assert.match(paymentRoutes, /router\.get\(\s*'\/:id'/);
+    assert.doesNotMatch(paymentRoutes, /\/initiate/);
+    assert.doesNotMatch(paymentRoutes, /\/booking\/:bookingId/);
+
+    assert.match(bookingRoutes, /\/:id\/payment/);
+    assert.match(bookingRoutes, /\/:id\/refund/);
+    assert.match(bookingRoutes, /\/:id\/cancel/);
+    assert.doesNotMatch(bookingRoutes, /router\.delete\('\/:id'/);
+
+    assert.doesNotMatch(postmanSource, /\/bookings\/shops/);
+    assert.doesNotMatch(postmanSource, /\/payments\/initiate/);
+    assert.doesNotMatch(postmanSource, /\/payments\/booking/);
+});

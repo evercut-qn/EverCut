@@ -4,7 +4,13 @@ import serviceRepository from '../repositories/service.repository.js';
 import shopRepository from '../repositories/shop.repository.js';
 import customerRepository from '../repositories/customer.repository.js';
 import { NotFoundError, BadRequestError, ForbiddenError } from '../utils/api-error.js';
-import { isBookingInFuture, isWithinShopHours, getDayOfWeek, isWithinCancellationWindow } from '../utils/time.utils.js';
+import {
+    isBookingInFuture,
+    isWithinShopHours,
+    getDayOfWeek,
+    isWithinCancellationWindow,
+    toTwentyFourHourTime,
+} from '../utils/time.utils.js';
 import { buildPagination } from '../utils/pagination.utils.js';
 import {
     BOOKING_MILESTONE_TARGETS,
@@ -17,6 +23,7 @@ import {
     SERVICE_TYPE,
 } from '../utils/constants.js';
 import { getEffectiveServicePrice, normalizeServicePricing } from '../utils/service-pricing.utils.js';
+import { buildSlotLockTimes, toDateOnlyString } from '../utils/slot-lock.utils.js';
 import logger from '../utils/logger.js';
 
 /**
@@ -30,6 +37,45 @@ const sumServicePrices = (services = []) => services.reduce(
     (sum, service) => sum + (getEffectiveServicePrice(service) ?? 0),
     0,
 );
+const getServiceDuration = (service) => (
+    service.serviceType === SERVICE_TYPE.BUNDLED
+        ? service.totalDuration
+        : service.duration
+);
+const sumServiceDurations = (services = []) => services.reduce(
+    (sum, service) => sum + (Number(getServiceDuration(service)) || 0),
+    0,
+);
+const assertValidServiceDuration = (durationMinutes) => {
+    if (!Number.isFinite(durationMinutes) || durationMinutes <= 0) {
+        throw new BadRequestError('Selected services must have a valid duration');
+    }
+};
+const normalizeBookingTime = (time) => {
+    const normalized = toTwentyFourHourTime(time);
+    if (!normalized) throw new BadRequestError('Booking time must use HH:MM or hh:mm AM/PM format');
+    return normalized;
+};
+const getBookingSlotLockTimes = (booking) => {
+    if (Array.isArray(booking.slotLockTimes) && booking.slotLockTimes.length > 0) {
+        return booking.slotLockTimes;
+    }
+
+    const normalizedTime = toTwentyFourHourTime(booking.time);
+    return normalizedTime ? [normalizedTime] : [booking.time].filter(Boolean);
+};
+const releaseBookingSlotLock = async (booking) => {
+    await employeeRepository.releaseSlots(
+        booking.employeeId,
+        toDateOnlyString(booking.date),
+        getBookingSlotLockTimes(booking),
+    );
+};
+const assertBookingCanChangeBeforePayment = (booking) => {
+    if (booking.status !== BOOKING_STATUS.PENDING || booking.paymentStatus !== PAYMENT_STATUS.PENDING) {
+        throw new BadRequestError('Booking cannot be changed after payment has started');
+    }
+};
 const isBundleSelection = (services = []) => (
     services.length > 1
     || services.some((service) => service.serviceType === SERVICE_TYPE.BUNDLED)
@@ -70,7 +116,7 @@ const buildBookingDetailsPayload = async (booking) => {
     const services = normalizeBookedServices(
         await serviceRepository.findByIds(
             booking.serviceIds,
-            'serviceName finalPrice totalPrice actualPrice offerPrice imageUrl serviceType',
+            'serviceName finalPrice totalPrice actualPrice offerPrice imageUrl serviceType duration totalDuration',
         ),
     );
     const totalAmount = sumServicePrices(services);
@@ -88,6 +134,7 @@ const buildBookingDetailsPayload = async (booking) => {
         status: booking.status,
         paymentStatus: booking.paymentStatus,
         payoutStatus: booking.payoutStatus,
+        durationMinutes: booking.durationMinutes || sumServiceDurations(services),
         paymentTransactionId: booking.paymentTransactionId,
         merchantOrderId: booking.merchantOrderId,
     };
@@ -95,13 +142,14 @@ const buildBookingDetailsPayload = async (booking) => {
 
 export const bookSalon = async (userId, data) => {
     const { serviceId, employeeId, shopId, date, time } = data;
+    const normalizedTime = normalizeBookingTime(time);
 
     const customer = await customerRepository.findByUserId(userId);
     if (!customer) throw new NotFoundError('Customer profile');
     const customerId = customer._id;
 
     // Validate date/time is in future
-    if (!isBookingInFuture(date, time)) {
+    if (!isBookingInFuture(date, normalizedTime)) {
         throw new BadRequestError('Cannot book in the past. Please select a future date and time.');
     }
 
@@ -117,7 +165,7 @@ export const bookSalon = async (userId, data) => {
     }
 
     // Check shop hours
-    if (!isWithinShopHours(time, shop.openTime, shop.closeTime)) {
+    if (!isWithinShopHours(normalizedTime, shop.openTime, shop.closeTime)) {
         throw new BadRequestError('Booking time is outside shop hours');
     }
 
@@ -128,7 +176,7 @@ export const bookSalon = async (userId, data) => {
     const services = normalizeBookedServices(
         await serviceRepository.findByIds(
             serviceIds,
-            'serviceName finalPrice totalPrice actualPrice offerPrice serviceType shopId',
+            'serviceName finalPrice totalPrice actualPrice offerPrice serviceType shopId duration totalDuration',
         ),
     );
     if (!services.length) throw new NotFoundError('Services');
@@ -139,12 +187,15 @@ export const bookSalon = async (userId, data) => {
         throw new BadRequestError('Selected services must belong to the target shop');
     }
 
-    // Claim employee slot atomically
-    const employee = await employeeRepository.claimSlot(employeeId, date, time, { shopId });
-    if (!employee) throw new BadRequestError('Employee not available at this date/time');
-
     const totalAmount = sumServicePrices(services);
+    const durationMinutes = sumServiceDurations(services);
+    assertValidServiceDuration(durationMinutes);
     assertBundleMinimum(services, totalAmount);
+    const slotLockTimes = buildSlotLockTimes(normalizedTime, durationMinutes);
+
+    // Claim employee slot markers atomically.
+    const employee = await employeeRepository.claimSlots(employeeId, date, slotLockTimes, { shopId });
+    if (!employee) throw new BadRequestError('Employee not available at this date/time');
 
     let booking;
     try {
@@ -154,14 +205,16 @@ export const bookSalon = async (userId, data) => {
             employeeId,
             shopId,
             date,
-            time,
+            time: normalizedTime,
             totalAmount,
+            durationMinutes,
+            slotLockTimes,
             status: BOOKING_STATUS.PENDING,
             paymentStatus: PAYMENT_STATUS.PENDING,
             payoutStatus: PAYOUT_STATUS.NOT_INITIATED,
         });
     } catch (error) {
-        await employeeRepository.releaseSlot(employeeId, date, time);
+        await employeeRepository.releaseSlots(employeeId, date, slotLockTimes);
         throw error;
     }
 
@@ -172,8 +225,10 @@ export const bookSalon = async (userId, data) => {
         employee,
         services,
         date,
-        time,
+        time: normalizedTime,
         totalAmount,
+        durationMinutes,
+        slotLockTimes,
         status: booking.status,
         paymentStatus: booking.paymentStatus,
         payoutStatus: booking.payoutStatus,
@@ -234,8 +289,7 @@ export const cancelBooking = async (bookingId, userId) => {
         throw new BadRequestError(`Cancellation not allowed within ${CANCELLATION_WINDOW_HOURS} hours of appointment`);
     }
 
-    // Release employee slot
-    await employeeRepository.releaseSlot(booking.employeeId, booking.date.toISOString().split('T')[0], booking.time);
+    await releaseBookingSlotLock(booking);
     let cancellationNote = null;
 
     if (booking.paymentStatus === PAYMENT_STATUS.SUCCESS) {
@@ -272,6 +326,7 @@ export const cancelBooking = async (bookingId, userId) => {
 // ── Customer: reschedule booking ─────────────────────────────────────────
 
 export const rescheduleBooking = async (bookingId, userId, newDate, newTime) => {
+    const normalizedNewTime = normalizeBookingTime(newTime);
     const booking = await bookingRepository.findById(bookingId);
     if (!booking) throw new NotFoundError('Booking');
 
@@ -280,8 +335,14 @@ export const rescheduleBooking = async (bookingId, userId, newDate, newTime) => 
         throw new ForbiddenError('You can only reschedule your own bookings');
     }
 
+    assertBookingCanChangeBeforePayment(booking);
+
     if (!isBookingInFuture(booking.date.toISOString().split('T')[0], booking.time)) {
         throw new BadRequestError('Appointment has already passed');
+    }
+
+    if (!isBookingInFuture(newDate, normalizedNewTime)) {
+        throw new BadRequestError('Cannot reschedule to a past date/time');
     }
 
     if (isWithinCancellationWindow(booking.date, booking.time, CANCELLATION_WINDOW_HOURS)) {
@@ -292,23 +353,31 @@ export const rescheduleBooking = async (bookingId, userId, newDate, newTime) => 
         throw new BadRequestError('You can only reschedule once');
     }
 
-    // Check for conflict
-    const conflict = await bookingRepository.findConflict(booking.shopId, booking.employeeId, newDate, newTime, bookingId);
-    if (conflict) throw new BadRequestError('This slot is already booked. Please choose another time.');
-
-    // Release old slot, claim new
     const oldDate = booking.date.toISOString().split('T')[0];
-    await employeeRepository.releaseSlot(booking.employeeId, oldDate, booking.time);
+    const durationMinutes = booking.durationMinutes || sumServiceDurations(
+        normalizeBookedServices(
+            await serviceRepository.findByIds(
+                booking.serviceIds,
+                'serviceType duration totalDuration',
+            ),
+        ),
+    );
+    assertValidServiceDuration(durationMinutes);
+    const oldSlotLockTimes = getBookingSlotLockTimes(booking);
+    const newSlotLockTimes = buildSlotLockTimes(normalizedNewTime, durationMinutes);
 
-    const claimed = await employeeRepository.claimSlot(booking.employeeId, newDate, newTime, { shopId: booking.shopId });
+    await employeeRepository.releaseSlots(booking.employeeId, oldDate, oldSlotLockTimes);
+
+    const claimed = await employeeRepository.claimSlots(booking.employeeId, newDate, newSlotLockTimes, { shopId: booking.shopId });
     if (!claimed) {
-        // Restore old slot if new claim fails
-        await employeeRepository.claimSlot(booking.employeeId, oldDate, booking.time, { shopId: booking.shopId });
+        await employeeRepository.claimSlots(booking.employeeId, oldDate, oldSlotLockTimes, { shopId: booking.shopId });
         throw new BadRequestError('Employee not available at the new date/time');
     }
 
     booking.date = newDate;
-    booking.time = newTime;
+    booking.time = normalizedNewTime;
+    booking.durationMinutes = durationMinutes;
+    booking.slotLockTimes = newSlotLockTimes;
     booking.rescheduleCount += 1;
     await booking.save();
 
@@ -318,6 +387,7 @@ export const rescheduleBooking = async (bookingId, userId, newDate, newTime) => 
 // ── Customer: reorder (re-book) ──────────────────────────────────────────
 
 export const reorderBooking = async (userId, bookingId, newDate, newTime) => {
+    const normalizedNewTime = normalizeBookingTime(newTime);
     const customer = await customerRepository.findByUserId(userId);
     if (!customer) throw new NotFoundError('Customer profile');
     const customerId = customer._id;
@@ -329,24 +399,27 @@ export const reorderBooking = async (userId, bookingId, newDate, newTime) => {
     }
 
     // Prevent same date/time
-    if (existing.date.toISOString().split('T')[0] === new Date(newDate).toISOString().split('T')[0] && existing.time === newTime) {
+    if (existing.date.toISOString().split('T')[0] === new Date(newDate).toISOString().split('T')[0] && existing.time === normalizedNewTime) {
         throw new BadRequestError('Please choose a different date or time');
     }
 
-    if (!isBookingInFuture(newDate, newTime)) {
+    if (!isBookingInFuture(newDate, normalizedNewTime)) {
         throw new BadRequestError('Cannot book for a past date/time');
     }
 
     const services = normalizeBookedServices(
         await serviceRepository.findByIds(
             existing.serviceIds,
-            'serviceName finalPrice totalPrice actualPrice offerPrice serviceType',
+            'serviceName finalPrice totalPrice actualPrice offerPrice serviceType duration totalDuration',
         ),
     );
     const totalAmount = sumServicePrices(services);
+    const durationMinutes = sumServiceDurations(services);
+    assertValidServiceDuration(durationMinutes);
     assertBundleMinimum(services, totalAmount);
+    const slotLockTimes = buildSlotLockTimes(normalizedNewTime, durationMinutes);
 
-    const employee = await employeeRepository.claimSlot(existing.employeeId, newDate, newTime, {
+    const employee = await employeeRepository.claimSlots(existing.employeeId, newDate, slotLockTimes, {
         shopId: existing.shopId,
     });
     if (!employee) throw new BadRequestError('Employee not available');
@@ -358,8 +431,10 @@ export const reorderBooking = async (userId, bookingId, newDate, newTime) => {
             employeeId: existing.employeeId,
             shopId: existing.shopId,
             date: newDate,
-            time: newTime,
+            time: normalizedNewTime,
             totalAmount,
+            durationMinutes,
+            slotLockTimes,
             status: BOOKING_STATUS.PENDING,
             paymentStatus: PAYMENT_STATUS.PENDING,
             payoutStatus: PAYOUT_STATUS.NOT_INITIATED,
@@ -370,13 +445,15 @@ export const reorderBooking = async (userId, bookingId, newDate, newTime) => {
             employee,
             services,
             totalAmount,
+            durationMinutes,
+            slotLockTimes,
             status: newBooking.status,
             paymentStatus: newBooking.paymentStatus,
             payoutStatus: newBooking.payoutStatus,
             paymentRequired: true,
         };
     } catch (err) {
-        await employeeRepository.releaseSlot(existing.employeeId, newDate, newTime);
+        await employeeRepository.releaseSlots(existing.employeeId, newDate, slotLockTimes);
         throw err;
     }
 };
@@ -441,7 +518,7 @@ export const getBookingConfirmation = async (bookingId, userId) => {
     const services = normalizeBookedServices(
         await serviceRepository.findByIds(
             booking.serviceIds,
-            'serviceName finalPrice totalPrice actualPrice offerPrice serviceType',
+            'serviceName finalPrice totalPrice actualPrice offerPrice serviceType duration totalDuration',
         ),
     );
     const totalAmount = sumServicePrices(services);
@@ -459,6 +536,7 @@ export const getBookingConfirmation = async (bookingId, userId) => {
 // ── Customer: update booking ─────────────────────────────────────────────
 
 export const updateBooking = async (bookingId, userId, { employeeId, date, time }) => {
+    const normalizedTime = normalizeBookingTime(time);
     const booking = await bookingRepository.findById(bookingId);
     if (!booking) throw new NotFoundError('Booking');
 
@@ -467,28 +545,46 @@ export const updateBooking = async (bookingId, userId, { employeeId, date, time 
         throw new ForbiddenError('You can only update your own bookings');
     }
 
+    assertBookingCanChangeBeforePayment(booking);
+
+    if (!isBookingInFuture(date, normalizedTime)) {
+        throw new BadRequestError('Cannot update to a past date/time');
+    }
+
     const oldDate = booking.date.toISOString().split('T')[0];
     const isSameSlot = booking.employeeId.toString() === employeeId
         && oldDate === new Date(date).toISOString().split('T')[0]
-        && booking.time === time;
+        && booking.time === normalizedTime;
 
     // Nothing to update if the slot hasn't changed
     if (isSameSlot) return booking;
 
-    // Release the old slot first (always, regardless of employee change)
-    await employeeRepository.releaseSlot(booking.employeeId, oldDate, booking.time);
+    const durationMinutes = booking.durationMinutes || sumServiceDurations(
+        normalizeBookedServices(
+            await serviceRepository.findByIds(
+                booking.serviceIds,
+                'serviceType duration totalDuration',
+            ),
+        ),
+    );
+    assertValidServiceDuration(durationMinutes);
+    const oldSlotLockTimes = getBookingSlotLockTimes(booking);
+    const newSlotLockTimes = buildSlotLockTimes(normalizedTime, durationMinutes);
+
+    await employeeRepository.releaseSlots(booking.employeeId, oldDate, oldSlotLockTimes);
 
     // Claim the new slot
-    const employee = await employeeRepository.claimSlot(employeeId, date, time, { shopId: booking.shopId });
+    const employee = await employeeRepository.claimSlots(employeeId, date, newSlotLockTimes, { shopId: booking.shopId });
     if (!employee) {
-        // Restore the old slot if the new claim fails
-        await employeeRepository.claimSlot(booking.employeeId, oldDate, booking.time, { shopId: booking.shopId });
+        await employeeRepository.claimSlots(booking.employeeId, oldDate, oldSlotLockTimes, { shopId: booking.shopId });
         throw new BadRequestError('Employee not available at this date/time');
     }
 
     booking.employeeId = employeeId;
     booking.date = date;
-    booking.time = time;
+    booking.time = normalizedTime;
+    booking.durationMinutes = durationMinutes;
+    booking.slotLockTimes = newSlotLockTimes;
     await booking.save();
 
     return booking;
@@ -571,9 +667,7 @@ export const getAvailableSlots = async (employeeId, date, serviceId) => {
     }
 
     // Get service duration
-    const serviceDuration = service.serviceType === 'bundled'
-        ? service.totalDuration
-        : service.duration;
+    const serviceDuration = getServiceDuration(service);
 
     if (!serviceDuration || serviceDuration <= 0) {
         throw new BadRequestError('Service must have a valid duration');
@@ -581,7 +675,11 @@ export const getAvailableSlots = async (employeeId, date, serviceId) => {
 
     // Get booked slots for this date
     const bookings = await bookingRepository.findByEmployeeAndDate(employeeId, date);
-    const bookedSlots = bookings.map((b) => ({ date: b.date, time: b.time }));
+    const bookedSlots = bookings.map((b) => ({
+        date: b.date,
+        time: b.time,
+        durationMinutes: b.durationMinutes,
+    }));
 
     // Calculate available slots
     const { calculateAvailableSlots } = await import('../utils/slot-calculator.utils.js');
@@ -646,9 +744,7 @@ export const getShopAvailability = async (shopId, date, serviceId) => {
     }
 
     // Get service duration
-    const serviceDuration = service.serviceType === 'bundled'
-        ? service.totalDuration
-        : service.duration;
+    const serviceDuration = getServiceDuration(service);
 
     if (!serviceDuration || serviceDuration <= 0) {
         throw new BadRequestError('Service must have a valid duration');
@@ -681,7 +777,11 @@ export const getShopAvailability = async (shopId, date, serviceId) => {
     for (const employee of activeEmployees) {
         // Get booked slots for this employee on this date
         const bookings = await bookingRepository.findByEmployeeAndDate(employee._id, date);
-        const bookedSlots = bookings.map((b) => ({ date: b.date, time: b.time }));
+        const bookedSlots = bookings.map((b) => ({
+            date: b.date,
+            time: b.time,
+            durationMinutes: b.durationMinutes,
+        }));
 
         // Calculate available slots
         const availableSlots = getAvailableSlotTimes({
@@ -750,7 +850,12 @@ export const getBookingsByShop = async (ownerId, query = {}) => {
 };
 
 export const updateBookingStatus = async (bookingId, status, ownerId) => {
-    const allowed = ['cancelled', 'completed', 'confirmed'];
+    const allowed = [
+        BOOKING_STATUS.CANCELLED,
+        BOOKING_STATUS.COMPLETED,
+        BOOKING_STATUS.CONFIRMED,
+        BOOKING_STATUS.NO_SHOW,
+    ];
     if (!allowed.includes(status)) throw new BadRequestError(`Invalid status. Allowed: ${allowed.join(', ')}`);
 
     const shop = await shopRepository.findByOwnerId(ownerId);
@@ -770,8 +875,8 @@ export const updateBookingStatus = async (bookingId, status, ownerId) => {
         throw new BadRequestError('Cannot confirm a booking before payment succeeds');
     }
 
-    if (status === BOOKING_STATUS.COMPLETED && booking.paymentStatus !== PAYMENT_STATUS.SUCCESS) {
-        throw new BadRequestError('Cannot complete a booking before payment succeeds');
+    if ([BOOKING_STATUS.COMPLETED, BOOKING_STATUS.NO_SHOW].includes(status) && booking.paymentStatus !== PAYMENT_STATUS.SUCCESS) {
+        throw new BadRequestError('Cannot close a booking before payment succeeds');
     }
 
     if (status === BOOKING_STATUS.CANCELLED && booking.paymentStatus === PAYMENT_STATUS.SUCCESS) {
@@ -782,7 +887,8 @@ export const updateBookingStatus = async (bookingId, status, ownerId) => {
         status,
         cancelledAt: status === BOOKING_STATUS.CANCELLED ? new Date() : booking.cancelledAt,
         completedAt: status === BOOKING_STATUS.COMPLETED ? new Date() : booking.completedAt,
-        payoutStatus: status === BOOKING_STATUS.COMPLETED
+        noShowAt: status === BOOKING_STATUS.NO_SHOW ? new Date() : booking.noShowAt,
+        payoutStatus: [BOOKING_STATUS.COMPLETED, BOOKING_STATUS.NO_SHOW].includes(status)
             ? (booking.payoutStatus || PAYOUT_STATUS.NOT_INITIATED)
             : booking.payoutStatus,
     });
@@ -949,12 +1055,7 @@ export const cancelBookingByBarber = async (bookingId, ownerId) => {
         throw new ForbiddenError('You can only cancel bookings for your own shop');
     }
 
-    // Release employee slot
-    await employeeRepository.releaseSlot(
-        booking.employeeId,
-        booking.date.toISOString().split('T')[0],
-        booking.time,
-    );
+    await releaseBookingSlotLock(booking);
 
     // Handle PAID bookings
     if (booking.paymentStatus === PAYMENT_STATUS.SUCCESS) {
@@ -1046,12 +1147,7 @@ export const autoCancelAwaitingBookings = async () => {
                 continue;
             }
 
-            // Release employee slot
-            await employeeRepository.releaseSlot(
-                booking.employeeId,
-                booking.date.toISOString().split('T')[0],
-                booking.time,
-            );
+            await releaseBookingSlotLock(booking);
 
             // Initiate FULL refund (no deductions for auto-cancel)
             try {
