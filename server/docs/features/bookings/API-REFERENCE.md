@@ -1,8 +1,135 @@
 # Booking API - Quick Reference
 
-## Endpoints
+## Discovery & Availability Endpoints
 
-### 1. Create Booking
+### 1. Get Shop Employees
+```http
+GET /api/v1/bookings/shops/:shopId/employees
+```
+
+**Purpose:** Get list of active employees for a shop
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "employees": [
+      {
+        "id": "emp1",
+        "firstName": "John",
+        "lastName": "Doe",
+        "photoUrl": "https://...",
+        "gender": "male",
+        "workingHours": {
+          "start": "09:00",
+          "end": "18:00"
+        },
+        "isActive": true
+      }
+    ]
+  }
+}
+```
+
+---
+
+### 2. Get Employee Available Slots
+```http
+GET /api/v1/employees/:employeeId/available-slots?date=2026-04-28&serviceId=service1
+Authorization: Bearer <token>
+```
+
+**Purpose:** Get available time slots for specific employee and service
+
+**Query Parameters:**
+- `date` (required): YYYY-MM-DD format
+- `serviceId` (required): Service ID
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "employeeId": "emp1",
+    "employeeName": "John Doe",
+    "date": "2026-04-28",
+    "service": {
+      "id": "service1",
+      "name": "Haircut",
+      "duration": 30
+    },
+    "slots": [
+      {
+        "time": "09:00",
+        "available": true
+      },
+      {
+        "time": "09:30",
+        "available": true
+      },
+      {
+        "time": "10:00",
+        "available": false,
+        "reason": "booked"
+      }
+    ],
+    "totalAvailable": 15,
+    "totalSlots": 18
+  }
+}
+```
+
+---
+
+### 3. Get Shop Availability
+```http
+GET /api/v1/bookings/shops/:shopId/availability?date=2026-04-28&serviceId=service1
+Authorization: Bearer <token>
+```
+
+**Purpose:** Get availability across all employees for a shop
+
+**Query Parameters:**
+- `date` (required): YYYY-MM-DD format
+- `serviceId` (required): Service ID
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "shopId": "shop1",
+    "shopName": "Elite Salon",
+    "date": "2026-04-28",
+    "service": {
+      "id": "service1",
+      "name": "Haircut",
+      "duration": 30
+    },
+    "employees": [
+      {
+        "employeeId": "emp1",
+        "employeeName": "John Doe",
+        "photoUrl": "https://...",
+        "availableSlots": ["09:00", "09:30", "11:00"],
+        "totalAvailable": 3
+      }
+    ],
+    "firstAvailable": {
+      "employeeId": "emp1",
+      "employeeName": "John Doe",
+      "time": "09:00"
+    }
+  }
+}
+```
+
+---
+
+## Booking Management Endpoints
+
+### 4. Create Booking
 ```http
 POST /api/v1/bookings
 Authorization: Bearer <customer_token>
@@ -21,7 +148,7 @@ Content-Type: application/json
 
 ---
 
-### 2. Get Pending Confirmations (Barber)
+### 5. Get Pending Confirmations (Barber)
 ```http
 GET /api/v1/bookings/pending-confirmations?page=1&limit=10
 Authorization: Bearer <barber_token>
@@ -33,7 +160,7 @@ Authorization: Bearer <barber_token>
 
 ---
 
-### 3. Confirm Booking (Barber)
+### 6. Confirm Booking (Barber)
 ```http
 PATCH /api/v1/bookings/:id/confirm
 Authorization: Bearer <barber_token>
@@ -48,7 +175,7 @@ Authorization: Bearer <barber_token>
 
 ---
 
-### 4. Cancel Booking
+### 7. Cancel Booking
 
 #### Customer Cancellation
 ```http
@@ -77,7 +204,7 @@ Authorization: Bearer <barber_token>
 
 ---
 
-### 5. Update Booking Status (Barber)
+### 8. Update Booking Status (Barber)
 ```http
 PUT /api/v1/bookings/:id/status
 Authorization: Bearer <barber_token>

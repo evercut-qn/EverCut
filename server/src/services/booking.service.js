@@ -528,6 +528,209 @@ export const getEmployeeCalendar = async (employeeId, date) => {
     };
 };
 
+// ── Customer: available slots ────────────────────────────────────────────
+
+export const getAvailableSlots = async (employeeId, date, serviceId) => {
+    if (!date) throw new BadRequestError('Date query parameter is required');
+    if (!serviceId) throw new BadRequestError('ServiceId query parameter is required');
+
+    // Validate date format
+    const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+    if (!datePattern.test(date)) {
+        throw new BadRequestError('Date must be in YYYY-MM-DD format');
+    }
+
+    const now = new Date();
+    const todayStr = now.toISOString().slice(0, 10);
+
+    if (date < todayStr) {
+        throw new BadRequestError('Cannot fetch availability for past dates');
+    }
+
+    // Get employee details
+    const employee = await employeeRepository.findByIdLean(
+        employeeId,
+        'firstName lastName shopId workingHours blockedDates isActive',
+    );
+    if (!employee) throw new NotFoundError('Employee');
+    if (!employee.isActive) throw new BadRequestError('Employee is not active');
+
+    // Get shop details
+    const shop = await shopRepository.findByIdWithFields(
+        employee.shopId,
+        'shopName openTime closeTime isOpen',
+    );
+    if (!shop) throw new NotFoundError('Shop');
+    if (!shop.isOpen) throw new BadRequestError('Shop is currently closed');
+
+    // Get service details
+    const service = await serviceRepository.findById(serviceId);
+    if (!service) throw new NotFoundError('Service');
+    if (String(service.shopId) !== String(employee.shopId)) {
+        throw new BadRequestError('Service does not belong to this shop');
+    }
+
+    // Get service duration
+    const serviceDuration = service.serviceType === 'bundled'
+        ? service.totalDuration
+        : service.duration;
+
+    if (!serviceDuration || serviceDuration <= 0) {
+        throw new BadRequestError('Service must have a valid duration');
+    }
+
+    // Get booked slots for this date
+    const bookings = await bookingRepository.findByEmployeeAndDate(employeeId, date);
+    const bookedSlots = bookings.map((b) => ({ date: b.date, time: b.time }));
+
+    // Calculate available slots
+    const { calculateAvailableSlots } = await import('../utils/slot-calculator.utils.js');
+    const availability = calculateAvailableSlots({
+        date,
+        shopHours: {
+            openTime: shop.openTime,
+            closeTime: shop.closeTime,
+        },
+        employeeHours: employee.workingHours,
+        serviceDuration,
+        bookedSlots,
+        blockedDates: employee.blockedDates || [],
+        now,
+    });
+
+    return {
+        employeeId,
+        employeeName: `${employee.firstName} ${employee.lastName}`,
+        date,
+        service: {
+            id: service._id,
+            name: service.serviceName,
+            duration: serviceDuration,
+        },
+        shopHours: {
+            openTime: shop.openTime,
+            closeTime: shop.closeTime,
+        },
+        employeeHours: employee.workingHours,
+        ...availability,
+    };
+};
+
+export const getShopAvailability = async (shopId, date, serviceId) => {
+    if (!date) throw new BadRequestError('Date query parameter is required');
+    if (!serviceId) throw new BadRequestError('ServiceId query parameter is required');
+
+    // Validate date format
+    const datePattern = /^\d{4}-\d{2}-\d{2}$/;
+    if (!datePattern.test(date)) {
+        throw new BadRequestError('Date must be in YYYY-MM-DD format');
+    }
+
+    const now = new Date();
+    const todayStr = now.toISOString().slice(0, 10);
+
+    if (date < todayStr) {
+        throw new BadRequestError('Cannot fetch availability for past dates');
+    }
+
+    // Get shop details
+    const shop = await shopRepository.findById(shopId);
+    if (!shop) throw new NotFoundError('Shop');
+    if (!shop.isOpen) throw new BadRequestError('Shop is currently closed');
+
+    // Get service details
+    const service = await serviceRepository.findById(serviceId);
+    if (!service) throw new NotFoundError('Service');
+    if (String(service.shopId) !== String(shopId)) {
+        throw new BadRequestError('Service does not belong to this shop');
+    }
+
+    // Get service duration
+    const serviceDuration = service.serviceType === 'bundled'
+        ? service.totalDuration
+        : service.duration;
+
+    if (!serviceDuration || serviceDuration <= 0) {
+        throw new BadRequestError('Service must have a valid duration');
+    }
+
+    // Get all active employees for this shop
+    const employees = await employeeRepository.findByShopId(shopId, {});
+    const activeEmployees = employees.filter((emp) => emp.isActive && !emp.deletedAt);
+
+    if (activeEmployees.length === 0) {
+        return {
+            shopId,
+            shopName: shop.shopName,
+            date,
+            service: {
+                id: service._id,
+                name: service.serviceName,
+                duration: serviceDuration,
+            },
+            employees: [],
+            firstAvailable: null,
+        };
+    }
+
+    // Calculate availability for each employee
+    const { getAvailableSlotTimes } = await import('../utils/slot-calculator.utils.js');
+    const employeeAvailability = [];
+    let firstAvailable = null;
+
+    for (const employee of activeEmployees) {
+        // Get booked slots for this employee on this date
+        const bookings = await bookingRepository.findByEmployeeAndDate(employee._id, date);
+        const bookedSlots = bookings.map((b) => ({ date: b.date, time: b.time }));
+
+        // Calculate available slots
+        const availableSlots = getAvailableSlotTimes({
+            date,
+            shopHours: {
+                openTime: shop.openTime,
+                closeTime: shop.closeTime,
+            },
+            employeeHours: employee.workingHours,
+            serviceDuration,
+            bookedSlots,
+            blockedDates: employee.blockedDates || [],
+            now,
+        });
+
+        if (availableSlots.length > 0) {
+            employeeAvailability.push({
+                employeeId: employee._id,
+                employeeName: `${employee.firstName} ${employee.lastName}`,
+                photoUrl: employee.photoUrl,
+                availableSlots,
+                totalAvailable: availableSlots.length,
+            });
+
+            // Track first available slot across all employees
+            if (!firstAvailable || availableSlots[0] < firstAvailable.time) {
+                firstAvailable = {
+                    employeeId: employee._id,
+                    employeeName: `${employee.firstName} ${employee.lastName}`,
+                    time: availableSlots[0],
+                };
+            }
+        }
+    }
+
+    return {
+        shopId,
+        shopName: shop.shopName,
+        date,
+        service: {
+            id: service._id,
+            name: service.serviceName,
+            duration: serviceDuration,
+        },
+        employees: employeeAvailability,
+        firstAvailable,
+    };
+};
+
 // ── Barber-side: booking management ──────────────────────────────────────
 
 export const getBookingsByShop = async (ownerId, query = {}) => {

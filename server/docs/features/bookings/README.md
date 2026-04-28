@@ -4,15 +4,29 @@
 
 | File | Description |
 |------|-------------|
+| **COMPLETE-IMPLEMENTATION-REPORT.md** | Complete implementation report and summary |
 | **BOOKING-DISCOVERY-FLOW.md** | Complete end-to-end flow from shop discovery to booking creation |
 | **BOOKING-FLOW-DIAGRAM.md** | Visual diagrams and quick reference |
 | **BOOKING-FLOW.md** | Booking lifecycle, scenarios, and API reference |
+| **BOOKING-AVAILABILITY-IMPLEMENTATION-PLAN.md** | Implementation plan for availability APIs |
 | **API-REFERENCE.md** | API endpoints with examples |
 
 ---
 
-## 🔄 Booking Flow
+## 🔄 Complete Booking Flow
 
+### Discovery Phase (NEW)
+```
+1. Browse Shops → GET /shops/nearby
+2. View Shop → GET /shops/:id
+3. View Employees → GET /shops/:id/employees
+4. Check Availability → GET /shops/:id/availability
+   OR
+   Check Employee Slots → GET /employees/:id/available-slots
+5. Select Available Slot
+```
+
+### Booking Phase
 ```
 CREATE → PENDING → PAYMENT → AWAITING_CONFIRMATION (24h max)
                                     ↓
@@ -41,7 +55,14 @@ CREATE → PENDING → PAYMENT → AWAITING_CONFIRMATION (24h max)
 - **Auto-cancel (24h no response):** FULL refund (no fees)
 - **Cannot cancel after confirm:** Not allowed
 
-### Key Endpoints
+### Discovery Endpoints (NEW)
+```
+GET /bookings/shops/:id/employees           List employees
+GET /employees/:id/available-slots          Employee availability
+GET /bookings/shops/:id/availability        Shop-wide availability
+```
+
+### Booking Endpoints
 ```
 POST   /bookings                        Create booking
 GET    /bookings/pending-confirmations  List pending (barber)
@@ -53,14 +74,27 @@ DELETE /bookings/:id                    Cancel
 
 ## 📁 Implementation
 
+### Files Created (NEW)
+- `utils/slot-calculator.utils.js` - Slot calculation utility
+
 ### Files Modified
 - `utils/constants.js` - Added `AWAITING_CONFIRMATION` status
-- `models/booking.model.js` - Added `barberConfirmedAt`, `barberCancelledAt`
+- `models/booking.model.js` - Added `barberConfirmedAt`, `barberCancelledAt`, `autoCancelledAt`
+- `models/shop.model.js` - Added `missedConfirmationCount`, `lastMissedConfirmationAt`
 - `services/payment.service.js` - Updated webhook, refund logic
-- `services/booking.service.js` - Merged cancel functions
+- `services/booking.service.js` - Merged cancel functions, added availability APIs
+- `services/shop.service.js` - Added `getEmployeesByShopId()`
 - `controllers/booking.controller.js` - Reorganized
+- `controllers/shop.controller.js` - Added `getShopEmployees()`, `getShopAvailability()`
+- `controllers/employee.controller.js` - Added `getAvailableSlots()`
 - `routes/bookings.routes.js` - Cleaned up
+- `routes/shops.routes.js` - Added employee list and availability routes
+- `routes/employees.routes.js` - Added available slots route
 - `validators/booking.validator.js` - Added pagination schema
+- `validators/shop.validator.js` - Added `shopAvailabilityQuerySchema`
+- `validators/employee.validator.js` - Added `availableSlotsQuerySchema`
+- `jobs/auto-cancel-bookings.cron.js` - Auto-cancel cron job
+- `server.js` - Integrated cron job
 
 ### Key Changes
 1. ✅ Payment success → Status: `AWAITING_CONFIRMATION` (not auto-confirmed)
@@ -69,11 +103,23 @@ DELETE /bookings/:id                    Cancel
 4. ✅ Missed confirmations tracked per shop
 5. ✅ Single cancel endpoint: `DELETE /bookings/:id`
 6. ✅ Cannot cancel after confirmation (barber commitment)
+7. ✅ NEW: Employee list API for shop discovery
+8. ✅ NEW: Available slots API with service duration consideration
+9. ✅ NEW: Shop-wide availability API
+10. ✅ NEW: Slot calculator utility for backend availability calculation
 
 ---
 
 ## 🧪 Testing
 
+### Discovery Flow (NEW)
+1. Get shop employees → `GET /shops/:id/employees`
+2. Check availability → `GET /employees/:id/available-slots?date=2026-04-28&serviceId=service1`
+3. Verify slots consider service duration
+4. Verify blocked dates work
+5. Verify past slots filtered (today)
+
+### Booking Flow
 1. Create booking → Status: `PENDING`
 2. Pay for booking → Status: `AWAITING_CONFIRMATION` (24h countdown)
 3. Barber confirms → Status: `CONFIRMED`
@@ -81,5 +127,6 @@ DELETE /bookings/:id                    Cancel
 
 ---
 
-**Version:** 2.1.0  
-**Status:** ✅ Production Ready
+**Version:** 3.0.0  
+**Status:** ✅ Production Ready  
+**Last Updated:** April 28, 2026

@@ -54,3 +54,14 @@ export const getEmployeeCalendar = async (req, res, next) => {
         next(err);
     }
 };
+
+export const getAvailableSlots = async (req, res, next) => {
+    try {
+        const params = getValidatedRequestData(req, 'params');
+        const query = getValidatedRequestData(req, 'query');
+        const result = await bookingService.getAvailableSlots(params.id, query.date, query.serviceId);
+        return res.status(200).json(ApiResponse.success(result, 'Available slots fetched'));
+    } catch (err) {
+        next(err);
+    }
+};

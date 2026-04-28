@@ -1,5 +1,6 @@
 import shopRepository from '../repositories/shop.repository.js';
 import * as accountService from '../services/account.service.js';
+import * as bookingService from '../services/booking.service.js';
 import * as photoService from '../services/photo.service.js';
 import * as pinService from '../services/pin.service.js';
 import * as serviceCatalogService from '../services/service-catalog.service.js';
@@ -125,6 +126,16 @@ export const getShopById = async (req, res, next) => {
     }
 };
 
+export const getShopEmployees = async (req, res, next) => {
+    try {
+        const params = getValidatedRequestData(req, 'params');
+        const employees = await shopService.getEmployeesByShopId(params.id);
+        return res.status(200).json(ApiResponse.success({ employees }, 'Employees fetched'));
+    } catch (err) {
+        next(err);
+    }
+};
+
 export const getNearbyShops = async (req, res, next) => {
     try {
         const { longitude, latitude } = getValidatedRequestData(req, 'query');
@@ -163,6 +174,17 @@ export const searchShops = async (req, res, next) => {
         const { query: q } = getValidatedRequestData(req, 'query');
         const results = await serviceCatalogService.searchShops(q);
         return res.status(200).json(ApiResponse.success(results, 'Shop search results'));
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const getShopAvailability = async (req, res, next) => {
+    try {
+        const params = getValidatedRequestData(req, 'params');
+        const query = getValidatedRequestData(req, 'query');
+        const result = await bookingService.getShopAvailability(params.id, query.date, query.serviceId);
+        return res.status(200).json(ApiResponse.success(result, 'Shop availability fetched'));
     } catch (err) {
         next(err);
     }

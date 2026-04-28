@@ -1,8 +1,40 @@
 # Booking Availability - Implementation Plan
 
-**Version:** 1.0  
+**Version:** 1.1  
 **Date:** April 28, 2026  
-**Status:** Ready for Implementation
+**Status:** ✅ COMPLETED
+
+---
+
+## Implementation Status
+
+### ✅ Completed Tasks
+
+1. **Slot Calculator Utility** - `server/src/utils/slot-calculator.utils.js`
+   - `generateTimeSlots()` - Generate all possible time slots
+   - `calculateAvailableSlots()` - Main calculation considering all constraints
+   - `getAvailableSlotTimes()` - Convenience function for available slots only
+   - `findFirstAvailableSlot()` - Find first available slot
+
+2. **Employee List API** - `GET /shops/:id/employees`
+   - Service: `getEmployeesByShopId()` in `shop.service.js`
+   - Controller: `getShopEmployees()` in `shop.controller.js`
+   - Route: Added to `shops.routes.js`
+   - Returns active employees with public information
+
+3. **Available Slots API** - `GET /employees/:id/available-slots`
+   - Service: `getAvailableSlots()` in `booking.service.js`
+   - Controller: `getAvailableSlots()` in `employee.controller.js`
+   - Route: Added to `employees.routes.js`
+   - Validator: `availableSlotsQuerySchema` in `employee.validator.js`
+   - Calculates slots considering service duration, booked slots, blocked dates
+
+4. **Shop Availability API** - `GET /shops/:id/availability`
+   - Service: `getShopAvailability()` in `booking.service.js`
+   - Controller: `getShopAvailability()` in `shop.controller.js`
+   - Route: Added to `shops.routes.js`
+   - Validator: `shopAvailabilityQuerySchema` in `shop.validator.js`
+   - Aggregates availability across all employees
 
 ---
 

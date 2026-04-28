@@ -855,7 +855,7 @@ const customerBookingsCollection = {
 const customerShopDiscoveryCollection = {
   info: {
     name: 'EverCut - Customer Shop Discovery',
-    description: 'Nearby shop discovery and search requests using the same Bengaluru coordinates as the barber onboarding flow.',
+    description: 'Nearby shop discovery, employee list, availability checking, and search requests using the same Bengaluru coordinates as the barber onboarding flow.',
     schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
   },
   auth: bearerAuth('customer_access_token'),
@@ -863,7 +863,9 @@ const customerShopDiscoveryCollection = {
     syncPairs: [
       ['shared_shop_id', 'shop_id'],
       ['shared_service_id', 'service_id'],
+      ['shared_employee_id', 'employee_id'],
     ],
+    includeDateHelpers: true,
   }),
   variable: [
     ...baseVariables(
@@ -871,6 +873,8 @@ const customerShopDiscoveryCollection = {
       textVariable('coordinates', sharedCoordinates),
       textVariable('shop_id', ''),
       textVariable('service_id', ''),
+      textVariable('employee_id', ''),
+      textVariable('booking_date', ''),
       textVariable('service_search_query', 'Postman'),
       textVariable('shop_search_query', 'Postman'),
     ),
@@ -911,7 +915,58 @@ const customerShopDiscoveryCollection = {
       }),
     },
     {
-      name: '3. Get Doorstep Shops',
+      name: '3. Get Shop Employees And Capture Employee ID',
+      ...request({
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/bookings/shops/{{shop_id}}/employees',
+        description: 'Returns the list of active employees for the shop and captures the first employee ID.',
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          'const response = pm.response.json();',
+          'const data = response.data || {};',
+          'const employees = Array.isArray(data.employees) ? data.employees : [];',
+          "const firstEmployee = employees[0];",
+          "if (firstEmployee && firstEmployee.id) { pm.collectionVariables.set('employee_id', firstEmployee.id); pm.globals.set('shared_employee_id', firstEmployee.id); }",
+        ),
+      }),
+    },
+    {
+      name: '4. Get Employee Available Slots',
+      ...request({
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/employees/{{employee_id}}/available-slots?date={{booking_date}}&serviceId={{service_id}}',
+        description: 'Returns available time slots for the employee considering service duration, booked slots, and blocked dates.',
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          'const response = pm.response.json();',
+          'const data = response.data || {};',
+          "pm.test('response includes slot information', function () {",
+          "  pm.expect(data).to.have.property('slots');",
+          "  pm.expect(data).to.have.property('totalAvailable');",
+          "  pm.expect(data).to.have.property('totalSlots');",
+          "});",
+        ),
+      }),
+    },
+    {
+      name: '5. Get Shop Availability',
+      ...request({
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/bookings/shops/{{shop_id}}/availability?date={{booking_date}}&serviceId={{service_id}}',
+        description: 'Returns availability across all employees for the shop, including first available slot suggestion.',
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          'const response = pm.response.json();',
+          'const data = response.data || {};',
+          "pm.test('response includes employee availability', function () {",
+          "  pm.expect(data).to.have.property('employees');",
+          "  pm.expect(data.employees).to.be.an('array');",
+          "});",
+        ),
+      }),
+    },
+    {
+      name: '6. Get Doorstep Shops',
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/shops/doorstep',
@@ -920,7 +975,7 @@ const customerShopDiscoveryCollection = {
       }),
     },
     {
-      name: '4. Search Services',
+      name: '7. Search Services',
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/services/search?query={{service_search_query}}&gender=male',
@@ -929,7 +984,7 @@ const customerShopDiscoveryCollection = {
       }),
     },
     {
-      name: '5. Search Shops',
+      name: '8. Search Shops',
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/shops/search?query={{shop_search_query}}',

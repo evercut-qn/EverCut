@@ -1,6 +1,7 @@
 import { Router } from 'express';
 
 import * as bookingController from '../controllers/booking.controller.js';
+import * as shopController from '../controllers/shop.controller.js';
 import authenticate from '../middleware/authenticate.middleware.js';
 import { authorize } from '../middleware/authorize.middleware.js';
 import { validate } from '../middleware/validate.middleware.js';
@@ -17,8 +18,23 @@ import {
     updateBookingSchema,
     paginationQuerySchema,
 } from '../validators/booking.validator.js';
+import { shopIdParamSchema, shopAvailabilityQuerySchema } from '../validators/shop.validator.js';
 
 const router = Router();
+
+// ============================================================================
+// Discovery Routes (public/customer - for booking flow)
+// ============================================================================
+
+// Get employees for a shop (used in booking discovery)
+router.get('/shops/:id/employees', validate(shopIdParamSchema, 'params'), shopController.getShopEmployees);
+
+// Get shop availability (used in booking discovery)
+router.get('/shops/:id/availability', authenticate, validate(shopIdParamSchema, 'params'), validate(shopAvailabilityQuerySchema, 'query'), shopController.getShopAvailability);
+
+// ============================================================================
+// Authenticated Booking Routes
+// ============================================================================
 
 router.use(authenticate);
 

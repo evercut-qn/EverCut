@@ -9,6 +9,7 @@ import { ROLES } from '../utils/constants.js';
 import { paginationSchema } from '../validators/common.validator.js';
 import {
     addEmployeeSchema,
+    availableSlotsQuerySchema,
     employeeIdParamSchema,
     updateEmployeeSchema,
 } from '../validators/employee.validator.js';
@@ -22,6 +23,14 @@ router.get(
     validate(employeeIdParamSchema, 'params'),
     validate(employeeCalendarQuerySchema, 'query'),
     employeeController.getEmployeeCalendar,
+);
+
+router.get(
+    '/:id/available-slots',
+    authenticate,
+    validate(employeeIdParamSchema, 'params'),
+    validate(availableSlotsQuerySchema, 'query'),
+    employeeController.getAvailableSlots,
 );
 
 router.use(authenticate, authorize(ROLES.BARBER));

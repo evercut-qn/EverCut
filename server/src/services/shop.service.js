@@ -450,6 +450,27 @@ export const getShopInfoForCustomer = async (shopId) => {
     };
 };
 
+export const getEmployeesByShopId = async (shopId) => {
+    const shop = await shopRepository.findById(shopId);
+    if (!shop) throw new NotFoundError('Shop');
+
+    const employeeRepository = (await import('../repositories/employee.repository.js')).default;
+    const employees = await employeeRepository.findByShopId(shopId, {});
+
+    // Return only public employee information
+    return employees
+        .filter((emp) => emp.isActive && !emp.deletedAt)
+        .map((emp) => ({
+            id: emp._id,
+            firstName: emp.firstName,
+            lastName: emp.lastName,
+            photoUrl: emp.photoUrl,
+            gender: emp.gender,
+            workingHours: emp.workingHours,
+            isActive: emp.isActive,
+        }));
+};
+
 export const getNearbyShops = async (coordinates) => {
     return shopRepository.findNearby(
         coordinates,
