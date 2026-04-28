@@ -1,28 +1,105 @@
 # Booking System - Quick Reference
 
-## 📖 Documentation Structure
-
-### 🎯 Core Documentation (Start Here)
+## 📖 Documentation
 
 | File | Description | Audience |
 |------|-------------|----------|
-| **BOOKING-FLOW.md** | Complete booking lifecycle, scenarios, and business rules | All developers |
-| **API-REFERENCE.md** | Quick API endpoint reference with examples | All developers |
-| **COMPLETE-BOOKING-API-FLOW.md** | Detailed API guide with request/response examples | All developers |
-
-### 📱 Feature-Specific Guides
-
-| File | Description | Audience |
-|------|-------------|----------|
-| **MULTI-SERVICE-BOOKING-GUIDE.md** | Multi-service booking examples and validation rules | All developers |
-| **BOOKING-DISCOVERY-FLOW.md** | Shop discovery and search flow | All developers |
-| **FLUTTER-IMPLEMENTATION-GUIDE.md** | Flutter code examples and best practices | Flutter team |
-
-### 📦 Historical Documentation
-
-Completed implementation plans, analysis reports, and superseded documentation are archived in the `archive/` folder for reference. See `archive/README.md` for details.
+| **BOOKING-SYSTEM-GUIDE.md** | Complete booking system guide - API endpoints, lifecycle, flows, business rules, and scenarios | All developers |
 
 ---
+
+## 🔄 Quick Overview
+
+### Booking Lifecycle
+
+```
+CREATE → PENDING → PAYMENT → AWAITING_CONFIRMATION → CONFIRMED → COMPLETED
+           ↓           ↓              ↓                    ↓
+       CANCELLED   CANCELLED      CANCELLED            CANCELLED
+```
+
+### Key Features
+
+✅ **24-hour auto-cancel** - Bookings auto-cancel if barber doesn't respond  
+✅ **Full refund on auto-cancel** - Customer gets 100% refund  
+✅ **Atomic slot claiming** - Prevents double booking  
+✅ **Multi-service support** - Book multiple services in one booking  
+✅ **Smart availability** - Backend calculates available slots  
+✅ **Flexible cancellation** - Customer can cancel with partial refund
+
+---
+
+## 🚀 Quick Start
+
+### 1. Discovery Flow
+```
+Browse Shops → View Shop → View Employees → Check Availability → Create Booking
+```
+
+### 2. Key Endpoints
+
+**Discovery:**
+- `GET /api/v1/shops/nearby` - Find nearby shops
+- `GET /api/v1/shops/:id/employees` - List employees
+- `GET /api/v1/employees/:id/available-slots` - Check availability
+
+**Booking:**
+- `POST /api/v1/bookings` - Create booking
+- `PATCH /api/v1/bookings/:id/confirm` - Barber confirms
+- `POST /api/v1/bookings/:id/cancel` - Cancel booking
+
+### 3. Availability Decision
+
+**Customer selected employee?**
+- YES → Use `GET /employees/:id/available-slots`
+- NO → Use `GET /shops/:id/availability`
+
+---
+
+## � Business Rules Summary
+
+1. **Payment Before Confirmation** - Customer must pay before barber can confirm
+2. **24-Hour Auto-Cancel** - Full refund if barber doesn't respond
+3. **2-Hour Cancellation Window** - Cannot cancel within 2h of appointment
+4. **Partial Refund** - Customer cancellation deducts fees
+5. **Update Only Before Payment** - Booking locked after payment
+6. **Max 1 Reschedule** - Per booking, before payment only
+7. **Price Lock** - Amount locked at creation time
+
+---
+
+## 🔑 Status Definitions
+
+| Status | Description | Can Cancel? | Can Update? |
+|--------|-------------|-------------|-------------|
+| PENDING | Created, not paid | ✅ Yes | ✅ Yes |
+| AWAITING_CONFIRMATION | Paid, waiting (24h max) | ✅ Yes | ❌ No |
+| CONFIRMED | Barber confirmed | ✅ Yes (>2h) | ❌ No |
+| COMPLETED | Service delivered | ❌ No | ❌ No |
+| CANCELLED | Booking cancelled | ❌ No | ❌ No |
+
+---
+
+## 📁 Implementation Files
+
+### Backend Files Modified
+- `models/booking.model.js` - Booking schema with status tracking
+- `services/booking.service.js` - Business logic and validation
+- `controllers/booking.controller.js` - API endpoints
+- `routes/bookings.routes.js` - Route definitions
+- `validators/booking.validator.js` - Request validation
+- `jobs/auto-cancel-bookings.cron.js` - Auto-cancel cron job
+
+### Key Utilities
+- `utils/slot-calculator.utils.js` - Slot calculation utility
+
+---
+
+**Version:** 3.0.0  
+**Status:** ✅ Production Ready  
+**Last Updated:** April 28, 2026
+
+For complete details, see **BOOKING-SYSTEM-GUIDE.md**
 
 ## 🔄 Complete Booking Flow
 
