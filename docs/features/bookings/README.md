@@ -1,15 +1,26 @@
 # Booking System - Quick Reference
 
-## 📖 Documentation
+## 📖 Documentation Structure
 
-| File | Description |
-|------|-------------|
-| **COMPLETE-IMPLEMENTATION-REPORT.md** | Complete implementation report and summary |
-| **BOOKING-DISCOVERY-FLOW.md** | Complete end-to-end flow from shop discovery to booking creation |
-| **BOOKING-FLOW-DIAGRAM.md** | Visual diagrams and quick reference |
-| **BOOKING-FLOW.md** | Booking lifecycle, scenarios, and API reference |
-| **BOOKING-AVAILABILITY-IMPLEMENTATION-PLAN.md** | Implementation plan for availability APIs |
-| **API-REFERENCE.md** | API endpoints with examples |
+### 🎯 Core Documentation (Start Here)
+
+| File | Description | Audience |
+|------|-------------|----------|
+| **BOOKING-FLOW.md** | Complete booking lifecycle, scenarios, and business rules | All developers |
+| **API-REFERENCE.md** | Quick API endpoint reference with examples | All developers |
+| **COMPLETE-BOOKING-API-FLOW.md** | Detailed API guide with request/response examples | All developers |
+
+### 📱 Feature-Specific Guides
+
+| File | Description | Audience |
+|------|-------------|----------|
+| **MULTI-SERVICE-BOOKING-GUIDE.md** | Multi-service booking examples and validation rules | All developers |
+| **BOOKING-DISCOVERY-FLOW.md** | Shop discovery and search flow | All developers |
+| **FLUTTER-IMPLEMENTATION-GUIDE.md** | Flutter code examples and best practices | Flutter team |
+
+### 📦 Historical Documentation
+
+Completed implementation plans, analysis reports, and superseded documentation are archived in the `archive/` folder for reference. See `archive/README.md` for details.
 
 ---
 
@@ -17,12 +28,12 @@
 
 ### Discovery Phase (NEW)
 ```
-1. Browse Shops → GET /shops/nearby
-2. View Shop → GET /shops/:id
-3. View Employees → GET /shops/:id/employees
-4. Check Availability → GET /shops/:id/availability
-   OR
-   Check Employee Slots → GET /employees/:id/available-slots
+1. Browse Shops → GET /api/v1/shops/nearby
+2. View Shop → GET /api/v1/shops/:id
+3. View Employees → GET /api/v1/shops/:id/employees
+4. Check Availability (choose one):
+   Option A: GET /api/v1/employees/:id/available-slots?date=YYYY-MM-DD&serviceId=X
+   Option B: GET /api/v1/shops/:id/availability?date=YYYY-MM-DD&serviceId=X
 5. Select Available Slot
 ```
 
@@ -57,17 +68,22 @@ CREATE → PENDING → PAYMENT → AWAITING_CONFIRMATION (24h max)
 
 ### Discovery Endpoints
 ```
-GET /shops/:id/employees                    List employees
-GET /employees/:id/available-slots          Employee availability
-GET /shops/:id/availability                 Shop-wide availability
+GET /api/v1/shops/:id/employees                    List employees (public)
+GET /api/v1/employees/:id/available-slots          Employee availability (auth required)
+GET /api/v1/shops/:id/availability                 Shop-wide availability (auth required)
 ```
+
+**Note:** These routes are correctly placed in their respective resource files:
+- Employee list under `/shops` (employees are a sub-resource of shops)
+- Employee slots under `/employees` (employee-specific operation)
+- Shop availability under `/shops` (shop-level aggregation)
 
 ### Booking Endpoints
 ```
-POST   /bookings                        Create booking
-GET    /bookings/pending-confirmations  List pending (barber)
-PATCH  /bookings/:id/confirm            Confirm (barber)
-DELETE /bookings/:id                    Cancel
+POST   /api/v1/bookings                        Create booking
+GET    /api/v1/bookings/pending-confirmations  List pending (barber)
+PATCH  /api/v1/bookings/:id/confirm            Confirm (barber)
+POST   /api/v1/bookings/:id/cancel             Cancel
 ```
 
 ---

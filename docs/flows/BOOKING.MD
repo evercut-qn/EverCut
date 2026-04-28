@@ -19,11 +19,25 @@ Bookings now use normalized `HH:MM` time and an atomic multi-slot lock. If a 60-
 
 5. Check availability (choose one):
    
-   **Option A - Check specific employee:**
+   **Option A - Check specific employee (recommended):**
+   
+   Single service:
    `GET /api/v1/employees/:id/available-slots?date=2099-01-01&serviceId=<service_id>`
    
+   Multiple services:
+   `GET /api/v1/employees/:id/available-slots?date=2099-01-01&serviceId[]=<service_id_1>&serviceId[]=<service_id_2>`
+   
+   Returns available time slots for a specific employee considering total service duration.
+   
    **Option B - Check all employees (shop-wide):**
+   
+   Single service:
    `GET /api/v1/shops/:id/availability?date=2099-01-01&serviceId=<service_id>`
+   
+   Multiple services:
+   `GET /api/v1/shops/:id/availability?date=2099-01-01&serviceId[]=<service_id_1>&serviceId[]=<service_id_2>`
+   
+   Returns availability across all shop employees with first available suggestion.
 
 6. Create booking:
    `POST /api/v1/bookings`
@@ -36,11 +50,34 @@ Bookings now use normalized `HH:MM` time and an atomic multi-slot lock. If a 60-
 
 ## Create Booking Request
 
+**Single Service:**
 ```json
 {
   "shopId": "shop_id",
   "employeeId": "employee_id",
-  "serviceId": ["service_id"],
+  "serviceId": "service_id",
+  "date": "2099-01-01",
+  "time": "10:00"
+}
+```
+
+**Multiple Services:**
+```json
+{
+  "shopId": "shop_id",
+  "employeeId": "employee_id",
+  "serviceId": ["service_id_1", "service_id_2", "service_id_3"],
+  "date": "2099-01-01",
+  "time": "10:00"
+}
+```
+
+**Mixed (Services + Bundles):**
+```json
+{
+  "shopId": "shop_id",
+  "employeeId": "employee_id",
+  "serviceId": ["haircut_id", "bundle_id", "beard_trim_id"],
   "date": "2099-01-01",
   "time": "10:00"
 }
@@ -48,6 +85,7 @@ Bookings now use normalized `HH:MM` time and an atomic multi-slot lock. If a 60-
 
 ## Create Booking Response
 
+**Single Service:**
 ```json
 {
   "success": true,
@@ -57,8 +95,26 @@ Bookings now use normalized `HH:MM` time and an atomic multi-slot lock. If a 60-
     "status": "pending",
     "paymentStatus": "pending",
     "paymentRequired": true,
-    "durationMinutes": 60,
-    "slotLockTimes": ["10:00", "10:30"]
+    "durationMinutes": 30,
+    "slotLockTimes": ["10:00"],
+    "totalAmount": 300
+  }
+}
+```
+
+**Multiple Services:**
+```json
+{
+  "success": true,
+  "message": "Booking created",
+  "data": {
+    "bookingId": "booking_id",
+    "status": "pending",
+    "paymentStatus": "pending",
+    "paymentRequired": true,
+    "durationMinutes": 140,
+    "slotLockTimes": ["10:00", "10:30", "11:00", "11:30", "12:00", "12:30"],
+    "totalAmount": 1250
   }
 }
 ```
@@ -79,3 +135,9 @@ Bookings now use normalized `HH:MM` time and an atomic multi-slot lock. If a 60-
 - Update and reschedule are blocked once payment has started.
 - Failed, expired, or suspicious payment sessions cancel the unpaid booking and release slot locks.
 - Bundle bookings below the configured minimum amount are rejected before any slot is locked.
+- **Multi-Service Support:** You can select multiple services, bundles, or a combination of both in a single booking.
+  - Maximum 10 services per booking
+  - Maximum 8 hours (480 minutes) total duration
+  - No duplicate services allowed
+  - Total price and duration calculated automatically
+  - Slots locked based on total duration
