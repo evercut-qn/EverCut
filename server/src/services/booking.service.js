@@ -15,6 +15,7 @@ import { buildPagination } from '../utils/pagination.utils.js';
 import {
     BOOKING_MILESTONE_TARGETS,
     BOOKING_STATUS,
+    BOOKING_LIMITS,
     BUNDLE_RULES,
     MAX_RESCHEDULE_COUNT,
     CANCELLATION_WINDOW_HOURS,
@@ -172,6 +173,19 @@ export const bookSalon = async (userId, data) => {
     // Normalize serviceIds
     const serviceIds = Array.isArray(serviceId) ? serviceId : [serviceId];
 
+    // Validate: No duplicates
+    const uniqueServiceIds = new Set(serviceIds);
+    if (uniqueServiceIds.size !== serviceIds.length) {
+        throw new BadRequestError('Duplicate services are not allowed');
+    }
+
+    // Validate: Maximum services limit
+    if (serviceIds.length > BOOKING_LIMITS.MAX_SERVICES_PER_BOOKING) {
+        throw new BadRequestError(
+            `Cannot select more than ${BOOKING_LIMITS.MAX_SERVICES_PER_BOOKING} services per booking`,
+        );
+    }
+
     // Validate services
     const services = normalizeBookedServices(
         await serviceRepository.findByIds(
@@ -191,6 +205,14 @@ export const bookSalon = async (userId, data) => {
     const durationMinutes = sumServiceDurations(services);
     assertValidServiceDuration(durationMinutes);
     assertBundleMinimum(services, totalAmount);
+
+    // Validate: Maximum duration limit
+    if (durationMinutes > BOOKING_LIMITS.MAX_BOOKING_DURATION_MINUTES) {
+        throw new BadRequestError(
+            `Total booking duration cannot exceed ${BOOKING_LIMITS.MAX_BOOKING_DURATION_MINUTES / 60} hours`,
+        );
+    }
+
     const slotLockTimes = buildSlotLockTimes(normalizedTime, durationMinutes);
 
     // Claim employee slot markers atomically.
@@ -643,6 +665,9 @@ export const getAvailableSlots = async (employeeId, date, serviceId) => {
         throw new BadRequestError('Cannot fetch availability for past dates');
     }
 
+    // Normalize serviceIds to array
+    const serviceIds = Array.isArray(serviceId) ? serviceId : [serviceId];
+
     // Get employee details
     const employee = await employeeRepository.findByIdLean(
         employeeId,
@@ -660,17 +685,22 @@ export const getAvailableSlots = async (employeeId, date, serviceId) => {
     if (!shop.isOpen) throw new BadRequestError('Shop is currently closed');
 
     // Get service details
-    const service = await serviceRepository.findById(serviceId);
-    if (!service) throw new NotFoundError('Service');
-    if (String(service.shopId) !== String(employee.shopId)) {
-        throw new BadRequestError('Service does not belong to this shop');
+    const services = normalizeBookedServices(
+        await serviceRepository.findByIds(serviceIds, 'serviceName serviceType shopId duration totalDuration'),
+    );
+    if (!services.length) throw new NotFoundError('Services');
+    if (services.length !== serviceIds.length) {
+        throw new BadRequestError('One or more services not found');
+    }
+    if (services.some((service) => String(service.shopId) !== String(employee.shopId))) {
+        throw new BadRequestError('All services must belong to this shop');
     }
 
-    // Get service duration
-    const serviceDuration = getServiceDuration(service);
+    // Calculate total service duration
+    const serviceDuration = sumServiceDurations(services);
 
     if (!serviceDuration || serviceDuration <= 0) {
-        throw new BadRequestError('Service must have a valid duration');
+        throw new BadRequestError('Services must have a valid total duration');
     }
 
     // Get booked slots for this date
@@ -700,11 +730,12 @@ export const getAvailableSlots = async (employeeId, date, serviceId) => {
         employeeId,
         employeeName: `${employee.firstName} ${employee.lastName}`,
         date,
-        service: {
-            id: service._id,
-            name: service.serviceName,
-            duration: serviceDuration,
-        },
+        services: services.map((s) => ({
+            id: s._id,
+            name: s.serviceName,
+            duration: getServiceDuration(s),
+        })),
+        totalDuration: serviceDuration,
         shopHours: {
             openTime: shop.openTime,
             closeTime: shop.closeTime,
@@ -731,23 +762,31 @@ export const getShopAvailability = async (shopId, date, serviceId) => {
         throw new BadRequestError('Cannot fetch availability for past dates');
     }
 
+    // Normalize serviceIds to array
+    const serviceIds = Array.isArray(serviceId) ? serviceId : [serviceId];
+
     // Get shop details
     const shop = await shopRepository.findById(shopId);
     if (!shop) throw new NotFoundError('Shop');
     if (!shop.isOpen) throw new BadRequestError('Shop is currently closed');
 
     // Get service details
-    const service = await serviceRepository.findById(serviceId);
-    if (!service) throw new NotFoundError('Service');
-    if (String(service.shopId) !== String(shopId)) {
-        throw new BadRequestError('Service does not belong to this shop');
+    const services = normalizeBookedServices(
+        await serviceRepository.findByIds(serviceIds, 'serviceName serviceType shopId duration totalDuration'),
+    );
+    if (!services.length) throw new NotFoundError('Services');
+    if (services.length !== serviceIds.length) {
+        throw new BadRequestError('One or more services not found');
+    }
+    if (services.some((service) => String(service.shopId) !== String(shopId))) {
+        throw new BadRequestError('All services must belong to this shop');
     }
 
-    // Get service duration
-    const serviceDuration = getServiceDuration(service);
+    // Calculate total service duration
+    const serviceDuration = sumServiceDurations(services);
 
     if (!serviceDuration || serviceDuration <= 0) {
-        throw new BadRequestError('Service must have a valid duration');
+        throw new BadRequestError('Services must have a valid total duration');
     }
 
     // Get all active employees for this shop
@@ -759,11 +798,12 @@ export const getShopAvailability = async (shopId, date, serviceId) => {
             shopId,
             shopName: shop.shopName,
             date,
-            service: {
-                id: service._id,
-                name: service.serviceName,
-                duration: serviceDuration,
-            },
+            services: services.map((s) => ({
+                id: s._id,
+                name: s.serviceName,
+                duration: getServiceDuration(s),
+            })),
+            totalDuration: serviceDuration,
             employees: [],
             firstAvailable: null,
         };
@@ -821,11 +861,12 @@ export const getShopAvailability = async (shopId, date, serviceId) => {
         shopId,
         shopName: shop.shopName,
         date,
-        service: {
-            id: service._id,
-            name: service.serviceName,
-            duration: serviceDuration,
-        },
+        services: services.map((s) => ({
+            id: s._id,
+            name: s.serviceName,
+            duration: getServiceDuration(s),
+        })),
+        totalDuration: serviceDuration,
         employees: employeeAvailability,
         firstAvailable,
     };

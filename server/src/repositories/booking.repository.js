@@ -205,11 +205,11 @@ class BookingRepository {
     }
 
     async findByEmployeeAndDate(employeeId, date) {
-        return Booking.find({
+        return Booking.find(trustQueryOperators({
             employeeId,
             date,
             status: { $nin: [BOOKING_STATUS.CANCELLED] },
-        }).lean();
+        })).lean();
     }
 
     async findConflict(shopId, employeeId, date, time, excludeBookingId) {

@@ -285,5 +285,8 @@ export const shopAvailabilityQuerySchema = Joi.object({
     date: Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/).required().messages({
         'string.pattern.base': 'date must be in YYYY-MM-DD format',
     }),
-    serviceId: objectId.required(),
+    serviceId: Joi.alternatives().try(
+        objectId,
+        Joi.array().items(objectId).min(1),
+    ).required(),
 });

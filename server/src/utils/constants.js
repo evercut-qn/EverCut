@@ -120,6 +120,19 @@ export const REFUND_FEES = Object.freeze({
     BUNDLE: 15,
 });
 
+// ---------------------------------------------------------------------------
+// Booking Limits
+// ---------------------------------------------------------------------------
+
+export const BOOKING_LIMITS = Object.freeze({
+    MAX_SERVICES_PER_BOOKING: 10,      // Maximum 10 services/bundles per booking
+    MAX_BOOKING_DURATION_MINUTES: 480, // Maximum 8 hours per booking
+});
+
+// ---------------------------------------------------------------------------
+// Bundle Rules
+// ---------------------------------------------------------------------------
+
 export const BUNDLE_RULES = Object.freeze({
     MIN_SERVICE_AMOUNT: 300,
 });
