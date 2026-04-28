@@ -156,8 +156,8 @@ Added booking-domain milestone logic in `booking.service.js`:
 - `server/postman-collections/10-barber-bookings.json`
 - `server/postman-collections/EverCut.postman_environment.json`
 - `server/postman-collections/README.md`
-- `server/docs/architecture/IMPLEMENTATION-PLAN.md`
-- `server/docs/reports/BOOKING-MILESTONE-PROGRESS-REPORT.md`
+- `docs/architecture/IMPLEMENTATION-PLAN.md`
+- `docs/reports/BOOKING-MILESTONE-PROGRESS-REPORT.md`
 
 ---
 

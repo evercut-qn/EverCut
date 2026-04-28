@@ -83,7 +83,7 @@ Research documents for technology decisions and comparisons.
 ## 📂 Directory Structure
 
 ```
-server/docs/
+docs/
 ├── README.md                          # This file
 ├── architecture/                      # Architecture & planning docs
 │   └── IMPLEMENTATION-PLAN.md

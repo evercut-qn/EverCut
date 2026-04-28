@@ -141,8 +141,8 @@ The only parity gap found during this audit was that customer routes already exp
 - `server/scripts/regenerate-postman-collections.mjs`
 - `server/postman-collections/13-barber-ratings.json`
 - `server/postman-collections/README.md`
-- `server/docs/architecture/IMPLEMENTATION-PLAN.md`
-- `server/docs/reports/RATINGS-ROUTE-AUDIT-REPORT.md`
+- `docs/architecture/IMPLEMENTATION-PLAN.md`
+- `docs/reports/RATINGS-ROUTE-AUDIT-REPORT.md`
 
 ---
 

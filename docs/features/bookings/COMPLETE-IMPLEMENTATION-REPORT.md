@@ -103,10 +103,10 @@ server/src/validators/employee.validator.js
 
 ### Documentation Files (4)
 ```
-server/docs/features/bookings/BOOKING-AVAILABILITY-IMPLEMENTATION-PLAN.md
-server/docs/features/bookings/COMPLETE-IMPLEMENTATION-REPORT.md
-server/docs/features/bookings/README.md (updated)
-server/docs/features/bookings/API-REFERENCE.md (updated)
+docs/features/bookings/BOOKING-AVAILABILITY-IMPLEMENTATION-PLAN.md
+docs/features/bookings/COMPLETE-IMPLEMENTATION-REPORT.md
+docs/features/bookings/README.md (updated)
+docs/features/bookings/API-REFERENCE.md (updated)
 ```
 
 ### Postman Collections (1)
@@ -397,7 +397,7 @@ Successfully delivered a complete booking availability system that:
 ### Support Contacts
 
 For questions or issues:
-1. Check documentation in `server/docs/features/bookings/`
+1. Check documentation in `docs/features/bookings/`
 2. Review Postman collections for examples
 3. Check implementation in `server/src/services/booking.service.js`
 
