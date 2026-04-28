@@ -1518,7 +1518,16 @@ const barberBookingsCollection = {
       }),
     },
     {
-      name: '4. Get Confirmed Bookings',
+      name: '4. Get Pending Confirmations',
+      ...request({
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/bookings/pending-confirmations',
+        description: 'Lists all bookings awaiting barber confirmation. These are paid bookings that need explicit barber approval.',
+        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
+      }),
+    },
+    {
+      name: '5. Get Confirmed Bookings',
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/bookings/status?status=confirmed',
@@ -1527,7 +1536,16 @@ const barberBookingsCollection = {
       }),
     },
     {
-      name: '5. Update Booking Status',
+      name: '6. Confirm Booking',
+      ...request({
+        method: 'PATCH',
+        url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id_status}}/confirm',
+        description: 'Barber explicitly confirms a booking, moving it from awaiting_confirmation to confirmed status.',
+        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
+      }),
+    },
+    {
+      name: '7. Update Booking Status',
       ...request({
         method: 'PUT',
         url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id_status}}/status',
@@ -1540,7 +1558,7 @@ const barberBookingsCollection = {
       }),
     },
     {
-      name: '6. Cancel Paid Booking (Terminal)',
+      name: '8. Cancel Paid Booking (Terminal)',
       ...request({
         method: 'POST',
         url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id_delete}}/cancel',
