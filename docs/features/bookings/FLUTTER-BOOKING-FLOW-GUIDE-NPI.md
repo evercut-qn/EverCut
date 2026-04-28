@@ -8,7 +8,7 @@
 
 ## Summary
 
-You're absolutely right about the payment flow! The current guide uses **web-based payment integration** which provides a poor user experience. Modern apps like Swiggy, Zomato, and Uber use **native payment integration** where users stay within the app.
+The current implementation uses **web-based payment integration** which provides a poor user experience. Modern apps like Swiggy, Zomato, and Uber use **native payment integration** where users stay within the app.
 
 ## Why Web URLs Are Bad:
 
