@@ -19,29 +19,7 @@
       "listen": "prerequest",
       "script": {
         "type": "text/javascript",
-        "exec": [
-          "const readScopedValue = (...keys) => {",
-          "  for (const key of keys) {",
-          "    const environmentValue = pm.environment.get(key);",
-          "    if (environmentValue) return environmentValue;",
-          "    const globalValue = pm.globals.get(key);",
-          "    if (globalValue) return globalValue;",
-          "  }",
-          "  return '';",
-          "};",
-          "const syncScopedValue = (sourceKey, collectionKey = sourceKey) => {",
-          "  const scopedValue = readScopedValue(sourceKey);",
-          "  if (scopedValue) {",
-          "    pm.collectionVariables.set(collectionKey, scopedValue);",
-          "  }",
-          "};",
-          "syncScopedValue('base_url');",
-          "syncScopedValue('api_prefix');",
-          "const customerToken = readScopedValue('customer_access_token');",
-          "if (customerToken) { pm.collectionVariables.set('customer_access_token', customerToken); }",
-          "const barberToken = readScopedValue('barber_access_token');",
-          "if (barberToken) { pm.collectionVariables.set('barber_access_token', barberToken); }"
-        ]
+        "exec": []
       }
     }
   ],
@@ -57,18 +35,6 @@
       "value": "api/v1",
       "type": "string",
       "description": "API prefix used by every request"
-    },
-    {
-      "key": "customer_access_token",
-      "value": "",
-      "type": "string",
-      "description": "JWT access token - auto-set by 01-authentication.json for returning users or by 02-onboarding.json after first-time signup"
-    },
-    {
-      "key": "barber_access_token",
-      "value": "",
-      "type": "string",
-      "description": "JWT access token - auto-set by 01-authentication.json for returning users or by 02-onboarding.json after first-time signup"
     }
   ],
   "item": [

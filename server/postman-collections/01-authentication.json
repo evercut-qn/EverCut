@@ -31,65 +31,6 @@
       "key": "test_otp",
       "value": "123456",
       "type": "string"
-    },
-    {
-      "key": "customer_access_token",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "key": "customer_refresh_token",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "key": "customer_onboarding_token",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "key": "barber_access_token",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "key": "barber_refresh_token",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "key": "barber_onboarding_token",
-      "value": "",
-      "type": "string"
-    }
-  ],
-  "event": [
-    {
-      "listen": "prerequest",
-      "script": {
-        "type": "text/javascript",
-        "exec": [
-          "const readScopedValue = (...keys) => {",
-          "  for (const key of keys) {",
-          "    const environmentValue = pm.environment.get(key);",
-          "    if (environmentValue) return environmentValue;",
-          "    const globalValue = pm.globals.get(key);",
-          "    if (globalValue) return globalValue;",
-          "  }",
-          "  return '';",
-          "};",
-          "const baseUrl = readScopedValue('base_url');",
-          "if (baseUrl) { pm.collectionVariables.set('base_url', baseUrl); }",
-          "const apiPrefix = readScopedValue('api_prefix');",
-          "if (apiPrefix) { pm.collectionVariables.set('api_prefix', apiPrefix); }",
-          "const customerMobile = readScopedValue('test_customer_mobile');",
-          "if (customerMobile) { pm.collectionVariables.set('test_customer_mobile', customerMobile); }",
-          "const barberMobile = readScopedValue('test_barber_mobile');",
-          "if (barberMobile) { pm.collectionVariables.set('test_barber_mobile', barberMobile); }",
-          "const testOtp = readScopedValue('test_otp');",
-          "if (testOtp) { pm.collectionVariables.set('test_otp', testOtp); }"
-        ]
-      }
     }
   ],
   "item": [
@@ -183,23 +124,13 @@
               "const response = pm.response.json();",
               "const data = response.data || {};",
               "if (data.isNewUser && data.onboardingToken) {",
-              "  pm.collectionVariables.set('customer_onboarding_token', data.onboardingToken);",
               "  pm.environment.set('customer_onboarding_token', data.onboardingToken);",
-              "  pm.collectionVariables.set('customer_access_token', '');",
-              "  pm.collectionVariables.set('customer_refresh_token', '');",
-              "  pm.environment.set('customer_access_token', '');",
-              "  pm.environment.set('customer_refresh_token', '');",
+              "  pm.environment.unset('customer_access_token');",
+              "  pm.environment.unset('customer_refresh_token');",
               "} else {",
-              "  pm.collectionVariables.set('customer_onboarding_token', '');",
-              "  pm.environment.set('customer_onboarding_token', '');",
-              "  if (data.accessToken) {",
-              "    pm.collectionVariables.set('customer_access_token', data.accessToken);",
-              "    pm.environment.set('customer_access_token', data.accessToken);",
-              "  }",
-              "  if (data.refreshToken) {",
-              "    pm.collectionVariables.set('customer_refresh_token', data.refreshToken);",
-              "    pm.environment.set('customer_refresh_token', data.refreshToken);",
-              "  }",
+              "  pm.environment.unset('customer_onboarding_token');",
+              "  if (data.accessToken) pm.environment.set('customer_access_token', data.accessToken);",
+              "  if (data.refreshToken) pm.environment.set('customer_refresh_token', data.refreshToken);",
               "}",
               "pm.collectionVariables.set('last_session_role', 'CUSTOMER');",
               "pm.collectionVariables.set('last_session_is_new_user', String(Boolean(data.isNewUser)));"
@@ -298,23 +229,13 @@
               "const response = pm.response.json();",
               "const data = response.data || {};",
               "if (data.isNewUser && data.onboardingToken) {",
-              "  pm.collectionVariables.set('barber_onboarding_token', data.onboardingToken);",
               "  pm.environment.set('barber_onboarding_token', data.onboardingToken);",
-              "  pm.collectionVariables.set('barber_access_token', '');",
-              "  pm.collectionVariables.set('barber_refresh_token', '');",
-              "  pm.environment.set('barber_access_token', '');",
-              "  pm.environment.set('barber_refresh_token', '');",
+              "  pm.environment.unset('barber_access_token');",
+              "  pm.environment.unset('barber_refresh_token');",
               "} else {",
-              "  pm.collectionVariables.set('barber_onboarding_token', '');",
-              "  pm.environment.set('barber_onboarding_token', '');",
-              "  if (data.accessToken) {",
-              "    pm.collectionVariables.set('barber_access_token', data.accessToken);",
-              "    pm.environment.set('barber_access_token', data.accessToken);",
-              "  }",
-              "  if (data.refreshToken) {",
-              "    pm.collectionVariables.set('barber_refresh_token', data.refreshToken);",
-              "    pm.environment.set('barber_refresh_token', data.refreshToken);",
-              "  }",
+              "  pm.environment.unset('barber_onboarding_token');",
+              "  if (data.accessToken) pm.environment.set('barber_access_token', data.accessToken);",
+              "  if (data.refreshToken) pm.environment.set('barber_refresh_token', data.refreshToken);",
               "}",
               "pm.collectionVariables.set('last_session_role', 'BARBER');",
               "pm.collectionVariables.set('last_session_is_new_user', String(Boolean(data.isNewUser)));"
@@ -366,14 +287,8 @@
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
               "const response = pm.response.json();",
               "const data = response.data || {};",
-              "if (data.accessToken) {",
-              "  pm.collectionVariables.set('customer_access_token', data.accessToken);",
-              "  pm.environment.set('customer_access_token', data.accessToken);",
-              "}",
-              "if (data.refreshToken) {",
-              "  pm.collectionVariables.set('customer_refresh_token', data.refreshToken);",
-              "  pm.environment.set('customer_refresh_token', data.refreshToken);",
-              "}"
+              "if (data.accessToken) pm.environment.set('customer_access_token', data.accessToken);",
+              "if (data.refreshToken) pm.environment.set('customer_refresh_token', data.refreshToken);"
             ]
           }
         }
@@ -422,14 +337,8 @@
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
               "const response = pm.response.json();",
               "const data = response.data || {};",
-              "if (data.accessToken) {",
-              "  pm.collectionVariables.set('barber_access_token', data.accessToken);",
-              "  pm.environment.set('barber_access_token', data.accessToken);",
-              "}",
-              "if (data.refreshToken) {",
-              "  pm.collectionVariables.set('barber_refresh_token', data.refreshToken);",
-              "  pm.environment.set('barber_refresh_token', data.refreshToken);",
-              "}"
+              "if (data.accessToken) pm.environment.set('barber_access_token', data.accessToken);",
+              "if (data.refreshToken) pm.environment.set('barber_refresh_token', data.refreshToken);"
             ]
           }
         }
@@ -469,10 +378,8 @@
               "  pm.expect(response).to.have.property('data');",
               "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
-              "pm.collectionVariables.set('customer_access_token', '');",
-              "pm.collectionVariables.set('customer_refresh_token', '');",
-              "pm.environment.set('customer_access_token', '');",
-              "pm.environment.set('customer_refresh_token', '');"
+              "pm.environment.unset('customer_access_token');",
+              "pm.environment.unset('customer_refresh_token');"
             ]
           }
         }

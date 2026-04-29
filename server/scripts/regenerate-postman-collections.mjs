@@ -4,21 +4,16 @@
  * Programmatically rebuilds every Postman collection in postman-collections/.
  *
  * What this script does:
- *   1. Defines all request items, pre-request scripts, and test scripts in code
- *   2. Writes one JSON file per collection (01-authentication.json … 13-barber-ratings.json)
- *   3. Writes the local Postman environment template used by the collections
+ * 1. Defines all request items, pre-request scripts, and test scripts in code
+ * 2. Writes one JSON file per collection (01-authentication.json … 13-barber-ratings.json)
+ * 3. Writes the local Postman environment template used by the collections
  *
  * When to run it:
- *   Run after changing route URLs, request bodies, validator shapes, or Postman test scripts.
- *   The resulting files can be re-imported into Postman immediately.
+ * Run after changing route URLs, request bodies, validator shapes, or Postman test scripts.
+ * The resulting files can be re-imported into Postman immediately.
  *
  * Usage:
- *   node scripts/regenerate-postman-collections.mjs
- *
- * Output:
- *   postman-collections/01-authentication.json
- *   postman-collections/02-onboarding.json
- *   … (one file per collection)
+ * node scripts/regenerate-postman-collections.mjs
  */
 
 import { mkdirSync, writeFileSync } from 'fs';
@@ -32,13 +27,7 @@ mkdirSync(COLLECTIONS_DIR, { recursive: true });
 
 const bearerAuth = (tokenVariable) => ({
   type: 'bearer',
-  bearer: [
-    {
-      key: 'token',
-      value: `{{${tokenVariable}}}`,
-      type: 'string',
-    },
-  ],
+  bearer: [{ key: 'token', value: `{{${tokenVariable}}}`, type: 'string' }],
 });
 
 const textVariable = (key, value = '', description) => {
@@ -47,44 +36,17 @@ const textVariable = (key, value = '', description) => {
   return variable;
 };
 
-const request = ({
-  method,
-  url,
-  description,
-  headers = [],
-  body,
-  auth,
-  event,
-}) => {
-  const requestObject = {
-    method,
-    header: headers,
-    url,
-    description,
-  };
-
+const request = ({ method, url, description, headers = [], body, auth, event }) => {
+  const requestObject = { method, header: headers, url, description };
   if (body) requestObject.body = body;
   if (auth) requestObject.auth = auth;
-
   const item = { request: requestObject };
   if (event) item.event = event;
   return item;
 };
 
-const jsonBody = (raw) => ({
-  mode: 'raw',
-  raw,
-  options: {
-    raw: {
-      language: 'json',
-    },
-  },
-});
-
-const formDataBody = (formdata) => ({
-  mode: 'formdata',
-  formdata,
-});
+const jsonBody = (raw) => ({ mode: 'raw', raw, options: { raw: { language: 'json' } } });
+const formDataBody = (formdata) => ({ mode: 'formdata', formdata });
 
 const fileField = (key, description) => {
   const field = { key, type: 'file' };
@@ -110,87 +72,32 @@ const standardEnvelopeAssertions = [
   '});',
 ];
 
-const testEvent = (...exec) => [
-  {
-    listen: 'test',
-    script: {
-      type: 'text/javascript',
-      exec: [...standardEnvelopeAssertions, ...exec],
-    },
-  },
-];
-
-const preRequestEvent = (...exec) => [
-  {
-    listen: 'prerequest',
-    script: {
-      type: 'text/javascript',
-      exec,
-    },
-  },
-];
-
+const testEvent = (...exec) => [{ listen: 'test', script: { type: 'text/javascript', exec: [...standardEnvelopeAssertions, ...exec] } }];
+const preRequestEvent = (...exec) => [{ listen: 'prerequest', script: { type: 'text/javascript', exec } }];
 const mergedEvents = (preRequestExec, testExec) => [
-  {
-    listen: 'prerequest',
-    script: {
-      type: 'text/javascript',
-      exec: preRequestExec,
-    },
-  },
-  {
-    listen: 'test',
-    script: {
-      type: 'text/javascript',
-      exec: [...standardEnvelopeAssertions, ...testExec],
-    },
-  },
+  { listen: 'prerequest', script: { type: 'text/javascript', exec: preRequestExec } },
+  { listen: 'test', script: { type: 'text/javascript', exec: [...standardEnvelopeAssertions, ...testExec] } },
 ];
 
 const collectionPreRequest = ({
   syncPairs = [],
   includeDateHelpers = false,
   extra = [],
-  includeAccessTokens = true,
-  includeOnboardingTokens = false,
 } = {}) => {
-  const exec = [
-    "const readScopedValue = (...keys) => {",
-    "  for (const key of keys) {",
-    "    const environmentValue = pm.environment.get(key);",
-    "    if (environmentValue) return environmentValue;",
-    "    const globalValue = pm.globals.get(key);",
-    "    if (globalValue) return globalValue;",
-    "  }",
-    "  return '';",
-    "};",
-    "const syncScopedValue = (sourceKey, collectionKey = sourceKey) => {",
-    "  const scopedValue = readScopedValue(sourceKey);",
-    "  if (scopedValue) {",
-    "    pm.collectionVariables.set(collectionKey, scopedValue);",
-    "  }",
-    "};",
-    "syncScopedValue('base_url');",
-    "syncScopedValue('api_prefix');",
-    ...syncPairs.map(([sourceKey, collectionKey]) => `syncScopedValue('${sourceKey}', '${collectionKey}');`),
-  ];
+  const exec = [];
 
-  if (includeAccessTokens) {
+  if (syncPairs.length > 0) {
     exec.push(
-      "const customerToken = readScopedValue('customer_access_token');",
-      "if (customerToken) { pm.collectionVariables.set('customer_access_token', customerToken); }",
-      "const barberToken = readScopedValue('barber_access_token');",
-      "if (barberToken) { pm.collectionVariables.set('barber_access_token', barberToken); }",
+      "// Automatically pull IDs from Globals ONLY if user hasn't manually set them in Collection Variables.",
+      "const syncGlobalToCollection = (globalKey, collectionKey = globalKey) => {",
+      "  const globalVal = pm.globals.get(globalKey);",
+      "  const collVal = pm.collectionVariables.get(collectionKey);",
+      "  if (globalVal && !collVal) {",
+      "    pm.collectionVariables.set(collectionKey, globalVal);",
+      "  }",
+      "};"
     );
-  }
-
-  if (includeOnboardingTokens) {
-    exec.push(
-      "const customerOnboardingToken = readScopedValue('customer_onboarding_token');",
-      "if (customerOnboardingToken) { pm.collectionVariables.set('customer_onboarding_token', customerOnboardingToken); }",
-      "const barberOnboardingToken = readScopedValue('barber_onboarding_token');",
-      "if (barberOnboardingToken) { pm.collectionVariables.set('barber_onboarding_token', barberOnboardingToken); }",
-    );
+    exec.push(...syncPairs.map(([sourceKey, collectionKey]) => `syncGlobalToCollection('${sourceKey}', '${collectionKey}');`));
   }
 
   if (includeDateHelpers) {
@@ -200,61 +107,44 @@ const collectionPreRequest = ({
       "  const date = new Date();",
       "  date.setHours(0, 0, 0, 0);",
       "  date.setDate(date.getDate() + daysAhead);",
-      "  ",
-      "  // Skip Sundays (shop closed)",
       "  if (skipSundays) {",
-      "    while (date.getDay() === 0) {",
-      "      date.setDate(date.getDate() + 1);",
-      "    }",
+      "    while (date.getDay() === 0) { date.setDate(date.getDate() + 1); }",
       "  }",
-      "  ",
       "  return date;",
       "};",
-      "",
       "const toIsoDate = (date) => {",
       "  const year = date.getFullYear();",
       "  const month = String(date.getMonth() + 1).padStart(2, '0');",
       "  const day = String(date.getDate()).padStart(2, '0');",
       "  return `${year}-${month}-${day}`;",
       "};",
-      "",
       "const getWorkingHourTime = (hour) => {",
-      "  // Ensure time is within working hours (9 AM - 8 PM)",
       "  const clampedHour = Math.max(9, Math.min(20, hour));",
       "  return `${String(clampedHour).padStart(2, '0')}:00`;",
       "};",
       "",
-      "// Check if user has manually set dates/times in environment",
-      "const hasManualDate = pm.environment.get('booking_date') || pm.globals.get('booking_date');",
-      "const hasManualTime = pm.environment.get('booking_time') || pm.globals.get('booking_time');",
+      "// Check if user has manually set dates/times in Collection Variables",
+      "const hasManualDate = pm.collectionVariables.get('booking_date');",
+      "const hasManualTime = pm.collectionVariables.get('booking_time');",
       "",
-      "// Only auto-generate if not manually set",
       "if (!hasManualDate) {",
       "  pm.collectionVariables.set('booking_date', toIsoDate(getNextAvailableDate(1)));",
       "  pm.collectionVariables.set('booking_update_date', toIsoDate(getNextAvailableDate(2)));",
       "  pm.collectionVariables.set('booking_reschedule_date', toIsoDate(getNextAvailableDate(3)));",
       "  pm.collectionVariables.set('booking_reorder_date', toIsoDate(getNextAvailableDate(4)));",
       "  pm.collectionVariables.set('calendar_date', toIsoDate(getNextAvailableDate(2)));",
-      "} else {",
-      "  // Use manually set dates",
-      "  pm.collectionVariables.set('booking_date', hasManualDate);",
       "}",
       "",
       "if (!hasManualTime) {",
-      "  // Generate times within working hours",
       "  pm.collectionVariables.set('booking_time', getWorkingHourTime(11));",
       "  pm.collectionVariables.set('booking_update_time', getWorkingHourTime(12));",
       "  pm.collectionVariables.set('booking_reschedule_time', getWorkingHourTime(13));",
       "  pm.collectionVariables.set('booking_reorder_time', getWorkingHourTime(14));",
-      "} else {",
-      "  // Use manually set time",
-      "  pm.collectionVariables.set('booking_time', hasManualTime);",
-      "}",
+      "}"
     );
   }
 
   exec.push(...extra);
-
   return preRequestEvent(...exec);
 };
 
@@ -263,32 +153,6 @@ const baseVariables = (...extra) => [
   textVariable('api_prefix', 'api/v1', 'API prefix used by every request'),
   ...extra,
 ];
-
-const accessTokenVariables = () => ([
-  textVariable(
-    'customer_access_token',
-    '',
-    'JWT access token - auto-set by 01-authentication.json for returning users or by 02-onboarding.json after first-time signup',
-  ),
-  textVariable(
-    'barber_access_token',
-    '',
-    'JWT access token - auto-set by 01-authentication.json for returning users or by 02-onboarding.json after first-time signup',
-  ),
-]);
-
-const onboardingTokenVariables = () => ([
-  textVariable(
-    'customer_onboarding_token',
-    '',
-    'Short-lived onboarding JWT - auto-set by 01-authentication.json when a new customer is detected',
-  ),
-  textVariable(
-    'barber_onboarding_token',
-    '',
-    'Short-lived onboarding JWT - auto-set by 01-authentication.json when a new barber is detected',
-  ),
-]);
 
 const writeCollection = (filename, collection) => {
   const filePath = resolve(COLLECTIONS_DIR, filename);
@@ -312,35 +176,8 @@ const authenticationCollection = {
       textVariable('test_customer_mobile', '9876543210'),
       textVariable('test_barber_mobile', '9876543211'),
       textVariable('test_otp', '123456'),
-      textVariable('customer_access_token', ''),
-      textVariable('customer_refresh_token', ''),
-      textVariable('customer_onboarding_token', ''),
-      textVariable('barber_access_token', ''),
-      textVariable('barber_refresh_token', ''),
-      textVariable('barber_onboarding_token', ''),
     ),
   ],
-  event: preRequestEvent(
-    "const readScopedValue = (...keys) => {",
-    "  for (const key of keys) {",
-    "    const environmentValue = pm.environment.get(key);",
-    "    if (environmentValue) return environmentValue;",
-    "    const globalValue = pm.globals.get(key);",
-    "    if (globalValue) return globalValue;",
-    "  }",
-    "  return '';",
-    "};",
-    "const baseUrl = readScopedValue('base_url');",
-    "if (baseUrl) { pm.collectionVariables.set('base_url', baseUrl); }",
-    "const apiPrefix = readScopedValue('api_prefix');",
-    "if (apiPrefix) { pm.collectionVariables.set('api_prefix', apiPrefix); }",
-    "const customerMobile = readScopedValue('test_customer_mobile');",
-    "if (customerMobile) { pm.collectionVariables.set('test_customer_mobile', customerMobile); }",
-    "const barberMobile = readScopedValue('test_barber_mobile');",
-    "if (barberMobile) { pm.collectionVariables.set('test_barber_mobile', barberMobile); }",
-    "const testOtp = readScopedValue('test_otp');",
-    "if (testOtp) { pm.collectionVariables.set('test_otp', testOtp); }",
-  ),
   item: [
     {
       name: '1. Send Customer OTP',
@@ -349,13 +186,9 @@ const authenticationCollection = {
         url: '{{base_url}}/{{api_prefix}}/auth/otp/send',
         auth: { type: 'noauth' },
         headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody(`{
-  "mobile": "{{test_customer_mobile}}"
-}`),
+        body: jsonBody(`{\n  "mobile": "{{test_customer_mobile}}"\n}`),
         description: 'Send an OTP to the customer test number configured in the active Postman environment.',
-        event: testEvent(
-          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
-        ),
+        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
     },
     {
@@ -365,36 +198,23 @@ const authenticationCollection = {
         url: '{{base_url}}/{{api_prefix}}/auth/otp/verify',
         auth: { type: 'noauth' },
         headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody(`{
-  "mobile": "{{test_customer_mobile}}",
-  "otp": "{{test_otp}}"
-}`),
+        body: jsonBody(`{\n  "mobile": "{{test_customer_mobile}}",\n  "otp": "{{test_otp}}"\n}`),
         description: 'Verify the customer OTP and capture either onboarding or session JWTs for downstream collections.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
-          'const response = pm.response.json();',
-          'const data = response.data || {};',
+          "const response = pm.response.json();",
+          "const data = response.data || {};",
           "if (data.isNewUser && data.onboardingToken) {",
-          "  pm.collectionVariables.set('customer_onboarding_token', data.onboardingToken);",
           "  pm.environment.set('customer_onboarding_token', data.onboardingToken);",
-          "  pm.collectionVariables.set('customer_access_token', '');",
-          "  pm.collectionVariables.set('customer_refresh_token', '');",
-          "  pm.environment.set('customer_access_token', '');",
-          "  pm.environment.set('customer_refresh_token', '');",
+          "  pm.environment.unset('customer_access_token');",
+          "  pm.environment.unset('customer_refresh_token');",
           "} else {",
-          "  pm.collectionVariables.set('customer_onboarding_token', '');",
-          "  pm.environment.set('customer_onboarding_token', '');",
-          "  if (data.accessToken) {",
-          "    pm.collectionVariables.set('customer_access_token', data.accessToken);",
-          "    pm.environment.set('customer_access_token', data.accessToken);",
-          "  }",
-          "  if (data.refreshToken) {",
-          "    pm.collectionVariables.set('customer_refresh_token', data.refreshToken);",
-          "    pm.environment.set('customer_refresh_token', data.refreshToken);",
-          "  }",
+          "  pm.environment.unset('customer_onboarding_token');",
+          "  if (data.accessToken) pm.environment.set('customer_access_token', data.accessToken);",
+          "  if (data.refreshToken) pm.environment.set('customer_refresh_token', data.refreshToken);",
           "}",
           "pm.collectionVariables.set('last_session_role', 'CUSTOMER');",
-          "pm.collectionVariables.set('last_session_is_new_user', String(Boolean(data.isNewUser)));",
+          "pm.collectionVariables.set('last_session_is_new_user', String(Boolean(data.isNewUser)));"
         ),
       }),
     },
@@ -405,13 +225,9 @@ const authenticationCollection = {
         url: '{{base_url}}/{{api_prefix}}/auth/otp/send',
         auth: { type: 'noauth' },
         headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody(`{
-  "mobile": "{{test_barber_mobile}}"
-}`),
+        body: jsonBody(`{\n  "mobile": "{{test_barber_mobile}}"\n}`),
         description: 'Send an OTP to the barber test number configured in the active Postman environment.',
-        event: testEvent(
-          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
-        ),
+        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
     },
     {
@@ -421,36 +237,23 @@ const authenticationCollection = {
         url: '{{base_url}}/{{api_prefix}}/auth/otp/verify',
         auth: { type: 'noauth' },
         headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody(`{
-  "mobile": "{{test_barber_mobile}}",
-  "otp": "{{test_otp}}"
-}`),
+        body: jsonBody(`{\n  "mobile": "{{test_barber_mobile}}",\n  "otp": "{{test_otp}}"\n}`),
         description: 'Verify the barber OTP and capture either onboarding or session JWTs for downstream collections.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
-          'const response = pm.response.json();',
-          'const data = response.data || {};',
+          "const response = pm.response.json();",
+          "const data = response.data || {};",
           "if (data.isNewUser && data.onboardingToken) {",
-          "  pm.collectionVariables.set('barber_onboarding_token', data.onboardingToken);",
           "  pm.environment.set('barber_onboarding_token', data.onboardingToken);",
-          "  pm.collectionVariables.set('barber_access_token', '');",
-          "  pm.collectionVariables.set('barber_refresh_token', '');",
-          "  pm.environment.set('barber_access_token', '');",
-          "  pm.environment.set('barber_refresh_token', '');",
+          "  pm.environment.unset('barber_access_token');",
+          "  pm.environment.unset('barber_refresh_token');",
           "} else {",
-          "  pm.collectionVariables.set('barber_onboarding_token', '');",
-          "  pm.environment.set('barber_onboarding_token', '');",
-          "  if (data.accessToken) {",
-          "    pm.collectionVariables.set('barber_access_token', data.accessToken);",
-          "    pm.environment.set('barber_access_token', data.accessToken);",
-          "  }",
-          "  if (data.refreshToken) {",
-          "    pm.collectionVariables.set('barber_refresh_token', data.refreshToken);",
-          "    pm.environment.set('barber_refresh_token', data.refreshToken);",
-          "  }",
+          "  pm.environment.unset('barber_onboarding_token');",
+          "  if (data.accessToken) pm.environment.set('barber_access_token', data.accessToken);",
+          "  if (data.refreshToken) pm.environment.set('barber_refresh_token', data.refreshToken);",
           "}",
           "pm.collectionVariables.set('last_session_role', 'BARBER');",
-          "pm.collectionVariables.set('last_session_is_new_user', String(Boolean(data.isNewUser)));",
+          "pm.collectionVariables.set('last_session_is_new_user', String(Boolean(data.isNewUser)));"
         ),
       }),
     },
@@ -461,22 +264,14 @@ const authenticationCollection = {
         url: '{{base_url}}/{{api_prefix}}/auth/token/refresh',
         auth: { type: 'noauth' },
         headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody(`{
-  "refreshToken": "{{customer_refresh_token}}"
-}`),
+        body: jsonBody(`{\n  "refreshToken": "{{customer_refresh_token}}"\n}`),
         description: 'Exchange the stored customer refresh token for a fresh access/refresh token pair.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
-          'const response = pm.response.json();',
-          'const data = response.data || {};',
-          "if (data.accessToken) {",
-          "  pm.collectionVariables.set('customer_access_token', data.accessToken);",
-          "  pm.environment.set('customer_access_token', data.accessToken);",
-          "}",
-          "if (data.refreshToken) {",
-          "  pm.collectionVariables.set('customer_refresh_token', data.refreshToken);",
-          "  pm.environment.set('customer_refresh_token', data.refreshToken);",
-          "}",
+          "const response = pm.response.json();",
+          "const data = response.data || {};",
+          "if (data.accessToken) pm.environment.set('customer_access_token', data.accessToken);",
+          "if (data.refreshToken) pm.environment.set('customer_refresh_token', data.refreshToken);"
         ),
       }),
     },
@@ -487,22 +282,14 @@ const authenticationCollection = {
         url: '{{base_url}}/{{api_prefix}}/auth/token/refresh',
         auth: { type: 'noauth' },
         headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody(`{
-  "refreshToken": "{{barber_refresh_token}}"
-}`),
+        body: jsonBody(`{\n  "refreshToken": "{{barber_refresh_token}}"\n}`),
         description: 'Exchange the stored barber refresh token for a fresh access/refresh token pair.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
-          'const response = pm.response.json();',
-          'const data = response.data || {};',
-          "if (data.accessToken) {",
-          "  pm.collectionVariables.set('barber_access_token', data.accessToken);",
-          "  pm.environment.set('barber_access_token', data.accessToken);",
-          "}",
-          "if (data.refreshToken) {",
-          "  pm.collectionVariables.set('barber_refresh_token', data.refreshToken);",
-          "  pm.environment.set('barber_refresh_token', data.refreshToken);",
-          "}",
+          "const response = pm.response.json();",
+          "const data = response.data || {};",
+          "if (data.accessToken) pm.environment.set('barber_access_token', data.accessToken);",
+          "if (data.refreshToken) pm.environment.set('barber_refresh_token', data.refreshToken);"
         ),
       }),
     },
@@ -515,10 +302,8 @@ const authenticationCollection = {
         description: 'Revoke the active customer refresh token and clear the stored customer session values.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
-          "pm.collectionVariables.set('customer_access_token', '');",
-          "pm.collectionVariables.set('customer_refresh_token', '');",
-          "pm.environment.set('customer_access_token', '');",
-          "pm.environment.set('customer_refresh_token', '');",
+          "pm.environment.unset('customer_access_token');",
+          "pm.environment.unset('customer_refresh_token');"
         ),
       }),
     },
@@ -529,14 +314,9 @@ const authenticationCollection = {
         url: '{{base_url}}/{{api_prefix}}/auth/otp/resend',
         auth: { type: 'noauth' },
         headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody(`{
-  "mobile": "{{test_customer_mobile}}",
-  "retryType": "text"
-}`),
+        body: jsonBody(`{\n  "mobile": "{{test_customer_mobile}}",\n  "retryType": "text"\n}`),
         description: 'Resend the customer OTP over the text channel for local OTP flow testing.',
-        event: testEvent(
-          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
-        ),
+        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
     },
     {
@@ -546,9 +326,7 @@ const authenticationCollection = {
         url: '{{base_url}}/{{api_prefix}}/health',
         auth: { type: 'noauth' },
         description: 'Simple liveness check for the API server.',
-        event: testEvent(
-          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
-        ),
+        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
     },
   ],
@@ -560,13 +338,8 @@ const onboardingCollection = {
     description: 'Customer and barber onboarding requests wired for the OTP test users and the local sample upload asset. Run 01-authentication.json first to populate onboarding tokens. Shop schedule fields accept HH:MM or hh:mm AM/PM input and are normalized to 24-hour storage. Upon successful onboarding, access and refresh tokens are captured for the other collections.',
     schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
   },
-  variable: [
-    ...baseVariables(
-      ...accessTokenVariables(),
-      ...onboardingTokenVariables(),
-    ),
-  ],
-  event: collectionPreRequest({ includeOnboardingTokens: true }),
+  variable: [...baseVariables()],
+  event: collectionPreRequest(),
   item: [
     {
       name: '1. Complete Customer Profile',
@@ -588,20 +361,12 @@ const onboardingCollection = {
         description: 'Creates the customer for the OTP-verified customer test user. A rerun returns 409 because onboarding only succeeds once per account.',
         event: testEvent(
           "pm.test('status is 201 or 409', function () { pm.expect(pm.response.code).to.be.oneOf([201, 409]); });",
-          'const response = pm.response.code === 201 ? pm.response.json() : null;',
-          'const data = response && response.data ? response.data : {};',
           "if (pm.response.code === 201) {",
-          "  if (data.accessToken) {",
-          "    pm.collectionVariables.set('customer_access_token', data.accessToken);",
-          "    pm.environment.set('customer_access_token', data.accessToken);",
-          "  }",
-          "  if (data.refreshToken) {",
-          "    pm.collectionVariables.set('customer_refresh_token', data.refreshToken);",
-          "    pm.environment.set('customer_refresh_token', data.refreshToken);",
-          "  }",
-          "  pm.collectionVariables.set('customer_onboarding_token', '');",
-          "  pm.environment.set('customer_onboarding_token', '');",
-          "}",
+          "  const data = pm.response.json().data || {};",
+          "  if (data.accessToken) pm.environment.set('customer_access_token', data.accessToken);",
+          "  if (data.refreshToken) pm.environment.set('customer_refresh_token', data.refreshToken);",
+          "  pm.environment.unset('customer_onboarding_token');",
+          "}"
         ),
       }),
     },
@@ -639,23 +404,14 @@ const onboardingCollection = {
         description: 'Creates the barber shop for the OTP-verified barber test user. Shop schedule values can be sent in HH:MM or hh:mm AM/PM format and are normalized by the backend. The three shop image fields already point to the local sample file.',
         event: testEvent(
           "pm.test('status is 201 or 409', function () { pm.expect(pm.response.code).to.be.oneOf([201, 409]); });",
-          'const response = pm.response.code === 201 ? pm.response.json() : null;',
-          'const data = response && response.data ? response.data : {};',
-          'const shopId = data.shop && data.shop._id;',
-          "if (shopId) { pm.globals.set('shared_shop_id', shopId); }",
           "if (pm.response.code === 201) {",
-          "  if (data.accessToken) {",
-          "    pm.collectionVariables.set('barber_access_token', data.accessToken);",
-          "    pm.environment.set('barber_access_token', data.accessToken);",
-          "  }",
-          "  if (data.refreshToken) {",
-          "    pm.collectionVariables.set('barber_refresh_token', data.refreshToken);",
-          "    pm.environment.set('barber_refresh_token', data.refreshToken);",
-          "  }",
-          "  pm.collectionVariables.set('barber_onboarding_token', '');",
-          "  pm.environment.set('barber_onboarding_token', '');",
+          "  const data = pm.response.json().data || {};",
+          "  if (data.shop && data.shop._id) pm.globals.set('shared_shop_id', data.shop._id);",
+          "  if (data.accessToken) pm.environment.set('barber_access_token', data.accessToken);",
+          "  if (data.refreshToken) pm.environment.set('barber_refresh_token', data.refreshToken);",
+          "  pm.environment.unset('barber_onboarding_token');",
           "  pm.globals.set('shared_barber_pin', '1234');",
-          "}",
+          "}"
         ),
       }),
     },
@@ -672,7 +428,6 @@ const customerCollection = {
   event: collectionPreRequest(),
   variable: [
     ...baseVariables(
-      ...accessTokenVariables(),
       textVariable('coordinates', sharedCoordinates),
       textVariable('shop_id', ''),
       textVariable('service_id', ''),
@@ -722,14 +477,13 @@ const customerCollection = {
         description: 'Uses the shared Bengaluru coordinates so the response includes the barber shop created by onboarding. The script captures the first nearby Postman shop and service IDs.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
-          'const response = pm.response.json();',
-          'const data = response.data || {};',
-          'const shops = Array.isArray(data.shops) ? data.shops : [];',
-          'const services = Array.isArray(data.services) ? data.services : [];',
+          "const data = pm.response.json().data || {};",
+          "const shops = Array.isArray(data.shops) ? data.shops : [];",
+          "const services = Array.isArray(data.services) ? data.services : [];",
           "const preferredShop = shops.find((shop) => typeof shop.shopName === 'string' && shop.shopName.includes('Postman')) || shops[0];",
           "const preferredService = services.find((service) => typeof service.serviceName === 'string' && service.serviceName.includes('Postman')) || services[0];",
           "if (preferredShop && preferredShop._id) { pm.collectionVariables.set('shop_id', preferredShop._id); pm.globals.set('shared_shop_id', preferredShop._id); }",
-          "if (preferredService && preferredService._id) { pm.collectionVariables.set('service_id', preferredService._id); pm.globals.set('shared_service_id', preferredService._id); }",
+          "if (preferredService && preferredService._id) { pm.collectionVariables.set('service_id', preferredService._id); pm.globals.set('shared_service_id', preferredService._id); }"
         ),
       }),
     },
@@ -754,7 +508,6 @@ const customerBookingsCollection = {
   }),
   variable: [
     ...baseVariables(
-      ...accessTokenVariables(),
       textVariable('shop_id', ''),
       textVariable('employee_id', ''),
       textVariable('service_id', ''),
@@ -780,10 +533,10 @@ const customerBookingsCollection = {
         description: 'Lists upcoming bookings and captures the first booking ID and first service ID when they already exist.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
-          'const response = pm.response.json();',
-          'const bookings = Array.isArray(response.data && response.data.items) ? response.data.items : [];',
-          'const firstBooking = bookings[0];',
-          "if (firstBooking && firstBooking._id) { pm.collectionVariables.set('booking_id', firstBooking._id); pm.globals.set('shared_booking_id', firstBooking._id); }",
+          "const response = pm.response.json();",
+          "const bookings = Array.isArray(response.data && response.data.items) ? response.data.items : [];",
+          "const firstBooking = bookings[0];",
+          "if (firstBooking && firstBooking._id) { pm.collectionVariables.set('booking_id', firstBooking._id); pm.globals.set('shared_booking_id', firstBooking._id); }"
         ),
       }),
     },
@@ -802,19 +555,13 @@ const customerBookingsCollection = {
         method: 'POST',
         url: '{{base_url}}/{{api_prefix}}/bookings',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody(`{
-  "serviceId": ["{{service_id}}"],
-  "employeeId": "{{employee_id}}",
-  "shopId": "{{shop_id}}",
-  "date": "{{booking_date}}",
-  "time": "{{booking_time}}"
-}`),
+        body: jsonBody(`{\n  "serviceId": ["{{service_id}}"],\n  "employeeId": "{{employee_id}}",\n  "shopId": "{{shop_id}}",\n  "date": "{{booking_date}}",\n  "time": "{{booking_time}}"\n}`),
         description: 'Creates a new future booking using the shared shop, employee, and service IDs. The body matches the real validator shape.',
         event: testEvent(
           "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
-          'const response = pm.response.json();',
-          'const bookingId = response.data && response.data.bookingId;',
-          "if (bookingId) { pm.collectionVariables.set('booking_id', bookingId); pm.globals.set('shared_booking_id', bookingId); }",
+          "const response = pm.response.json();",
+          "const bookingId = response.data && response.data.bookingId;",
+          "if (bookingId) { pm.collectionVariables.set('booking_id', bookingId); pm.globals.set('shared_booking_id', bookingId); }"
         ),
       }),
     },
@@ -851,11 +598,7 @@ const customerBookingsCollection = {
         method: 'PUT',
         url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id}}',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody(`{
-  "employeeId": "{{employee_id}}",
-  "date": "{{booking_update_date}}",
-  "time": "{{booking_update_time}}"
-}`),
+        body: jsonBody(`{\n  "employeeId": "{{employee_id}}",\n  "date": "{{booking_update_date}}",\n  "time": "{{booking_update_time}}"\n}`),
         description: 'Updates the booking using the real validator shape: all three fields are required. Note: 7-day advance booking window applies.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -866,10 +609,7 @@ const customerBookingsCollection = {
         method: 'PUT',
         url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id}}/reschedule',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody(`{
-  "newDate": "{{booking_reschedule_date}}",
-  "newTime": "{{booking_reschedule_time}}"
-}`),
+        body: jsonBody(`{\n  "newDate": "{{booking_reschedule_date}}",\n  "newTime": "{{booking_reschedule_time}}"\n}`),
         description: 'Reschedules the current booking to a later generated date and time. Limited to once per booking. 7-day advance booking window applies.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -880,16 +620,13 @@ const customerBookingsCollection = {
         method: 'POST',
         url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id}}/reorder',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody(`{
-  "date": "{{booking_reorder_date}}",
-  "time": "{{booking_reorder_time}}"
-}`),
+        body: jsonBody(`{\n  "date": "{{booking_reorder_date}}",\n  "time": "{{booking_reorder_time}}"\n}`),
         description: 'Creates a fresh booking from the current one. The API expects `date` and `time`, not `newDate` and `newTime`. 7-day advance booking window applies.',
         event: testEvent(
           "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
-          'const response = pm.response.json();',
-          'const bookingId = response.data && response.data.bookingId;',
-          "if (bookingId) { pm.collectionVariables.set('reordered_booking_id', bookingId); }",
+          "const response = pm.response.json();",
+          "const bookingId = response.data && response.data.bookingId;",
+          "if (bookingId) { pm.collectionVariables.set('reordered_booking_id', bookingId); }"
         ),
       }),
     },
@@ -922,7 +659,6 @@ const customerShopDiscoveryCollection = {
   }),
   variable: [
     ...baseVariables(
-      ...accessTokenVariables(),
       textVariable('coordinates', sharedCoordinates),
       textVariable('shop_id', ''),
       textVariable('service_id', ''),
@@ -941,10 +677,10 @@ const customerShopDiscoveryCollection = {
         description: 'Finds nearby shops and captures the Postman barber shop ID when it is present.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
-          'const response = pm.response.json();',
-          'const shops = Array.isArray(response.data) ? response.data : [];',
+          "const response = pm.response.json();",
+          "const shops = Array.isArray(response.data) ? response.data : [];",
           "const preferredShop = shops.find((shop) => typeof shop.shopName === 'string' && shop.shopName.includes('Postman')) || shops[0];",
-          "if (preferredShop && preferredShop._id) { pm.collectionVariables.set('shop_id', preferredShop._id); pm.globals.set('shared_shop_id', preferredShop._id); }",
+          "if (preferredShop && preferredShop._id) { pm.collectionVariables.set('shop_id', preferredShop._id); pm.globals.set('shared_shop_id', preferredShop._id); }"
         ),
       }),
     },
@@ -956,14 +692,14 @@ const customerShopDiscoveryCollection = {
         description: 'Returns the full customer-facing shop payload and captures the first Postman service ID from the embedded service lists.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
-          'const response = pm.response.json();',
-          'const data = response.data || {};',
-          'const single = data.services && Array.isArray(data.services.single) ? data.services.single : [];',
-          'const bundled = data.services && Array.isArray(data.services.bundled) ? data.services.bundled : [];',
-          'const services = [...single, ...bundled];',
+          "const response = pm.response.json();",
+          "const data = response.data || {};",
+          "const single = data.services && Array.isArray(data.services.single) ? data.services.single : [];",
+          "const bundled = data.services && Array.isArray(data.services.bundled) ? data.services.bundled : [];",
+          "const services = [...single, ...bundled];",
           "const preferredService = services.find((service) => typeof service.serviceName === 'string' && service.serviceName.includes('Postman')) || services[0];",
           "if (data.shop && data.shop._id) { pm.collectionVariables.set('shop_id', data.shop._id); pm.globals.set('shared_shop_id', data.shop._id); }",
-          "if (preferredService && preferredService._id) { pm.collectionVariables.set('service_id', preferredService._id); pm.globals.set('shared_service_id', preferredService._id); }",
+          "if (preferredService && preferredService._id) { pm.collectionVariables.set('service_id', preferredService._id); pm.globals.set('shared_service_id', preferredService._id); }"
         ),
       }),
     },
@@ -975,11 +711,11 @@ const customerShopDiscoveryCollection = {
         description: 'Returns the list of active employees for the shop and captures the first employee ID.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
-          'const response = pm.response.json();',
-          'const data = response.data || {};',
-          'const employees = Array.isArray(data.employees) ? data.employees : [];',
+          "const response = pm.response.json();",
+          "const data = response.data || {};",
+          "const employees = Array.isArray(data.employees) ? data.employees : [];",
           "const firstEmployee = employees[0];",
-          "if (firstEmployee && firstEmployee.id) { pm.collectionVariables.set('employee_id', firstEmployee.id); pm.globals.set('shared_employee_id', firstEmployee.id); }",
+          "if (firstEmployee && firstEmployee.id) { pm.collectionVariables.set('employee_id', firstEmployee.id); pm.globals.set('shared_employee_id', firstEmployee.id); }"
         ),
       }),
     },
@@ -991,13 +727,13 @@ const customerShopDiscoveryCollection = {
         description: 'Returns available time slots for the employee considering service duration, booked slots, and blocked dates. 7-day advance booking window applies.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
-          'const response = pm.response.json();',
-          'const data = response.data || {};',
+          "const response = pm.response.json();",
+          "const data = response.data || {};",
           "pm.test('response includes slot information', function () {",
           "  pm.expect(data).to.have.property('slots');",
           "  pm.expect(data).to.have.property('totalAvailable');",
           "  pm.expect(data).to.have.property('totalSlots');",
-          "});",
+          "});"
         ),
       }),
     },
@@ -1009,12 +745,12 @@ const customerShopDiscoveryCollection = {
         description: 'Returns availability across all employees for the shop, including first available slot suggestion. 7-day advance booking window applies.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
-          'const response = pm.response.json();',
-          'const data = response.data || {};',
+          "const response = pm.response.json();",
+          "const data = response.data || {};",
           "pm.test('response includes employee availability', function () {",
           "  pm.expect(data).to.have.property('employees');",
           "  pm.expect(data.employees).to.be.an('array');",
-          "});",
+          "});"
         ),
       }),
     },
@@ -1058,7 +794,6 @@ const customerRatingsCollection = {
   event: collectionPreRequest(),
   variable: [
     ...baseVariables(
-      ...accessTokenVariables(),
       textVariable('shop_id', ''),
     ),
   ],
@@ -1071,12 +806,12 @@ const customerRatingsCollection = {
         description: 'Captures a shop ID from the authenticated customer\'s completed past bookings. This request fails the collection clearly when no eligible booking exists for rating.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
-          'const response = pm.response.json();',
-          'const bookings = Array.isArray(response.data && response.data.items) ? response.data.items : [];',
+          "const response = pm.response.json();",
+          "const bookings = Array.isArray(response.data && response.data.items) ? response.data.items : [];",
           "const completedBooking = bookings.find((booking) => booking && booking.status === 'completed' && booking.shopId);",
-          'const shopId = completedBooking && completedBooking.shopId && (completedBooking.shopId._id || completedBooking.shopId);',
+          "const shopId = completedBooking && completedBooking.shopId && (completedBooking.shopId._id || completedBooking.shopId);",
           "pm.test('completed booking exists for rating eligibility', function () { pm.expect(shopId, 'A completed past booking is required before submitting a rating.').to.be.ok; });",
-          "if (shopId) { pm.collectionVariables.set('shop_id', shopId); pm.globals.set('shared_shop_id', shopId); }",
+          "if (shopId) { pm.collectionVariables.set('shop_id', shopId); pm.globals.set('shared_shop_id', shopId); }"
         ),
       }),
     },
@@ -1086,15 +821,9 @@ const customerRatingsCollection = {
         method: 'POST',
         url: '{{base_url}}/{{api_prefix}}/ratings',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody(`{
-  "shopId": "{{shop_id}}",
-  "rating": 5,
-  "review": "Postman collection review for the OTP/JWT customer flow."
-}`),
+        body: jsonBody(`{\n  "shopId": "{{shop_id}}",\n  "rating": 5,\n  "review": "Postman collection review for the OTP/JWT customer flow."\n}`),
         description: 'Creates a new rating for the captured shop from the customer\'s completed booking history. The API allows only one rating per customer per shop, so reruns return 409 instead of 201 after the first success.',
-        event: testEvent(
-          "pm.test('status is 201 or 409', function () { pm.expect(pm.response.code).to.be.oneOf([201, 409]); });",
-        ),
+        event: testEvent("pm.test('status is 201 or 409', function () { pm.expect(pm.response.code).to.be.oneOf([201, 409]); });"),
       }),
     },
     {
@@ -1133,7 +862,6 @@ const barberProfileCollection = {
   }),
   variable: [
     ...baseVariables(
-      ...accessTokenVariables(),
       textVariable('shop_id', ''),
       textVariable('barber_active_pin', '1234'),
       textVariable('barber_next_pin', '5678'),
@@ -1148,9 +876,9 @@ const barberProfileCollection = {
         description: 'Reads the barber profile and stores the current shop ID for the dependent collections.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
-          'const response = pm.response.json();',
-          'const shopId = response.data && response.data._id;',
-          "if (shopId) { pm.collectionVariables.set('shop_id', shopId); pm.globals.set('shared_shop_id', shopId); }",
+          "const response = pm.response.json();",
+          "const shopId = response.data && response.data._id;",
+          "if (shopId) { pm.collectionVariables.set('shop_id', shopId); pm.globals.set('shared_shop_id', shopId); }"
         ),
       }),
     },
@@ -1160,35 +888,7 @@ const barberProfileCollection = {
         method: 'PUT',
         url: '{{base_url}}/{{api_prefix}}/shops/me',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody(`{
-  "email": "test.barber.updated@example.com",
-  "firstName": "Test",
-  "lastName": "Barber",
-  "shopOwner": "Test Barber",
-  "dateOfBirth": "1991-01-12",
-  "gender": "Male",
-  "shopName": "Postman Test Barber Studio",
-  "businessCategory": "Barber",
-  "targetCustomers": "male",
-  "shopLocation": "${barberLocationText}",
-  "location": ${barberLocationGeoJson},
-  "amenities": ["Air Conditioning", "Waiting Area", "Parking Area", "Wi-Fi"],
-  "workingDays": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
-  "workingHours": {
-    "opensAt": "09:00",
-    "closesAt": "20:00"
-  },
-  "breakTimings": [
-    {
-      "startsAt": "13:00",
-      "endsAt": "14:00"
-    }
-  ],
-  "accountHolderName": "Test Barber",
-  "bankName": "HDFC Bank",
-  "upiAddress": "test.barber@upi",
-  "bio": "Updated from the automated Postman profile collection."
-}`),
+        body: jsonBody(`{\n  "email": "test.barber.updated@example.com",\n  "firstName": "Test",\n  "lastName": "Barber",\n  "shopOwner": "Test Barber",\n  "dateOfBirth": "1991-01-12",\n  "gender": "Male",\n  "shopName": "Postman Test Barber Studio",\n  "businessCategory": "Barber",\n  "targetCustomers": "male",\n  "shopLocation": "${barberLocationText}",\n  "location": ${barberLocationGeoJson},\n  "amenities": ["Air Conditioning", "Waiting Area", "Parking Area", "Wi-Fi"],\n  "workingDays": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],\n  "workingHours": {\n    "opensAt": "09:00",\n    "closesAt": "20:00"\n  },\n  "breakTimings": [\n    {\n      "startsAt": "13:00",\n      "endsAt": "14:00"\n    }\n  ],\n  "accountHolderName": "Test Barber",\n  "bankName": "HDFC Bank",\n  "upiAddress": "test.barber@upi",\n  "bio": "Updated from the automated Postman profile collection."\n}`),
         description: 'Updates the barber profile using the onboarding-friendly request shape that the backend validators actually accept.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -1208,11 +908,7 @@ const barberProfileCollection = {
         method: 'PUT',
         url: '{{base_url}}/{{api_prefix}}/shops/me/upi',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody(`{
-  "accountHolderName": "Test Barber",
-  "bankName": "HDFC Bank",
-  "upiAddress": "test.barber+verified@upi"
-}`),
+        body: jsonBody(`{\n  "accountHolderName": "Test Barber",\n  "bankName": "HDFC Bank",\n  "upiAddress": "test.barber+verified@upi"\n}`),
         description: 'Updates only the dedicated payment fields.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -1223,9 +919,7 @@ const barberProfileCollection = {
         method: 'PUT',
         url: '{{base_url}}/{{api_prefix}}/shops/me/status',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody(`{
-  "status": true
-}`),
+        body: jsonBody(`{\n  "status": true\n}`),
         description: 'Explicitly opens the shop so customer discovery and bookings can run immediately after this collection.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -1256,25 +950,21 @@ const barberProfileCollection = {
         method: 'PUT',
         url: '{{base_url}}/{{api_prefix}}/shops/me/pin',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody(`{
-  "currentPin": "{{barber_active_pin}}",
-  "newPin": "{{barber_next_pin}}",
-  "confirmNewPin": "{{barber_next_pin}}"
-}`),
+        body: jsonBody(`{\n  "currentPin": "{{barber_active_pin}}",\n  "newPin": "{{barber_next_pin}}",\n  "confirmNewPin": "{{barber_next_pin}}"\n}`),
         description: 'Flips the barber PIN between 1234 and 5678 so the request stays rerunnable.',
-        event: [
-          ...preRequestEvent(
+        event: mergedEvents(
+          [
             "const currentPin = pm.collectionVariables.get('barber_active_pin') || '1234';",
             "const nextPin = currentPin === '1234' ? '5678' : '1234';",
-            "pm.collectionVariables.set('barber_next_pin', nextPin);",
-          ),
-          ...testEvent(
+            "pm.collectionVariables.set('barber_next_pin', nextPin);"
+          ],
+          [
             "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
             "const nextPin = pm.collectionVariables.get('barber_next_pin');",
             "pm.collectionVariables.set('barber_active_pin', nextPin);",
-            "pm.globals.set('shared_barber_pin', nextPin);",
-          ),
-        ],
+            "pm.globals.set('shared_barber_pin', nextPin);"
+          ]
+        ),
       }),
     },
     {
@@ -1292,9 +982,7 @@ const barberProfileCollection = {
         method: 'DELETE',
         url: '{{base_url}}/{{api_prefix}}/shops/me',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody(`{
-  "currentPin": "{{barber_active_pin}}"
-}`),
+        body: jsonBody(`{\n  "currentPin": "{{barber_active_pin}}"\n}`),
         description: 'Soft-deletes the barber account and revokes the JWT refresh token. Run this instead of the sign-out request when you want the account deleted.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -1314,7 +1002,6 @@ const barberEmployeesCollection = {
   }),
   variable: [
     ...baseVariables(
-      ...accessTokenVariables(),
       textVariable('employee_id', ''),
       textVariable('employee_phone', ''),
     ),
@@ -1328,10 +1015,10 @@ const barberEmployeesCollection = {
         description: 'Lists current employees and captures the first Postman employee ID when it already exists.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
-          'const response = pm.response.json();',
-          'const employees = Array.isArray(response.data && response.data.items) ? response.data.items : [];',
+          "const response = pm.response.json();",
+          "const employees = Array.isArray(response.data && response.data.items) ? response.data.items : [];",
           "const preferredEmployee = employees.find((employee) => typeof employee.firstName === 'string' && employee.firstName.includes('Postman')) || employees[0];",
-          "if (preferredEmployee && preferredEmployee._id) { pm.collectionVariables.set('employee_id', preferredEmployee._id); pm.globals.set('shared_employee_id', preferredEmployee._id); }",
+          "if (preferredEmployee && preferredEmployee._id) { pm.collectionVariables.set('employee_id', preferredEmployee._id); pm.globals.set('shared_employee_id', preferredEmployee._id); }"
         ),
       }),
     },
@@ -1350,18 +1037,18 @@ const barberEmployeesCollection = {
           fileField('photo', 'Attach employee photo file manually in Postman (optional)'),
         ]),
         description: 'Creates a new employee with a generated phone number so the request stays rerunnable. Employee working hours remain HH:MM 24-hour values even when the shop was originally created with AM/PM schedule input.',
-        event: [
-          ...preRequestEvent(
+        event: mergedEvents(
+          [
             "const suffix = Date.now().toString().slice(-7);",
-            "pm.collectionVariables.set('employee_phone', `+1555${suffix}`);",
-          ),
-          ...testEvent(
+            "pm.collectionVariables.set('employee_phone', `+1555${suffix}`);"
+          ],
+          [
             "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
-            'const response = pm.response.json();',
-            'const employeeId = response.data && response.data._id;',
-            "if (employeeId) { pm.collectionVariables.set('employee_id', employeeId); pm.globals.set('shared_employee_id', employeeId); }",
-          ),
-        ],
+            "const response = pm.response.json();",
+            "const employeeId = response.data && response.data._id;",
+            "if (employeeId) { pm.collectionVariables.set('employee_id', employeeId); pm.globals.set('shared_employee_id', employeeId); }"
+          ]
+        ),
       }),
     },
     {
@@ -1389,7 +1076,7 @@ const barberEmployeesCollection = {
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           "pm.collectionVariables.unset('employee_id');",
-          "pm.globals.unset('shared_employee_id');",
+          "pm.globals.unset('shared_employee_id');"
         ),
       }),
     },
@@ -1408,7 +1095,6 @@ const barberServicesCollection = {
   }),
   variable: [
     ...baseVariables(
-      ...accessTokenVariables(),
       textVariable('service_id', ''),
       textVariable('single_service_name', ''),
       textVariable('bundled_service_name', ''),
@@ -1423,10 +1109,10 @@ const barberServicesCollection = {
         description: 'Lists current services and captures the first Postman service ID when it already exists.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
-          'const response = pm.response.json();',
-          'const services = Array.isArray(response.data && response.data.items) ? response.data.items : [];',
+          "const response = pm.response.json();",
+          "const services = Array.isArray(response.data && response.data.items) ? response.data.items : [];",
           "const preferredService = services.find((service) => typeof service.serviceName === 'string' && service.serviceName.includes('Postman')) || services[0];",
-          "if (preferredService && preferredService._id) { pm.collectionVariables.set('service_id', preferredService._id); pm.globals.set('shared_service_id', preferredService._id); }",
+          "if (preferredService && preferredService._id) { pm.collectionVariables.set('service_id', preferredService._id); pm.globals.set('shared_service_id', preferredService._id); }"
         ),
       }),
     },
@@ -1436,26 +1122,17 @@ const barberServicesCollection = {
         method: 'POST',
         url: '{{base_url}}/{{api_prefix}}/services',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody(`{
-  "serviceName": "{{single_service_name}}",
-  "serviceType": "single",
-  "serviceFor": "male",
-  "duration": 30,
-  "actualPrice": 500,
-  "offerPrice": 50
-}`),
+        body: jsonBody(`{\n  "serviceName": "{{single_service_name}}",\n  "serviceType": "single",\n  "serviceFor": "male",\n  "duration": 30,\n  "actualPrice": 500,\n  "offerPrice": 50\n}`),
         description: 'Creates a single service using only fields that the API validator accepts.',
-        event: [
-          ...preRequestEvent(
-            "pm.collectionVariables.set('single_service_name', `Postman Express Cut ${Date.now().toString().slice(-6)}`);",
-          ),
-          ...testEvent(
+        event: mergedEvents(
+          ["pm.collectionVariables.set('single_service_name', `Postman Express Cut ${Date.now().toString().slice(-6)}`);"],
+          [
             "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
-            'const response = pm.response.json();',
-            'const serviceId = response.data && response.data._id;',
-            "if (serviceId) { pm.collectionVariables.set('service_id', serviceId); pm.globals.set('shared_service_id', serviceId); }",
-          ),
-        ],
+            "const response = pm.response.json();",
+            "const serviceId = response.data && response.data._id;",
+            "if (serviceId) { pm.collectionVariables.set('service_id', serviceId); pm.globals.set('shared_service_id', serviceId); }"
+          ]
+        ),
       }),
     },
     {
@@ -1464,22 +1141,12 @@ const barberServicesCollection = {
         method: 'POST',
         url: '{{base_url}}/{{api_prefix}}/services',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody(`{
-  "serviceName": "{{bundled_service_name}}",
-  "serviceType": "bundled",
-  "serviceFor": "male",
-  "actualPrice": 900,
-  "offerPrice": 100,
-  "bundledServices": ["Haircut", "Beard Trim", "Head Massage"],
-  "totalDuration": 75
-}`),
+        body: jsonBody(`{\n  "serviceName": "{{bundled_service_name}}",\n  "serviceType": "bundled",\n  "serviceFor": "male",\n  "actualPrice": 900,\n  "offerPrice": 100,\n  "bundledServices": ["Haircut", "Beard Trim", "Head Massage"],\n  "totalDuration": 75\n}`),
         description: 'Creates a bundled service using the fields required by the backend validator.',
-        event: [
-          ...preRequestEvent(
-            "pm.collectionVariables.set('bundled_service_name', `Postman Grooming Combo ${Date.now().toString().slice(-6)}`);",
-          ),
-          ...testEvent("pm.test('status is 201', function () { pm.response.to.have.status(201); });"),
-        ],
+        event: mergedEvents(
+          ["pm.collectionVariables.set('bundled_service_name', `Postman Grooming Combo ${Date.now().toString().slice(-6)}`);"],
+          ["pm.test('status is 201', function () { pm.response.to.have.status(201); });"]
+        ),
       }),
     },
     {
@@ -1488,9 +1155,7 @@ const barberServicesCollection = {
         method: 'PUT',
         url: '{{base_url}}/{{api_prefix}}/services/{{service_id}}',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody(`{
-  "serviceFor": "unisex"
-}`),
+        body: jsonBody(`{\n  "serviceFor": "unisex"\n}`),
         description: 'Updates the captured service with a validator-approved field.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -1504,7 +1169,7 @@ const barberServicesCollection = {
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           "pm.collectionVariables.unset('service_id');",
-          "pm.globals.unset('shared_service_id');",
+          "pm.globals.unset('shared_service_id');"
         ),
       }),
     },
@@ -1526,7 +1191,6 @@ const barberBookingsCollection = {
   }),
   variable: [
     ...baseVariables(
-      ...accessTokenVariables(),
       textVariable('booking_id_status', ''),
       textVariable('booking_id_delete', ''),
     ),
@@ -1540,15 +1204,15 @@ const barberBookingsCollection = {
         description: 'Reads the barber booking dashboard payload and captures one ID for status updates plus one paid booking ID for the cancellation route when available.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
-          'const response = pm.response.json();',
-          'const data = response.data || {};',
-          'const bookings = Array.isArray(data.items) ? data.items : [];',
+          "const response = pm.response.json();",
+          "const data = response.data || {};",
+          "const bookings = Array.isArray(data.items) ? data.items : [];",
           "const statusBooking = bookings.find((booking) => ['pending', 'confirmed'].includes(booking.status)) || bookings[0];",
           "const deleteBooking = bookings.find((booking) => booking.paymentStatus === 'success') || statusBooking;",
           "const statusBookingId = statusBooking && (statusBooking._id || statusBooking.bookingId);",
           "const deleteBookingId = deleteBooking && (deleteBooking._id || deleteBooking.bookingId);",
           "if (statusBookingId) { pm.collectionVariables.set('booking_id_status', statusBookingId); pm.globals.set('shared_booking_id', statusBookingId); }",
-          "if (deleteBookingId) { pm.collectionVariables.set('booking_id_delete', deleteBookingId); }",
+          "if (deleteBookingId) { pm.collectionVariables.set('booking_id_delete', deleteBookingId); }"
         ),
       }),
     },
@@ -1603,9 +1267,7 @@ const barberBookingsCollection = {
         method: 'PUT',
         url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id_status}}/status',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody(`{
-  "status": "completed"
-}`),
+        body: jsonBody(`{\n  "status": "completed"\n}`),
         description: 'Updates the captured booking status. Use `booking_id_status`, not the delete-only booking ID.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -1618,7 +1280,7 @@ const barberBookingsCollection = {
         description: 'Cancels a paid booking only when the booking is still awaiting confirmation.',
         event: testEvent(
           "pm.test('status is 200 or 400', function () { pm.expect(pm.response.code).to.be.oneOf([200, 400]); });",
-          "if (pm.response.code === 200) { pm.collectionVariables.unset('booking_id_delete'); }",
+          "if (pm.response.code === 200) { pm.collectionVariables.unset('booking_id_delete'); }"
         ),
       }),
     },
@@ -1637,7 +1299,6 @@ const barberPhotosCollection = {
   }),
   variable: [
     ...baseVariables(
-      ...accessTokenVariables(),
       textVariable('photo_id', ''),
     ),
   ],
@@ -1650,10 +1311,10 @@ const barberPhotosCollection = {
         description: 'Lists the current gallery and captures the first photo ID. Barber onboarding already creates three gallery photos.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
-          'const response = pm.response.json();',
-          'const photos = Array.isArray(response.data && response.data.items) ? response.data.items : [];',
-          'const firstPhoto = photos[0];',
-          "if (firstPhoto && firstPhoto._id) { pm.collectionVariables.set('photo_id', firstPhoto._id); pm.globals.set('shared_photo_id', firstPhoto._id); }",
+          "const response = pm.response.json();",
+          "const photos = Array.isArray(response.data && response.data.items) ? response.data.items : [];",
+          "const firstPhoto = photos[0];",
+          "if (firstPhoto && firstPhoto._id) { pm.collectionVariables.set('photo_id', firstPhoto._id); pm.globals.set('shared_photo_id', firstPhoto._id); }"
         ),
       }),
     },
@@ -1670,10 +1331,10 @@ const barberPhotosCollection = {
         description: 'Uploads one gallery image using the local sample file and captures the new photo ID.',
         event: testEvent(
           "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
-          'const response = pm.response.json();',
-          'const photos = Array.isArray(response.data) ? response.data : [];',
-          'const firstPhoto = photos[0];',
-          "if (firstPhoto && firstPhoto._id) { pm.collectionVariables.set('photo_id', firstPhoto._id); pm.globals.set('shared_photo_id', firstPhoto._id); }",
+          "const response = pm.response.json();",
+          "const photos = Array.isArray(response.data) ? response.data : [];",
+          "const firstPhoto = photos[0];",
+          "if (firstPhoto && firstPhoto._id) { pm.collectionVariables.set('photo_id', firstPhoto._id); pm.globals.set('shared_photo_id', firstPhoto._id); }"
         ),
       }),
     },
@@ -1704,7 +1365,7 @@ const barberPhotosCollection = {
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           "pm.collectionVariables.unset('photo_id');",
-          "pm.globals.unset('shared_photo_id');",
+          "pm.globals.unset('shared_photo_id');"
         ),
       }),
     },
@@ -1719,11 +1380,7 @@ const barberEarningsCollection = {
   },
   auth: bearerAuth('barber_access_token'),
   event: collectionPreRequest(),
-  variable: [
-    ...baseVariables(
-      ...accessTokenVariables(),
-    ),
-  ],
+  variable: [...baseVariables()],
   item: [
     {
       name: '1. Get Earnings',
@@ -1747,7 +1404,6 @@ const barberRatingsCollection = {
   event: collectionPreRequest(),
   variable: [
     ...baseVariables(
-      ...accessTokenVariables(),
       textVariable('rating_id_add_reply', ''),
       textVariable('rating_id_update_reply', ''),
       textVariable('rating_id_remove_rating', ''),
@@ -1762,19 +1418,19 @@ const barberRatingsCollection = {
         description: 'Run this first. It captures the three seeded rating IDs created by `node scripts/seed-barber-rating-mock-data.js`.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
-          'const response = pm.response.json();',
-          'const ratings = Array.isArray(response.data && response.data.items) ? response.data.items : [];',
-          'const capture = (variableName, marker) => {',
+          "const response = pm.response.json();",
+          "const ratings = Array.isArray(response.data && response.data.items) ? response.data.items : [];",
+          "const capture = (variableName, marker) => {",
           "  const match = ratings.find((item) => typeof item.review === 'string' && item.review.includes(marker));",
-          '  const ratingId = match && (match.ratingId || match._id);',
+          "  const ratingId = match && (match.ratingId || match._id);",
           "  if (ratingId) { pm.collectionVariables.set(variableName, ratingId); }",
-          '};',
+          "};",
           "capture('rating_id_add_reply', '[ADD_REPLY_TARGET]');",
           "capture('rating_id_update_reply', '[UPDATE_REPLY_TARGET]');",
           "capture('rating_id_remove_rating', '[REMOVE_RATING_TARGET]');",
           "if (!pm.collectionVariables.get('rating_id_add_reply') || !pm.collectionVariables.get('rating_id_update_reply') || !pm.collectionVariables.get('rating_id_remove_rating')) {",
           "  console.warn('Seeded rating markers were not found. Run `node scripts/seed-barber-rating-mock-data.js` before using this collection.');",
-          "}",
+          "}"
         ),
       }),
     },
@@ -1793,13 +1449,9 @@ const barberRatingsCollection = {
         method: 'POST',
         url: '{{base_url}}/{{api_prefix}}/ratings/{{rating_id_add_reply}}/reply',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody(`{
-  "replyText": "Thanks for the feedback. We appreciate your visit."
-}`),
+        body: jsonBody(`{\n  "replyText": "Thanks for the feedback. We appreciate your visit."\n}`),
         description: 'Adds a reply to the seeded rating that has no reply yet. Reruns return 409 once the reply already exists.',
-        event: testEvent(
-          "pm.test('status is 200 or 409', function () { pm.expect(pm.response.code).to.be.oneOf([200, 409]); });",
-        ),
+        event: testEvent("pm.test('status is 200 or 409', function () { pm.expect(pm.response.code).to.be.oneOf([200, 409]); });"),
       }),
     },
     {
@@ -1808,9 +1460,7 @@ const barberRatingsCollection = {
         method: 'PUT',
         url: '{{base_url}}/{{api_prefix}}/ratings/{{rating_id_update_reply}}/reply',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody(`{
-  "replyText": "Updated reply from Postman for the seeded barber rating flow."
-}`),
+        body: jsonBody(`{\n  "replyText": "Updated reply from Postman for the seeded barber rating flow."\n}`),
         description: 'Updates the seeded reply on the dedicated rating fixture.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -1858,17 +1508,18 @@ const paymentsPayoutsCollection = {
       ['cashfree_webhook_secret', 'cashfree_webhook_secret'],
     ],
     extra: [
-      "// Ensure payment_booking_id is set from shared_booking_id or booking_id",
-      "const bookingId = readScopedValue('shared_booking_id', 'booking_id', 'payment_booking_id');",
-      "if (bookingId) {",
-      "  pm.collectionVariables.set('payment_booking_id', bookingId);",
-      "  pm.environment.set('payment_booking_id', bookingId);",
-      "}",
+      "// Ensure payment_booking_id is synced ONLY if it hasn't been set manually.",
+      "const currentPaymentBookingId = pm.collectionVariables.get('payment_booking_id');",
+      "if (!currentPaymentBookingId) {",
+      "  const bookingId = pm.globals.get('shared_booking_id') || pm.globals.get('booking_id');",
+      "  if (bookingId) {",
+      "    pm.collectionVariables.set('payment_booking_id', bookingId);",
+      "  }",
+      "}"
     ],
   }),
   variable: [
     ...baseVariables(
-      ...accessTokenVariables(),
       textVariable('admin_access_token', '', 'Required for payout retry. Use a JWT for a user whose role is ADMIN.'),
       textVariable('payment_booking_id', '', 'Booking ID for payment - auto-synced from shared_booking_id or booking_id'),
       textVariable('payment_id', '', 'Auto-captured from payment initiation'),
@@ -1890,9 +1541,7 @@ const paymentsPayoutsCollection = {
         url: '{{base_url}}/{{api_prefix}}/payments',
         auth: bearerAuth('customer_access_token'),
         headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody(`{
-  "bookingId": "{{payment_booking_id}}"
-}`),
+        body: jsonBody(`{\n  "bookingId": "{{payment_booking_id}}"\n}`),
         description: 'Creates a PhonePe native SDK checkout order for the authenticated customer\'s pending booking. The response returns orderId, token, merchantId, merchantOrderId, and paymentId for the Flutter PhonePe SDK. No redirect URL is returned.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
@@ -1907,11 +1556,9 @@ const paymentsPayoutsCollection = {
           "  pm.expect(response.data).to.not.have.property('redirectUrl');",
           "  pm.collectionVariables.set('payment_id', response.data.paymentId);",
           "  pm.collectionVariables.set('merchant_order_id', response.data.merchantOrderId);",
-          "  pm.environment.set('payment_id', response.data.paymentId);",
-          "  pm.environment.set('merchant_order_id', response.data.merchantOrderId);",
           "  pm.globals.set('payment_id', response.data.paymentId);",
           "  pm.globals.set('merchant_order_id', response.data.merchantOrderId);",
-          "});",
+          "});"
         ),
       }),
     },
@@ -1932,11 +1579,7 @@ const paymentsPayoutsCollection = {
         url: '{{base_url}}/{{api_prefix}}/payments/{{payment_id}}/verify',
         auth: bearerAuth('customer_access_token'),
         headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody(`{
-  "sdkStatus": "SUCCESS",
-  "sdkResponseCode": "SDK_CALLBACK",
-  "sdkMessage": "Flutter SDK callback received"
-}`),
+        body: jsonBody(`{\n  "sdkStatus": "SUCCESS",\n  "sdkResponseCode": "SDK_CALLBACK",\n  "sdkMessage": "Flutter SDK callback received"\n}`),
         description: 'Verifies the PhonePe SDK callback with the backend. The SDK callback is informational only; this endpoint calls PhonePe Order Status and returns the authoritative state.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
@@ -1946,7 +1589,7 @@ const paymentsPayoutsCollection = {
           "  pm.expect(response.data).to.have.property('status');",
           "  pm.expect(response.data).to.have.property('gatewayState');",
           "  pm.expect(response.data).to.have.property('paymentStatus');",
-          "});",
+          "});"
         ),
       }),
     },
@@ -1963,14 +1606,12 @@ const paymentsPayoutsCollection = {
           "const data = response.data || {};",
           "if (data._id) {",
           "  pm.collectionVariables.set('payment_id', data._id);",
-          "  pm.environment.set('payment_id', data._id);",
           "  pm.globals.set('payment_id', data._id);",
           "}",
           "if (data.merchantOrderId) {",
           "  pm.collectionVariables.set('merchant_order_id', data.merchantOrderId);",
-          "  pm.environment.set('merchant_order_id', data.merchantOrderId);",
           "  pm.globals.set('merchant_order_id', data.merchantOrderId);",
-          "}",
+          "}"
         ),
       }),
     },
@@ -1981,9 +1622,7 @@ const paymentsPayoutsCollection = {
         url: '{{base_url}}/{{api_prefix}}/bookings/{{payment_booking_id}}/refund',
         auth: bearerAuth('barber_access_token'),
         headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody(`{
-  "reason": "Customer cancelled before payout batch"
-}`),
+        body: jsonBody(`{\n  "reason": "Customer cancelled before payout batch"\n}`),
         description: 'Initiates a refund for a completed payment when payout has not started. Allowed roles: BARBER or ADMIN.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
@@ -1992,15 +1631,13 @@ const paymentsPayoutsCollection = {
           "  pm.expect(response.success).to.equal(true);",
           "  if (response.data?.merchantRefundId) {",
           "    pm.collectionVariables.set('merchant_refund_id', response.data.merchantRefundId);",
-          "    pm.environment.set('merchant_refund_id', response.data.merchantRefundId);",
           "    pm.globals.set('merchant_refund_id', response.data.merchantRefundId);",
           "  }",
           "  if (response.data?.refundId) {",
           "    pm.collectionVariables.set('refund_id', response.data.refundId);",
-          "    pm.environment.set('refund_id', response.data.refundId);",
           "    pm.globals.set('refund_id', response.data.refundId);",
           "  }",
-          "});",
+          "});"
         ),
       }),
     },
@@ -2017,10 +1654,9 @@ const paymentsPayoutsCollection = {
           "  const response = pm.response.json();",
           "  if (response.data?._id) {",
           "    pm.collectionVariables.set('payout_id', response.data._id);",
-          "    pm.environment.set('payout_id', response.data._id);",
           "    pm.globals.set('payout_id', response.data._id);",
           "  }",
-          "});",
+          "});"
         ),
       }),
     },
@@ -2034,23 +1670,7 @@ const paymentsPayoutsCollection = {
           { key: 'Content-Type', value: 'application/json' },
           { key: 'Authorization', value: '{{phonepe_webhook_authorization}}' },
         ],
-        body: jsonBody(`{
-  "event": "checkout.order.completed",
-  "payload": {
-    "merchantOrderId": "{{merchant_order_id}}",
-    "orderId": "PO{{$timestamp}}",
-    "state": "COMPLETED",
-    "amount": 30300,
-    "paymentDetails": [
-      {
-        "paymentMode": "UPI",
-        "transactionId": "TXN{{$timestamp}}",
-        "amount": 30300,
-        "state": "COMPLETED"
-      }
-    ]
-  }
-}`),
+        body: jsonBody(`{\n  "event": "checkout.order.completed",\n  "payload": {\n    "merchantOrderId": "{{merchant_order_id}}",\n    "orderId": "PO{{$timestamp}}",\n    "state": "COMPLETED",\n    "amount": 30300,\n    "paymentDetails": [\n      {\n        "paymentMode": "UPI",\n        "transactionId": "TXN{{$timestamp}}",\n        "amount": 30300,\n        "state": "COMPLETED"\n      }\n    ]\n  }\n}`),
         description: 'Simulates a PhonePe payment success webhook. The pre-request script computes the SHA256 signature using webhook credentials from environment variables. Backend verifies signature, then calls PhonePe Order Status API for double verification.',
         event: mergedEvents(
           [
@@ -2059,7 +1679,7 @@ const paymentsPayoutsCollection = {
             "const password = pm.collectionVariables.get('phonepe_webhook_password') || pm.environment.get('phonepe_webhook_password') || 'test-phonepe-webhook-password';",
             "const authString = username + ':' + password;",
             "const authSignature = CryptoJS.SHA256(authString).toString(CryptoJS.enc.Hex);",
-            "pm.collectionVariables.set('phonepe_webhook_authorization', authSignature);",
+            "pm.collectionVariables.set('phonepe_webhook_authorization', authSignature);"
           ],
           [
             "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
@@ -2067,7 +1687,7 @@ const paymentsPayoutsCollection = {
             "  const response = pm.response.json();",
             "  pm.expect(response).to.have.property('received');",
             "  pm.expect(response.received).to.equal(true);",
-            "});",
+            "});"
           ]
         ),
       }),
@@ -2082,23 +1702,7 @@ const paymentsPayoutsCollection = {
           { key: 'Content-Type', value: 'application/json' },
           { key: 'Authorization', value: '{{phonepe_webhook_authorization}}' },
         ],
-        body: jsonBody(`{
-  "event": "checkout.order.failed",
-  "payload": {
-    "merchantOrderId": "{{merchant_order_id}}",
-    "orderId": "PO{{$timestamp}}",
-    "state": "FAILED",
-    "amount": 30300,
-    "paymentDetails": [
-      {
-        "paymentMode": "UPI",
-        "state": "FAILED",
-        "errorCode": "PAYMENT_DECLINED",
-        "detailedErrorCode": "INSUFFICIENT_FUNDS"
-      }
-    ]
-  }
-}`),
+        body: jsonBody(`{\n  "event": "checkout.order.failed",\n  "payload": {\n    "merchantOrderId": "{{merchant_order_id}}",\n    "orderId": "PO{{$timestamp}}",\n    "state": "FAILED",\n    "amount": 30300,\n    "paymentDetails": [\n      {\n        "paymentMode": "UPI",\n        "state": "FAILED",\n        "errorCode": "PAYMENT_DECLINED",\n        "detailedErrorCode": "INSUFFICIENT_FUNDS"\n      }\n    ]\n  }\n}`),
         description: 'Simulates a PhonePe payment failure webhook. Use this to test payment failure handling and booking cancellation logic.',
         event: mergedEvents(
           [
@@ -2107,7 +1711,7 @@ const paymentsPayoutsCollection = {
             "const password = pm.collectionVariables.get('phonepe_webhook_password') || pm.environment.get('phonepe_webhook_password') || 'test-phonepe-webhook-password';",
             "const authString = username + ':' + password;",
             "const authSignature = CryptoJS.SHA256(authString).toString(CryptoJS.enc.Hex);",
-            "pm.collectionVariables.set('phonepe_webhook_authorization', authSignature);",
+            "pm.collectionVariables.set('phonepe_webhook_authorization', authSignature);"
           ],
           [
             "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
@@ -2115,7 +1719,7 @@ const paymentsPayoutsCollection = {
             "  const response = pm.response.json();",
             "  pm.expect(response).to.have.property('received');",
             "  pm.expect(response.received).to.equal(true);",
-            "});",
+            "});"
           ]
         ),
       }),
@@ -2130,16 +1734,7 @@ const paymentsPayoutsCollection = {
           { key: 'Content-Type', value: 'application/json' },
           { key: 'Authorization', value: '{{phonepe_webhook_authorization}}' },
         ],
-        body: jsonBody(`{
-  "event": "pg.refund.completed",
-  "payload": {
-    "merchantRefundId": "{{merchant_refund_id}}",
-    "refundId": "{{refund_id}}",
-    "originalMerchantOrderId": "{{merchant_order_id}}",
-    "state": "COMPLETED",
-    "amount": 29000
-  }
-}`),
+        body: jsonBody(`{\n  "event": "pg.refund.completed",\n  "payload": {\n    "merchantRefundId": "{{merchant_refund_id}}",\n    "refundId": "{{refund_id}}",\n    "originalMerchantOrderId": "{{merchant_order_id}}",\n    "state": "COMPLETED",\n    "amount": 29000\n  }\n}`),
         description: 'Simulates a PhonePe refund completion webhook. Use this after initiating a refund to test refund success handling.',
         event: mergedEvents(
           [
@@ -2148,7 +1743,7 @@ const paymentsPayoutsCollection = {
             "const password = pm.collectionVariables.get('phonepe_webhook_password') || pm.environment.get('phonepe_webhook_password') || 'test-phonepe-webhook-password';",
             "const authString = username + ':' + password;",
             "const authSignature = CryptoJS.SHA256(authString).toString(CryptoJS.enc.Hex);",
-            "pm.collectionVariables.set('phonepe_webhook_authorization', authSignature);",
+            "pm.collectionVariables.set('phonepe_webhook_authorization', authSignature);"
           ],
           [
             "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
@@ -2156,7 +1751,7 @@ const paymentsPayoutsCollection = {
             "  const response = pm.response.json();",
             "  pm.expect(response).to.have.property('received');",
             "  pm.expect(response.received).to.equal(true);",
-            "});",
+            "});"
           ]
         ),
       }),
@@ -2172,21 +1767,7 @@ const paymentsPayoutsCollection = {
           { key: 'x-webhook-timestamp', value: '{{cashfree_webhook_timestamp}}' },
           { key: 'x-webhook-signature', value: '{{cashfree_webhook_signature}}' },
         ],
-        body: jsonBody(`{
-  "event": "TRANSFER_SUCCESS",
-  "data": {
-    "transfer": {
-      "transfer_id": "{{payout_transfer_id}}",
-      "cf_transfer_id": "CF{{$timestamp}}",
-      "status": "SUCCESS",
-      "transfer_utr": "UTR{{$timestamp}}",
-      "transfer_amount": 450,
-      "transfer_mode": "upi",
-      "acknowledged": 1,
-      "processed_on": "{{$isoTimestamp}}"
-    }
-  }
-}`),
+        body: jsonBody(`{\n  "event": "TRANSFER_SUCCESS",\n  "data": {\n    "transfer": {\n      "transfer_id": "{{payout_transfer_id}}",\n      "cf_transfer_id": "CF{{$timestamp}}",\n      "status": "SUCCESS",\n      "transfer_utr": "UTR{{$timestamp}}",\n      "transfer_amount": 450,\n      "transfer_mode": "upi",\n      "acknowledged": 1,\n      "processed_on": "{{$isoTimestamp}}"\n    }\n  }\n}`),
         description: 'Simulates a Cashfree payout success webhook. The pre-request script computes the HMAC-SHA256 signature using timestamp + body + secret. Backend verifies signature, then updates payout and booking status.',
         event: mergedEvents(
           [
@@ -2219,7 +1800,7 @@ const paymentsPayoutsCollection = {
             "// Compute HMAC signature: HMAC-SHA256(timestamp + rawBody, secret)",
             "const signaturePayload = timestamp + rawBody;",
             "const signature = CryptoJS.HmacSHA256(signaturePayload, secret).toString(CryptoJS.enc.Base64);",
-            "pm.collectionVariables.set('cashfree_webhook_signature', signature);",
+            "pm.collectionVariables.set('cashfree_webhook_signature', signature);"
           ],
           [
             "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
@@ -2227,7 +1808,7 @@ const paymentsPayoutsCollection = {
             "  const response = pm.response.json();",
             "  pm.expect(response).to.have.property('received');",
             "  pm.expect(response.received).to.equal(true);",
-            "});",
+            "});"
           ]
         ),
       }),
@@ -2243,20 +1824,7 @@ const paymentsPayoutsCollection = {
           { key: 'x-webhook-timestamp', value: '{{cashfree_webhook_timestamp}}' },
           { key: 'x-webhook-signature', value: '{{cashfree_webhook_signature}}' },
         ],
-        body: jsonBody(`{
-  "event": "TRANSFER_FAILED",
-  "data": {
-    "transfer": {
-      "transfer_id": "{{payout_transfer_id}}",
-      "cf_transfer_id": "CF{{$timestamp}}",
-      "status": "FAILED",
-      "failure_reason": "INVALID_VPA",
-      "transfer_amount": 450,
-      "transfer_mode": "upi",
-      "acknowledged": 1
-    }
-  }
-}`),
+        body: jsonBody(`{\n  "event": "TRANSFER_FAILED",\n  "data": {\n    "transfer": {\n      "transfer_id": "{{payout_transfer_id}}",\n      "cf_transfer_id": "CF{{$timestamp}}",\n      "status": "FAILED",\n      "failure_reason": "INVALID_VPA",\n      "transfer_amount": 450,\n      "transfer_mode": "upi",\n      "acknowledged": 1\n    }\n  }\n}`),
         description: 'Simulates a Cashfree payout failure webhook. Use this to test payout failure handling and retry logic.',
         event: mergedEvents(
           [
@@ -2285,7 +1853,7 @@ const paymentsPayoutsCollection = {
             "",
             "const signaturePayload = timestamp + rawBody;",
             "const signature = CryptoJS.HmacSHA256(signaturePayload, secret).toString(CryptoJS.enc.Base64);",
-            "pm.collectionVariables.set('cashfree_webhook_signature', signature);",
+            "pm.collectionVariables.set('cashfree_webhook_signature', signature);"
           ],
           [
             "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
@@ -2293,7 +1861,7 @@ const paymentsPayoutsCollection = {
             "  const response = pm.response.json();",
             "  pm.expect(response).to.have.property('received');",
             "  pm.expect(response.received).to.equal(true);",
-            "});",
+            "});"
           ]
         ),
       }),
@@ -2305,116 +1873,21 @@ const environmentTemplate = {
   id: 'evercut-local-environment',
   name: 'EverCut Local',
   values: [
-    {
-      key: 'base_url',
-      value: 'http://localhost:5000',
-      enabled: true,
-    },
-    {
-      key: 'api_prefix',
-      value: 'api/v1',
-      enabled: true,
-    },
-    {
-      key: 'test_customer_mobile',
-      value: '9876543210',
-      enabled: true,
-    },
-    {
-      key: 'test_barber_mobile',
-      value: '9876543211',
-      enabled: true,
-    },
-    {
-      key: 'test_otp',
-      value: '123456',
-      enabled: true,
-    },
-    {
-      key: 'customer_access_token',
-      value: '',
-      enabled: true,
-    },
-    {
-      key: 'customer_refresh_token',
-      value: '',
-      enabled: true,
-    },
-    {
-      key: 'customer_onboarding_token',
-      value: '',
-      enabled: true,
-    },
-    {
-      key: 'barber_access_token',
-      value: '',
-      enabled: true,
-    },
-    {
-      key: 'barber_refresh_token',
-      value: '',
-      enabled: true,
-    },
-    {
-      key: 'barber_onboarding_token',
-      value: '',
-      enabled: true,
-    },
-    {
-      key: 'admin_access_token',
-      value: '',
-      enabled: true,
-    },
-    {
-      key: 'payment_booking_id',
-      value: '',
-      enabled: true,
-    },
-    {
-      key: 'payment_id',
-      value: '',
-      enabled: true,
-    },
-    {
-      key: 'merchant_order_id',
-      value: '',
-      enabled: true,
-    },
-    {
-      key: 'merchant_refund_id',
-      value: '',
-      enabled: true,
-    },
-    {
-      key: 'refund_id',
-      value: '',
-      enabled: true,
-    },
-    {
-      key: 'payout_id',
-      value: '',
-      enabled: true,
-    },
-    {
-      key: 'payout_transfer_id',
-      value: '',
-      enabled: true,
-    },
-    {
-      key: 'phonepe_webhook_username',
-      value: 'test-phonepe-webhook-user',
-      enabled: true,
-    },
-    {
-      key: 'phonepe_webhook_password',
-      value: 'test-phonepe-webhook-password',
-      enabled: true,
-    },
-    {
-      key: 'cashfree_webhook_secret',
-      value: 'test-cashfree-client-secret',
-      enabled: true,
-    },
+    { key: 'base_url', value: 'http://localhost:5000', enabled: true },
+    { key: 'api_prefix', value: 'api/v1', enabled: true },
+    { key: 'test_customer_mobile', value: '9876543210', enabled: true },
+    { key: 'test_barber_mobile', value: '9876543211', enabled: true },
+    { key: 'test_otp', value: '123456', enabled: true },
+    { key: 'customer_access_token', value: '', enabled: true },
+    { key: 'customer_refresh_token', value: '', enabled: true },
+    { key: 'customer_onboarding_token', value: '', enabled: true },
+    { key: 'barber_access_token', value: '', enabled: true },
+    { key: 'barber_refresh_token', value: '', enabled: true },
+    { key: 'barber_onboarding_token', value: '', enabled: true },
+    { key: 'admin_access_token', value: '', enabled: true },
+    { key: 'phonepe_webhook_username', value: 'test-phonepe-webhook-user', enabled: true },
+    { key: 'phonepe_webhook_password', value: 'test-phonepe-webhook-password', enabled: true },
+    { key: 'cashfree_webhook_secret', value: 'test-cashfree-client-secret', enabled: true },
   ],
   _postman_variable_scope: 'environment',
   _postman_exported_at: new Date().toISOString(),

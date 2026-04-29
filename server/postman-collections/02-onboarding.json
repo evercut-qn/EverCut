@@ -16,30 +16,6 @@
       "value": "api/v1",
       "type": "string",
       "description": "API prefix used by every request"
-    },
-    {
-      "key": "customer_access_token",
-      "value": "",
-      "type": "string",
-      "description": "JWT access token - auto-set by 01-authentication.json for returning users or by 02-onboarding.json after first-time signup"
-    },
-    {
-      "key": "barber_access_token",
-      "value": "",
-      "type": "string",
-      "description": "JWT access token - auto-set by 01-authentication.json for returning users or by 02-onboarding.json after first-time signup"
-    },
-    {
-      "key": "customer_onboarding_token",
-      "value": "",
-      "type": "string",
-      "description": "Short-lived onboarding JWT - auto-set by 01-authentication.json when a new customer is detected"
-    },
-    {
-      "key": "barber_onboarding_token",
-      "value": "",
-      "type": "string",
-      "description": "Short-lived onboarding JWT - auto-set by 01-authentication.json when a new barber is detected"
     }
   ],
   "event": [
@@ -47,33 +23,7 @@
       "listen": "prerequest",
       "script": {
         "type": "text/javascript",
-        "exec": [
-          "const readScopedValue = (...keys) => {",
-          "  for (const key of keys) {",
-          "    const environmentValue = pm.environment.get(key);",
-          "    if (environmentValue) return environmentValue;",
-          "    const globalValue = pm.globals.get(key);",
-          "    if (globalValue) return globalValue;",
-          "  }",
-          "  return '';",
-          "};",
-          "const syncScopedValue = (sourceKey, collectionKey = sourceKey) => {",
-          "  const scopedValue = readScopedValue(sourceKey);",
-          "  if (scopedValue) {",
-          "    pm.collectionVariables.set(collectionKey, scopedValue);",
-          "  }",
-          "};",
-          "syncScopedValue('base_url');",
-          "syncScopedValue('api_prefix');",
-          "const customerToken = readScopedValue('customer_access_token');",
-          "if (customerToken) { pm.collectionVariables.set('customer_access_token', customerToken); }",
-          "const barberToken = readScopedValue('barber_access_token');",
-          "if (barberToken) { pm.collectionVariables.set('barber_access_token', barberToken); }",
-          "const customerOnboardingToken = readScopedValue('customer_onboarding_token');",
-          "if (customerOnboardingToken) { pm.collectionVariables.set('customer_onboarding_token', customerOnboardingToken); }",
-          "const barberOnboardingToken = readScopedValue('barber_onboarding_token');",
-          "if (barberOnboardingToken) { pm.collectionVariables.set('barber_onboarding_token', barberOnboardingToken); }"
-        ]
+        "exec": []
       }
     }
   ],
@@ -163,19 +113,11 @@
               "  pm.expect(response).to.have.property('data');",
               "});",
               "pm.test('status is 201 or 409', function () { pm.expect(pm.response.code).to.be.oneOf([201, 409]); });",
-              "const response = pm.response.code === 201 ? pm.response.json() : null;",
-              "const data = response && response.data ? response.data : {};",
               "if (pm.response.code === 201) {",
-              "  if (data.accessToken) {",
-              "    pm.collectionVariables.set('customer_access_token', data.accessToken);",
-              "    pm.environment.set('customer_access_token', data.accessToken);",
-              "  }",
-              "  if (data.refreshToken) {",
-              "    pm.collectionVariables.set('customer_refresh_token', data.refreshToken);",
-              "    pm.environment.set('customer_refresh_token', data.refreshToken);",
-              "  }",
-              "  pm.collectionVariables.set('customer_onboarding_token', '');",
-              "  pm.environment.set('customer_onboarding_token', '');",
+              "  const data = pm.response.json().data || {};",
+              "  if (data.accessToken) pm.environment.set('customer_access_token', data.accessToken);",
+              "  if (data.refreshToken) pm.environment.set('customer_refresh_token', data.refreshToken);",
+              "  pm.environment.unset('customer_onboarding_token');",
               "}"
             ]
           }
@@ -337,21 +279,12 @@
               "  pm.expect(response).to.have.property('data');",
               "});",
               "pm.test('status is 201 or 409', function () { pm.expect(pm.response.code).to.be.oneOf([201, 409]); });",
-              "const response = pm.response.code === 201 ? pm.response.json() : null;",
-              "const data = response && response.data ? response.data : {};",
-              "const shopId = data.shop && data.shop._id;",
-              "if (shopId) { pm.globals.set('shared_shop_id', shopId); }",
               "if (pm.response.code === 201) {",
-              "  if (data.accessToken) {",
-              "    pm.collectionVariables.set('barber_access_token', data.accessToken);",
-              "    pm.environment.set('barber_access_token', data.accessToken);",
-              "  }",
-              "  if (data.refreshToken) {",
-              "    pm.collectionVariables.set('barber_refresh_token', data.refreshToken);",
-              "    pm.environment.set('barber_refresh_token', data.refreshToken);",
-              "  }",
-              "  pm.collectionVariables.set('barber_onboarding_token', '');",
-              "  pm.environment.set('barber_onboarding_token', '');",
+              "  const data = pm.response.json().data || {};",
+              "  if (data.shop && data.shop._id) pm.globals.set('shared_shop_id', data.shop._id);",
+              "  if (data.accessToken) pm.environment.set('barber_access_token', data.accessToken);",
+              "  if (data.refreshToken) pm.environment.set('barber_refresh_token', data.refreshToken);",
+              "  pm.environment.unset('barber_onboarding_token');",
               "  pm.globals.set('shared_barber_pin', '1234');",
               "}"
             ]
