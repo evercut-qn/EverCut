@@ -727,6 +727,23 @@ async function handlePaymentSuccess(webhookData) {
         return { processed: true, event: PHONEPE_WEBHOOK_EVENTS.ORDER_COMPLETED };
     }
 
+    // CRITICAL: Only mark as completed if PhonePe confirms the payment is COMPLETED
+    if (webhookData.state !== 'COMPLETED') {
+        logger.warn('[PaymentService] Webhook claims success but gatewayState is not COMPLETED', {
+            merchantOrderId: webhookData.merchantOrderId,
+            gatewayState: webhookData.state,
+            webhookEvent: webhookData.event,
+        });
+        
+        // Update gatewayState but keep payment pending
+        await paymentRepository.updateById(payment._id, {
+            gatewayState: webhookData.state,
+            webhookReceivedAt: new Date(),
+        });
+        
+        return { processed: true, event: PHONEPE_WEBHOOK_EVENTS.ORDER_COMPLETED };
+    }
+
     if (hasPaymentAmountMismatch(payment, webhookData)) {
         await rejectPaymentAmountMismatch(payment, webhookData);
         return { processed: true, event: PHONEPE_WEBHOOK_EVENTS.ORDER_COMPLETED };
