@@ -907,7 +907,7 @@ Cashfree Payouts V2 uses a **direct header-based authentication** model. Unlike 
 
 | Environment | Base URL |
 |---|---|
-| **Sandbox (Test)** | `https://sandbox.cashfree.com/payout` |
+| **Sandbox** | `https://sandbox.cashfree.com/payout` |
 | **Production** | `https://api.cashfree.com/payout` |
 
 ### 11.4 Key Capabilities
@@ -941,7 +941,7 @@ Step 4: Provide business details:
 Step 5: Submit KYC documents (see Section 12.2)
 Step 6: Aadhaar-based OTP or DigiLocker verification
 Step 7: Bank account linking (Cashfree sends ₹1 penny drop for verification)
-Step 8: Account activated for TEST environment (~24 working hours)
+Step 8: Account activated for SANDBOX environment (~24 working hours)
 Step 9: Activate Payouts product separately:
   - Navigate to Dashboard → Products → Payouts → Activate
   - Payouts has a separate virtual wallet and separate API credentials
@@ -1557,7 +1557,7 @@ stateDiagram-v2
 ├── # ─── Cashfree Payouts ───
 ├── CASHFREE_PAYOUT_CLIENT_ID=<payout_client_id>
 ├── CASHFREE_PAYOUT_CLIENT_SECRET=<payout_client_secret>
-├── CASHFREE_PAYOUT_ENV=TEST|PRODUCTION
+├── CASHFREE_PAYOUT_ENV=SANDBOX|PRODUCTION
 ├── # ─── Payment Settings ───
 ├── PAYMENT_REDIRECT_BASE_URL=https://api.evercut.in/api/v1/payments/redirect
 └── PLATFORM_COMMISSION_PERCENT=15

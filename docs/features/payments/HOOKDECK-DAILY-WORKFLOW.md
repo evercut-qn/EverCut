@@ -540,7 +540,7 @@ Forwarding → http://localhost:5000/api/v1/payouts/webhook
 
 #### 1. Login to Cashfree
 
-- **TEST Mode**: https://sandbox.cashfree.com
+- **Sandbox Mode**: https://sandbox.cashfree.com
 - **Production**: https://merchant.cashfree.com
 
 #### 2. Navigate to Webhooks

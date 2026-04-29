@@ -266,7 +266,7 @@ PHONEPE_WEBHOOK_PASSWORD=securePass123
 # ─── Cashfree Payouts ───
 CASHFREE_PAYOUT_CLIENT_ID=your_cashfree_payout_client_id
 CASHFREE_PAYOUT_CLIENT_SECRET=your_cashfree_payout_client_secret
-CASHFREE_PAYOUT_ENV=TEST
+CASHFREE_PAYOUT_ENV=SANDBOX
 
 # ─── Payment Settings ───
 PAYMENT_REDIRECT_BASE_URL=https://api.evercut.in/api/v1/payments/redirect
@@ -297,8 +297,8 @@ phonepe: Object.freeze({
 cashfree: Object.freeze({
     payoutClientId: requireEnv('CASHFREE_PAYOUT_CLIENT_ID'),
     payoutClientSecret: requireEnv('CASHFREE_PAYOUT_CLIENT_SECRET'),
-    payoutEnv: optionalEnv('CASHFREE_PAYOUT_ENV', 'TEST'),
-    payoutBaseUrl: optionalEnv('CASHFREE_PAYOUT_ENV', 'TEST') === 'PRODUCTION'
+    payoutEnv: optionalEnv('CASHFREE_PAYOUT_ENV', 'SANDBOX'),
+    payoutBaseUrl: optionalEnv('CASHFREE_PAYOUT_ENV', 'SANDBOX') === 'PRODUCTION'
         ? 'https://api.cashfree.com/payout'
         : 'https://sandbox.cashfree.com/payout',
     payoutApiVersion: '2025-01-01',

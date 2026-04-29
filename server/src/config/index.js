@@ -131,8 +131,8 @@ const config = Object.freeze({
   cashfree: Object.freeze({
     payoutClientId: providerEnv('CASHFREE_PAYOUT_CLIENT_ID', 'test-cashfree-client-id'),
     payoutClientSecret: providerEnv('CASHFREE_PAYOUT_CLIENT_SECRET', 'test-cashfree-client-secret'),
-    payoutEnv: optionalEnv('CASHFREE_PAYOUT_ENV', 'TEST'),
-    payoutBaseUrl: optionalEnv('CASHFREE_PAYOUT_ENV', 'TEST') === 'PRODUCTION'
+    payoutEnv: optionalEnv('CASHFREE_PAYOUT_ENV', 'SANDBOX'),
+    payoutBaseUrl: optionalEnv('CASHFREE_PAYOUT_ENV', 'SANDBOX') === 'PRODUCTION'
       ? 'https://api.cashfree.com/payout'
       : 'https://sandbox.cashfree.com/payout',
     payoutApiVersion: '2024-01-01',

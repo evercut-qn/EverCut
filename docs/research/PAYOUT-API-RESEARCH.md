@@ -502,7 +502,7 @@ Step 3: Provide business details:
   - Website URL (or app description if no website)
 Step 4: Submit KYC documents (see Section 6.2)
 Step 5: Bank account linking (Cashfree sends ₹1 penny drop for verification)
-Step 6: Account activated for TEST environment
+Step 6: Account activated for SANDBOX environment
 Step 7: Activate Payouts product separately:
   - Navigate to Dashboard → Products → Payouts → Activate
   - Payouts has a separate virtual wallet and separate API credentials
@@ -559,7 +559,7 @@ After account activation:
 # ─── Cashfree Payouts ───────────────────────────────────────────
 CASHFREE_PAYOUT_CLIENT_ID=CF_PAYOUT_CLIENT_ID_HERE
 CASHFREE_PAYOUT_CLIENT_SECRET=CF_PAYOUT_SECRET_HERE
-CASHFREE_PAYOUT_ENV=TEST           # TEST or PRODUCTION
+CASHFREE_PAYOUT_ENV=SANDBOX           # SANDBOX or PRODUCTION
 
 # ─── PhonePe PG (existing) ──────────────────────────────────────
 PHONEPE_CLIENT_ID=your_phonepe_client_id
@@ -573,7 +573,7 @@ PHONEPE_ENV=SANDBOX
 
 | Environment | Base URL |
 |-------------|---------|
-| **Sandbox (TEST)** | `https://sandbox.cashfree.com/payout` |
+| **Sandbox** | `https://sandbox.cashfree.com/payout` |
 | **Production** | `https://payout-api.cashfree.com` |
 
 **Sandbox testing flow:**

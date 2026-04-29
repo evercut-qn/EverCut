@@ -962,7 +962,7 @@ async function showFinalSummary(payoutResult) {
         console.log('  3. Verify booking payout status changes to "completed"\n');
         
         console.log('Cashfree Dashboard:');
-        console.log(`  - TEST: https://sandbox.cashfree.com/merchant/payouts`);
+        console.log(`  - SANDBOX: https://sandbox.cashfree.com/merchant/payouts`);
         console.log(`  - PROD: https://merchant.cashfree.com/merchant/payouts\n`);
         
         console.log('Monitor webhooks:');

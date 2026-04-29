@@ -64,7 +64,7 @@ npm run dev
 Server running on port 5000
 MongoDB connected
 PhonePe adapter initialized (SANDBOX mode)
-Cashfree adapter initialized (TEST mode)
+Cashfree adapter initialized (SANDBOX mode)
 ```
 
 ---
