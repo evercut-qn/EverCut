@@ -38,6 +38,16 @@ const customerRepository = (await import('../../repositories/customer.repository
 const serviceRepository = (await import('../../repositories/service.repository.js')).default;
 const bookingService = await import('../booking.service.js');
 
+const getInWindowBookingDate = (daysFromNow = 1) => {
+    const date = new Date();
+    date.setDate(date.getDate() + daysFromNow);
+    return [
+        date.getFullYear(),
+        String(date.getMonth() + 1).padStart(2, '0'),
+        String(date.getDate()).padStart(2, '0'),
+    ].join('-');
+};
+
 test('getBookingsByShop loads bookings by shopId so deleted employees do not disappear from history', async (t) => {
     t.mock.method(shopRepository, 'findByOwnerId', async () => ({ _id: 'shop-1' }));
 
@@ -226,17 +236,18 @@ test('bookSalon creates a pending booking that requires payment before confirmat
         };
     });
 
+    const bookingDate = getInWindowBookingDate();
     const result = await bookingService.bookSalon('user-1', {
         shopId: 'shop-1',
         employeeId: 'employee-1',
         serviceId: 'service-1',
-        date: '2099-01-01',
+        date: bookingDate,
         time: '10:00 AM',
     });
 
     assert.deepEqual(capturedClaim, {
         employeeId: 'employee-1',
-        date: '2099-01-01',
+        date: bookingDate,
         times: ['10:00'],
         options: { shopId: 'shop-1' },
     });
@@ -246,7 +257,7 @@ test('bookSalon creates a pending booking that requires payment before confirmat
         serviceIds: ['service-1'],
         employeeId: 'employee-1',
         shopId: 'shop-1',
-        date: '2099-01-01',
+        date: bookingDate,
         time: '10:00',
         totalAmount: 120,
         durationMinutes: 30,
@@ -305,11 +316,12 @@ test('bookSalon claims every slot marker covered by the selected service duratio
         ...payload,
     }));
 
+    const bookingDate = getInWindowBookingDate();
     await bookingService.bookSalon('user-1', {
         shopId: 'shop-1',
         employeeId: 'employee-1',
         serviceId: 'service-1',
-        date: '2099-01-01',
+        date: bookingDate,
         time: '10:00',
     });
 
@@ -382,7 +394,7 @@ test('bookSalon rejects bundle bookings below the documented minimum service amo
             shopId: 'shop-1',
             employeeId: 'employee-1',
             serviceId: 'bundle-1',
-            date: '2099-01-02',
+            date: getInWindowBookingDate(),
             time: '10:00 AM',
         }),
         /at least ₹300/,

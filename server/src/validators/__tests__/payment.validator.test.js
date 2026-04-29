@@ -6,6 +6,7 @@ import {
     initiatePaymentSchema,
     paymentIdParamSchema,
     refundSchema,
+    verifyPaymentSchema,
 } from '../payment.validator.js';
 
 test('initiatePaymentSchema accepts a valid booking id payload', () => {
@@ -44,4 +45,27 @@ test('refundSchema rejects reasons that are too short', () => {
     });
 
     assert.match(error?.message || '', /at least 3 characters/);
+});
+
+test('verifyPaymentSchema accepts PhonePe SDK callback context without trusting it as final', () => {
+    const { error, value } = verifyPaymentSchema.validate({
+        sdkStatus: 'INTERRUPTED',
+        sdkResponseCode: 'USER_CANCEL',
+        sdkMessage: 'User returned from native SDK',
+    });
+
+    assert.equal(error, undefined);
+    assert.deepEqual(value, {
+        sdkStatus: 'INTERRUPTED',
+        sdkResponseCode: 'USER_CANCEL',
+        sdkMessage: 'User returned from native SDK',
+    });
+});
+
+test('verifyPaymentSchema rejects unknown SDK statuses', () => {
+    const { error } = verifyPaymentSchema.validate({
+        sdkStatus: 'TRUST_ME_BRO',
+    });
+
+    assert.match(error?.message || '', /must be one of/);
 });

@@ -7,13 +7,13 @@ import * as paymentController from '../controllers/payment.controller.js';
 import {
     initiatePaymentSchema,
     paymentIdParamSchema,
+    verifyPaymentSchema,
 } from '../validators/payment.validator.js';
 import { ROLES } from '../utils/constants.js';
 
 const router = Router();
 
 router.post('/webhook', paymentController.handleWebhook);
-router.get('/redirect', paymentController.handleRedirect);
 
 router.post(
     '/',
@@ -21,6 +21,15 @@ router.post(
     authorize(ROLES.CUSTOMER),
     validate(initiatePaymentSchema, 'body'),
     paymentController.initiatePayment,
+);
+
+router.post(
+    '/:id/verify',
+    authenticate,
+    authorize(ROLES.CUSTOMER),
+    validate(paymentIdParamSchema, 'params'),
+    validate(verifyPaymentSchema, 'body'),
+    paymentController.verifyPayment,
 );
 
 router.get(

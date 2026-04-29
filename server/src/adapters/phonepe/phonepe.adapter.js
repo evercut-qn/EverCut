@@ -25,19 +25,19 @@ class PhonePeAdapter extends PaymentGatewayAdapter {
         return 'phonepe';
     }
 
-    async createOrder({ merchantOrderId, amount, redirectUrl, message, metadata }) {
+    async createOrder({ merchantOrderId, amount, metadata, paymentModeConfig = null }) {
         const requestBody = {
             merchantOrderId,
             amount,
             expireAfter: config.payment.sessionExpirySeconds,
             paymentFlow: {
                 type: 'PG_CHECKOUT',
-                message: message || 'Payment for EverCut salon booking',
-                merchantUrls: {
-                    redirectUrl,
-                },
             },
         };
+
+        if (paymentModeConfig) {
+            requestBody.paymentFlow.paymentModeConfig = paymentModeConfig;
+        }
 
         if (metadata) {
             const metaEntries = Object.entries(metadata).slice(0, 15);
@@ -48,9 +48,13 @@ class PhonePeAdapter extends PaymentGatewayAdapter {
             }
         }
 
-        const data = await this._makeRequest('POST', PHONEPE_ENDPOINTS.CREATE_PAYMENT, requestBody);
+        const data = await this._makeRequest('POST', PHONEPE_ENDPOINTS.CREATE_SDK_ORDER, requestBody);
 
-        logger.info('[PhonePeAdapter] Order created', {
+        if (!data.token) {
+            throw new PaymentError('PhonePe SDK order token was not returned');
+        }
+
+        logger.info('[PhonePeAdapter] Native SDK order created', {
             merchantOrderId,
             gatewayOrderId: data.orderId,
             state: data.state,
@@ -58,14 +62,14 @@ class PhonePeAdapter extends PaymentGatewayAdapter {
 
         return {
             orderId: data.orderId,
-            redirectUrl: data.redirectUrl,
+            token: data.token,
             state: data.state,
             expiresAt: data.expireAt || data.expire_at || null,
         };
     }
 
     async getOrderStatus(merchantOrderId) {
-        const endpoint = `${PHONEPE_ENDPOINTS.ORDER_STATUS(merchantOrderId)}?details=true`;
+        const endpoint = `${PHONEPE_ENDPOINTS.ORDER_STATUS(merchantOrderId)}?details=true&errorContext=true`;
         const data = await this._makeRequest('GET', endpoint);
 
         return {

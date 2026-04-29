@@ -34,9 +34,199 @@ ensureRequiredEnv();
 const paymentService = await import('../payment.service.js');
 const paymentRepository = (await import('../../repositories/payment.repository.js')).default;
 const bookingRepository = (await import('../../repositories/booking.repository.js')).default;
+const customerRepository = (await import('../../repositories/customer.repository.js')).default;
 const employeeRepository = (await import('../../repositories/employee.repository.js')).default;
+const serviceRepository = (await import('../../repositories/service.repository.js')).default;
 const shopRepository = (await import('../../repositories/shop.repository.js')).default;
 const phonePeAdapter = (await import('../../adapters/phonepe/phonepe.adapter.js')).default;
+
+test('initiatePayment creates a native PhonePe SDK order and never returns a redirect URL', async (t) => {
+    t.mock.method(customerRepository, 'findByUserId', async () => ({ _id: 'customer-1' }));
+    t.mock.method(bookingRepository, 'findById', async () => ({
+        _id: 'booking-1',
+        customerId: 'customer-1',
+        shopId: 'shop-1',
+        serviceIds: ['service-1'],
+        status: 'pending',
+        paymentStatus: 'pending',
+        totalAmount: 120,
+    }));
+    t.mock.method(paymentRepository, 'findPendingByBookingId', async () => null);
+    t.mock.method(serviceRepository, 'findByIds', async () => ([
+        {
+            _id: 'service-1',
+            serviceType: 'single',
+            finalPrice: 120,
+            duration: 30,
+        },
+    ]));
+
+    let createdPayment = null;
+    t.mock.method(paymentRepository, 'create', async (payload) => {
+        createdPayment = payload;
+        return {
+            _id: 'payment-1',
+            ...payload,
+        };
+    });
+
+    let gatewayArgs = null;
+    t.mock.method(phonePeAdapter, 'createOrder', async (args) => {
+        gatewayArgs = args;
+        return {
+            orderId: 'OMO-native-1',
+            token: 'sdk-order-token',
+            state: 'PENDING',
+            expiresAt: 1777037869000,
+        };
+    });
+
+    const paymentUpdates = [];
+    t.mock.method(paymentRepository, 'updateById', async (id, updates) => {
+        paymentUpdates.push({ id, updates });
+        return { _id: id, ...updates };
+    });
+
+    let bookingUpdate = null;
+    t.mock.method(bookingRepository, 'updateById', async (id, updates) => {
+        bookingUpdate = { id, updates };
+        return { _id: id, ...updates };
+    });
+
+    const result = await paymentService.initiatePayment('user-1', 'booking-1');
+
+    assert.equal(result.redirectUrl, undefined);
+    assert.equal(result.paymentId, 'payment-1');
+    assert.equal(result.bookingId, 'booking-1');
+    assert.equal(result.orderId, 'OMO-native-1');
+    assert.equal(result.token, 'sdk-order-token');
+    assert.equal(result.merchantId, 'merchant-id');
+    assert.equal(result.gateway, 'phonepe');
+    assert.equal(result.amountInPaisa, 12300);
+    assert.equal(result.amountInRupees, 123);
+    assert.equal(result.state, 'PENDING');
+    assert.equal(result.expiresAt, 1777037869000);
+    assert.match(result.merchantOrderId, /^EC-booking-1-/);
+
+    assert.equal(gatewayArgs.redirectUrl, undefined);
+    assert.equal(gatewayArgs.amount, 12300);
+    assert.equal(gatewayArgs.metadata.bookingId, 'booking-1');
+
+    assert.equal(createdPayment.amount, 12300);
+    assert.equal(paymentUpdates[0].id, 'payment-1');
+    assert.equal(paymentUpdates[0].updates.gatewayOrderId, 'OMO-native-1');
+    assert.equal(paymentUpdates[0].updates.sdkOrderTokenIssued, true);
+    assert.equal(paymentUpdates[0].updates.redirectUrl, undefined);
+    assert.deepEqual(bookingUpdate, {
+        id: 'booking-1',
+        updates: {
+            paymentTransactionId: 'payment-1',
+            merchantOrderId: result.merchantOrderId,
+            paymentStatus: 'initiated',
+            paymentGateway: 'phonepe',
+        },
+    });
+});
+
+test('initiatePayment reuses an unexpired pending native SDK order without exposing redirect URLs', async (t) => {
+    t.mock.method(customerRepository, 'findByUserId', async () => ({ _id: 'customer-1' }));
+    t.mock.method(bookingRepository, 'findById', async () => ({
+        _id: 'booking-1',
+        customerId: 'customer-1',
+        shopId: 'shop-1',
+        serviceIds: ['service-1'],
+        status: 'pending',
+        paymentStatus: 'initiated',
+        totalAmount: 120,
+    }));
+    t.mock.method(paymentRepository, 'findPendingByBookingId', async () => ({
+        _id: 'payment-1',
+        bookingId: 'booking-1',
+        merchantOrderId: 'EC-booking-1-reuse',
+        gatewayOrderId: 'OMO-native-1',
+        amount: 12300,
+        amountInRupees: 123,
+        gatewayState: 'PENDING',
+        expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+    }));
+
+    const gatewayMock = t.mock.method(phonePeAdapter, 'createOrder', async () => {
+        throw new Error('should not create a duplicate native order');
+    });
+
+    const result = await paymentService.initiatePayment('user-1', 'booking-1');
+
+    assert.equal(result.redirectUrl, undefined);
+    assert.equal(result.token, null);
+    assert.equal(result.reusable, true);
+    assert.equal(result.orderId, 'OMO-native-1');
+    assert.equal(result.paymentId, 'payment-1');
+    assert.equal(result.merchantOrderId, 'EC-booking-1-reuse');
+    assert.equal(gatewayMock.mock.calls.length, 0);
+});
+
+test('verifyPayment confirms native SDK results through PhonePe order status before returning success', async (t) => {
+    let currentPayment = {
+        _id: 'payment-1',
+        bookingId: 'booking-1',
+        customerId: 'customer-1',
+        merchantOrderId: 'EC-booking-1',
+        status: 'pending',
+        amount: 12300,
+        amountInRupees: 123,
+    };
+
+    t.mock.method(paymentRepository, 'findById', async () => currentPayment);
+    t.mock.method(paymentRepository, 'findByMerchantOrderId', async () => currentPayment);
+    t.mock.method(customerRepository, 'findByUserId', async () => ({ _id: 'customer-1' }));
+    t.mock.method(phonePeAdapter, 'getOrderStatus', async (merchantOrderId) => ({
+        orderId: 'OMO-native-1',
+        merchantOrderId,
+        state: 'COMPLETED',
+        amount: 12300,
+        paymentDetails: [{
+            paymentMode: 'UPI_INTENT',
+            transactionId: 'TXN-native-1',
+            amount: 12300,
+            state: 'COMPLETED',
+        }],
+    }));
+
+    const paymentUpdates = [];
+    t.mock.method(paymentRepository, 'updateById', async (id, updates) => {
+        paymentUpdates.push({ id, updates });
+        currentPayment = { ...currentPayment, ...updates };
+        return { _id: id, ...currentPayment };
+    });
+
+    const bookingUpdates = [];
+    let currentBooking = {
+        _id: 'booking-1',
+        status: 'pending',
+        paymentStatus: 'initiated',
+    };
+    t.mock.method(bookingRepository, 'findById', async () => currentBooking);
+    t.mock.method(bookingRepository, 'updateById', async (id, updates) => {
+        bookingUpdates.push({ id, updates });
+        currentBooking = { ...currentBooking, ...updates };
+        return { _id: id, ...currentBooking };
+    });
+
+    const result = await paymentService.verifyPayment('user-1', 'payment-1', {
+        sdkStatus: 'SUCCESS',
+    });
+
+    assert.equal(result.status, 'completed');
+    assert.equal(result.gatewayState, 'COMPLETED');
+    assert.equal(result.bookingStatus, 'awaiting_confirmation');
+    assert.equal(result.paymentStatus, 'success');
+    assert.equal(result.sdkStatus, 'SUCCESS');
+    assert.equal(result.orderId, 'OMO-native-1');
+    assert.equal(result.transactionId, 'TXN-native-1');
+    assert.equal(paymentUpdates[0].updates.status, 'completed');
+    assert.equal(bookingUpdates[0].updates.status, 'awaiting_confirmation');
+    assert.equal(bookingUpdates[0].updates.paymentStatus, 'success');
+});
 
 test('initiateRefund deducts the refund fee and non-refundable platform fee before calling PhonePe', async (t) => {
     t.mock.method(paymentRepository, 'findCompletedByBookingId', async () => ({

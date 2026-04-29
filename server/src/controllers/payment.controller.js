@@ -45,20 +45,22 @@ export const getPaymentStatus = async (req, res, next) => {
     }
 };
 
-export const getPaymentByBooking = async (req, res, next) => {
+export const verifyPayment = async (req, res, next) => {
     try {
         const { id } = getValidatedRequestData(req, 'params');
-        const result = await paymentService.getPaymentByBooking(req.user._id, id);
-        return res.status(200).json(ApiResponse.success(result, 'Payment details'));
+        const verificationContext = getValidatedRequestData(req, 'body');
+        const result = await paymentService.verifyPayment(req.user._id, id, verificationContext);
+        return res.status(200).json(ApiResponse.success(result, 'Payment verified'));
     } catch (error) {
         next(error);
     }
 };
 
-export const handleRedirect = async (req, res, next) => {
+export const getPaymentByBooking = async (req, res, next) => {
     try {
-        const bookingId = req.query.bookingId || '';
-        return res.redirect(`evercut://payment-result?bookingId=${encodeURIComponent(bookingId)}`);
+        const { id } = getValidatedRequestData(req, 'params');
+        const result = await paymentService.getPaymentByBooking(req.user._id, id);
+        return res.status(200).json(ApiResponse.success(result, 'Payment details'));
     } catch (error) {
         next(error);
     }

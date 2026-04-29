@@ -26,3 +26,12 @@ export const refundSchema = Joi.object({
         'any.required': 'Refund reason is required',
     }),
 });
+
+export const verifyPaymentSchema = Joi.object({
+    sdkStatus: Joi.string()
+        .trim()
+        .valid('SUCCESS', 'FAILURE', 'INTERRUPTED', 'UNKNOWN')
+        .optional(),
+    sdkResponseCode: Joi.string().trim().max(100).allow('', null).optional(),
+    sdkMessage: Joi.string().trim().max(500).allow('', null).optional(),
+}).unknown(false);

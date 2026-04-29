@@ -37,7 +37,7 @@ Validation and field-level failures are returned inside `data.errors`.
 | `11-barber-photos.json` | EverCut - Barber Photos | Shop gallery: upload, list, stats, delete |
 | `12-barber-earnings.json` | EverCut - Barber Earnings | Earnings summary (requires completed bookings for non-zero values) |
 | `13-barber-ratings.json` | EverCut - Barber Ratings | Rating listing, summary, reply management, and rating removal |
-| `14-payments-payouts.json` | EverCut - Payments & Payouts | PhonePe payment initiation/status/refund requests, Cashfree payout retry, and webhook simulation |
+| `14-payments-payouts.json` | EverCut - Payments & Payouts | Native PhonePe SDK payment initiation/verification/status/refund requests and Cashfree payout retry |
 | `EverCut.postman_environment.json` | — | Active environment with OTP/JWT variables for local testing |
 | `assets/sample-upload.png` | — | Sample image pre-wired into file-upload requests |
 
@@ -192,17 +192,12 @@ Employee `workingHours.start` and `workingHours.end` remain `HH:MM` 24-hour valu
 
 | # | Method | Endpoint | Description |
 |---|---|---|---|
-| 1 | POST | `/api/v1/payments` | Initiate PhonePe payment for a pending customer booking |
+| 1 | POST | `/api/v1/payments` | Create native PhonePe SDK order for a pending customer booking |
 | 2 | GET | `/api/v1/payments/{{payment_id}}` | Read and poll payment status |
-| 3 | GET | `/api/v1/bookings/{{payment_booking_id}}/payment` | Get latest payment for a booking |
-| 4 | GET | `/api/v1/payments/redirect` | PhonePe redirect/deep-link handler |
+| 3 | POST | `/api/v1/payments/{{payment_id}}/verify` | Verify Flutter SDK callback through backend/PhonePe Order Status |
+| 4 | GET | `/api/v1/bookings/{{payment_booking_id}}/payment` | Get latest payment for a booking |
 | 5 | POST | `/api/v1/bookings/{{payment_booking_id}}/refund` | Initiate refund before payout starts |
 | 6 | POST | `/api/v1/payouts/{{payout_id}}/retry` | Retry failed or reversed payout as admin |
-| 7 | POST | `/api/v1/payments/webhook` | Simulate PhonePe payment success webhook |
-| 8 | POST | `/api/v1/payments/webhook` | Simulate PhonePe payment failed webhook |
-| 9 | POST | `/api/v1/payments/webhook` | Simulate PhonePe refund completed webhook |
-| 10 | POST | `/api/v1/payouts/webhook` | Simulate Cashfree payout success webhook with HMAC signature |
-| 11 | POST | `/api/v1/payouts/webhook` | Simulate Cashfree payout failed webhook with HMAC signature |
 
 ---
 

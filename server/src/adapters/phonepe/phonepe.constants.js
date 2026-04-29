@@ -1,8 +1,8 @@
 export const PHONEPE_ENDPOINTS = {
     AUTH_TOKEN: '/v1/oauth/token',
-    CREATE_PAYMENT: '/checkout/v2/pay',
+    CREATE_SDK_ORDER: '/checkout/v2/sdk/order',
     ORDER_STATUS: (merchantOrderId) => `/checkout/v2/order/${merchantOrderId}/status`,
-    INITIATE_REFUND: '/checkout/v2/refund',
+    INITIATE_REFUND: '/checkout/v2/order/refund',
     REFUND_STATUS: (merchantRefundId) => `/checkout/v2/refund/${merchantRefundId}/status`,
 };
 

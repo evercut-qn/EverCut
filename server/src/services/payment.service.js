@@ -337,6 +337,131 @@ const assertRefundPermission = async (actor, booking) => {
     }
 };
 
+const dateToEpochMs = (value) => {
+    if (!value) return null;
+    if (typeof value === 'number') return value;
+
+    const timestamp = new Date(value).getTime();
+    return Number.isFinite(timestamp) ? timestamp : null;
+};
+
+const buildNativePaymentInitiationResponse = ({
+    payment,
+    bookingId,
+    gatewayResponse = null,
+    reusable = false,
+}) => ({
+    paymentId: payment._id,
+    bookingId,
+    merchantOrderId: payment.merchantOrderId,
+    orderId: gatewayResponse?.orderId || payment.gatewayOrderId || null,
+    token: gatewayResponse?.token || payment.sdkOrderToken || null,
+    merchantId: config.phonepe.merchantId,
+    amountInPaisa: payment.amount,
+    amountInRupees: payment.amountInRupees,
+    currency: payment.currency || 'INR',
+    state: gatewayResponse?.state || payment.gatewayState || 'PENDING',
+    expiresAt: dateToEpochMs(gatewayResponse?.expiresAt || payment.expiresAt),
+    gateway: PAYMENT_GATEWAYS.PHONEPE,
+    paymentFlow: 'PHONEPE_SDK',
+    reusable,
+});
+
+const mapBookingPaymentStatus = (paymentStatus) => {
+    switch (paymentStatus) {
+        case PAYMENT_TRANSACTION_STATUS.COMPLETED:
+            return PAYMENT_STATUS.SUCCESS;
+        case PAYMENT_TRANSACTION_STATUS.FAILED:
+        case PAYMENT_TRANSACTION_STATUS.EXPIRED:
+            return PAYMENT_STATUS.FAILED;
+        case PAYMENT_TRANSACTION_STATUS.REFUND_PENDING:
+            return PAYMENT_STATUS.REFUND_PENDING;
+        case PAYMENT_TRANSACTION_STATUS.REFUNDED:
+            return PAYMENT_STATUS.REFUNDED;
+        case PAYMENT_TRANSACTION_STATUS.REFUND_FAILED:
+            return PAYMENT_STATUS.REFUND_FAILED;
+        case PAYMENT_TRANSACTION_STATUS.INITIATED:
+            return PAYMENT_STATUS.INITIATED;
+        case PAYMENT_TRANSACTION_STATUS.PENDING:
+        default:
+            return PAYMENT_STATUS.PENDING;
+    }
+};
+
+const buildPaymentStatusResponse = async (payment, gatewayStatus = null, sdkContext = {}) => {
+    const booking = await bookingRepository.findById(payment.bookingId);
+    const firstPayment = gatewayStatus?.paymentDetails?.[0] || null;
+
+    return {
+        _id: payment._id,
+        paymentId: payment._id,
+        bookingId: payment.bookingId,
+        merchantOrderId: payment.merchantOrderId,
+        orderId: gatewayStatus?.orderId || payment.gatewayOrderId || null,
+        status: payment.status,
+        gatewayState: gatewayStatus?.state || payment.gatewayState || null,
+        amountInPaisa: payment.amount,
+        amountInRupees: payment.amountInRupees,
+        currency: payment.currency || 'INR',
+        paymentMode: firstPayment?.paymentMode || payment.paymentMode || null,
+        transactionId: firstPayment?.transactionId || payment.gatewayTransactionId || null,
+        bookingStatus: booking?.status || null,
+        paymentStatus: booking?.paymentStatus || mapBookingPaymentStatus(payment.status),
+        sdkStatus: sdkContext.sdkStatus || null,
+        sdkResponseCode: sdkContext.sdkResponseCode || null,
+        sdkMessage: sdkContext.sdkMessage || null,
+        error: payment.errorCode || payment.errorDescription
+            ? {
+                code: payment.errorCode || null,
+                detailedCode: payment.detailedErrorCode || null,
+                source: payment.errorSource || null,
+                stage: payment.errorStage || null,
+                description: payment.errorDescription || null,
+            }
+            : null,
+        createdAt: payment.createdAt,
+        updatedAt: payment.updatedAt,
+    };
+};
+
+const syncPaymentWithGateway = async (payment, sdkContext = {}) => {
+    let gatewayStatus = null;
+
+    if (MUTABLE_PAYMENT_STATUSES.has(payment.status)) {
+        gatewayStatus = await phonePeAdapter.getOrderStatus(payment.merchantOrderId);
+
+        if (gatewayStatus.state === 'COMPLETED') {
+            await handlePaymentSuccess({
+                merchantOrderId: payment.merchantOrderId,
+                state: gatewayStatus.state,
+                amount: gatewayStatus.amount,
+                paymentDetails: gatewayStatus.paymentDetails,
+                errorCode: gatewayStatus.errorCode,
+                detailedErrorCode: gatewayStatus.detailedErrorCode,
+                errorContext: gatewayStatus.errorContext,
+            });
+        } else if (gatewayStatus.state === 'FAILED') {
+            await handlePaymentFailure({
+                merchantOrderId: payment.merchantOrderId,
+                state: gatewayStatus.state,
+                amount: gatewayStatus.amount,
+                paymentDetails: gatewayStatus.paymentDetails,
+                errorCode: gatewayStatus.errorCode,
+                detailedErrorCode: gatewayStatus.detailedErrorCode,
+                errorContext: gatewayStatus.errorContext,
+            });
+        } else {
+            await paymentRepository.updateById(payment._id, {
+                gatewayState: gatewayStatus.state || payment.gatewayState,
+                statusPolledAt: new Date(),
+            });
+        }
+    }
+
+    const latestPayment = await paymentRepository.findById(payment._id);
+    return buildPaymentStatusResponse(latestPayment, gatewayStatus, sdkContext);
+};
+
 export const initiatePayment = async (userId, bookingId) => {
     const { booking, customer } = await loadBookingWithCustomerAccess(userId, bookingId);
 
@@ -354,11 +479,11 @@ export const initiatePayment = async (userId, bookingId) => {
 
     const existingPending = await paymentRepository.findPendingByBookingId(bookingId);
     if (existingPending?.expiresAt && new Date(existingPending.expiresAt) > new Date()) {
-        return {
-            redirectUrl: existingPending.redirectUrl,
-            paymentId: existingPending._id,
-            merchantOrderId: existingPending.merchantOrderId,
-        };
+        return buildNativePaymentInitiationResponse({
+            payment: existingPending,
+            bookingId,
+            reusable: true,
+        });
     }
 
     if (existingPending) {
@@ -391,14 +516,10 @@ export const initiatePayment = async (userId, bookingId) => {
         },
     });
 
-    const redirectUrl = `${config.payment.redirectBaseUrl}?bookingId=${bookingId}`;
-
     try {
         const gatewayResponse = await phonePeAdapter.createOrder({
             merchantOrderId,
             amount: settlement.totalAmountInPaisa,
-            redirectUrl,
-            message: `EverCut Salon Booking #${bookingId}`,
             metadata: {
                 bookingId: toObjectIdString(bookingId),
                 customerId: toObjectIdString(customer._id),
@@ -408,7 +529,9 @@ export const initiatePayment = async (userId, bookingId) => {
 
         await paymentRepository.updateById(paymentTransaction._id, {
             gatewayOrderId: gatewayResponse.orderId,
-            redirectUrl: gatewayResponse.redirectUrl,
+            sdkOrderToken: gatewayResponse.token,
+            sdkOrderTokenIssued: true,
+            sdkOrderTokenIssuedAt: new Date(),
             status: PAYMENT_TRANSACTION_STATUS.PENDING,
             gatewayState: gatewayResponse.state,
             expiresAt: gatewayResponse.expiresAt
@@ -428,13 +551,24 @@ export const initiatePayment = async (userId, bookingId) => {
             merchantOrderId,
             amountInRupees: settlement.totalAmountInRupees,
             gateway: PAYMENT_GATEWAYS.PHONEPE,
+            paymentFlow: 'PHONEPE_SDK',
         });
 
-        return {
-            redirectUrl: gatewayResponse.redirectUrl,
-            paymentId: paymentTransaction._id,
-            merchantOrderId,
-        };
+        const paymentResponseBase = paymentTransaction.toObject
+            ? paymentTransaction.toObject()
+            : paymentTransaction;
+
+        return buildNativePaymentInitiationResponse({
+            payment: {
+                ...paymentResponseBase,
+                gatewayOrderId: gatewayResponse.orderId,
+                sdkOrderToken: gatewayResponse.token,
+                gatewayState: gatewayResponse.state,
+                expiresAt: gatewayResponse.expiresAt,
+            },
+            bookingId,
+            gatewayResponse,
+        });
     } catch (error) {
         await paymentRepository.updateById(paymentTransaction._id, {
             status: PAYMENT_TRANSACTION_STATUS.FAILED,
@@ -498,49 +632,50 @@ export const getPaymentStatus = async (userId, paymentId) => {
         throw new ForbiddenError('You can only access your own payments');
     }
 
-    if (payment.status === PAYMENT_TRANSACTION_STATUS.PENDING) {
-        try {
-            const latestStatus = await phonePeAdapter.getOrderStatus(payment.merchantOrderId);
-            if (latestStatus.state === 'COMPLETED') {
-                await handlePaymentSuccess({
-                    merchantOrderId: payment.merchantOrderId,
-                    state: latestStatus.state,
-                    amount: latestStatus.amount,
-                    paymentDetails: latestStatus.paymentDetails,
-                    errorCode: latestStatus.errorCode,
-                    detailedErrorCode: latestStatus.detailedErrorCode,
-                    errorContext: latestStatus.errorContext,
-                });
-            } else if (latestStatus.state === 'FAILED') {
-                await handlePaymentFailure({
-                    merchantOrderId: payment.merchantOrderId,
-                    state: latestStatus.state,
-                    amount: latestStatus.amount,
-                    paymentDetails: latestStatus.paymentDetails,
-                    errorCode: latestStatus.errorCode,
-                    detailedErrorCode: latestStatus.detailedErrorCode,
-                    errorContext: latestStatus.errorContext,
-                });
-            }
-        } catch (error) {
-            logger.warn('[PaymentService] Payment status poll failed', {
-                paymentId,
-                merchantOrderId: payment.merchantOrderId,
-                error: error.message,
-            });
-        }
+    try {
+        return await syncPaymentWithGateway(payment);
+    } catch (error) {
+        logger.warn('[PaymentService] Payment status poll failed', {
+            paymentId,
+            merchantOrderId: payment.merchantOrderId,
+            error: error.message,
+        });
     }
 
     const latestPayment = await paymentRepository.findById(paymentId);
-    return {
-        _id: latestPayment._id,
-        bookingId: latestPayment.bookingId,
-        merchantOrderId: latestPayment.merchantOrderId,
-        status: latestPayment.status,
-        amountInRupees: latestPayment.amountInRupees,
-        paymentMode: latestPayment.paymentMode,
-        createdAt: latestPayment.createdAt,
-    };
+    return buildPaymentStatusResponse(latestPayment);
+};
+
+export const verifyPayment = async (userId, paymentId, sdkContext = {}) => {
+    const payment = await paymentRepository.findById(paymentId);
+    if (!payment) {
+        throw new NotFoundError('Payment');
+    }
+
+    const customer = await customerRepository.findByUserId(userId);
+    if (!customer || toObjectIdString(payment.customerId) !== toObjectIdString(customer._id)) {
+        throw new ForbiddenError('You can only verify your own payments');
+    }
+
+    logger.info('[PaymentService] Verifying native payment result', {
+        paymentId,
+        bookingId: payment.bookingId,
+        merchantOrderId: payment.merchantOrderId,
+        sdkStatus: sdkContext.sdkStatus || null,
+    });
+
+    try {
+        return await syncPaymentWithGateway(payment, sdkContext);
+    } catch (error) {
+        logger.warn('[PaymentService] Native payment verification poll failed', {
+            paymentId,
+            merchantOrderId: payment.merchantOrderId,
+            error: error.message,
+        });
+
+        const latestPayment = await paymentRepository.findById(paymentId);
+        return buildPaymentStatusResponse(latestPayment, null, sdkContext);
+    }
 };
 
 export const getPaymentByBooking = async (userId, bookingId) => {
@@ -557,9 +692,13 @@ export const getPaymentByBooking = async (userId, bookingId) => {
 
     return {
         _id: payment._id,
+        paymentId: payment._id,
         bookingId: payment.bookingId,
         merchantOrderId: payment.merchantOrderId,
+        orderId: payment.gatewayOrderId || null,
         status: payment.status,
+        gatewayState: payment.gatewayState || null,
+        amountInPaisa: payment.amount,
         amountInRupees: payment.amountInRupees,
         paymentMode: payment.paymentMode,
         createdAt: payment.createdAt,
@@ -607,6 +746,7 @@ async function handlePaymentSuccess(webhookData) {
         errorSource: null,
         errorStage: null,
         errorDescription: null,
+        sdkOrderToken: null,
         webhookReceivedAt: new Date(),
         webhookProcessed: true,
     });
@@ -666,6 +806,7 @@ async function handlePaymentFailure(webhookData) {
         errorSource: webhookData.errorContext?.source || null,
         errorStage: webhookData.errorContext?.stage || null,
         errorDescription: webhookData.errorContext?.description || null,
+        sdkOrderToken: null,
         webhookReceivedAt: new Date(),
         webhookProcessed: true,
     });

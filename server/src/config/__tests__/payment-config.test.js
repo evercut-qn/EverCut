@@ -35,22 +35,23 @@ const applyRequiredEnv = () => {
     }
 };
 
-test('payment config defaults match the documented local port and redirect URL', async () => {
+test('payment config defaults expose native PhonePe SDK auth URLs without redirect settings', async () => {
     const originalEnv = { ...process.env };
 
     try {
         applyRequiredEnv();
         process.env.NODE_ENV = 'development';
         process.env.PORT = '';
-        process.env.PAYMENT_REDIRECT_BASE_URL = '';
+        process.env.PHONEPE_ENV = 'SANDBOX';
 
         const config = await loadFreshConfig();
 
         assert.equal(config.port, 5000);
         assert.equal(
-            config.payment.redirectBaseUrl,
-            'http://localhost:5000/api/v1/payments/redirect',
+            config.phonepe.authUrl,
+            'https://api-preprod.phonepe.com/apis/pg-sandbox/v1/oauth/token',
         );
+        assert.equal(Object.hasOwn(config.payment, 'redirectBaseUrl'), false);
     } finally {
         for (const key of Object.keys(process.env)) {
             if (!(key in originalEnv)) {

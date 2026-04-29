@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "EverCut - Payments & Payouts",
-    "description": "Payment initiation, status checking, refund processing, and payout retry for the EverCut dual-provider payment system. PhonePe is used for customer collection; Cashfree Payouts is used for barber disbursement.",
+    "description": "Native PhonePe SDK payment initiation/verification, status checking, refund processing, and payout retry for the EverCut dual-provider payment system. PhonePe is used for customer collection; Cashfree Payouts is used for barber disbursement.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -128,7 +128,7 @@
   ],
   "item": [
     {
-      "name": "1. Initiate Payment",
+      "name": "1. Create Native SDK Payment Order",
       "request": {
         "method": "POST",
         "header": [
@@ -138,7 +138,7 @@
           }
         ],
         "url": "{{base_url}}/{{api_prefix}}/payments",
-        "description": "Creates a PhonePe checkout order for the authenticated customer's pending booking. The booking must be created first through 04-customer-bookings.json. The payment_booking_id is auto-synced from shared_booking_id captured during booking creation.",
+        "description": "Creates a PhonePe native SDK checkout order for the authenticated customer's pending booking. The response returns orderId, token, merchantId, merchantOrderId, and paymentId for the Flutter PhonePe SDK. No redirect URL is returned.",
         "body": {
           "mode": "raw",
           "raw": "{\n  \"bookingId\": \"{{payment_booking_id}}\"\n}",
@@ -175,11 +175,15 @@
               "  pm.expect(response).to.have.property('data');",
               "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
-              "pm.test('captures payment references', function () {",
+              "pm.test('captures native payment references', function () {",
               "  const response = pm.response.json();",
               "  pm.expect(response.success).to.equal(true);",
               "  pm.expect(response.data).to.have.property('paymentId');",
               "  pm.expect(response.data).to.have.property('merchantOrderId');",
+              "  pm.expect(response.data).to.have.property('orderId');",
+              "  pm.expect(response.data).to.have.property('token');",
+              "  pm.expect(response.data).to.have.property('merchantId');",
+              "  pm.expect(response.data).to.not.have.property('redirectUrl');",
               "  pm.collectionVariables.set('payment_id', response.data.paymentId);",
               "  pm.collectionVariables.set('merchant_order_id', response.data.merchantOrderId);",
               "  pm.environment.set('payment_id', response.data.paymentId);",
@@ -198,7 +202,7 @@
         "method": "GET",
         "header": [],
         "url": "{{base_url}}/{{api_prefix}}/payments/{{payment_id}}",
-        "description": "Reads payment details and polls PhonePe once when the payment is still pending.",
+        "description": "Reads payment details and polls PhonePe once when the payment is still pending. Use this for manual status checks or post-failure support.",
         "auth": {
           "type": "bearer",
           "bearer": [
@@ -232,7 +236,67 @@
       ]
     },
     {
-      "name": "3. Get Payment By Booking",
+      "name": "3. Verify Native SDK Payment",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/{{api_prefix}}/payments/{{payment_id}}/verify",
+        "description": "Verifies the PhonePe SDK callback with the backend. The SDK callback is informational only; this endpoint calls PhonePe Order Status and returns the authoritative state.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"sdkStatus\": \"SUCCESS\",\n  \"sdkResponseCode\": \"SDK_CALLBACK\",\n  \"sdkMessage\": \"Flutter SDK callback received\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{customer_access_token}}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "});",
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "pm.test('verified response has authoritative status fields', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response.success).to.equal(true);",
+              "  pm.expect(response.data).to.have.property('status');",
+              "  pm.expect(response.data).to.have.property('gatewayState');",
+              "  pm.expect(response.data).to.have.property('paymentStatus');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Get Payment By Booking",
       "request": {
         "method": "GET",
         "header": [],
@@ -283,7 +347,7 @@
       ]
     },
     {
-      "name": "4. Initiate Refund",
+      "name": "5. Initiate Refund",
       "request": {
         "method": "POST",
         "header": [
@@ -350,7 +414,7 @@
       ]
     },
     {
-      "name": "5. Retry Failed Payout",
+      "name": "6. Retry Failed Payout",
       "request": {
         "method": "POST",
         "header": [],

@@ -93,8 +93,16 @@ const paymentTransactionSchema = new mongoose.Schema(
             type: String,
             default: null,
         },
-        redirectUrl: {
+        sdkOrderToken: {
             type: String,
+            default: null,
+        },
+        sdkOrderTokenIssued: {
+            type: Boolean,
+            default: false,
+        },
+        sdkOrderTokenIssuedAt: {
+            type: Date,
             default: null,
         },
         amount: {

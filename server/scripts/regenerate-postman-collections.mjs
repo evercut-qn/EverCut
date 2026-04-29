@@ -1786,7 +1786,7 @@ const barberRatingsCollection = {
 const paymentsPayoutsCollection = {
   info: {
     name: 'EverCut - Payments & Payouts',
-    description: 'Payment initiation, status checking, refund processing, and payout retry for the EverCut dual-provider payment system. PhonePe is used for customer collection; Cashfree Payouts is used for barber disbursement.',
+    description: 'Native PhonePe SDK payment initiation/verification, status checking, refund processing, and payout retry for the EverCut dual-provider payment system. PhonePe is used for customer collection; Cashfree Payouts is used for barber disbursement.',
     schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
   },
   auth: bearerAuth('customer_access_token'),
@@ -1823,7 +1823,7 @@ const paymentsPayoutsCollection = {
   ],
   item: [
     {
-      name: '1. Initiate Payment',
+      name: '1. Create Native SDK Payment Order',
       ...request({
         method: 'POST',
         url: '{{base_url}}/{{api_prefix}}/payments',
@@ -1832,14 +1832,18 @@ const paymentsPayoutsCollection = {
         body: jsonBody(`{
   "bookingId": "{{payment_booking_id}}"
 }`),
-        description: 'Creates a PhonePe checkout order for the authenticated customer\'s pending booking. The booking must be created first through 04-customer-bookings.json. The payment_booking_id is auto-synced from shared_booking_id captured during booking creation.',
+        description: 'Creates a PhonePe native SDK checkout order for the authenticated customer\'s pending booking. The response returns orderId, token, merchantId, merchantOrderId, and paymentId for the Flutter PhonePe SDK. No redirect URL is returned.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
-          "pm.test('captures payment references', function () {",
+          "pm.test('captures native payment references', function () {",
           "  const response = pm.response.json();",
           "  pm.expect(response.success).to.equal(true);",
           "  pm.expect(response.data).to.have.property('paymentId');",
           "  pm.expect(response.data).to.have.property('merchantOrderId');",
+          "  pm.expect(response.data).to.have.property('orderId');",
+          "  pm.expect(response.data).to.have.property('token');",
+          "  pm.expect(response.data).to.have.property('merchantId');",
+          "  pm.expect(response.data).to.not.have.property('redirectUrl');",
           "  pm.collectionVariables.set('payment_id', response.data.paymentId);",
           "  pm.collectionVariables.set('merchant_order_id', response.data.merchantOrderId);",
           "  pm.environment.set('payment_id', response.data.paymentId);",
@@ -1856,12 +1860,37 @@ const paymentsPayoutsCollection = {
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/payments/{{payment_id}}',
         auth: bearerAuth('customer_access_token'),
-        description: 'Reads payment details and polls PhonePe once when the payment is still pending.',
+        description: 'Reads payment details and polls PhonePe once when the payment is still pending. Use this for manual status checks or post-failure support.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
     },
     {
-      name: '3. Get Payment By Booking',
+      name: '3. Verify Native SDK Payment',
+      ...request({
+        method: 'POST',
+        url: '{{base_url}}/{{api_prefix}}/payments/{{payment_id}}/verify',
+        auth: bearerAuth('customer_access_token'),
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{
+  "sdkStatus": "SUCCESS",
+  "sdkResponseCode": "SDK_CALLBACK",
+  "sdkMessage": "Flutter SDK callback received"
+}`),
+        description: 'Verifies the PhonePe SDK callback with the backend. The SDK callback is informational only; this endpoint calls PhonePe Order Status and returns the authoritative state.',
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          "pm.test('verified response has authoritative status fields', function () {",
+          "  const response = pm.response.json();",
+          "  pm.expect(response.success).to.equal(true);",
+          "  pm.expect(response.data).to.have.property('status');",
+          "  pm.expect(response.data).to.have.property('gatewayState');",
+          "  pm.expect(response.data).to.have.property('paymentStatus');",
+          "});",
+        ),
+      }),
+    },
+    {
+      name: '4. Get Payment By Booking',
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/bookings/{{payment_booking_id}}/payment',
@@ -1885,7 +1914,7 @@ const paymentsPayoutsCollection = {
       }),
     },
     {
-      name: '4. Initiate Refund',
+      name: '5. Initiate Refund',
       ...request({
         method: 'POST',
         url: '{{base_url}}/{{api_prefix}}/bookings/{{payment_booking_id}}/refund',
@@ -1915,7 +1944,7 @@ const paymentsPayoutsCollection = {
       }),
     },
     {
-      name: '5. Retry Failed Payout',
+      name: '6. Retry Failed Payout',
       ...request({
         method: 'POST',
         url: '{{base_url}}/{{api_prefix}}/payouts/{{payout_id}}/retry',

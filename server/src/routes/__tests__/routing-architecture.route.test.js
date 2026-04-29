@@ -131,9 +131,11 @@ test('booking discovery and payment routes use final resource-oriented URLs', as
     assert.doesNotMatch(bookingRoutes, /\/shops\/:id\/employees/);
 
     assert.match(paymentRoutes, /router\.post\(\s*'\/'/);
+    assert.match(paymentRoutes, /router\.post\(\s*'\/:id\/verify'/);
     assert.match(paymentRoutes, /router\.get\(\s*'\/:id'/);
     assert.doesNotMatch(paymentRoutes, /\/initiate/);
     assert.doesNotMatch(paymentRoutes, /\/booking\/:bookingId/);
+    assert.doesNotMatch(paymentRoutes, /\/redirect/);
 
     assert.match(bookingRoutes, /\/:id\/payment/);
     assert.match(bookingRoutes, /\/:id\/refund/);

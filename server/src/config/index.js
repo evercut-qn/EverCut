@@ -119,6 +119,9 @@ const config = Object.freeze({
     env: optionalEnv('PHONEPE_ENV', 'SANDBOX'),
     webhookUsername: providerEnv('PHONEPE_WEBHOOK_USERNAME', 'test-phonepe-webhook-user'),
     webhookPassword: providerEnv('PHONEPE_WEBHOOK_PASSWORD', 'test-phonepe-webhook-password'),
+    authUrl: optionalEnv('PHONEPE_ENV', 'SANDBOX') === 'PRODUCTION'
+      ? 'https://api.phonepe.com/apis/identity-manager/v1/oauth/token'
+      : 'https://api-preprod.phonepe.com/apis/pg-sandbox/v1/oauth/token',
     baseUrl: optionalEnv('PHONEPE_ENV', 'SANDBOX') === 'PRODUCTION'
       ? 'https://api.phonepe.com/apis/pg'
       : 'https://api-preprod.phonepe.com/apis/pg-sandbox',
@@ -137,7 +140,6 @@ const config = Object.freeze({
 
   /** Payment + Payout business rules */
   payment: Object.freeze({
-    redirectBaseUrl: optionalEnv('PAYMENT_REDIRECT_BASE_URL', 'http://localhost:5000/api/v1/payments/redirect'),
     platformFeeSingle: 3,
     platformFeeBundle: 10,
     refundFeeSingle: 7,

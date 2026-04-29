@@ -46,7 +46,7 @@ class PhonePeTokenManager {
     }
 
     async _refreshToken() {
-        const url = `${config.phonepe.baseUrl}${'/v1/oauth/token'}`;
+        const url = config.phonepe.authUrl;
         const body = new URLSearchParams({
             client_id: config.phonepe.clientId,
             client_version: String(config.phonepe.clientVersion),
