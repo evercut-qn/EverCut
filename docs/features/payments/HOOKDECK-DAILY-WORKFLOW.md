@@ -6,7 +6,8 @@
 
 ```bash
 # Terminal 1: Server
-cd server && npm run dev
+cd server
+npm run dev
 
 # Terminal 2: Payment webhooks (PhonePe)
 hookdeck listen 5000 phonepe-webhooks --path /api/v1/payments/webhook

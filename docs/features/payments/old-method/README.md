@@ -72,7 +72,7 @@ For the **active native SDK flow**, see:
 - **[../../../flows/BACKEND-TESTING-COMPLETE-FLOW.md](../../../flows/BACKEND-TESTING-COMPLETE-FLOW.md)** - Testing native SDK payments (complete flow)
 - **[../../bookings/BOOKING-SYSTEM-GUIDE.md](../../bookings/BOOKING-SYSTEM-GUIDE.md)** - Complete booking + payment flow
 - **[../../../flows/FLUTTER-BOOKING-PAYMENT-FLOW.md](../../../flows/FLUTTER-BOOKING-PAYMENT-FLOW.md)** - Flutter SDK implementation
-- **[../../../reports/PHONEPE-PG-FLUTTER-NODEJS.md](../../../reports/PHONEPE-PG-FLUTTER-NODEJS.md)** - Native SDK source of truth
+- **[../../../research/PHONEPE-PG-FLUTTER-NODEJS.md](../../../research/PHONEPE-PG-FLUTTER-NODEJS.md)** - Native SDK source of truth
 
 ---
 
@@ -167,7 +167,7 @@ Then consult the archived documents in this directory.
 If you have questions about:
 - **Old flow** - Consult archived docs in this directory
 - **New flow** - See current documentation links above
-- **Migration** - See `docs/reports/PHONEPE-PG-FLUTTER-NODEJS.md`
+- **Migration** - See `docs/research/PHONEPE-PG-FLUTTER-NODEJS.md`
 
 ---
 

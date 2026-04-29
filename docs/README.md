@@ -28,9 +28,9 @@ Detailed, implementation-ready guides for Flutter developers and backend testing
 | Document | Description | Status |
 |----------|-------------|--------|
 | [FLUTTER-BOOKING-PAYMENT-FLOW.md](./flows/FLUTTER-BOOKING-PAYMENT-FLOW.md) | Complete Flutter implementation guide for booking + native PhonePe SDK payment flow | ✅ Production Ready |
-| [BACKEND-TESTING-COMPLETE-FLOW.md](./flows/BACKEND-TESTING-COMPLETE-FLOW.md) | Backend testing guide covering booking, payment, and payout (customer → barber) | ✅ Production Ready |
+| [POSTMAN-BOOKING-PAYMENT-GUIDE.md](./testing/POSTMAN-BOOKING-PAYMENT-GUIDE.md) | Postman testing guide for booking & payment flow (auth → payment → barber approval) | ✅ Production Ready |
 
-> **Note:** The `docs/flows/` directory contains detailed, step-by-step implementation guides for developers. These are standalone, production-ready documents with code examples, API contracts, and testing procedures.
+> **Note:** The `docs/flows/` directory contains detailed, step-by-step implementation guides for developers. The `docs/testing/` directory contains Postman API testing documentation.
 
 ---
 
@@ -78,8 +78,8 @@ Detailed guides for implementing specific features.
 
 | Document | Description | Status |
 |----------|-------------|--------|
-| [PHONEPE-PG-FLUTTER-NODEJS.md](./reports/PHONEPE-PG-FLUTTER-NODEJS.md) | **Native PhonePe Flutter SDK integration** (source of truth) | ✅ Production Ready |
-| [BACKEND-TESTING-COMPLETE-FLOW.md](./flows/BACKEND-TESTING-COMPLETE-FLOW.md) | Backend testing guide for complete booking, payment, and payout flow | ✅ Production Ready |
+| [PHONEPE-PG-FLUTTER-NODEJS.md](./research/PHONEPE-PG-FLUTTER-NODEJS.md) | **Native PhonePe Flutter SDK integration** (source of truth) | ✅ Production Ready |
+| [POSTMAN-BOOKING-PAYMENT-GUIDE.md](./testing/POSTMAN-BOOKING-PAYMENT-GUIDE.md) | Postman testing guide for booking & payment flow | ✅ Production Ready |
 | [old-method/](./features/payments/old-method/) | Archived web redirect/payment-link documentation | 📦 Archived |
 
 > **Note:** EverCut migrated from web redirect payment flow to native PhonePe Flutter SDK in April 2026. Old redirect-based documentation is archived in `features/payments/old-method/` for historical reference only.
@@ -119,8 +119,9 @@ docs/
 ├── README.md                          # This file
 ├── PAYMENT-MIGRATION-SUMMARY.md       # Native SDK migration summary
 ├── flows/                             # Developer implementation guides
-│   ├── FLUTTER-BOOKING-PAYMENT-FLOW.md
-│   └── BACKEND-TESTING-COMPLETE-FLOW.md
+│   └── FLUTTER-BOOKING-PAYMENT-FLOW.md
+├── testing/                           # Postman API testing guides
+│   └── POSTMAN-BOOKING-PAYMENT-GUIDE.md
 ├── architecture/                      # Architecture & planning docs
 │   └── IMPLEMENTATION-PLAN.md
 ├── security/                          # Security audits & reports
@@ -144,14 +145,19 @@ docs/
 ├── reports/                           # Bug fixes & improvement reports
 │   ├── BACKEND-INTEGRITY-FIXES-REPORT.md
 │   ├── E2E-BACKEND-VERIFICATION-REPORT.md
-│   ├── PHONEPE-PG-FLUTTER-NODEJS.md   # Native SDK source of truth
 │   ├── MSG91-Revision-Improvements-Report.md
 │   ├── PHOTO-GALLERY-FIXES-REPORT.md
 │   ├── REQUEST-VALIDATION-QUERY-FIX-REPORT.md
 │   └── SERVICE-CATALOG-FIXES-REPORT.md
-└── research/                          # Research & analysis docs
-    ├── OBJECT-STORAGE-RESEARCH.MD
-    └── OTP-AUTH-RESEARCH.md
+├── research/                          # Research & analysis docs
+│   ├── OBJECT-STORAGE-RESEARCH.MD
+│   ├── OTP-AUTH-RESEARCH.md
+│   ├── PAYOUT-API-RESEARCH.md
+│   ├── UPI-API-RESEARCH.md
+│   ├── ZOHO-VS-PHONEPE-PG-COMPARISON.md
+│   └── PHONEPE-PG-FLUTTER-NODEJS.md   # Native SDK integration research
+└── testing/                           # Postman API testing guides
+    └── POSTMAN-BOOKING-PAYMENT-GUIDE.md
 ```
 
 ---
@@ -168,12 +174,12 @@ docs/
 
 1. **Booking + Payment Flow:** [FLUTTER-BOOKING-PAYMENT-FLOW.md](./flows/FLUTTER-BOOKING-PAYMENT-FLOW.md) — Complete implementation guide with native PhonePe SDK
 2. **Backend Contract:** [BOOKING-SYSTEM-GUIDE.md](./features/bookings/BOOKING-SYSTEM-GUIDE.md) — API contracts and flow details
-3. **Native SDK Source:** [PHONEPE-PG-FLUTTER-NODEJS.md](./reports/PHONEPE-PG-FLUTTER-NODEJS.md) — PhonePe integration reference
+3. **Native SDK Source:** [PHONEPE-PG-FLUTTER-NODEJS.md](./research/PHONEPE-PG-FLUTTER-NODEJS.md) — PhonePe integration reference
 
 ### For Backend Testing
 
-1. **Complete Flow Testing:** [BACKEND-TESTING-COMPLETE-FLOW.md](./flows/BACKEND-TESTING-COMPLETE-FLOW.md) — Test booking, payment, and payout without Flutter
-2. **Postman Collections:** `server/postman-collections/` — Ready-to-use API test collections
+1. **Booking & Payment Testing:** [POSTMAN-BOOKING-PAYMENT-GUIDE.md](./testing/POSTMAN-BOOKING-PAYMENT-GUIDE.md) — Test booking & payment flow from auth to barber approval
+2. **Postman Collections:** `server/postman-collections/` — Ready-to-use API test collections with auto-generated signatures
 
 ### For Security Review
 
