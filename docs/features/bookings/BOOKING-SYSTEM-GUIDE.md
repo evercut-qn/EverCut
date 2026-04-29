@@ -150,8 +150,10 @@ COMPLETED (Service Done)
 
 | Method | Endpoint | Auth | Purpose |
 |--------|----------|------|---------|
-| POST | `/api/v1/payments/initiate` | CUSTOMER | Initiate payment |
-| GET | `/api/v1/bookings/:id/payment` | CUSTOMER | Get payment details |
+| POST | `/api/v1/payments` | CUSTOMER | Initiate native SDK payment |
+| POST | `/api/v1/payments/:id/verify` | CUSTOMER | Verify payment after SDK callback |
+| GET | `/api/v1/payments/:id` | CUSTOMER | Get payment status |
+| GET | `/api/v1/bookings/:id/payment` | CUSTOMER | Get payment details for booking |
 | POST | `/api/v1/bookings/:id/refund` | ADMIN/BARBER | Initiate refund |
 
 ---
@@ -386,10 +388,10 @@ Content-Type: application/json
 
 ---
 
-### Step 6: Initiate Payment
+### Step 6: Initiate Native SDK Payment
 
 ```http
-POST /api/v1/payments/initiate
+POST /api/v1/payments
 Authorization: Bearer <customer_token>
 Content-Type: application/json
 
@@ -398,19 +400,59 @@ Content-Type: application/json
 }
 ```
 
-**Returns:** Payment link for customer to complete payment
+**Returns:** Native SDK credentials for Flutter to launch PhonePe SDK
+
+```json
+{
+  "success": true,
+  "message": "Payment initiated",
+  "data": {
+    "paymentId": "payment_id",
+    "bookingId": "booking123",
+    "merchantOrderId": "EC-booking123-...",
+    "orderId": "OMO123456789",
+    "token": "eyJhbGci...",
+    "merchantId": "MERCHANT_ID",
+    "amountInPaisa": 30300,
+    "amountInRupees": 303,
+    "state": "PENDING",
+    "expiresAt": 1234567890000,
+    "gateway": "phonepe",
+    "paymentFlow": "PHONEPE_SDK"
+  }
+}
+```
+
+**Flutter Action:** Launch PhonePe SDK with `orderId`, `token`, `merchantId`
 
 ---
 
-### Step 7: Payment Webhook (Automatic)
+### Step 7: Verify Payment (After SDK Callback)
 
-When customer completes payment, payment gateway sends webhook to backend:
+After PhonePe SDK returns callback to Flutter, Flutter must verify with backend:
 
-**What Happens:**
+```http
+POST /api/v1/payments/:paymentId/verify
+Authorization: Bearer <customer_token>
+Content-Type: application/json
+
+{
+  "sdkStatus": "SUCCESS",
+  "sdkResponseCode": "PAYMENT_SUCCESS",
+  "sdkMessage": "Payment completed successfully"
+}
+```
+
+**Backend Action:** Polls PhonePe Order Status API to verify actual payment state
+
+**What Happens on Success:**
+- ✅ Payment transaction status updated to `COMPLETED`
 - ✅ Booking status updated to `AWAITING_CONFIRMATION`
 - ✅ `paidAt` timestamp set
 - ✅ 24-hour countdown starts
 - ✅ Barber notified to confirm
+
+**Webhook Backup:** PhonePe also sends S2S webhook for production reliability
 
 ---
 

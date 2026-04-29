@@ -540,7 +540,7 @@ If the 7-day restriction needs to be removed:
 
 ### Files Updated
 
-1. ✅ `docs/flows/BOOKING.MD` - Added booking window note
+1. ✅ `docs/features/bookings/BOOKING-SYSTEM-GUIDE.md` - Added booking window note
 2. ✅ `docs/features/bookings/BOOKING-DATE-RESTRICTION-UPDATE.md` - This document
 
 ### Files to Update (Future)

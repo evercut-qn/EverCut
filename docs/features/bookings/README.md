@@ -33,7 +33,7 @@ CREATE → PENDING → PAYMENT → AWAITING_CONFIRMATION → CONFIRMED → COMPL
 
 ### 1. Discovery Flow
 ```
-Browse Shops → View Shop → View Employees → Check Availability → Create Booking
+Browse Shops → View Shop → View Employees → Check Availability → Create Booking → Pay (Native SDK)
 ```
 
 ### 2. Key Endpoints
@@ -47,6 +47,11 @@ Browse Shops → View Shop → View Employees → Check Availability → Create 
 - `POST /api/v1/bookings` - Create booking
 - `PATCH /api/v1/bookings/:id/confirm` - Barber confirms
 - `POST /api/v1/bookings/:id/cancel` - Cancel booking
+
+**Payment (Native SDK):**
+- `POST /api/v1/payments` - Initiate native SDK payment
+- `POST /api/v1/payments/:id/verify` - Verify payment after SDK callback
+- `GET /api/v1/payments/:id` - Get payment status
 
 ### 3. Availability Decision
 
@@ -103,7 +108,7 @@ For complete details, see **BOOKING-SYSTEM-GUIDE.md**
 
 ## 🔄 Complete Booking Flow
 
-### Discovery Phase (NEW)
+### Discovery Phase
 ```
 1. Browse Shops → GET /api/v1/shops/nearby
 2. View Shop → GET /api/v1/shops/:id
@@ -114,9 +119,9 @@ For complete details, see **BOOKING-SYSTEM-GUIDE.md**
 5. Select Available Slot
 ```
 
-### Booking Phase
+### Booking Phase (Native SDK Payment)
 ```
-CREATE → PENDING → PAYMENT → AWAITING_CONFIRMATION (24h max)
+CREATE → PENDING → NATIVE SDK PAYMENT → AWAITING_CONFIRMATION (24h max)
                                     ↓
                               BARBER DECISION
                                     ↓
@@ -161,6 +166,14 @@ POST   /api/v1/bookings                        Create booking
 GET    /api/v1/bookings/pending-confirmations  List pending (barber)
 PATCH  /api/v1/bookings/:id/confirm            Confirm (barber)
 POST   /api/v1/bookings/:id/cancel             Cancel
+```
+
+### Payment Endpoints (Native SDK)
+```
+POST   /api/v1/payments                        Initiate native SDK payment
+POST   /api/v1/payments/:id/verify             Verify payment after SDK callback
+GET    /api/v1/payments/:id                    Get payment status
+GET    /api/v1/bookings/:id/payment            Get payment for booking
 ```
 
 ---

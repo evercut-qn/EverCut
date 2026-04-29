@@ -21,6 +21,19 @@ Core architectural documents and implementation plans.
 
 ---
 
+## 🔄 Developer Flow Guides
+
+Detailed, implementation-ready guides for Flutter developers and backend testing.
+
+| Document | Description | Status |
+|----------|-------------|--------|
+| [FLUTTER-BOOKING-PAYMENT-FLOW.md](./flows/FLUTTER-BOOKING-PAYMENT-FLOW.md) | Complete Flutter implementation guide for booking + native PhonePe SDK payment flow | ✅ Production Ready |
+| [BACKEND-TESTING-COMPLETE-FLOW.md](./flows/BACKEND-TESTING-COMPLETE-FLOW.md) | Backend testing guide covering booking, payment, and payout (customer → barber) | ✅ Production Ready |
+
+> **Note:** The `docs/flows/` directory contains detailed, step-by-step implementation guides for developers. These are standalone, production-ready documents with code examples, API contracts, and testing procedures.
+
+---
+
 ## 🔐 Security & Audits
 
 Security assessments, vulnerability reports, and audit findings.
@@ -51,6 +64,25 @@ Detailed guides for implementing specific features.
 | [MSG91-INTEGRATION-GUIDE.md](./features/msg91/MSG91-INTEGRATION-GUIDE.md) | MSG91 OTP integration implementation guide | 📋 Implementation Guide |
 | [MSG91-EXTERNAL-SETUP-GUIDE.md](./features/msg91/MSG91-EXTERNAL-SETUP-GUIDE.md) | MSG91 account setup and DLT registration | 📋 Setup Guide |
 | [MSG91-POSTMAN-UPDATES-GUIDE.md](./features/msg91/MSG91-POSTMAN-UPDATES-GUIDE.md) | Postman collection updates for MSG91 | 📋 Testing Guide |
+
+### Booking & Payment System
+
+| Document | Description | Status |
+|----------|-------------|--------|
+| [BOOKING-SYSTEM-GUIDE.md](./features/bookings/BOOKING-SYSTEM-GUIDE.md) | Complete booking system with native PhonePe SDK payment flow | ✅ Production Ready |
+| [FLUTTER-BOOKING-PAYMENT-FLOW.md](./flows/FLUTTER-BOOKING-PAYMENT-FLOW.md) | Flutter implementation guide for native SDK payments | ✅ Production Ready |
+| [BOOKING-DATE-RESTRICTION-UPDATE.md](./features/bookings/BOOKING-DATE-RESTRICTION-UPDATE.md) | Booking date window restrictions | 📋 Implementation Guide |
+| [README.md](./features/bookings/README.md) | Booking system quick reference | ✅ Reference |
+
+### Payment Integration
+
+| Document | Description | Status |
+|----------|-------------|--------|
+| [PHONEPE-PG-FLUTTER-NODEJS.md](./reports/PHONEPE-PG-FLUTTER-NODEJS.md) | **Native PhonePe Flutter SDK integration** (source of truth) | ✅ Production Ready |
+| [BACKEND-TESTING-COMPLETE-FLOW.md](./flows/BACKEND-TESTING-COMPLETE-FLOW.md) | Backend testing guide for complete booking, payment, and payout flow | ✅ Production Ready |
+| [old-method/](./features/payments/old-method/) | Archived web redirect/payment-link documentation | 📦 Archived |
+
+> **Note:** EverCut migrated from web redirect payment flow to native PhonePe Flutter SDK in April 2026. Old redirect-based documentation is archived in `features/payments/old-method/` for historical reference only.
 
 ---
 
@@ -85,6 +117,10 @@ Research documents for technology decisions and comparisons.
 ```
 docs/
 ├── README.md                          # This file
+├── PAYMENT-MIGRATION-SUMMARY.md       # Native SDK migration summary
+├── flows/                             # Developer implementation guides
+│   ├── FLUTTER-BOOKING-PAYMENT-FLOW.md
+│   └── BACKEND-TESTING-COMPLETE-FLOW.md
 ├── architecture/                      # Architecture & planning docs
 │   └── IMPLEMENTATION-PLAN.md
 ├── security/                          # Security audits & reports
@@ -94,6 +130,12 @@ docs/
 ├── features/                          # Feature implementation guides
 │   ├── auth/
 │   │   └── GOOGLE-OAUTH-UNIVERSAL-AUTH.MD
+│   ├── bookings/
+│   │   ├── BOOKING-SYSTEM-GUIDE.md
+│   │   ├── BOOKING-DATE-RESTRICTION-UPDATE.md
+│   │   └── README.md
+│   ├── payments/
+│   │   └── old-method/                # Archived redirect flow docs
 │   └── msg91/
 │       ├── MSG91-COMPLETE-GUIDE.md
 │       ├── MSG91-INTEGRATION-GUIDE.md
@@ -102,6 +144,7 @@ docs/
 ├── reports/                           # Bug fixes & improvement reports
 │   ├── BACKEND-INTEGRITY-FIXES-REPORT.md
 │   ├── E2E-BACKEND-VERIFICATION-REPORT.md
+│   ├── PHONEPE-PG-FLUTTER-NODEJS.md   # Native SDK source of truth
 │   ├── MSG91-Revision-Improvements-Report.md
 │   ├── PHOTO-GALLERY-FIXES-REPORT.md
 │   ├── REQUEST-VALIDATION-QUERY-FIX-REPORT.md
@@ -120,6 +163,17 @@ docs/
 1. Start with [IMPLEMENTATION-PLAN.md](./architecture/IMPLEMENTATION-PLAN.md) to understand the architecture
 2. Review [SECURITY-AUTH-AUDIT.md](./security/SECURITY-AUTH-AUDIT.md) for security best practices
 3. Follow [MSG91-INTEGRATION-GUIDE.md](./features/msg91/MSG91-INTEGRATION-GUIDE.md) for authentication setup
+
+### For Flutter Developers
+
+1. **Booking + Payment Flow:** [FLUTTER-BOOKING-PAYMENT-FLOW.md](./flows/FLUTTER-BOOKING-PAYMENT-FLOW.md) — Complete implementation guide with native PhonePe SDK
+2. **Backend Contract:** [BOOKING-SYSTEM-GUIDE.md](./features/bookings/BOOKING-SYSTEM-GUIDE.md) — API contracts and flow details
+3. **Native SDK Source:** [PHONEPE-PG-FLUTTER-NODEJS.md](./reports/PHONEPE-PG-FLUTTER-NODEJS.md) — PhonePe integration reference
+
+### For Backend Testing
+
+1. **Complete Flow Testing:** [BACKEND-TESTING-COMPLETE-FLOW.md](./flows/BACKEND-TESTING-COMPLETE-FLOW.md) — Test booking, payment, and payout without Flutter
+2. **Postman Collections:** `server/postman-collections/` — Ready-to-use API test collections
 
 ### For Security Review
 

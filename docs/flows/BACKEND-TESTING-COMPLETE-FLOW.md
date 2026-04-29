@@ -66,7 +66,7 @@ For local smoke tests that do not call external providers, PhonePe and Cashfree 
 | `PHONEPE_MERCHANT_ID` | Production/provider tests | PhonePe merchant ID. Required in production. |
 | `PHONEPE_WEBHOOK_USERNAME` | Production/provider tests | Username configured in PhonePe webhook security. |
 | `PHONEPE_WEBHOOK_PASSWORD` | Production/provider tests | Password configured in PhonePe webhook security. |
-| `PAYMENT_REDIRECT_BASE_URL` | Yes | Backend redirect endpoint passed to PhonePe checkout. |
+| ~~`PAYMENT_REDIRECT_BASE_URL`~~ | ~~Deprecated~~ | ~~Old web redirect flow only~~ |
 | `CASHFREE_PAYOUT_ENV` | Yes | `TEST` or `PRODUCTION`; controls Cashfree payout base URL. |
 | `CASHFREE_PAYOUT_CLIENT_ID` | Production/provider tests | Cashfree Payouts client ID. Required in production. |
 | `CASHFREE_PAYOUT_CLIENT_SECRET` | Production/provider tests | Cashfree Payouts client secret and webhook HMAC secret. Required in production. |
@@ -174,7 +174,7 @@ Run `14-payments-payouts.json` -> `1. Initiate Payment`.
 Request:
 
 ```http
-POST /api/v1/payments/initiate
+POST /api/v1/payments
 Authorization: Bearer {{customer_access_token}}
 Content-Type: application/json
 ```
@@ -185,25 +185,56 @@ Content-Type: application/json
 }
 ```
 
-Expected result:
+Expected result (Native SDK):
 
 ```json
 {
   "success": true,
   "message": "Payment initiated",
   "data": {
-    "redirectUrl": "https://...",
     "paymentId": "65f1e7a125d0dc001f2a2001",
-    "merchantOrderId": "EC-..."
+    "bookingId": "booking_id",
+    "merchantOrderId": "EC-...",
+    "orderId": "OMO123456789",
+    "token": "eyJhbGci...",
+    "merchantId": "MERCHANT_ID",
+    "amountInPaisa": 30300,
+    "amountInRupees": 303,
+    "state": "PENDING",
+    "expiresAt": 1234567890000,
+    "gateway": "phonepe",
+    "paymentFlow": "PHONEPE_SDK"
   }
 }
 ```
+
+**Note:** Response includes `orderId`, `token`, `merchantId` for Flutter SDK launch (NO `redirectUrl`).
 
 The collection captures `payment_id` and `merchant_order_id`.
 
 ### 3.4 Verify Payment Status
 
-Run `14-payments-payouts.json` -> `2. Get Payment Status`.
+Run `14-payments-payouts.json` -> `2. Verify Payment`.
+
+**Note:** In production, Flutter calls this after PhonePe SDK callback. For backend testing, simulate SDK callback:
+
+Request:
+
+```http
+POST /api/v1/payments/:paymentId/verify
+Authorization: Bearer {{customer_access_token}}
+Content-Type: application/json
+```
+
+```json
+{
+  "sdkStatus": "SUCCESS",
+  "sdkResponseCode": "PAYMENT_SUCCESS",
+  "sdkMessage": "Payment completed successfully"
+}
+```
+
+Backend action: Polls PhonePe Order Status API to verify actual payment state.
 
 Expected statuses:
 
@@ -232,10 +263,10 @@ Expected backend behavior:
 
 1. Payment transaction becomes `completed`.
 2. Booking `paymentStatus` becomes `success`.
-3. Booking `status` becomes `confirmed`.
+3. Booking `status` becomes `awaiting_confirmation`.
 4. Endpoint returns HTTP 200 with `{ "received": true }`.
 
-If the `merchant_order_id` does not exist, the endpoint still returns 200 because provider webhook endpoints acknowledge receipt, but logs show that no payment was found.
+**Note:** Webhook is a backup reliability mechanism. Primary verification is via the verify endpoint.
 
 ### 3.6 Refund Before Payout
 

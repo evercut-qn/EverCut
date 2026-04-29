@@ -9,7 +9,7 @@
 ## Table of Contents
 
 1. [Summary](#summary)
-2. [Key Issues in Current Flow](#key-issues-in-current-flow)
+2. [Key Issues](#key-issues)
 3. [Final Optimized Flow](#final-optimized-flow)
 4. [API Integration Design](#api-integration-design)
 5. [Payment Flow](#payment-flow)
@@ -37,7 +37,7 @@ This guide provides a production-ready Flutter booking flow that is **strictly a
 
 ---
 
-## Key Issues in Current Flow
+## Key Issues
 
 Based on backend analysis, common issues in booking flows include:
 
@@ -129,18 +129,18 @@ Based on backend analysis, common issues in booking flows include:
 
 10. Payment Initiation
     ├─ POST /api/v1/payments (bookingId)
-    ├─ Get redirectUrl
-    └─ Open payment gateway (WebView or external browser)
+    ├─ Get orderId, token, merchantId
+    └─ Launch PhonePe SDK natively
 
 11. Payment Processing
-    ├─ User completes payment in gateway
-    ├─ Gateway redirects to app via deep link
-    └─ Deep link delivers bookingId to DeepLinkHandler
-        NOTE: Do NOT trust gateway result.success — always verify with backend.
+    ├─ PhonePe SDK handles payment in-app
+    ├─ SDK returns callback to Flutter
+    └─ Flutter calls POST /api/v1/payments/:paymentId/verify
+        NOTE: SDK callback is informational only — always verify with backend.
 
-12. Payment Verification (triggered by deep link, not gateway result)
-    ├─ GET /api/v1/bookings/:id/payment
-    ├─ Poll until status != 'pending' (capped exponential backoff)
+12. Payment Verification (triggered by SDK callback)
+    ├─ POST /api/v1/payments/:paymentId/verify (with SDK status)
+    ├─ Backend polls PhonePe Order Status API
     ├─ Handle success/failure/pending-timeout
     └─ Navigate to appropriate screen
 
@@ -273,12 +273,26 @@ Future<PaymentResult> initiatePayment(String bookingId) async {
   final response = await _dio.post('/api/v1/payments', data: {
     'bookingId': bookingId,
   });
-  return PaymentResult.fromJson(response.data);
+  return PaymentResult.fromJson(response.data['data']);
 }
 
-Future<PaymentStatus> getPaymentStatus(String bookingId) async {
-  final response = await _dio.get('/api/v1/bookings/$bookingId/payment');
-  return PaymentStatus.fromJson(response.data);
+Future<PaymentStatus> verifyPayment({
+  required String paymentId,
+  required String sdkStatus,
+  required String sdkResponseCode,
+  required String sdkMessage,
+}) async {
+  final response = await _dio.post('/api/v1/payments/$paymentId/verify', data: {
+    'sdkStatus': sdkStatus,
+    'sdkResponseCode': sdkResponseCode,
+    'sdkMessage': sdkMessage,
+  });
+  return PaymentStatus.fromJson(response.data['data']);
+}
+
+Future<PaymentStatus> getPaymentStatus(String paymentId) async {
+  final response = await _dio.get('/api/v1/payments/$paymentId');
+  return PaymentStatus.fromJson(response.data['data']);
 }
 ```
 
@@ -293,11 +307,15 @@ BOOKING CREATED (status: pending)
          ↓
 PAYMENT INITIATED (paymentStatus: initiated)
          ↓
-USER PAYS IN GATEWAY
+FLUTTER LAUNCHES PHONEPE SDK (native in-app)
          ↓
-DEEP LINK RECEIVED → DeepLinkHandler triggers backend verification
+USER COMPLETES PAYMENT IN PHONEPE APP
          ↓
-WEBHOOK RECEIVED (paymentStatus: success, status: awaiting_confirmation)
+SDK CALLBACK TO FLUTTER (informational only)
+         ↓
+FLUTTER CALLS VERIFY ENDPOINT → Backend polls PhonePe Order Status
+         ↓
+WEBHOOK RECEIVED (backup reliability, paymentStatus: success, status: awaiting_confirmation)
          ↓
 BARBER CONFIRMS (status: confirmed) OR AUTO-CANCEL (status: cancelled)
          ↓
@@ -306,43 +324,91 @@ SERVICE COMPLETED (status: completed)
 
 ### 2. **Flutter Payment Implementation**
 
-**Important:** `_launchPaymentGateway` launches the gateway and returns when the user exits
-(via back button, deep link, or error). Do NOT trust its return value for payment status.
-Payment verification is always triggered by the deep link handler.
+**Critical:** Native SDK flow does NOT use `redirectUrl`. Flutter launches PhonePe SDK directly.
 
 ```dart
 class PaymentFlow {
   Future<void> processPayment(String bookingId) async {
     try {
-      // 1. Initiate payment
+      // 1. Initiate payment - get SDK credentials
       final paymentResult = await _bookingService.initiatePayment(bookingId);
 
-      // 2. Open payment gateway — blocks until user exits gateway
-      await _launchPaymentGateway(paymentResult.redirectUrl);
+      // 2. Launch PhonePe SDK with credentials
+      final sdkResult = await _launchPhonePeSDK(
+        orderId: paymentResult.orderId,
+        token: paymentResult.token,
+        merchantId: paymentResult.merchantId,
+      );
 
-      // 3. Do NOT verify here — verification is always handled by DeepLinkHandler
-      //    after gateway redirects to evercut://payment-result?bookingId=...
-      //    If deep link is not received (e.g., app killed), show a "Check Status" prompt.
+      // 3. Verify payment with backend (ALWAYS, regardless of SDK result)
+      await _verifyPaymentWithBackend(
+        paymentId: paymentResult.paymentId,
+        sdkStatus: sdkResult.status,
+        sdkResponseCode: sdkResult.responseCode,
+        sdkMessage: sdkResult.message,
+      );
     } catch (e) {
       await _handlePaymentError(bookingId, e);
     }
   }
 
-  /// Called by DeepLinkHandler — the single source of truth for payment verification.
-  Future<void> verifyPayment(String bookingId) async {
+  /// Launch PhonePe SDK natively
+  Future<SDKResult> _launchPhonePeSDK({
+    required String orderId,
+    required String token,
+    required String merchantId,
+  }) async {
+    final Map<String, dynamic> payloadMap = {
+      'orderId': orderId,
+      'merchantId': merchantId,
+      'token': token,
+      'paymentMode': {'type': 'PAY_PAGE'},
+    };
+    final String request = jsonEncode(payloadMap);
+
+    final Map<dynamic, dynamic>? sdkResponse =
+        await PhonePePaymentSdk.startTransaction(request, _iosAppSchema);
+
+    if (sdkResponse == null) {
+      return SDKResult(
+        status: 'INCOMPLETE',
+        responseCode: 'USER_CANCELLED',
+        message: 'Transaction not completed',
+      );
+    }
+
+    return SDKResult(
+      status: sdkResponse['status']?.toString() ?? 'UNKNOWN',
+      responseCode: sdkResponse['code']?.toString() ?? '',
+      message: sdkResponse['message']?.toString() ?? '',
+    );
+  }
+
+  /// Verify payment with backend - ALWAYS call this after SDK callback
+  Future<void> _verifyPaymentWithBackend({
+    required String paymentId,
+    required String sdkStatus,
+    required String sdkResponseCode,
+    required String sdkMessage,
+  }) async {
     const maxAttempts = 10;
     const baseDelay = Duration(seconds: 2);
-    const maxDelay = Duration(seconds: 30); // Cap backoff at 30s
+    const maxDelay = Duration(seconds: 30);
 
     for (int attempt = 0; attempt < maxAttempts; attempt++) {
       try {
-        final status = await _bookingService.getPaymentStatus(bookingId);
+        final status = await _bookingService.verifyPayment(
+          paymentId: paymentId,
+          sdkStatus: sdkStatus,
+          sdkResponseCode: sdkResponseCode,
+          sdkMessage: sdkMessage,
+        );
 
-        if (status.status == 'success') {
-          await _handlePaymentSuccess(bookingId);
+        if (status.status == 'completed') {
+          await _handlePaymentSuccess(status.bookingId);
           return;
         } else if (status.status == 'failed') {
-          await _handlePaymentFailure(bookingId, status.error);
+          await _handlePaymentFailure(status.bookingId, status.error);
           return;
         }
 
@@ -351,28 +417,26 @@ class PaymentFlow {
         await Future.delayed(delay > maxDelay ? maxDelay : delay);
       } catch (e) {
         if (attempt == maxAttempts - 1) {
-          await _handlePaymentError(bookingId, e);
+          await _handlePaymentError(paymentId, e);
         }
       }
     }
 
     // Timeout — ask user to check booking status manually
-    await _handlePaymentTimeout(bookingId);
+    await _handlePaymentTimeout(paymentId);
   }
 }
-```
 
-### 3. **Deep Link Handling**
+class SDKResult {
+  final String status;
+  final String responseCode;
+  final String message;
 
-```dart
-class DeepLinkHandler {
-  // Registered as the app's URI listener for evercut://payment-result
-  void handlePaymentReturn(Uri uri) {
-    final bookingId = uri.queryParameters['bookingId'];
-    if (bookingId == null) return;
-    // Always verify with backend — never trust deep link params for status
-    _paymentFlow.verifyPayment(bookingId);
-  }
+  SDKResult({
+    required this.status,
+    required this.responseCode,
+    required this.message,
+  });
 }
 ```
 
