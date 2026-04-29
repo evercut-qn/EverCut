@@ -135,6 +135,7 @@ Bookings now use normalized `HH:MM` time and an atomic multi-slot lock. If a 60-
 - Update and reschedule are blocked once payment has started.
 - Failed, expired, or suspicious payment sessions cancel the unpaid booking and release slot locks.
 - Bundle bookings below the configured minimum amount are rejected before any slot is locked.
+- **Booking Window:** Bookings can only be made for dates from today up to 7 days in advance.
 - **Multi-Service Support:** You can select multiple services, bundles, or a combination of both in a single booking.
   - Maximum 10 services per booking
   - Maximum 8 hours (480 minutes) total duration

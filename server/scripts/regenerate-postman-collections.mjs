@@ -188,10 +188,10 @@ const collectionPreRequest = ({
       "  return date;",
       "};",
       "const toIsoDate = (date) => date.toISOString().slice(0, 10);",
-      "pm.collectionVariables.set('booking_date', toIsoDate(nextWorkingDay(2)));",
-      "pm.collectionVariables.set('booking_update_date', toIsoDate(nextWorkingDay(3)));",
-      "pm.collectionVariables.set('booking_reschedule_date', toIsoDate(nextWorkingDay(4)));",
-      "pm.collectionVariables.set('booking_reorder_date', toIsoDate(nextWorkingDay(5)));",
+      "pm.collectionVariables.set('booking_date', toIsoDate(nextWorkingDay(1)));",
+      "pm.collectionVariables.set('booking_update_date', toIsoDate(nextWorkingDay(2)));",
+      "pm.collectionVariables.set('booking_reschedule_date', toIsoDate(nextWorkingDay(3)));",
+      "pm.collectionVariables.set('booking_reorder_date', toIsoDate(nextWorkingDay(4)));",
       "pm.collectionVariables.set('calendar_date', toIsoDate(nextWorkingDay(2)));",
       "pm.collectionVariables.set('booking_time', '11:00');",
       "pm.collectionVariables.set('booking_update_time', '12:00');",
@@ -803,7 +803,7 @@ const customerBookingsCollection = {
   "date": "{{booking_update_date}}",
   "time": "{{booking_update_time}}"
 }`),
-        description: 'Updates the booking using the real validator shape: all three fields are required.',
+        description: 'Updates the booking using the real validator shape: all three fields are required. Note: 7-day advance booking window applies.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
     },
@@ -817,7 +817,7 @@ const customerBookingsCollection = {
   "newDate": "{{booking_reschedule_date}}",
   "newTime": "{{booking_reschedule_time}}"
 }`),
-        description: 'Reschedules the current booking to a later generated date and time.',
+        description: 'Reschedules the current booking to a later generated date and time. Limited to once per booking. 7-day advance booking window applies.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
     },
@@ -831,7 +831,7 @@ const customerBookingsCollection = {
   "date": "{{booking_reorder_date}}",
   "time": "{{booking_reorder_time}}"
 }`),
-        description: 'Creates a fresh booking from the current one. The API expects `date` and `time`, not `newDate` and `newTime`.',
+        description: 'Creates a fresh booking from the current one. The API expects `date` and `time`, not `newDate` and `newTime`. 7-day advance booking window applies.',
         event: testEvent(
           "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
           'const response = pm.response.json();',
@@ -935,7 +935,7 @@ const customerShopDiscoveryCollection = {
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/employees/{{employee_id}}/available-slots?date={{booking_date}}&serviceId={{service_id}}',
-        description: 'Returns available time slots for the employee considering service duration, booked slots, and blocked dates.',
+        description: 'Returns available time slots for the employee considering service duration, booked slots, and blocked dates. 7-day advance booking window applies.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           'const response = pm.response.json();',
@@ -953,7 +953,7 @@ const customerShopDiscoveryCollection = {
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/shops/{{shop_id}}/availability?date={{booking_date}}&serviceId={{service_id}}',
-        description: 'Returns availability across all employees for the shop, including first available slot suggestion.',
+        description: 'Returns availability across all employees for the shop, including first available slot suggestion. 7-day advance booking window applies.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           'const response = pm.response.json();',

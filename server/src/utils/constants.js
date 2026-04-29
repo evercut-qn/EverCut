@@ -127,6 +127,7 @@ export const REFUND_FEES = Object.freeze({
 export const BOOKING_LIMITS = Object.freeze({
     MAX_SERVICES_PER_BOOKING: 10,      // Maximum 10 services/bundles per booking
     MAX_BOOKING_DURATION_MINUTES: 480, // Maximum 8 hours per booking
+    MAX_ADVANCE_BOOKING_DAYS: 7,       // Maximum 7 days in advance
 });
 
 // ---------------------------------------------------------------------------

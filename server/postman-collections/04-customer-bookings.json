@@ -55,10 +55,10 @@
           "  return date;",
           "};",
           "const toIsoDate = (date) => date.toISOString().slice(0, 10);",
-          "pm.collectionVariables.set('booking_date', toIsoDate(nextWorkingDay(2)));",
-          "pm.collectionVariables.set('booking_update_date', toIsoDate(nextWorkingDay(3)));",
-          "pm.collectionVariables.set('booking_reschedule_date', toIsoDate(nextWorkingDay(4)));",
-          "pm.collectionVariables.set('booking_reorder_date', toIsoDate(nextWorkingDay(5)));",
+          "pm.collectionVariables.set('booking_date', toIsoDate(nextWorkingDay(1)));",
+          "pm.collectionVariables.set('booking_update_date', toIsoDate(nextWorkingDay(2)));",
+          "pm.collectionVariables.set('booking_reschedule_date', toIsoDate(nextWorkingDay(3)));",
+          "pm.collectionVariables.set('booking_reorder_date', toIsoDate(nextWorkingDay(4)));",
           "pm.collectionVariables.set('calendar_date', toIsoDate(nextWorkingDay(2)));",
           "pm.collectionVariables.set('booking_time', '11:00');",
           "pm.collectionVariables.set('booking_update_time', '12:00');",
@@ -371,7 +371,7 @@
           }
         ],
         "url": "{{base_url}}/{{api_prefix}}/bookings/{{booking_id}}",
-        "description": "Updates the booking using the real validator shape: all three fields are required.",
+        "description": "Updates the booking using the real validator shape: all three fields are required. Note: 7-day advance booking window applies.",
         "body": {
           "mode": "raw",
           "raw": "{\n  \"employeeId\": \"{{employee_id}}\",\n  \"date\": \"{{booking_update_date}}\",\n  \"time\": \"{{booking_update_time}}\"\n}",
@@ -414,7 +414,7 @@
           }
         ],
         "url": "{{base_url}}/{{api_prefix}}/bookings/{{booking_id}}/reschedule",
-        "description": "Reschedules the current booking to a later generated date and time.",
+        "description": "Reschedules the current booking to a later generated date and time. Limited to once per booking. 7-day advance booking window applies.",
         "body": {
           "mode": "raw",
           "raw": "{\n  \"newDate\": \"{{booking_reschedule_date}}\",\n  \"newTime\": \"{{booking_reschedule_time}}\"\n}",
@@ -457,7 +457,7 @@
           }
         ],
         "url": "{{base_url}}/{{api_prefix}}/bookings/{{booking_id}}/reorder",
-        "description": "Creates a fresh booking from the current one. The API expects `date` and `time`, not `newDate` and `newTime`.",
+        "description": "Creates a fresh booking from the current one. The API expects `date` and `time`, not `newDate` and `newTime`. 7-day advance booking window applies.",
         "body": {
           "mode": "raw",
           "raw": "{\n  \"date\": \"{{booking_reorder_date}}\",\n  \"time\": \"{{booking_reorder_time}}\"\n}",

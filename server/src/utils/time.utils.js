@@ -99,6 +99,38 @@ export const isWithinShopHours = (timeStr, openTime, closeTime) => {
 };
 
 /**
+ * Check whether a booking date is within the allowed advance booking window.
+ *
+ * @param   {string}  dateStr - Date in YYYY-MM-DD format
+ * @param   {number}  maxAdvanceDays - Maximum days in advance (default: 7)
+ * @param   {Date}    [now] - Current date for testing
+ * @returns {boolean}
+ */
+export const isWithinBookingWindow = (dateStr, maxAdvanceDays = 7, now = new Date()) => {
+    const bookingDate = new Date(dateStr);
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()); // Start of today
+    const maxDate = new Date(today);
+    maxDate.setDate(today.getDate() + maxAdvanceDays);
+
+    // Booking date must be >= today and <= today + maxAdvanceDays
+    return bookingDate >= today && bookingDate <= maxDate;
+};
+
+/**
+ * Check whether a booking date and time is valid for booking.
+ * Combines future check and booking window check.
+ *
+ * @param   {string}  dateStr
+ * @param   {string}  timeStr
+ * @param   {number}  maxAdvanceDays
+ * @param   {Date}    [now]
+ * @returns {boolean}
+ */
+export const isValidBookingDateTime = (dateStr, timeStr, maxAdvanceDays = 7, now = new Date()) => {
+    return isBookingInFuture(dateStr, timeStr, now) && isWithinBookingWindow(dateStr, maxAdvanceDays, now);
+};
+
+/**
  * Get the full weekday name for a given date string.
  *
  * @param   {string} dateStr

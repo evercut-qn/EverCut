@@ -10,6 +10,8 @@ import {
     getDayOfWeek,
     isWithinCancellationWindow,
     toTwentyFourHourTime,
+    isValidBookingDateTime,
+    isWithinBookingWindow,
 } from '../utils/time.utils.js';
 import { buildPagination } from '../utils/pagination.utils.js';
 import {
@@ -149,9 +151,12 @@ export const bookSalon = async (userId, data) => {
     if (!customer) throw new NotFoundError('Customer profile');
     const customerId = customer._id;
 
-    // Validate date/time is in future
-    if (!isBookingInFuture(date, normalizedTime)) {
-        throw new BadRequestError('Cannot book in the past. Please select a future date and time.');
+    // Validate date/time is in future and within booking window
+    if (!isValidBookingDateTime(date, normalizedTime, BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS)) {
+        if (!isBookingInFuture(date, normalizedTime)) {
+            throw new BadRequestError('Cannot book in the past. Please select a future date and time.');
+        }
+        throw new BadRequestError(`Bookings can only be made up to ${BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS} days in advance.`);
     }
 
     // Validate shop
@@ -363,8 +368,11 @@ export const rescheduleBooking = async (bookingId, userId, newDate, newTime) => 
         throw new BadRequestError('Appointment has already passed');
     }
 
-    if (!isBookingInFuture(newDate, normalizedNewTime)) {
-        throw new BadRequestError('Cannot reschedule to a past date/time');
+    if (!isValidBookingDateTime(newDate, normalizedNewTime, BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS)) {
+        if (!isBookingInFuture(newDate, normalizedNewTime)) {
+            throw new BadRequestError('Cannot reschedule to a past date/time');
+        }
+        throw new BadRequestError(`Bookings can only be made up to ${BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS} days in advance.`);
     }
 
     if (isWithinCancellationWindow(booking.date, booking.time, CANCELLATION_WINDOW_HOURS)) {
@@ -425,8 +433,11 @@ export const reorderBooking = async (userId, bookingId, newDate, newTime) => {
         throw new BadRequestError('Please choose a different date or time');
     }
 
-    if (!isBookingInFuture(newDate, normalizedNewTime)) {
-        throw new BadRequestError('Cannot book for a past date/time');
+    if (!isValidBookingDateTime(newDate, normalizedNewTime, BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS)) {
+        if (!isBookingInFuture(newDate, normalizedNewTime)) {
+            throw new BadRequestError('Cannot book for a past date/time');
+        }
+        throw new BadRequestError(`Bookings can only be made up to ${BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS} days in advance.`);
     }
 
     const services = normalizeBookedServices(
@@ -569,8 +580,11 @@ export const updateBooking = async (bookingId, userId, { employeeId, date, time 
 
     assertBookingCanChangeBeforePayment(booking);
 
-    if (!isBookingInFuture(date, normalizedTime)) {
-        throw new BadRequestError('Cannot update to a past date/time');
+    if (!isValidBookingDateTime(date, normalizedTime, BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS)) {
+        if (!isBookingInFuture(date, normalizedTime)) {
+            throw new BadRequestError('Cannot update to a past date/time');
+        }
+        throw new BadRequestError(`Bookings can only be made up to ${BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS} days in advance.`);
     }
 
     const oldDate = booking.date.toISOString().split('T')[0];
@@ -625,6 +639,11 @@ export const getEmployeeCalendar = async (employeeId, date) => {
 
     if (date < todayStr) throw new BadRequestError('Cannot fetch past bookings');
 
+    // Check if date is within booking window
+    if (!isWithinBookingWindow(date, BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS, now)) {
+        throw new BadRequestError(`Calendar can only be viewed up to ${BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS} days in advance.`);
+    }
+
     let bookings = await bookingRepository.findByEmployeeAndDate(employeeId, date);
 
     // For today, filter to future-only slots
@@ -663,6 +682,11 @@ export const getAvailableSlots = async (employeeId, date, serviceId) => {
 
     if (date < todayStr) {
         throw new BadRequestError('Cannot fetch availability for past dates');
+    }
+
+    // Check if date is within booking window
+    if (!isWithinBookingWindow(date, BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS, now)) {
+        throw new BadRequestError(`Availability can only be checked up to ${BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS} days in advance.`);
     }
 
     // Normalize serviceIds to array
@@ -760,6 +784,11 @@ export const getShopAvailability = async (shopId, date, serviceId) => {
 
     if (date < todayStr) {
         throw new BadRequestError('Cannot fetch availability for past dates');
+    }
+
+    // Check if date is within booking window
+    if (!isWithinBookingWindow(date, BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS, now)) {
+        throw new BadRequestError(`Availability can only be checked up to ${BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS} days in advance.`);
     }
 
     // Normalize serviceIds to array
