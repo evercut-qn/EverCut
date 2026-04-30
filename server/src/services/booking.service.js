@@ -133,15 +133,31 @@ const buildBookingDetailsPayload = async (booking) => {
     );
     const totalAmount = sumServicePrices(services);
 
+    // Calculate platform fee
+    const isBundled = isBundleSelection(services);
+    const platformFee = isBundled ? 10 : 3;
+
     return {
         bookingId: booking._id,
-        customer: booking.customerId,
-        employee: booking.employeeId,
+        customer: {
+            ...booking.customerId,
+            fullName: booking.customerId
+                ? `${booking.customerId.firstName || ''} ${booking.customerId.lastName || ''}`.trim()
+                : null,
+        },
+        employee: {
+            ...booking.employeeId,
+            fullName: booking.employeeId
+                ? `${booking.employeeId.firstName || ''} ${booking.employeeId.lastName || ''}`.trim()
+                : null,
+        },
         shop: booking.shopId,
         date: booking.date,
         time: booking.time,
         services,
-        totalAmount,
+        subTotal: totalAmount,
+        platformFee,
+        totalAmount: totalAmount + platformFee,
         totalServices: services.length,
         status: booking.status,
         paymentStatus: booking.paymentStatus,

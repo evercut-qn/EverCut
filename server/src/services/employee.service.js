@@ -233,6 +233,122 @@ export const getEmployees = async (ownerId, query = {}) => {
     return { items, pagination };
 };
 
+export const getEmployeeById = async (ownerId, employeeId) => {
+    const shop = await shopRepository.findByOwnerId(ownerId);
+    if (!shop) throw new NotFoundError('Shop profile');
+
+    const employee = await employeeRepository.findById(employeeId);
+    if (!employee || String(employee.shopId) !== String(shop._id)) {
+        throw new NotFoundError('Employee');
+    }
+
+    // Get today's bookings for this employee
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const todaysBookings = await bookingRepository.findByEmployeeIds(
+        [employee._id],
+        {
+            date: { $gte: today, $lt: tomorrow },
+            status: { $nin: ['cancelled'] },
+        },
+        {},
+    );
+
+    // Calculate today's statistics
+    const completedToday = todaysBookings.filter(
+        (b) => b.status === 'completed' || b.status === 'no-show',
+    ).length;
+    const pendingToday = todaysBookings.filter(
+        (b) => b.status === 'pending' || b.status === 'awaiting_confirmation' || b.status === 'confirmed',
+    ).length;
+
+    // Get total completed bookings (all time)
+    const allBookings = await bookingRepository.findByEmployeeIds(
+        [employee._id],
+        { status: { $in: ['completed', 'no-show'] } },
+        {},
+    );
+
+    // Calculate total earnings
+    const totalEarnings = allBookings.reduce((sum, booking) => sum + (booking.totalAmount || 0), 0);
+
+    // Get this month's bookings
+    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    
+    const monthBookings = await bookingRepository.findByEmployeeIds(
+        [employee._id],
+        {
+            date: { $gte: startOfMonth, $lte: endOfMonth },
+            status: { $in: ['completed', 'no-show'] },
+        },
+        {},
+    );
+
+    const monthlyEarnings = monthBookings.reduce((sum, booking) => sum + (booking.totalAmount || 0), 0);
+
+    // Get upcoming bookings (next 7 days)
+    const nextWeek = new Date(today);
+    nextWeek.setDate(nextWeek.getDate() + 7);
+
+    const upcomingBookings = await bookingRepository.findByEmployeeIds(
+        [employee._id],
+        {
+            date: { $gte: today, $lte: nextWeek },
+            status: { $nin: ['cancelled', 'completed', 'no-show'] },
+        },
+        {},
+    );
+
+    return {
+        employee: {
+            _id: employee._id,
+            firstName: employee.firstName,
+            lastName: employee.lastName,
+            fullName: `${employee.firstName} ${employee.lastName}`,
+            phoneNumber: employee.phoneNumber,
+            gender: employee.gender,
+            dateOfBirth: employee.dateOfBirth,
+            photoUrl: employee.photoUrl,
+            workingHours: employee.workingHours,
+            blockedDates: employee.blockedDates,
+            isActive: employee.isActive,
+            createdAt: employee.createdAt,
+        },
+        statistics: {
+            today: {
+                total: todaysBookings.length,
+                completed: completedToday,
+                pending: pendingToday,
+            },
+            allTime: {
+                totalBookings: allBookings.length,
+                totalEarnings,
+            },
+            thisMonth: {
+                totalBookings: monthBookings.length,
+                totalEarnings: monthlyEarnings,
+            },
+            upcoming: {
+                count: upcomingBookings.length,
+                bookings: upcomingBookings.slice(0, 5).map((b) => ({
+                    bookingId: b._id,
+                    date: b.date,
+                    time: b.time,
+                    customer: {
+                        name: `${b.customerId?.firstName || ''} ${b.customerId?.lastName || ''}`.trim(),
+                    },
+                    services: b.serviceIds?.map((s) => s.serviceName) || [],
+                    status: b.status,
+                })),
+            },
+        },
+    };
+};
+
 export const updateEmployee = async (ownerId, employeeId, data, file) => {
     const shop = await shopRepository.findByOwnerId(ownerId);
     if (!shop) throw new NotFoundError('Shop profile');

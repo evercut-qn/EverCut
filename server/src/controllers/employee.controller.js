@@ -23,6 +23,16 @@ export const getEmployees = async (req, res, next) => {
     }
 };
 
+export const getEmployeeById = async (req, res, next) => {
+    try {
+        const params = getValidatedRequestData(req, 'params');
+        const result = await employeeService.getEmployeeById(req.user._id, params.id);
+        return res.status(200).json(ApiResponse.success(result, 'Employee details fetched'));
+    } catch (err) {
+        next(err);
+    }
+};
+
 export const updateEmployee = async (req, res, next) => {
     try {
         const params = getValidatedRequestData(req, 'params');

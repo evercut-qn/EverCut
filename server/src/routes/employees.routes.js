@@ -36,6 +36,7 @@ router.get(
 router.use(authenticate, authorize(ROLES.BARBER));
 
 router.get('/', validate(paginationSchema, 'query'), employeeController.getEmployees);
+router.get('/:id', validate(employeeIdParamSchema, 'params'), employeeController.getEmployeeById);
 router.post('/', uploadEmployeePhoto, validate(addEmployeeSchema, 'body'), employeeController.addEmployee);
 router.put('/:id', validate(employeeIdParamSchema, 'params'), uploadEmployeePhoto, validate(updateEmployeeSchema, 'body'), employeeController.updateEmployee);
 router.delete('/:id', validate(employeeIdParamSchema, 'params'), employeeController.deleteEmployee);

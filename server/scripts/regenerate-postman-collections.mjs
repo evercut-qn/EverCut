@@ -1050,7 +1050,28 @@ const barberEmployeesCollection = {
       }),
     },
     {
-      name: '2. Add Employee',
+      name: '2. Get Employee Details',
+      ...request({
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/employees/{{employee_id}}',
+        description: 'Returns comprehensive employee information including profile, today\'s statistics, all-time statistics, monthly statistics, and upcoming bookings.',
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          "const response = pm.response.json();",
+          "const data = response.data || {};",
+          "pm.test('response includes employee profile', function () { pm.expect(data).to.have.property('employee'); });",
+          "pm.test('response includes statistics', function () { pm.expect(data).to.have.property('statistics'); });",
+          "if (data.statistics) {",
+          "  pm.test('statistics includes today', function () { pm.expect(data.statistics).to.have.property('today'); });",
+          "  pm.test('statistics includes allTime', function () { pm.expect(data.statistics).to.have.property('allTime'); });",
+          "  pm.test('statistics includes thisMonth', function () { pm.expect(data.statistics).to.have.property('thisMonth'); });",
+          "  pm.test('statistics includes upcoming', function () { pm.expect(data.statistics).to.have.property('upcoming'); });",
+          "}"
+        ),
+      }),
+    },
+    {
+      name: '3. Add Employee',
       ...request({
         method: 'POST',
         url: '{{base_url}}/{{api_prefix}}/employees',
@@ -1079,7 +1100,7 @@ const barberEmployeesCollection = {
       }),
     },
     {
-      name: '3. Update Employee',
+      name: '4. Update Employee',
       ...request({
         method: 'PUT',
         url: '{{base_url}}/{{api_prefix}}/employees/{{employee_id}}',
@@ -1095,7 +1116,7 @@ const barberEmployeesCollection = {
       }),
     },
     {
-      name: '4. Delete Employee (Terminal)',
+      name: '5. Delete Employee (Terminal)',
       ...request({
         method: 'DELETE',
         url: '{{base_url}}/{{api_prefix}}/employees/{{employee_id}}',
@@ -1906,6 +1927,114 @@ const paymentsPayoutsCollection = {
   ],
 };
 
+const dashboardCollection = {
+  info: {
+    name: 'EverCut - Dashboard',
+    description: 'Dashboard analytics collection for barber shop owners. Provides real-time occupancy metrics, staff availability, today\'s queue, and comprehensive overview. All endpoints require BARBER role authentication.',
+    schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
+  },
+  auth: bearerAuth('barber_access_token'),
+  event: collectionPreRequest(),
+  variable: [...baseVariables()],
+  item: [
+    {
+      name: '1. Get Dashboard Overview',
+      ...request({
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/dashboard/overview',
+        description: 'Returns all dashboard sections in a single response: pulse metrics, staff availability, and today\'s queue. Optimized for efficient dashboard loading.',
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          "const response = pm.response.json();",
+          "const data = response.data || {};",
+          "pm.test('response includes pulse', function () { pm.expect(data).to.have.property('pulse'); });",
+          "pm.test('response includes staff', function () { pm.expect(data).to.have.property('staff'); });",
+          "pm.test('response includes queue', function () { pm.expect(data).to.have.property('queue'); });"
+        ),
+      }),
+    },
+    {
+      name: '2. Get Today\'s Pulse',
+      ...request({
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/dashboard/pulse',
+        description: 'Returns real-time occupancy metrics and booking status breakdown for today. Shows booked vs total capacity and counts for All, Pending, Done, and Cancelled bookings.',
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          "const response = pm.response.json();",
+          "const data = response.data || {};",
+          "pm.test('response includes occupancy', function () { pm.expect(data).to.have.property('occupancy'); });",
+          "pm.test('response includes statusBreakdown', function () { pm.expect(data).to.have.property('statusBreakdown'); });",
+          "if (data.occupancy) {",
+          "  pm.test('occupancy has required fields', function () {",
+          "    pm.expect(data.occupancy).to.have.property('booked');",
+          "    pm.expect(data.occupancy).to.have.property('total');",
+          "    pm.expect(data.occupancy).to.have.property('percentage');",
+          "  });",
+          "}"
+        ),
+      }),
+    },
+    {
+      name: '3. Get Staff Availability',
+      ...request({
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/dashboard/staff',
+        description: 'Returns staff availability and progress tracking for today. Shows each employee\'s completed vs total appointments with progress percentage.',
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          "const response = pm.response.json();",
+          "const data = response.data || {};",
+          "pm.test('response includes staff array', function () { pm.expect(data).to.have.property('staff'); });",
+          "pm.test('response includes totalStaff', function () { pm.expect(data).to.have.property('totalStaff'); });",
+          "if (Array.isArray(data.staff) && data.staff.length > 0) {",
+          "  const firstStaff = data.staff[0];",
+          "  pm.test('staff item has required fields', function () {",
+          "    pm.expect(firstStaff).to.have.property('employeeId');",
+          "    pm.expect(firstStaff).to.have.property('name');",
+          "    pm.expect(firstStaff).to.have.property('progress');",
+          "  });",
+          "}"
+        ),
+      }),
+    },
+    {
+      name: '4. Get Today\'s Queue (Active)',
+      ...request({
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/dashboard/queue?filter=active',
+        description: 'Returns today\'s active appointments (within ±30 minutes of current time). Shows customer name, employee name, time, and services.',
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          "const response = pm.response.json();",
+          "const data = response.data || {};",
+          "pm.test('response includes filter', function () { pm.expect(data).to.have.property('filter'); });",
+          "pm.test('response includes active', function () { pm.expect(data).to.have.property('active'); });",
+          "pm.test('response includes upcoming', function () { pm.expect(data).to.have.property('upcoming'); });",
+          "pm.test('filter is active', function () { pm.expect(data.filter).to.equal('active'); });"
+        ),
+      }),
+    },
+    {
+      name: '5. Get Today\'s Queue (Upcoming)',
+      ...request({
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/dashboard/queue?filter=upcoming',
+        description: 'Returns today\'s upcoming appointments (more than 30 minutes in the future). Shows customer name, employee name, time, and services.',
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          "const response = pm.response.json();",
+          "const data = response.data || {};",
+          "pm.test('response includes filter', function () { pm.expect(data).to.have.property('filter'); });",
+          "pm.test('response includes active', function () { pm.expect(data).to.have.property('active'); });",
+          "pm.test('response includes upcoming', function () { pm.expect(data).to.have.property('upcoming'); });",
+          "pm.test('filter is upcoming', function () { pm.expect(data.filter).to.equal('upcoming'); });"
+        ),
+      }),
+    },
+  ],
+};
+
 const environmentTemplate = {
   id: 'evercut-local-environment',
   name: 'EverCut Local',
@@ -1944,5 +2073,6 @@ writeCollection('10-barber-bookings.json', barberBookingsCollection);
 writeCollection('11-barber-photos.json', barberPhotosCollection);
 writeCollection('12-barber-earnings.json', barberEarningsCollection);
 writeCollection('13-barber-ratings.json', barberRatingsCollection);
-writeCollection('14-payments-payouts.json', paymentsPayoutsCollection);
+writeCollection('14-dashboard.json', dashboardCollection);
+writeCollection('15-payments-payouts.json', paymentsPayoutsCollection);
 writeFileSync(resolve(COLLECTIONS_DIR, 'EverCut.postman_environment.json'), `${JSON.stringify(environmentTemplate, null, 2)}\n`);
