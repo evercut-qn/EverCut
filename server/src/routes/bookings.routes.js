@@ -37,6 +37,8 @@ router.get('/', authorize(ROLES.CUSTOMER, ROLES.BARBER), validate(bookingListQue
 router.get('/status', authorize(ROLES.BARBER), validate(bookingsByStatusQuerySchema, 'query'), bookingController.getBookingsByStatus);
 router.get('/pending-confirmations', authorize(ROLES.BARBER), validate(paginationQuerySchema, 'query'), bookingController.getPendingConfirmations);
 router.get('/stats', authorize(ROLES.BARBER), bookingController.getBookingStats);
+router.get('/stats/today', authorize(ROLES.BARBER), bookingController.getTodaysPulse);
+router.get('/queue', authorize(ROLES.BARBER), bookingController.getTodaysQueue);
 router.get('/progress', authorize(ROLES.BARBER), validate(bookingMilestoneProgressQuerySchema, 'query'), bookingController.getBookingMilestoneProgress);
 
 // ============================================================================

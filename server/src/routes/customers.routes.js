@@ -14,6 +14,5 @@ router.use(authenticate, authorize(ROLES.CUSTOMER));
 
 router.get('/me', customerController.getMe);
 router.put('/me', uploadCustomerPhoto, validate(updateCustomerSchema, 'body'), customerController.updateMe);
-router.get('/me/home', customerController.getMyHome);
 
 export default router;

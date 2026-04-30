@@ -429,3 +429,68 @@ export const deleteEmployee = async (ownerId, employeeId) => {
 
     return { message: 'Employee deleted successfully' };
 };
+
+// ── Dashboard Analytics (moved from dashboard.service.js) ────────────────
+
+/**
+ * Get staff availability and progress
+ * Shows each employee's daily appointment progress
+ */
+export const getStaffAvailability = async (ownerId) => {
+    const shop = await shopRepository.findByOwnerId(ownerId);
+    if (!shop) throw new NotFoundError('Shop');
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    // Get all active employees
+    const employees = await employeeRepository.findByShopId(shop._id, {});
+    const activeEmployees = employees.filter((emp) => emp.isActive && !emp.deletedAt);
+
+    // Get today's bookings for each employee
+    const staffAvailability = await Promise.all(
+        activeEmployees.map(async (employee) => {
+            const employeeBookings = await bookingRepository.findByEmployeeIds(
+                [employee._id],
+                {
+                    date: { $gte: today, $lt: tomorrow },
+                    status: { $nin: ['cancelled'] },
+                },
+                {},
+            );
+
+            const completedCount = employeeBookings.filter(
+                (b) =>
+                    b.status === 'completed' ||
+                    b.status === 'no-show',
+            ).length;
+
+            const totalCount = employeeBookings.length;
+            const remainingCount = totalCount - completedCount;
+
+            // Calculate progress percentage
+            const progressPercentage =
+                totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+
+            return {
+                employeeId: employee._id,
+                name: `${employee.firstName} ${employee.lastName}`,
+                role: 'Master Barber', // Could be enhanced with actual role field
+                photoUrl: employee.photoUrl,
+                progress: {
+                    completed: completedCount,
+                    total: totalCount,
+                    remaining: remainingCount,
+                    percentage: progressPercentage,
+                },
+            };
+        }),
+    );
+
+    return {
+        staff: staffAvailability,
+        totalStaff: activeEmployees.length,
+    };
+};

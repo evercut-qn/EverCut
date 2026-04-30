@@ -228,3 +228,29 @@ export const getBookingMilestoneProgress = async (req, res, next) => {
         next(err);
     }
 };
+
+/**
+ * Get today's pulse metrics (moved from dashboard)
+ */
+export const getTodaysPulse = async (req, res, next) => {
+    try {
+        const pulse = await bookingService.getTodaysPulse(req.user._id);
+        return res.status(200).json(ApiResponse.success(pulse, 'Today\'s pulse fetched'));
+    } catch (err) {
+        next(err);
+    }
+};
+
+/**
+ * Get today's queue (active/upcoming) (moved from dashboard)
+ */
+export const getTodaysQueue = async (req, res, next) => {
+    try {
+        const query = getValidatedRequestData(req, 'query');
+        const filter = query.filter || 'active';
+        const queue = await bookingService.getTodaysQueue(req.user._id, filter);
+        return res.status(200).json(ApiResponse.success(queue, 'Today\'s queue fetched'));
+    } catch (err) {
+        next(err);
+    }
+};

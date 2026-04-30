@@ -421,7 +421,7 @@ const onboardingCollection = {
 const customerCollection = {
   info: {
     name: 'EverCut - Customer',
-    description: 'Customer data, home payload, and nearby service discovery. The final request also captures shared shop/service IDs for later collections.',
+    description: 'Customer profile management and nearby service discovery. The final request also captures shared shop/service IDs for later collections. NOTE: The /customers/me/home endpoint has been removed - use /customers/me instead and extract the fields you need on the frontend.',
     schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
   },
   auth: bearerAuth('customer_access_token'),
@@ -461,16 +461,7 @@ const customerCollection = {
       }),
     },
     {
-      name: '3. Get Homepage',
-      ...request({
-        method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/customers/me/home',
-        description: 'Returns the compact home-screen payload.',
-        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
-      }),
-    },
-    {
-      name: '4. Get Services By Gender And Capture IDs',
+      name: '3. Get Services By Gender And Capture IDs',
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/shops/nearby/services?gender=male&coordinates={{coordinates}}',
@@ -1929,8 +1920,8 @@ const paymentsPayoutsCollection = {
 
 const dashboardCollection = {
   info: {
-    name: 'EverCut - Dashboard',
-    description: 'Dashboard analytics collection for barber shop owners. Provides real-time occupancy metrics, staff availability, today\'s queue, and comprehensive overview. All endpoints require BARBER role authentication.',
+    name: 'EverCut - Dashboard Analytics',
+    description: 'Dashboard analytics collection for barber shop owners. Provides real-time occupancy metrics, staff availability, and today\'s queue through resource-based endpoints. All endpoints require BARBER role authentication. NOTE: Endpoints have been refactored from /dashboard/* to resource-based routes.',
     schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
   },
   auth: bearerAuth('barber_access_token'),
@@ -1938,11 +1929,11 @@ const dashboardCollection = {
   variable: [...baseVariables()],
   item: [
     {
-      name: '1. Get Dashboard Overview',
+      name: '1. Get Dashboard Overview (Aggregated)',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/dashboard/overview',
-        description: 'Returns all dashboard sections in a single response: pulse metrics, staff availability, and today\'s queue. Optimized for efficient dashboard loading.',
+        url: '{{base_url}}/{{api_prefix}}/earnings/overview',
+        description: 'Returns all dashboard sections in a single response: pulse metrics, staff availability, and today\'s queue. Optimized for efficient dashboard loading. NEW ENDPOINT: Moved from /dashboard/overview to /earnings/overview.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           "const response = pm.response.json();",
@@ -1954,11 +1945,11 @@ const dashboardCollection = {
       }),
     },
     {
-      name: '2. Get Today\'s Pulse',
+      name: '2. Get Today\'s Pulse (Bookings)',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/dashboard/pulse',
-        description: 'Returns real-time occupancy metrics and booking status breakdown for today. Shows booked vs total capacity and counts for All, Pending, Done, and Cancelled bookings.',
+        url: '{{base_url}}/{{api_prefix}}/bookings/stats/today',
+        description: 'Returns real-time occupancy metrics and booking status breakdown for today. Shows booked vs total capacity and counts for All, Pending, Done, and Cancelled bookings. NEW ENDPOINT: Moved from /dashboard/pulse to /bookings/stats/today.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           "const response = pm.response.json();",
@@ -1976,11 +1967,11 @@ const dashboardCollection = {
       }),
     },
     {
-      name: '3. Get Staff Availability',
+      name: '3. Get Staff Availability (Employees)',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/dashboard/staff',
-        description: 'Returns staff availability and progress tracking for today. Shows each employee\'s completed vs total appointments with progress percentage.',
+        url: '{{base_url}}/{{api_prefix}}/employees/availability',
+        description: 'Returns staff availability and progress tracking for today. Shows each employee\'s completed vs total appointments with progress percentage. NEW ENDPOINT: Moved from /dashboard/staff to /employees/availability.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           "const response = pm.response.json();",
@@ -1999,11 +1990,11 @@ const dashboardCollection = {
       }),
     },
     {
-      name: '4. Get Today\'s Queue (Active)',
+      name: '4. Get Today\'s Queue - Active (Bookings)',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/dashboard/queue?filter=active',
-        description: 'Returns today\'s active appointments (within ±30 minutes of current time). Shows customer name, employee name, time, and services.',
+        url: '{{base_url}}/{{api_prefix}}/bookings/queue?filter=active',
+        description: 'Returns today\'s active appointments (within ±30 minutes of current time). Shows customer name, employee name, time, and services. NEW ENDPOINT: Moved from /dashboard/queue to /bookings/queue.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           "const response = pm.response.json();",
@@ -2016,11 +2007,11 @@ const dashboardCollection = {
       }),
     },
     {
-      name: '5. Get Today\'s Queue (Upcoming)',
+      name: '5. Get Today\'s Queue - Upcoming (Bookings)',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/dashboard/queue?filter=upcoming',
-        description: 'Returns today\'s upcoming appointments (more than 30 minutes in the future). Shows customer name, employee name, time, and services.',
+        url: '{{base_url}}/{{api_prefix}}/bookings/queue?filter=upcoming',
+        description: 'Returns today\'s upcoming appointments (more than 30 minutes in the future). Shows customer name, employee name, time, and services. NEW ENDPOINT: Moved from /dashboard/queue to /bookings/queue.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           "const response = pm.response.json();",

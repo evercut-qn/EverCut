@@ -10,5 +10,6 @@ const router = Router();
 router.use(authenticate, authorize(ROLES.BARBER));
 
 router.get('/', earningsController.getEarnings);
+router.get('/overview', earningsController.getDashboardOverview);
 
 export default router;

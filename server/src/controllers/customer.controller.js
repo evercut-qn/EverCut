@@ -11,15 +11,6 @@ export const getMe = async (req, res, next) => {
     }
 };
 
-export const getMyHome = async (req, res, next) => {
-    try {
-        const profile = await userService.getHomeProfile(req.user._id);
-        return res.status(200).json(ApiResponse.success(profile, 'Home profile fetched'));
-    } catch (err) {
-        next(err);
-    }
-};
-
 export const updateMe = async (req, res, next) => {
     try {
         const body = getValidatedRequestData(req, 'body');

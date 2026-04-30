@@ -13,17 +13,6 @@ export const getProfile = async (userId) => {
     return profile;
 };
 
-export const getHomeProfile = async (userId) => {
-    const profile = await customerRepository.findByUserId(userId);
-    if (!profile) throw new NotFoundError('Customer');
-
-    return {
-        photo: profile.photoUrl || null,
-        name: [profile.firstName, profile.lastName].filter(Boolean).join(' '),
-        address: profile.address || '',
-    };
-};
-
 export const updateProfile = async (userId, data, file) => {
     const profile = await customerRepository.findByUserId(userId);
     if (!profile) throw new NotFoundError('Customer');

@@ -75,3 +75,15 @@ export const getAvailableSlots = async (req, res, next) => {
         next(err);
     }
 };
+
+/**
+ * Get staff availability and progress (moved from dashboard)
+ */
+export const getStaffAvailability = async (req, res, next) => {
+    try {
+        const staff = await employeeService.getStaffAvailability(req.user._id);
+        return res.status(200).json(ApiResponse.success(staff, 'Staff availability fetched'));
+    } catch (err) {
+        next(err);
+    }
+};
