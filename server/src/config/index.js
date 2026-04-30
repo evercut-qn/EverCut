@@ -150,6 +150,11 @@ const config = Object.freeze({
     pollIntervalBaseMs: 3000,
     payoutBatchCronTime: '0 23 * * *',
     payoutBatchTimezone: 'Asia/Kolkata',
+    // Payment modes configuration (PhonePe V2 Schema)
+    // Configure which payment methods to enable
+    // Empty array = all payment modes enabled
+    // Examples: [{ type: 'UPI' }], [{ type: 'UPI' }, { type: 'CARD' }]
+    paymentModes: [{ type: 'UPI' }],
   }),
 });
 

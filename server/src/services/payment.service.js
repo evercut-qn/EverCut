@@ -525,6 +525,12 @@ export const initiatePayment = async (userId, bookingId) => {
                 customerId: toObjectIdString(customer._id),
                 shopId: toObjectIdString(booking.shopId),
             },
+            paymentModeConfig: config.payment.paymentModes?.length > 0
+                ? {
+                    version: 'V2',
+                    enabledPaymentModes: config.payment.paymentModes,
+                }
+                : null,
         });
 
         await paymentRepository.updateById(paymentTransaction._id, {
