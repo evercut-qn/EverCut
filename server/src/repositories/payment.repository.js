@@ -11,6 +11,30 @@ class PaymentRepository {
         return PaymentTransaction.findById(id);
     }
 
+    async findByIdForEarnings(id) {
+        return PaymentTransaction.findById(id)
+            .populate({
+                path: 'bookingId',
+                select: 'date time status paymentStatus totalAmount customerId employeeId serviceIds',
+                populate: [
+                    {
+                        path: 'customerId',
+                        select: 'firstName lastName userId',
+                        populate: { path: 'userId', select: 'phoneNumber' },
+                    },
+                    {
+                        path: 'employeeId',
+                        select: 'firstName lastName',
+                        options: { includeDeleted: true },
+                    },
+                    {
+                        path: 'serviceIds',
+                        select: 'serviceName actualPrice offerPrice finalPrice duration',
+                    },
+                ],
+            });
+    }
+
     async findByMerchantOrderId(merchantOrderId) {
         return PaymentTransaction.findOne({ merchantOrderId });
     }
@@ -19,6 +43,37 @@ class PaymentRepository {
         const query = PaymentTransaction.find(trustQueryOperators(filter))
             .sort({ createdAt: -1 })
             .populate('bookingId', 'date time status paymentStatus totalAmount')
+            .populate('customerId', 'firstName lastName userId')
+            .populate('shopId', 'shopName ownerId');
+
+        if (options.skip !== undefined) query.skip(options.skip);
+        if (options.limit !== undefined) query.limit(options.limit);
+        return query;
+    }
+
+    async findAllForEarnings(filter = {}, options = {}) {
+        const query = PaymentTransaction.find(trustQueryOperators(filter))
+            .sort({ createdAt: -1 })
+            .populate({
+                path: 'bookingId',
+                select: 'date time status paymentStatus totalAmount customerId employeeId serviceIds',
+                populate: [
+                    {
+                        path: 'customerId',
+                        select: 'firstName lastName userId',
+                        populate: { path: 'userId', select: 'phoneNumber' },
+                    },
+                    {
+                        path: 'employeeId',
+                        select: 'firstName lastName',
+                        options: { includeDeleted: true },
+                    },
+                    {
+                        path: 'serviceIds',
+                        select: 'serviceName actualPrice offerPrice finalPrice duration',
+                    },
+                ],
+            })
             .populate('customerId', 'firstName lastName userId')
             .populate('shopId', 'shopName ownerId');
 

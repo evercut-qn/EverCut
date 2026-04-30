@@ -1414,20 +1414,121 @@ const barberPhotosCollection = {
 const barberEarningsCollection = {
   info: {
     name: 'EverCut - Barber Earnings',
-    description: 'Single-request collection for the barber earnings summary. Completed bookings are required for non-zero values.',
+    description: 'Barber earnings summary and transaction history. Completed bookings are required for non-zero values.',
     schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
   },
   auth: bearerAuth('barber_access_token'),
   event: collectionPreRequest(),
-  variable: [...baseVariables()],
+  variable: [
+    ...baseVariables(
+      textVariable('transaction_id', '', 'Transaction ID - automatically set from transaction list response'),
+    ),
+  ],
   item: [
     {
-      name: '1. Get Earnings',
+      name: '1. Get Earnings Summary',
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/earnings',
-        description: 'Returns `totalEarning`, `lastMonthEarning`, and `todayEarning` across the barber shop employees.',
+        description: 'Returns `totalEarning`, `lastMonthEarning`, `todayEarning`, and `monthlyRevenue` with percentage change.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
+      }),
+    },
+    {
+      name: '2. Get Transaction History',
+      ...request({
+        method: 'GET',
+        url: {
+          raw: '{{base_url}}/{{api_prefix}}/earnings/transactions?page=1&limit=20',
+          host: ['{{base_url}}'],
+          path: ['{{api_prefix}}', 'earnings', 'transactions'],
+          query: [
+            { key: 'page', value: '1', description: 'Page number (default: 1)' },
+            { key: 'limit', value: '20', description: 'Items per page (default: 10)' },
+            { key: 'status', value: 'completed', description: 'Filter by payment status', disabled: true },
+            { key: 'startDate', value: '2024-01-01', description: 'Filter from date (ISO format)', disabled: true },
+            { key: 'endDate', value: '2024-12-31', description: 'Filter to date (ISO format)', disabled: true },
+          ],
+        },
+        description: 'Returns paginated transaction history with monthly revenue summary. Includes customer details, amounts, and timestamps.',
+        event: mergedEvents(
+          [],
+          [
+            "pm.test('response uses paginated envelope', function () {",
+            "  const response = pm.response.json();",
+            "  pm.expect(response).to.have.property('success', true);",
+            "  pm.expect(response.data).to.have.property('items');",
+            "  pm.expect(response.data).to.have.property('pagination');",
+            "  pm.expect(response.data).to.have.property('monthlyRevenue');",
+            "});",
+            "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+            "pm.test('transactions have required fields', function () {",
+            "  const response = pm.response.json();",
+            "  if (response.data.items.length > 0) {",
+            "    const transaction = response.data.items[0];",
+            "    pm.expect(transaction).to.have.property('transactionId');",
+            "    pm.expect(transaction).to.have.property('customer');",
+            "    pm.expect(transaction).to.have.property('amount');",
+            "    pm.expect(transaction).to.have.property('status');",
+            "    pm.expect(transaction).to.have.property('timestamp');",
+            "    ",
+            "    // Save first transaction ID for detail endpoint",
+            "    pm.collectionVariables.set('transaction_id', transaction._id);",
+            "  }",
+            "});",
+          ]
+        ),
+      }),
+    },
+    {
+      name: '3. Get Transaction Detail',
+      ...request({
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/earnings/transactions/{{transaction_id}}',
+        description: 'Returns detailed information about a specific transaction including customer, barber, services, and payment details.\n\nNOTE: Run \'2. Get Transaction History\' first to automatically populate the transaction_id variable, or manually set a valid MongoDB ObjectId in the transaction_id collection variable.',
+        event: mergedEvents(
+          [],
+          [
+            "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+            "pm.test('transaction detail has required fields', function () {",
+            "  const response = pm.response.json();",
+            "  const transaction = response.data;",
+            "  pm.expect(transaction).to.have.property('transactionId');",
+            "  pm.expect(transaction).to.have.property('customer');",
+            "  pm.expect(transaction.customer).to.have.property('name');",
+            "  pm.expect(transaction).to.have.property('barber');",
+            "  pm.expect(transaction.barber).to.have.property('name');",
+            "  pm.expect(transaction).to.have.property('services');",
+            "  pm.expect(transaction).to.have.property('grandTotal');",
+            "  pm.expect(transaction).to.have.property('paymentStatus');",
+            "});",
+          ]
+        ),
+      }),
+    },
+    {
+      name: '4. Download Transaction Statement (PDF)',
+      ...request({
+        method: 'GET',
+        url: {
+          raw: '{{base_url}}/{{api_prefix}}/earnings/transactions/statement?startDate=2024-01-01&endDate=2024-12-31',
+          host: ['{{base_url}}'],
+          path: ['{{api_prefix}}', 'earnings', 'transactions', 'statement'],
+          query: [
+            { key: 'startDate', value: '2024-01-01', description: 'Start date (ISO format, required)' },
+            { key: 'endDate', value: '2024-12-31', description: 'End date (ISO format, required)' },
+          ],
+        },
+        description: 'Downloads a professionally formatted PDF statement of all transactions within the specified date range. The PDF includes shop information, summary statistics, and a detailed transaction table.',
+        event: mergedEvents(
+          [],
+          [
+            "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+            "pm.test('response is PDF', function () {",
+            "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/pdf');",
+            "});",
+          ]
+        ),
       }),
     },
   ],
