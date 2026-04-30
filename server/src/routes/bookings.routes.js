@@ -17,6 +17,7 @@ import {
     rescheduleSchema,
     updateBookingSchema,
     paginationQuerySchema,
+    queueFilterQuerySchema,
 } from '../validators/booking.validator.js';
 import { refundSchema } from '../validators/payment.validator.js';
 
@@ -38,7 +39,7 @@ router.get('/status', authorize(ROLES.BARBER), validate(bookingsByStatusQuerySch
 router.get('/pending-confirmations', authorize(ROLES.BARBER), validate(paginationQuerySchema, 'query'), bookingController.getPendingConfirmations);
 router.get('/stats', authorize(ROLES.BARBER), bookingController.getBookingStats);
 router.get('/stats/today', authorize(ROLES.BARBER), bookingController.getTodaysPulse);
-router.get('/queue', authorize(ROLES.BARBER), bookingController.getTodaysQueue);
+router.get('/queue', authorize(ROLES.BARBER), validate(queueFilterQuerySchema, 'query'), bookingController.getTodaysQueue);
 router.get('/progress', authorize(ROLES.BARBER), validate(bookingMilestoneProgressQuerySchema, 'query'), bookingController.getBookingMilestoneProgress);
 
 // ============================================================================
