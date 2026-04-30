@@ -108,7 +108,6 @@ Authorization: Bearer {barber_access_token}
       {
         "employeeId": "507f1f77bcf86cd799439011",
         "name": "John Doe",
-        "role": "Master Barber",
         "photoUrl": "https://...",
         "progress": {
           "completed": 5,

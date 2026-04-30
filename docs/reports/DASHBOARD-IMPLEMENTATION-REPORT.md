@@ -159,7 +159,6 @@ This report documents the comprehensive implementation of the barber dashboard f
       {
         "employeeId": "...",
         "name": "Ram Kumar",
-        "role": "Master Barber",
         "photoUrl": "...",
         "progress": {
           "completed": 4,
@@ -285,9 +284,9 @@ This report documents the comprehensive implementation of the barber dashboard f
    - Upcoming: More than 30 minutes in the future
    - Can be configured if different thresholds needed
 
-3. **Employee Role**
-   - Hardcoded as "Master Barber" for all employees
-   - Can be enhanced with actual role field in Employee model
+3. **Response Structure**
+   - Returns array of staff members with progress metrics
+   - Can be enhanced with actual role field in Employee model if needed in the future
 
 4. **Timezone Handling**
    - Uses server timezone for time calculations

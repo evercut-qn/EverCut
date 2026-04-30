@@ -74,7 +74,6 @@ This document describes the comprehensive dashboard implementation for the EverC
       {
         "employeeId": "507f1f77bcf86cd799439011",
         "name": "Ram Kumar",
-        "role": "Master Barber",
         "photoUrl": "https://...",
         "progress": {
           "completed": 4,

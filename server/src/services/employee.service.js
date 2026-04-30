@@ -477,7 +477,6 @@ export const getStaffAvailability = async (ownerId) => {
             return {
                 employeeId: employee._id,
                 name: `${employee.firstName} ${employee.lastName}`,
-                role: 'Master Barber', // Could be enhanced with actual role field
                 photoUrl: employee.photoUrl,
                 progress: {
                     completed: completedCount,
