@@ -131,7 +131,7 @@ COMPLETED (Service Done)
 | POST | `/api/v1/bookings/:id/reorder` | CUSTOMER | Reorder booking |
 | POST | `/api/v1/bookings/:id/cancel` | CUSTOMER | Cancel booking |
 | GET | `/api/v1/bookings/:id/confirmation` | CUSTOMER | Get confirmation |
-| PUT | `/api/v1/bookings/:id/favorite` | CUSTOMER | Toggle favorite |
+| PATCH | `/api/v1/bookings/:id/favorite` | CUSTOMER | Toggle favorite |
 
 ### Booking Management (Barber)
 
@@ -152,7 +152,8 @@ COMPLETED (Service Done)
 |--------|----------|------|---------|
 | POST | `/api/v1/payments` | CUSTOMER | Initiate native SDK payment |
 | POST | `/api/v1/payments/:id/verify` | CUSTOMER | Verify payment after SDK callback |
-| GET | `/api/v1/payments/:id` | CUSTOMER | Get payment status |
+| GET | `/api/v1/payments` | CUSTOMER/BARBER/ADMIN | List visible payments |
+| GET | `/api/v1/payments/:id` | CUSTOMER/BARBER/ADMIN | Get payment status |
 | GET | `/api/v1/bookings/:id/payment` | CUSTOMER | Get payment details for booking |
 | POST | `/api/v1/bookings/:id/refund` | ADMIN/BARBER | Initiate refund |
 

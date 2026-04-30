@@ -136,6 +136,46 @@ export const getShopEmployees = async (req, res, next) => {
     }
 };
 
+export const getFavoriteShops = async (req, res, next) => {
+    try {
+        const query = getValidatedRequestData(req, 'query');
+        const result = await shopService.getFavoriteShops(req.user._id, query);
+        return res.status(200).json(ApiResponse.paginated(result.items, result.pagination, 'Favorite shops fetched'));
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const addFavoriteShop = async (req, res, next) => {
+    try {
+        const { id } = getValidatedRequestData(req, 'params');
+        const result = await shopService.addFavoriteShop(req.user._id, id);
+        return res.status(200).json(ApiResponse.success(result, 'Shop added to favorites'));
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const removeFavoriteShop = async (req, res, next) => {
+    try {
+        const { id } = getValidatedRequestData(req, 'params');
+        const result = await shopService.removeFavoriteShop(req.user._id, id);
+        return res.status(200).json(ApiResponse.success(result, 'Shop removed from favorites'));
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const toggleFavoriteShop = async (req, res, next) => {
+    try {
+        const { id } = getValidatedRequestData(req, 'params');
+        const result = await shopService.toggleFavoriteShop(req.user._id, id);
+        return res.status(200).json(ApiResponse.success(result, 'Favorite shop updated'));
+    } catch (err) {
+        next(err);
+    }
+};
+
 export const getNearbyShops = async (req, res, next) => {
     try {
         const { longitude, latitude } = getValidatedRequestData(req, 'query');

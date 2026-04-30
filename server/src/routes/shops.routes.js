@@ -10,6 +10,7 @@ import {
 import { validate } from '../middleware/validate.middleware.js';
 import { ROLES } from '../utils/constants.js';
 import { deleteBarberAccountSchema } from '../validators/account.validator.js';
+import { paginationSchema } from '../validators/common.validator.js';
 import {
     nearbyShopsQuerySchema,
     searchShopsQuerySchema,
@@ -39,8 +40,12 @@ router.get('/nearby/services', validate(servicesByGenderQuerySchema, 'query'), s
 router.get('/nearby', validate(nearbyShopsQuerySchema, 'query'), shopController.getNearbyShops);
 router.get('/doorstep', shopController.getDoorstepShops);
 router.get('/search', validate(searchShopsQuerySchema, 'query'), shopController.searchShops);
+router.get('/favorites', authenticate, authorize(ROLES.CUSTOMER), validate(paginationSchema, 'query'), shopController.getFavoriteShops);
 router.get('/:id/employees', validate(shopIdParamSchema, 'params'), shopController.getShopEmployees);
 router.get('/:id/availability', authenticate, validate(shopIdParamSchema, 'params'), validate(shopAvailabilityQuerySchema, 'query'), shopController.getShopAvailability);
+router.put('/:id/favorite', authenticate, authorize(ROLES.CUSTOMER), validate(shopIdParamSchema, 'params'), shopController.addFavoriteShop);
+router.delete('/:id/favorite', authenticate, authorize(ROLES.CUSTOMER), validate(shopIdParamSchema, 'params'), shopController.removeFavoriteShop);
+router.patch('/:id/favorite', authenticate, authorize(ROLES.CUSTOMER), validate(shopIdParamSchema, 'params'), shopController.toggleFavoriteShop);
 router.get('/:id', validate(shopIdParamSchema, 'params'), shopController.getShopById);
 
 export default router;

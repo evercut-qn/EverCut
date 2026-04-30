@@ -40,6 +40,103 @@ const serviceRepository = (await import('../../repositories/service.repository.j
 const shopRepository = (await import('../../repositories/shop.repository.js')).default;
 const phonePeAdapter = (await import('../../adapters/phonepe/phonepe.adapter.js')).default;
 
+test('getPayments lists only the authenticated customer payments', async (t) => {
+    t.mock.method(customerRepository, 'findByUserId', async () => ({ _id: 'customer-1' }));
+
+    let countFilter = null;
+    t.mock.method(paymentRepository, 'countAll', async (filter) => {
+        countFilter = filter;
+        return 6;
+    });
+
+    let listArgs = null;
+    t.mock.method(paymentRepository, 'findAll', async (filter, options) => {
+        listArgs = { filter, options };
+        return [
+            {
+                _id: 'payment-6',
+                bookingId: 'booking-6',
+                customerId: 'customer-1',
+                shopId: 'shop-1',
+                status: 'completed',
+                amount: 12300,
+                amountInRupees: 123,
+                merchantOrderId: 'EC-booking-6',
+            },
+        ];
+    });
+
+    const result = await paymentService.getPayments(
+        { _id: 'user-1', roleType: 'CUSTOMER' },
+        { status: 'completed', page: 2, limit: 5 },
+    );
+
+    assert.deepEqual(countFilter, {
+        customerId: 'customer-1',
+        status: 'completed',
+    });
+    assert.deepEqual(listArgs, {
+        filter: {
+            customerId: 'customer-1',
+            status: 'completed',
+        },
+        options: {
+            skip: 5,
+            limit: 5,
+        },
+    });
+    assert.deepEqual(result.pagination, {
+        currentPage: 2,
+        totalPages: 2,
+        totalDocuments: 6,
+        hasNextPage: false,
+        hasPrevPage: true,
+    });
+    assert.equal(result.items[0].paymentId, 'payment-6');
+});
+
+test('getPayments lists only the authenticated barber shop payments', async (t) => {
+    t.mock.method(shopRepository, 'findByOwnerId', async () => ({ _id: 'shop-1' }));
+
+    let countFilter = null;
+    t.mock.method(paymentRepository, 'countAll', async (filter) => {
+        countFilter = filter;
+        return 1;
+    });
+
+    let listArgs = null;
+    t.mock.method(paymentRepository, 'findAll', async (filter, options) => {
+        listArgs = { filter, options };
+        return [
+            {
+                _id: 'payment-1',
+                bookingId: 'booking-1',
+                customerId: 'customer-1',
+                shopId: 'shop-1',
+                status: 'pending',
+                amount: 12300,
+                amountInRupees: 123,
+                merchantOrderId: 'EC-booking-1',
+            },
+        ];
+    });
+
+    const result = await paymentService.getPayments(
+        { _id: 'barber-1', roleType: 'BARBER' },
+        { page: 1, limit: 10 },
+    );
+
+    assert.deepEqual(countFilter, { shopId: 'shop-1' });
+    assert.deepEqual(listArgs, {
+        filter: { shopId: 'shop-1' },
+        options: {
+            skip: 0,
+            limit: 10,
+        },
+    });
+    assert.equal(result.items[0].shopId, 'shop-1');
+});
+
 test('initiatePayment creates a native PhonePe SDK order and never returns a redirect URL', async (t) => {
     t.mock.method(customerRepository, 'findByUserId', async () => ({ _id: 'customer-1' }));
     t.mock.method(bookingRepository, 'findById', async () => ({

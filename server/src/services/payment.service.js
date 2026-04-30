@@ -31,6 +31,7 @@ import {
     getEffectiveServicePrice,
     normalizeServicePricing,
 } from '../utils/service-pricing.utils.js';
+import { buildPagination } from '../utils/pagination.utils.js';
 import { toDateOnlyString } from '../utils/slot-lock.utils.js';
 
 const toObjectIdString = (value) => String(value?._id || value || '');
@@ -171,6 +172,99 @@ const loadBookingWithCustomerAccess = async (userId, bookingId) => {
 
     return { booking, customer };
 };
+
+const normalizePaymentActor = (actorOrUserId) => {
+    if (actorOrUserId && typeof actorOrUserId === 'object') {
+        return {
+            userId: actorOrUserId.userId || actorOrUserId._id,
+            roleType: actorOrUserId.roleType || actorOrUserId.role,
+        };
+    }
+
+    return {
+        userId: actorOrUserId,
+        roleType: ROLES.CUSTOMER,
+    };
+};
+
+const applyPaymentQueryFilters = (filter, query = {}) => {
+    if (query.status) filter.status = query.status;
+    if (query.bookingId) filter.bookingId = query.bookingId;
+    return filter;
+};
+
+const buildPaymentListFilter = async (actorOrUserId, query = {}) => {
+    const actor = normalizePaymentActor(actorOrUserId);
+    const filter = {};
+
+    if (actor.roleType === ROLES.CUSTOMER) {
+        const customer = await customerRepository.findByUserId(actor.userId);
+        if (!customer) throw new NotFoundError('Customer profile');
+        filter.customerId = customer._id;
+        return applyPaymentQueryFilters(filter, query);
+    }
+
+    if (actor.roleType === ROLES.BARBER) {
+        const shop = await shopRepository.findByOwnerId(actor.userId);
+        if (!shop) throw new NotFoundError('Shop profile');
+        filter.shopId = shop._id;
+        return applyPaymentQueryFilters(filter, query);
+    }
+
+    if (actor.roleType === ROLES.ADMIN) {
+        return applyPaymentQueryFilters(filter, query);
+    }
+
+    throw new ForbiddenError('You are not allowed to access payments');
+};
+
+const assertPaymentAccess = async (actorOrUserId, payment) => {
+    const actor = normalizePaymentActor(actorOrUserId);
+
+    if (actor.roleType === ROLES.ADMIN) return;
+
+    if (actor.roleType === ROLES.BARBER) {
+        const shop = await shopRepository.findByOwnerId(actor.userId);
+        if (!shop || toObjectIdString(payment.shopId) !== toObjectIdString(shop._id)) {
+            throw new ForbiddenError('You can only access payments for your own shop');
+        }
+        return;
+    }
+
+    if (actor.roleType === ROLES.CUSTOMER) {
+        const customer = await customerRepository.findByUserId(actor.userId);
+        if (!customer || toObjectIdString(payment.customerId) !== toObjectIdString(customer._id)) {
+            throw new ForbiddenError('You can only access your own payments');
+        }
+        return;
+    }
+
+    throw new ForbiddenError('You are not allowed to access payments');
+};
+
+const buildPaymentListItem = (payment) => ({
+    _id: payment._id,
+    paymentId: payment._id,
+    bookingId: payment.bookingId?._id || payment.bookingId,
+    booking: payment.bookingId?._id ? payment.bookingId : null,
+    customerId: payment.customerId?._id || payment.customerId,
+    customer: payment.customerId?._id ? payment.customerId : null,
+    shopId: payment.shopId?._id || payment.shopId,
+    shop: payment.shopId?._id ? payment.shopId : null,
+    merchantOrderId: payment.merchantOrderId,
+    orderId: payment.gatewayOrderId || null,
+    status: payment.status,
+    gatewayState: payment.gatewayState || null,
+    amountInPaisa: payment.amount,
+    amountInRupees: payment.amountInRupees,
+    currency: payment.currency || 'INR',
+    paymentMode: payment.paymentMode || null,
+    transactionId: payment.gatewayTransactionId || null,
+    refund: payment.refund || null,
+    settlement: payment.settlement || null,
+    createdAt: payment.createdAt,
+    updatedAt: payment.updatedAt,
+});
 
 const loadBookedServices = async (booking) => {
     if (!Array.isArray(booking.serviceIds) || booking.serviceIds.length === 0) {
@@ -627,16 +721,25 @@ export const handleWebhook = async (headers, body) => {
     }
 };
 
-export const getPaymentStatus = async (userId, paymentId) => {
+export const getPayments = async (actorOrUserId, query = {}) => {
+    const filter = await buildPaymentListFilter(actorOrUserId, query);
+    const total = await paymentRepository.countAll(filter);
+    const { skip, limit, pagination } = buildPagination(query, total);
+    const payments = await paymentRepository.findAll(filter, { skip, limit });
+
+    return {
+        items: payments.map(buildPaymentListItem),
+        pagination,
+    };
+};
+
+export const getPaymentStatus = async (actorOrUserId, paymentId) => {
     const payment = await paymentRepository.findById(paymentId);
     if (!payment) {
         throw new NotFoundError('Payment');
     }
 
-    const customer = await customerRepository.findByUserId(userId);
-    if (!customer || toObjectIdString(payment.customerId) !== toObjectIdString(customer._id)) {
-        throw new ForbiddenError('You can only access your own payments');
-    }
+    await assertPaymentAccess(actorOrUserId, payment);
 
     try {
         return await syncPaymentWithGateway(payment);

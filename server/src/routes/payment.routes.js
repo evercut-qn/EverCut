@@ -7,6 +7,7 @@ import * as paymentController from '../controllers/payment.controller.js';
 import {
     initiatePaymentSchema,
     paymentIdParamSchema,
+    paymentListQuerySchema,
     verifyPaymentSchema,
 } from '../validators/payment.validator.js';
 import { ROLES } from '../utils/constants.js';
@@ -14,6 +15,14 @@ import { ROLES } from '../utils/constants.js';
 const router = Router();
 
 router.post('/webhook', paymentController.handleWebhook);
+
+router.get(
+    '/',
+    authenticate,
+    authorize(ROLES.CUSTOMER, ROLES.BARBER, ROLES.ADMIN),
+    validate(paymentListQuerySchema, 'query'),
+    paymentController.getPayments,
+);
 
 router.post(
     '/',
@@ -35,6 +44,7 @@ router.post(
 router.get(
     '/:id',
     authenticate,
+    authorize(ROLES.CUSTOMER, ROLES.BARBER, ROLES.ADMIN),
     validate(paymentIdParamSchema, 'params'),
     paymentController.getPaymentStatus,
 );

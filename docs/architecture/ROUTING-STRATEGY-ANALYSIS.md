@@ -71,7 +71,7 @@ Verdict: inferior for EverCut because roles are an access concern, while the dom
 Pros in this codebase:
 - matches the existing service layer organization
 - removes duplicated route trees for shared resources
-- keeps one route file and one controller module per resource
+- keeps one direct route file and one direct controller file per resource
 - makes public, customer, barber, and admin actions coexist under one resource surface with explicit RBAC
 - aligns better with REST and future expansion
 
@@ -117,21 +117,22 @@ All current API routes are mounted from `server/src/routes/index.js`:
 - `onboarding`: onboarding-token protected
 - `customers`: authenticated `CUSTOMER` only
 - `shops`: mix of public discovery endpoints and authenticated `BARBER` owner endpoints under `/shops/me`
+  - customer: list/add/remove/toggle favorite shops inside the shop discovery flow
 - `employees`: authenticated calendar lookup by employee ID, barber-only CRUD
 - `services`: public search, barber-only CRUD
 - `bookings`: shared resource with role-aware behavior
   - customer: list/create/update/reschedule/reorder/favorite/confirmation/cancel own bookings
-  - barber: list shop bookings, stats, progress, status updates, paid-booking deletion
+  - barber: list shop bookings, stats, progress, status updates, booking cancellation/refund flows
 - `photos`: barber-only
 - `ratings`: public shop reads, customer create, barber owner reads/replies/deletes
 - `earnings`: barber-only
-- `payments`: customer payment initiation, authenticated payment reads, barber/admin refunds, public webhook/redirect callbacks
+- `payments`: customer payment initiation, authenticated payment reads, barber/admin refunds, public webhook callbacks
 - `payouts`: admin retry plus public webhook callback
 
 ## Architectural Rules
 
-1. One route file per resource.
-2. One top-level controller module per resource unless a subdomain is genuinely independent.
+1. One direct route file per resource, such as `bookings.routes.js`; nested `module/index.js` wrappers are avoided unless a module genuinely needs multiple files.
+2. One direct controller file per resource, such as `booking.controller.js`; nested controller directories are avoided unless a subdomain is genuinely independent.
 3. Controllers stay thin: parse validated input, select role-aware flow, delegate to services.
 4. Services own business rules, ownership checks, and cross-entity coordination.
 5. Roles are enforced with middleware and service checks, not URL prefixes.
@@ -142,16 +143,16 @@ All current API routes are mounted from `server/src/routes/index.js`:
 
 ### Unified controllers introduced
 
-- `customer.controller.js`
-- `shop.controller.js`
-- `employee.controller.js`
-- `service.controller.js`
-- `booking.controller.js`
-- `photo.controller.js`
-- `rating.controller.js`
-- `earnings.controller.js`
-- `payment.controller.js`
-- `payout.controller.js`
+- `controllers/customer.controller.js`
+- `controllers/shop.controller.js`
+- `controllers/employee.controller.js`
+- `controllers/service.controller.js`
+- `controllers/booking.controller.js`
+- `controllers/photo.controller.js`
+- `controllers/rating.controller.js`
+- `controllers/earnings.controller.js`
+- `controllers/payment.controller.js`
+- `controllers/payout.controller.js`
 
 ### Shared service model retained
 

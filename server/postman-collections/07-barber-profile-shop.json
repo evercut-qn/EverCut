@@ -390,7 +390,7 @@
       ]
     },
     {
-      "name": "9A. Sign-Out Everywhere (Terminal)",
+      "name": "9. Sign-Out Everywhere (Terminal)",
       "request": {
         "method": "POST",
         "header": [],
@@ -419,7 +419,7 @@
       ]
     },
     {
-      "name": "9B. Delete Account (Terminal)",
+      "name": "10. Delete Account (Terminal)",
       "request": {
         "method": "DELETE",
         "header": [

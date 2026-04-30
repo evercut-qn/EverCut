@@ -15,6 +15,22 @@ class PaymentRepository {
         return PaymentTransaction.findOne({ merchantOrderId });
     }
 
+    async findAll(filter = {}, options = {}) {
+        const query = PaymentTransaction.find(trustQueryOperators(filter))
+            .sort({ createdAt: -1 })
+            .populate('bookingId', 'date time status paymentStatus totalAmount')
+            .populate('customerId', 'firstName lastName userId')
+            .populate('shopId', 'shopName ownerId');
+
+        if (options.skip !== undefined) query.skip(options.skip);
+        if (options.limit !== undefined) query.limit(options.limit);
+        return query;
+    }
+
+    async countAll(filter = {}) {
+        return PaymentTransaction.countDocuments(trustQueryOperators(filter));
+    }
+
     async findPendingByBookingId(bookingId) {
         return PaymentTransaction.findOne(trustQueryOperators({
             bookingId,

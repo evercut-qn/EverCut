@@ -79,6 +79,7 @@ Detailed guides for implementing specific features.
 | Document | Description | Status |
 |----------|-------------|--------|
 | [PAYMENT-MODES-CONFIGURATION.md](./features/payments/PAYMENT-MODES-CONFIGURATION.md) | Payment modes configuration using PhonePe V2 schema (official docs) | ✅ Production Ready |
+| [PHONEPE-SDK-WEBHOOK-ISSUE-SOLUTION.md](./features/payments/PHONEPE-SDK-WEBHOOK-ISSUE-SOLUTION.md) | PhonePe SDK webhook not arriving - polling solution | ✅ Production Ready |
 | [PHONEPE-PG-FLUTTER-NODEJS.md](./research/PHONEPE-PG-FLUTTER-NODEJS.md) | **Native PhonePe Flutter SDK integration** (source of truth) | ✅ Production Ready |
 | [POSTMAN-BOOKING-PAYMENT-GUIDE.md](./testing/POSTMAN-BOOKING-PAYMENT-GUIDE.md) | Postman testing guide for booking & payment flow | ✅ Production Ready |
 | [PAYMENT-GATEWAY-IMPLEMENTATION-GUIDE.md](./features/payments/PAYMENT-GATEWAY-IMPLEMENTATION-GUIDE.md) | PhonePe payment gateway implementation details | 📋 Implementation Guide |

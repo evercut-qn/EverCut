@@ -49,7 +49,9 @@ router.get('/:id/confirmation', authorize(ROLES.CUSTOMER), validate(bookingIdPar
 router.put('/:id', authorize(ROLES.CUSTOMER), validate(bookingIdParamSchema, 'params'), validate(updateBookingSchema, 'body'), bookingController.updateBooking);
 router.put('/:id/reschedule', authorize(ROLES.CUSTOMER), validate(bookingIdParamSchema, 'params'), validate(rescheduleSchema, 'body'), bookingController.rescheduleBooking);
 router.post('/:id/reorder', authorize(ROLES.CUSTOMER), validate(bookingIdParamSchema, 'params'), validate(reorderSchema, 'body'), bookingController.reorderBooking);
-router.put('/:id/favorite', authorize(ROLES.CUSTOMER), validate(bookingIdParamSchema, 'params'), bookingController.toggleFavorite);
+router.put('/:id/favorite', authorize(ROLES.CUSTOMER), validate(bookingIdParamSchema, 'params'), bookingController.addFavoriteBooking);
+router.delete('/:id/favorite', authorize(ROLES.CUSTOMER), validate(bookingIdParamSchema, 'params'), bookingController.removeFavoriteBooking);
+router.patch('/:id/favorite', authorize(ROLES.CUSTOMER), validate(bookingIdParamSchema, 'params'), bookingController.toggleFavoriteBooking);
 router.patch('/:id/confirm', authorize(ROLES.BARBER), validate(bookingIdParamSchema, 'params'), bookingController.confirmBookingByBarber);
 router.post('/:id/cancel', authorize(ROLES.CUSTOMER, ROLES.BARBER), validate(bookingIdParamSchema, 'params'), bookingController.cancelBooking);
 router.post('/:id/refund', authorize(ROLES.ADMIN, ROLES.BARBER), validate(bookingIdParamSchema, 'params'), validate(refundSchema, 'body'), paymentController.initiateRefund);

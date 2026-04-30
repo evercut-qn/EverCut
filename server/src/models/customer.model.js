@@ -66,6 +66,12 @@ const customerSchema = new mongoose.Schema(
                 ref: 'Booking',
             },
         ],
+        favoriteShops: [
+            {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: 'Shop',
+            },
+        ],
     },
     { timestamps: true },
 );

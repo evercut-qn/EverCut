@@ -1,6 +1,7 @@
 import Joi from 'joi';
 
-import { objectId } from './common.validator.js';
+import { ALL_PAYMENT_TRANSACTION_STATUSES } from '../utils/constants.js';
+import { objectId, paginationSchema } from './common.validator.js';
 
 export const initiatePaymentSchema = Joi.object({
     bookingId: objectId.required().messages({
@@ -18,6 +19,11 @@ export const bookingIdParamSchema = Joi.object({
     bookingId: objectId.required().messages({
         'any.required': 'Booking ID is required',
     }),
+});
+
+export const paymentListQuerySchema = paginationSchema.keys({
+    status: Joi.string().valid(...ALL_PAYMENT_TRANSACTION_STATUSES),
+    bookingId: objectId,
 });
 
 export const refundSchema = Joi.object({

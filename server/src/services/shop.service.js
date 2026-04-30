@@ -1,4 +1,5 @@
 import shopRepository from '../repositories/shop.repository.js';
+import customerRepository from '../repositories/customer.repository.js';
 import serviceRepository from '../repositories/service.repository.js';
 import photoRepository from '../repositories/photo.repository.js';
 import ratingRepository from '../repositories/rating.repository.js';
@@ -7,6 +8,7 @@ import { BadRequestError, NotFoundError } from '../utils/api-error.js';
 import { serializeBarberProfile, serializeUpiDetails } from '../utils/barber-profile.utils.js';
 import { escapeRegex } from '../utils/regex.utils.js';
 import { serializeRating } from '../utils/rating-response.utils.js';
+import { buildPagination } from '../utils/pagination.utils.js';
 import { normalizeServicePricing } from '../utils/service-pricing.utils.js';
 import { normalizeShopSchedule } from '../utils/shop-schedule.utils.js';
 import {
@@ -21,6 +23,16 @@ import {
 /**
  * Shop service business logic for barber profile management and customer discovery.
  */
+
+const toObjectIdString = (value) => String(value?._id || value || '');
+const isIdInList = (ids = [], id) => ids.some((item) => toObjectIdString(item) === toObjectIdString(id));
+const paginateArray = (items, query = {}) => {
+    const { skip, limit, pagination } = buildPagination(query, items.length);
+    return {
+        items: items.slice(skip, skip + limit),
+        pagination,
+    };
+};
 
 export const getShopByOwner = async (ownerId, userContext) => {
     const shop = await shopRepository.findByOwnerId(ownerId);
@@ -469,6 +481,64 @@ export const getEmployeesByShopId = async (shopId) => {
             workingHours: emp.workingHours,
             isActive: emp.isActive,
         }));
+};
+
+const loadCustomer = async (userId) => {
+    const customer = await customerRepository.findByUserId(userId);
+    if (!customer) throw new NotFoundError('Customer profile');
+    return customer;
+};
+
+const assertShopExists = async (shopId) => {
+    const shop = await shopRepository.findById(shopId);
+    if (!shop) throw new NotFoundError('Shop');
+    return shop;
+};
+
+export const getFavoriteShops = async (userId, query = {}) => {
+    const customer = await customerRepository.findFavoriteShopsByUserId(userId);
+    if (!customer) throw new NotFoundError('Customer profile');
+    return paginateArray(customer.favoriteShops || [], query);
+};
+
+export const addFavoriteShop = async (userId, shopId) => {
+    await loadCustomer(userId);
+    await assertShopExists(shopId);
+    await customerRepository.addFavoriteShop(userId, shopId);
+
+    return {
+        favorite: true,
+        shopId,
+    };
+};
+
+export const removeFavoriteShop = async (userId, shopId) => {
+    await loadCustomer(userId);
+    await customerRepository.removeFavoriteShop(userId, shopId);
+
+    return {
+        favorite: false,
+        shopId,
+    };
+};
+
+export const toggleFavoriteShop = async (userId, shopId) => {
+    const customer = await loadCustomer(userId);
+    await assertShopExists(shopId);
+
+    if (isIdInList(customer.favoriteShops, shopId)) {
+        await customerRepository.removeFavoriteShop(userId, shopId);
+        return {
+            favorite: false,
+            shopId,
+        };
+    }
+
+    await customerRepository.addFavoriteShop(userId, shopId);
+    return {
+        favorite: true,
+        shopId,
+    };
 };
 
 export const getNearbyShops = async (coordinates) => {

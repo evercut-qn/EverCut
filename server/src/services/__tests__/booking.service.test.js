@@ -433,3 +433,72 @@ test('cancelBooking returns a customer-friendly manual-refund message when payou
         'Refund window has closed. Please request a manual refund.',
     );
 });
+
+test('getFavoriteBookings returns a paginated customer booking favorites list', async (t) => {
+    t.mock.method(customerRepository, 'findFavoriteBookingsByUserId', async () => ({
+        favoriteBookings: [
+            { _id: 'booking-1' },
+            { _id: 'booking-2' },
+            { _id: 'booking-3' },
+        ],
+    }));
+
+    const result = await bookingService.getFavoriteBookings('user-1', { page: 2, limit: 2 });
+
+    assert.deepEqual(result, {
+        items: [{ _id: 'booking-3' }],
+        pagination: {
+            currentPage: 2,
+            totalPages: 2,
+            totalDocuments: 3,
+            hasNextPage: false,
+            hasPrevPage: true,
+        },
+    });
+});
+
+test('addFavoriteBooking rejects bookings owned by another customer', async (t) => {
+    t.mock.method(customerRepository, 'findByUserId', async () => ({
+        _id: 'customer-1',
+        favoriteBookings: [],
+    }));
+    t.mock.method(bookingRepository, 'findById', async () => ({
+        _id: 'booking-1',
+        customerId: 'customer-2',
+    }));
+
+    const addMock = t.mock.method(customerRepository, 'addFavoriteBooking', async () => {
+        throw new Error('should not favorite another customer booking');
+    });
+
+    await assert.rejects(
+        bookingService.addFavoriteBooking('user-1', 'booking-1'),
+        /own bookings/,
+    );
+    assert.equal(addMock.mock.calls.length, 0);
+});
+
+test('toggleFavoriteBooking removes an existing favorite booking', async (t) => {
+    t.mock.method(customerRepository, 'findByUserId', async () => ({
+        _id: 'customer-1',
+        favoriteBookings: ['booking-1'],
+    }));
+    t.mock.method(bookingRepository, 'findById', async () => ({
+        _id: 'booking-1',
+        customerId: 'customer-1',
+    }));
+
+    let removed = null;
+    t.mock.method(customerRepository, 'removeFavoriteBooking', async (userId, bookingId) => {
+        removed = { userId, bookingId };
+        return { _id: 'customer-1' };
+    });
+
+    const result = await bookingService.toggleFavoriteBooking('user-1', 'booking-1');
+
+    assert.deepEqual(removed, { userId: 'user-1', bookingId: 'booking-1' });
+    assert.deepEqual(result, {
+        favorite: false,
+        bookingId: 'booking-1',
+    });
+});

@@ -42,6 +42,7 @@ test('route index mounts feature-oriented resources instead of legacy role prefi
 
     assert.doesNotMatch(source, /router\.use\('\/customer'/);
     assert.doesNotMatch(source, /router\.use\('\/barber'/);
+    assert.doesNotMatch(source, /router\.use\('\/favorites'/);
 });
 
 test('legacy role-prefixed route and controller files are removed after the migration', async () => {
@@ -81,20 +82,86 @@ test('postman collection generator no longer emits legacy /customer or /barber U
     assert.doesNotMatch(source, /\/barber\//);
 });
 
-test('payment and payout controllers follow the same flat feature-controller structure', async () => {
-    const paymentRoutes = await readSource('routes/payment.routes.js');
-    const payoutRoutes = await readSource('routes/payout.routes.js');
-
-    for (const relativePath of [
+test('feature routes and controllers use simple direct files instead of module index wrappers', async () => {
+    const expectedPaths = [
+        'routes/auth.routes.js',
+        'routes/bookings.routes.js',
+        'routes/customers.routes.js',
+        'routes/earnings.routes.js',
+        'routes/employees.routes.js',
+        'routes/onboarding.routes.js',
+        'routes/payment.routes.js',
+        'routes/payout.routes.js',
+        'routes/photos.routes.js',
+        'routes/ratings.routes.js',
+        'routes/services.routes.js',
+        'routes/shops.routes.js',
+        'controllers/auth.controller.js',
+        'controllers/booking.controller.js',
+        'controllers/customer.controller.js',
+        'controllers/earnings.controller.js',
+        'controllers/employee.controller.js',
+        'controllers/onboarding.controller.js',
         'controllers/payment.controller.js',
         'controllers/payout.controller.js',
-    ]) {
+        'controllers/photo.controller.js',
+        'controllers/rating.controller.js',
+        'controllers/service.controller.js',
+        'controllers/shop.controller.js',
+    ];
+
+    const removedIndexWrappers = [
+        'routes/auth/index.js',
+        'routes/bookings/index.js',
+        'routes/customers/index.js',
+        'routes/earnings/index.js',
+        'routes/employees/index.js',
+        'routes/favorites/index.js',
+        'routes/onboarding/index.js',
+        'routes/payments/index.js',
+        'routes/payouts/index.js',
+        'routes/photos/index.js',
+        'routes/ratings/index.js',
+        'routes/services/index.js',
+        'routes/shops/index.js',
+        'controllers/auth/index.js',
+        'controllers/bookings/index.js',
+        'controllers/customers/index.js',
+        'controllers/earnings/index.js',
+        'controllers/employees/index.js',
+        'controllers/favorites/index.js',
+        'controllers/onboarding/index.js',
+        'controllers/payments/index.js',
+        'controllers/payouts/index.js',
+        'controllers/photos/index.js',
+        'controllers/ratings/index.js',
+        'controllers/services/index.js',
+        'controllers/shops/index.js',
+        'routes/favorites.routes.js',
+        'controllers/favorite.controller.js',
+        'services/favorites.service.js',
+    ];
+
+    for (const relativePath of expectedPaths) {
         assert.equal(
             await exists(relativePath),
             true,
             `expected ${relativePath} to exist`,
         );
     }
+
+    for (const relativePath of removedIndexWrappers) {
+        assert.equal(
+            await exists(relativePath),
+            false,
+            `expected ${relativePath} to be removed`,
+        );
+    }
+});
+
+test('payment and payout controllers use the direct flat controller files', async () => {
+    const paymentRoutes = await readSource('routes/payment.routes.js');
+    const payoutRoutes = await readSource('routes/payout.routes.js');
 
     for (const removedPath of [
         'controllers/payment/payment.controller.js',
@@ -145,4 +212,51 @@ test('booking discovery and payment routes use final resource-oriented URLs', as
     assert.doesNotMatch(postmanSource, /\/bookings\/shops/);
     assert.doesNotMatch(postmanSource, /\/payments\/initiate/);
     assert.doesNotMatch(postmanSource, /\/payments\/booking/);
+});
+
+test('favorite behavior is grouped by booking and shop flow, not a favorites module', async () => {
+    const indexSource = await readSource('routes/index.js');
+    const bookingRoutes = await readSource('routes/bookings.routes.js');
+    const shopRoutes = await readSource('routes/shops.routes.js');
+    const postmanSource = await readFile(
+        path.join(serverDir, 'scripts', 'regenerate-postman-collections.mjs'),
+        'utf8',
+    );
+
+    assert.doesNotMatch(indexSource, /favoritesRoutes/);
+    assert.doesNotMatch(indexSource, /\/favorites/);
+    assert.equal(await exists('routes/favorites.routes.js'), false);
+    assert.equal(await exists('controllers/favorite.controller.js'), false);
+    assert.equal(await exists('services/favorites.service.js'), false);
+
+    assert.match(bookingRoutes, /router\.put\('\/:id\/favorite'/);
+    assert.match(bookingRoutes, /router\.delete\('\/:id\/favorite'/);
+    assert.match(bookingRoutes, /router\.patch\('\/:id\/favorite'/);
+    assert.doesNotMatch(bookingRoutes, /\/favorites/);
+
+    assert.match(shopRoutes, /router\.get\('\/favorites'/);
+    assert.match(shopRoutes, /router\.put\('\/:id\/favorite'/);
+    assert.match(shopRoutes, /router\.delete\('\/:id\/favorite'/);
+    assert.match(shopRoutes, /router\.patch\('\/:id\/favorite'/);
+    assert.ok(
+        shopRoutes.indexOf("router.get('/favorites'") < shopRoutes.indexOf("router.get('/:id'"),
+        'GET /shops/favorites must be registered before GET /shops/:id',
+    );
+
+    assert.doesNotMatch(postmanSource, /\/favorites\//);
+    assert.match(postmanSource, /\/bookings\{\{booking_id\}\}\/favorite|\/bookings\/\{\{booking_id\}\}\/favorite/);
+    assert.match(postmanSource, /\/bookings\?type=favorites/);
+    assert.match(postmanSource, /\/shops\/favorites/);
+    assert.match(postmanSource, /\/shops\/\{\{shop_id\}\}\/favorite/);
+});
+
+test('payments expose a collection list before the payment-id route', async () => {
+    const paymentRoutes = await readSource('routes/payment.routes.js');
+
+    assert.match(paymentRoutes, /router\.get\(\s*'\/'\s*,[\s\S]*paymentController\.getPayments/);
+    assert.match(paymentRoutes, /router\.get\(\s*'\/:id'\s*,[\s\S]*paymentController\.getPaymentStatus/);
+    assert.ok(
+        paymentRoutes.indexOf("router.get(\n    '/',") < paymentRoutes.indexOf("router.get(\n    '/:id'"),
+        'GET /payments must be registered before GET /payments/:id',
+    );
 });

@@ -51,6 +51,7 @@ Browse Shops → View Shop → View Employees → Check Availability → Create 
 **Payment (Native SDK):**
 - `POST /api/v1/payments` - Initiate native SDK payment
 - `POST /api/v1/payments/:id/verify` - Verify payment after SDK callback
+- `GET /api/v1/payments` - List visible payments
 - `GET /api/v1/payments/:id` - Get payment status
 
 ### 3. Availability Decision
@@ -172,6 +173,7 @@ POST   /api/v1/bookings/:id/cancel             Cancel
 ```
 POST   /api/v1/payments                        Initiate native SDK payment
 POST   /api/v1/payments/:id/verify             Verify payment after SDK callback
+GET    /api/v1/payments                        List visible payments
 GET    /api/v1/payments/:id                    Get payment status
 GET    /api/v1/bookings/:id/payment            Get payment for booking
 ```
@@ -207,7 +209,7 @@ GET    /api/v1/bookings/:id/payment            Get payment for booking
 2. ✅ 24-hour auto-cancel if barber doesn't respond
 3. ✅ Auto-cancel = FULL refund (customer protection)
 4. ✅ Missed confirmations tracked per shop
-5. ✅ Single cancel endpoint: `DELETE /bookings/:id`
+5. ✅ Single cancel endpoint: `POST /bookings/:id/cancel`
 6. ✅ Cannot cancel after confirmation (barber commitment)
 7. ✅ NEW: Employee list API for shop discovery
 8. ✅ NEW: Available slots API with service duration consideration

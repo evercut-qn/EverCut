@@ -36,6 +36,15 @@ import logger from '../utils/logger.js';
 // ── Customer: book a salon ───────────────────────────────────────────────
 
 const normalizeBookedServices = (services = []) => services.map(normalizeServicePricing);
+const toObjectIdString = (value) => String(value?._id || value || '');
+const isIdInList = (ids = [], id) => ids.some((item) => toObjectIdString(item) === toObjectIdString(id));
+const paginateArray = (items, query = {}) => {
+    const { skip, limit, pagination } = buildPagination(query, items.length);
+    return {
+        items: items.slice(skip, skip + limit),
+        pagination,
+    };
+};
 const sumServicePrices = (services = []) => services.reduce(
     (sum, service) => sum + (getEffectiveServicePrice(service) ?? 0),
     0,
@@ -514,28 +523,75 @@ export const getCustomerBookings = async (userId, type, query = {}) => {
         return { items, pagination };
     }
     if (type === 'favorites') {
-        const customerPopulated = await customerRepository.findByUserIdPopulated(userId);
-        const favorites = customerPopulated?.favoriteBookings || [];
-        const total = favorites.length;
-        const { skip, limit, pagination } = buildPagination(query, total);
-        return { items: favorites.slice(skip, limit ? skip + limit : undefined), pagination };
+        return getFavoriteBookings(userId, query);
     }
 
     throw new BadRequestError('Invalid filter type. Use: past, upcoming, or favorites');
 };
 
-// ── Customer: toggle favorite ────────────────────────────────────────────
-
-export const toggleFavorite = async (userId, bookingId) => {
+const loadCustomer = async (userId) => {
     const customer = await customerRepository.findByUserId(userId);
-    if (!customer) throw new NotFoundError('Customer');
-
-    const isFavorited = customer.favoriteBookings.some((id) => id.toString() === bookingId);
-    if (isFavorited) {
-        return customerRepository.removeFavoriteBooking(userId, bookingId);
-    }
-    return customerRepository.addFavoriteBooking(userId, bookingId);
+    if (!customer) throw new NotFoundError('Customer profile');
+    return customer;
 };
+
+const assertBookingBelongsToCustomer = async (customer, bookingId) => {
+    const booking = await bookingRepository.findById(bookingId);
+    if (!booking) throw new NotFoundError('Booking');
+
+    if (toObjectIdString(booking.customerId) !== toObjectIdString(customer._id)) {
+        throw new ForbiddenError('You can only favorite your own bookings');
+    }
+
+    return booking;
+};
+
+export const getFavoriteBookings = async (userId, query = {}) => {
+    const customer = await customerRepository.findFavoriteBookingsByUserId(userId);
+    if (!customer) throw new NotFoundError('Customer profile');
+    return paginateArray(customer.favoriteBookings || [], query);
+};
+
+export const addFavoriteBooking = async (userId, bookingId) => {
+    const customer = await loadCustomer(userId);
+    await assertBookingBelongsToCustomer(customer, bookingId);
+    await customerRepository.addFavoriteBooking(userId, bookingId);
+
+    return {
+        favorite: true,
+        bookingId,
+    };
+};
+
+export const removeFavoriteBooking = async (userId, bookingId) => {
+    await loadCustomer(userId);
+    await customerRepository.removeFavoriteBooking(userId, bookingId);
+
+    return {
+        favorite: false,
+        bookingId,
+    };
+};
+
+export const toggleFavoriteBooking = async (userId, bookingId) => {
+    const customer = await loadCustomer(userId);
+    await assertBookingBelongsToCustomer(customer, bookingId);
+
+    if (isIdInList(customer.favoriteBookings, bookingId)) {
+        await customerRepository.removeFavoriteBooking(userId, bookingId);
+        return {
+            favorite: false,
+            bookingId,
+        };
+    }
+
+    await customerRepository.addFavoriteBooking(userId, bookingId);
+    return {
+        favorite: true,
+        bookingId,
+    };
+};
+
 
 // ── Customer: booking confirmation ───────────────────────────────────────
 

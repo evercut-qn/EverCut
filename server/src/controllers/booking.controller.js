@@ -114,11 +114,31 @@ export const reorderBooking = async (req, res, next) => {
     }
 };
 
-export const toggleFavorite = async (req, res, next) => {
+export const addFavoriteBooking = async (req, res, next) => {
     try {
-        const params = getValidatedRequestData(req, 'params');
-        const result = await bookingService.toggleFavorite(req.user._id, params.id);
-        return res.status(200).json(ApiResponse.success(result, 'Favorite updated'));
+        const { id } = getValidatedRequestData(req, 'params');
+        const result = await bookingService.addFavoriteBooking(req.user._id, id);
+        return res.status(200).json(ApiResponse.success(result, 'Booking added to favorites'));
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const removeFavoriteBooking = async (req, res, next) => {
+    try {
+        const { id } = getValidatedRequestData(req, 'params');
+        const result = await bookingService.removeFavoriteBooking(req.user._id, id);
+        return res.status(200).json(ApiResponse.success(result, 'Booking removed from favorites'));
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const toggleFavoriteBooking = async (req, res, next) => {
+    try {
+        const { id } = getValidatedRequestData(req, 'params');
+        const result = await bookingService.toggleFavoriteBooking(req.user._id, id);
+        return res.status(200).json(ApiResponse.success(result, 'Favorite booking updated'));
     } catch (err) {
         next(err);
     }

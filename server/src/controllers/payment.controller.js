@@ -35,10 +35,20 @@ export const initiatePayment = async (req, res, next) => {
     }
 };
 
+export const getPayments = async (req, res, next) => {
+    try {
+        const query = getValidatedRequestData(req, 'query');
+        const result = await paymentService.getPayments(req.user, query);
+        return res.status(200).json(ApiResponse.paginated(result.items, result.pagination, 'Payments fetched'));
+    } catch (error) {
+        next(error);
+    }
+};
+
 export const getPaymentStatus = async (req, res, next) => {
     try {
         const { id } = getValidatedRequestData(req, 'params');
-        const result = await paymentService.getPaymentStatus(req.user._id, id);
+        const result = await paymentService.getPaymentStatus(req.user, id);
         return res.status(200).json(ApiResponse.success(result, 'Payment status'));
     } catch (error) {
         next(error);

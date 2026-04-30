@@ -86,7 +86,8 @@ Shop opening, closing, and break times may be sent as either `HH:MM` or `hh:mm A
 | 3 | POST | `/api/v1/bookings` | Create a booking |
 | 4 | GET | `/api/v1/bookings/{{booking_id}}` | Get booking details |
 | 5 | GET | `/api/v1/bookings/{{booking_id}}/confirmation` | Get booking confirmation |
-| 6 | PUT | `/api/v1/bookings/{{booking_id}}/favorite` | Toggle favorite |
+| 6 | PATCH | `/api/v1/bookings/{{booking_id}}/favorite` | Toggle booking favorite |
+| 6B | GET | `/api/v1/bookings?type=favorites` | List favorite bookings |
 | 7 | PUT | `/api/v1/bookings/{{booking_id}}` | Update booking |
 | 8 | PUT | `/api/v1/bookings/{{booking_id}}/reschedule` | Reschedule booking |
 | 9 | POST | `/api/v1/bookings/{{booking_id}}/reorder` | Reorder booking |
@@ -101,9 +102,11 @@ Shop opening, closing, and break times may be sent as either `HH:MM` or `hh:mm A
 | 3 | GET | `/api/v1/shops/{{shop_id}}/employees` | Get shop employees - captures employee ID |
 | 4 | GET | `/api/v1/employees/{{employee_id}}/available-slots` | Get employee available slots |
 | 5 | GET | `/api/v1/shops/{{shop_id}}/availability` | Get shop-wide availability |
-| 6 | GET | `/api/v1/shops/doorstep` | Get doorstep shops |
-| 7 | GET | `/api/v1/services/search` | Search services by keyword and gender |
-| 8 | GET | `/api/v1/shops/search` | Search shops by keyword |
+| 6 | PATCH | `/api/v1/shops/{{shop_id}}/favorite` | Toggle favorite shop |
+| 7 | GET | `/api/v1/shops/favorites` | List favorite shops |
+| 8 | GET | `/api/v1/shops/doorstep` | Get doorstep shops |
+| 9 | GET | `/api/v1/services/search` | Search services by keyword and gender |
+| 10 | GET | `/api/v1/shops/search` | Search shops by keyword |
 
 ### `06-customer-ratings.json`
 
@@ -194,6 +197,7 @@ Employee `workingHours.start` and `workingHours.end` remain `HH:MM` 24-hour valu
 |---|---|---|---|
 | 1 | POST | `/api/v1/payments` | Create native PhonePe SDK order for a pending customer booking |
 | 2 | GET | `/api/v1/payments/{{payment_id}}` | Read and poll payment status |
+| 2B | GET | `/api/v1/payments` | List visible payments for the authenticated actor |
 | 3 | POST | `/api/v1/payments/{{payment_id}}/verify` | Verify Flutter SDK callback through backend/PhonePe Order Status |
 | 4 | GET | `/api/v1/bookings/{{payment_booking_id}}/payment` | Get latest payment for a booking |
 | 5 | POST | `/api/v1/bookings/{{payment_booking_id}}/refund` | Initiate refund before payout starts |

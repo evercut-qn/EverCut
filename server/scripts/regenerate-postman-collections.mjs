@@ -584,16 +584,25 @@ const customerBookingsCollection = {
       }),
     },
     {
-      name: '6. Toggle Favorite',
+      name: '6. Toggle Booking Favorite',
       ...request({
-        method: 'PUT',
+        method: 'PATCH',
         url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id}}/favorite',
-        description: 'Adds or removes the current booking from the customer favourites list.',
+        description: 'Adds or removes the current booking from the customer favorites list through the booking resource.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
     },
     {
-      name: '7. Update Booking',
+      name: '7. Get Favorite Bookings',
+      ...request({
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/bookings?type=favorites',
+        description: 'Lists the authenticated customer favorite bookings through the booking list flow.',
+        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
+      }),
+    },
+    {
+      name: '8. Update Booking',
       ...request({
         method: 'PUT',
         url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id}}',
@@ -604,7 +613,7 @@ const customerBookingsCollection = {
       }),
     },
     {
-      name: '8. Reschedule Booking',
+      name: '9. Reschedule Booking',
       ...request({
         method: 'PUT',
         url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id}}/reschedule',
@@ -615,7 +624,7 @@ const customerBookingsCollection = {
       }),
     },
     {
-      name: '9. Reorder Booking',
+      name: '10. Reorder Booking',
       ...request({
         method: 'POST',
         url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id}}/reorder',
@@ -631,7 +640,7 @@ const customerBookingsCollection = {
       }),
     },
     {
-      name: '10. Cancel Booking',
+      name: '11. Cancel Booking',
       ...request({
         method: 'POST',
         url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id}}/cancel',
@@ -755,7 +764,25 @@ const customerShopDiscoveryCollection = {
       }),
     },
     {
-      name: '6. Get Doorstep Shops',
+      name: '6. Toggle Favorite Shop',
+      ...request({
+        method: 'PATCH',
+        url: '{{base_url}}/{{api_prefix}}/shops/{{shop_id}}/favorite',
+        description: 'Adds or removes the captured shop from the authenticated customer favorite shops list through the shop discovery flow.',
+        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
+      }),
+    },
+    {
+      name: '7. Get Favorite Shops',
+      ...request({
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/shops/favorites',
+        description: 'Lists the authenticated customer favorite shops through the shop discovery flow.',
+        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
+      }),
+    },
+    {
+      name: '8. Get Doorstep Shops',
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/shops/doorstep',
@@ -764,7 +791,7 @@ const customerShopDiscoveryCollection = {
       }),
     },
     {
-      name: '7. Search Services',
+      name: '9. Search Services',
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/services/search?query={{service_search_query}}&gender=male',
@@ -773,7 +800,7 @@ const customerShopDiscoveryCollection = {
       }),
     },
     {
-      name: '8. Search Shops',
+      name: '10. Search Shops',
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/shops/search?query={{shop_search_query}}',
@@ -968,7 +995,7 @@ const barberProfileCollection = {
       }),
     },
     {
-      name: '9A. Sign-Out Everywhere (Terminal)',
+      name: '9. Sign-Out Everywhere (Terminal)',
       ...request({
         method: 'POST',
         url: '{{base_url}}/{{api_prefix}}/shops/me/sign-out-everywhere',
@@ -977,7 +1004,7 @@ const barberProfileCollection = {
       }),
     },
     {
-      name: '9B. Delete Account (Terminal)',
+      name: '10. Delete Account (Terminal)',
       ...request({
         method: 'DELETE',
         url: '{{base_url}}/{{api_prefix}}/shops/me',
@@ -1573,7 +1600,17 @@ const paymentsPayoutsCollection = {
       }),
     },
     {
-      name: '3. Verify Native SDK Payment',
+      name: '3. Get All Payments',
+      ...request({
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/payments',
+        auth: bearerAuth('customer_access_token'),
+        description: 'Lists payment transactions visible to the authenticated actor. Customers see their own payments, barbers see their shop payments, admins see all payments.',
+        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
+      }),
+    },
+    {
+      name: '4. Verify Native SDK Payment',
       ...request({
         method: 'POST',
         url: '{{base_url}}/{{api_prefix}}/payments/{{payment_id}}/verify',
@@ -1594,7 +1631,7 @@ const paymentsPayoutsCollection = {
       }),
     },
     {
-      name: '4. Get Payment By Booking',
+      name: '5. Get Payment By Booking',
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/bookings/{{payment_booking_id}}/payment',
