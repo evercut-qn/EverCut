@@ -142,7 +142,7 @@ curl -X GET "http://localhost:5000/api/v1/earnings/transactions?page=1&limit=20"
   -H "Authorization: Bearer <token>"
 
 # Filter by date range
-curl -X GET "http://localhost:5000/api/v1/earnings/transactions?startDate=2024-01-01&endDate=2024-12-31" \
+curl -X GET "http://localhost:5000/api/v1/earnings/transactions?startDate=2026-01-01&endDate=2026-12-31" \
   -H "Authorization: Bearer <token>"
 
 # Filter by status
@@ -227,7 +227,7 @@ Download a professional PDF statement of transactions within a date range.
 
 **PDF Response**:
 - Content-Type: `application/pdf`
-- Content-Disposition: `attachment; filename="transactions_2024-01-01_to_2024-12-31.pdf"`
+- Content-Disposition: `attachment; filename="transactions_2026-01-01_to_2026-12-31.pdf"`
 
 **PDF Features**:
 - Professional formatting with EverCut branding
@@ -246,7 +246,7 @@ Download a professional PDF statement of transactions within a date range.
 
 ```bash
 # Download PDF statement
-curl -X GET "http://localhost:5000/api/v1/earnings/transactions/statement?startDate=2024-01-01&endDate=2024-12-31" \
+curl -X GET "http://localhost:5000/api/v1/earnings/transactions/statement?startDate=2026-01-01&endDate=2026-12-31" \
   -H "Authorization: Bearer <token>" \
   --output transactions.pdf
 ```
@@ -386,8 +386,8 @@ The transaction amount shown to barbers is the **barber payout** amount, which i
 
 ```javascript
 // Example: Filter by date range
-const startDate = '2024-01-01';
-const endDate = '2024-12-31';
+const startDate = '2026-01-01';
+const endDate = '2026-12-31';
 const url = `/api/v1/earnings/transactions?startDate=${startDate}&endDate=${endDate}`;
 
 // Example: Filter by status
@@ -395,7 +395,7 @@ const status = 'completed';
 const url = `/api/v1/earnings/transactions?status=${status}`;
 
 // Example: Combine filters
-const url = `/api/v1/earnings/transactions?status=completed&startDate=2024-01-01&endDate=2024-12-31&page=1&limit=20`;
+const url = `/api/v1/earnings/transactions?status=completed&startDate=2026-01-01&endDate=2026-12-31&page=1&limit=20`;
 ```
 
 ---
@@ -431,7 +431,7 @@ GET /api/v1/earnings/transactions?page=1&limit=10
 GET /api/v1/earnings/transactions/<transaction_id>
 
 # 4. Download PDF statement
-GET /api/v1/earnings/transactions/statement?startDate=2024-01-01&endDate=2024-12-31
+GET /api/v1/earnings/transactions/statement?startDate=2026-01-01&endDate=2026-12-31
 ```
 
 ---

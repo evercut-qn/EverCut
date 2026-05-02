@@ -319,7 +319,7 @@ result.stream.pipe(res); // Stream PDF to response
 
 **Backend Response:**
 - Content-Type: `application/pdf`
-- Content-Disposition: `attachment; filename="transactions_2024-01-01_to_2024-12-31.pdf"`
+- Content-Disposition: `attachment; filename="transactions_2026-01-01_to_2026-12-31.pdf"`
 - Binary stream piped directly to response
 
 **Flutter Implementation:**
@@ -399,7 +399,7 @@ GET /api/v1/earnings/transactions?page=1&limit=20
 GET /api/v1/earnings/transactions/{transaction_id}
 
 # Download PDF statement
-GET /api/v1/earnings/transactions/statement?startDate=2024-01-01&endDate=2024-12-31
+GET /api/v1/earnings/transactions/statement?startDate=2026-01-01&endDate=2026-12-31
 ```
 
 ---

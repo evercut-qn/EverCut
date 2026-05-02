@@ -107,13 +107,13 @@
             },
             {
               "key": "startDate",
-              "value": "2024-01-01",
+              "value": "2026-01-01",
               "description": "Filter from date (ISO format)",
               "disabled": true
             },
             {
               "key": "endDate",
-              "value": "2024-12-31",
+              "value": "2026-12-31",
               "description": "Filter to date (ISO format)",
               "disabled": true
             }
@@ -224,7 +224,7 @@
         "method": "GET",
         "header": [],
         "url": {
-          "raw": "{{base_url}}/{{api_prefix}}/earnings/transactions/statement?startDate=2024-01-01&endDate=2024-12-31",
+          "raw": "{{base_url}}/{{api_prefix}}/earnings/transactions/statement?startDate=2026-01-01&endDate=2026-12-31",
           "host": [
             "{{base_url}}"
           ],
@@ -237,12 +237,12 @@
           "query": [
             {
               "key": "startDate",
-              "value": "2024-01-01",
+              "value": "2026-01-01",
               "description": "Start date (ISO format, required)"
             },
             {
               "key": "endDate",
-              "value": "2024-12-31",
+              "value": "2026-12-31",
               "description": "End date (ISO format, required)"
             }
           ]

@@ -283,7 +283,7 @@ GET /api/v1/earnings/transactions?page=1&limit=10
 GET /api/v1/earnings/transactions/<transaction_id>
 
 # 4. Download statement
-GET /api/v1/earnings/transactions/statement?startDate=2024-01-01&endDate=2024-12-31
+GET /api/v1/earnings/transactions/statement?startDate=2026-01-01&endDate=2026-12-31
 ```
 
 ## Performance Considerations
@@ -356,8 +356,8 @@ print('Grand Total: ₹${transaction['grandTotal']}');
 final response = await api.get(
   '/earnings/transactions/statement',
   queryParameters: {
-    'startDate': '2024-01-01',
-    'endDate': '2024-12-31',
+    'startDate': '2026-01-01',
+    'endDate': '2026-12-31',
   },
   options: Options(responseType: ResponseType.bytes),
 );
@@ -372,8 +372,8 @@ await file.writeAsBytes(response.data);
 ### Date Range Filter
 ```javascript
 // Frontend
-const startDate = '2024-01-01';
-const endDate = '2024-12-31';
+const startDate = '2026-01-01';
+const endDate = '2026-12-31';
 const url = `/api/v1/earnings/transactions?startDate=${startDate}&endDate=${endDate}`;
 
 // Backend

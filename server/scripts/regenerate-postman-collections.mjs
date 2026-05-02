@@ -1446,8 +1446,8 @@ const barberEarningsCollection = {
             { key: 'page', value: '1', description: 'Page number (default: 1)' },
             { key: 'limit', value: '20', description: 'Items per page (default: 10)' },
             { key: 'status', value: 'completed', description: 'Filter by payment status', disabled: true },
-            { key: 'startDate', value: '2024-01-01', description: 'Filter from date (ISO format)', disabled: true },
-            { key: 'endDate', value: '2024-12-31', description: 'Filter to date (ISO format)', disabled: true },
+            { key: 'startDate', value: '2026-01-01', description: 'Filter from date (ISO format)', disabled: true },
+            { key: 'endDate', value: '2026-12-31', description: 'Filter to date (ISO format)', disabled: true },
           ],
         },
         description: 'Returns paginated transaction history with monthly revenue summary. Includes customer details, amounts, and timestamps.',
@@ -1511,12 +1511,12 @@ const barberEarningsCollection = {
       ...request({
         method: 'GET',
         url: {
-          raw: '{{base_url}}/{{api_prefix}}/earnings/transactions/statement?startDate=2024-01-01&endDate=2024-12-31',
+          raw: '{{base_url}}/{{api_prefix}}/earnings/transactions/statement?startDate=2026-01-01&endDate=2026-12-31',
           host: ['{{base_url}}'],
           path: ['{{api_prefix}}', 'earnings', 'transactions', 'statement'],
           query: [
-            { key: 'startDate', value: '2024-01-01', description: 'Start date (ISO format, required)' },
-            { key: 'endDate', value: '2024-12-31', description: 'End date (ISO format, required)' },
+            { key: 'startDate', value: '2026-01-01', description: 'Start date (ISO format, required)' },
+            { key: 'endDate', value: '2026-12-31', description: 'End date (ISO format, required)' },
           ],
         },
         description: 'Downloads a professionally formatted PDF statement of all transactions within the specified date range. The PDF includes shop information, summary statistics, and a detailed transaction table.',
