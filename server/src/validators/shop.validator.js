@@ -75,7 +75,6 @@ const ifscSchema = Joi.string().trim().pattern(/^[A-Z]{4}0[A-Z0-9]{6}$/i);
 const bankAccountSchema = Joi.string().trim().min(6).max(34);
 
 export const updateBusinessSchema = Joi.object({
-    email: Joi.string().email(),
     shopName: Joi.string().trim().min(1).max(100),
     ownerName: Joi.string().trim().min(1).max(100),
     shopOwner: Joi.string().trim().min(1).max(100),

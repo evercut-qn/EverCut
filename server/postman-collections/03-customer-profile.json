@@ -88,7 +88,7 @@
         "method": "PUT",
         "header": [],
         "url": "{{base_url}}/{{api_prefix}}/customers/me",
-        "description": "Updates the customer data and reuses the sample image as an optional replacement photo.",
+        "description": "Updates the customer data and reuses the sample image as an optional replacement photo. NOTE: Email updates must use PUT /account/email endpoint.",
         "body": {
           "mode": "formdata",
           "formdata": [
@@ -100,11 +100,6 @@
             {
               "key": "lastName",
               "value": "Customer",
-              "type": "text"
-            },
-            {
-              "key": "email",
-              "value": "test.customer@example.com",
               "type": "text"
             },
             {

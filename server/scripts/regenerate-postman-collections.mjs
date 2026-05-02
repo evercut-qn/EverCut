@@ -349,7 +349,26 @@ const authenticationCollection = {
       }),
     },
     {
-      name: '11. Health Check',
+      name: '11. Update Email (Customer)',
+      ...request({
+        method: 'PUT',
+        url: '{{base_url}}/{{api_prefix}}/account/email',
+        auth: bearerAuth('customer_access_token'),
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "newEmail": "updated.customer@example.com"\n}`),
+        description: 'Update user email. Email is stored with emailVerified: false until verification is implemented.',
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          "const response = pm.response.json();",
+          "const data = response.data || {};",
+          "pm.test('response includes email', function () { pm.expect(data).to.have.property('email'); });",
+          "pm.test('response includes emailVerified', function () { pm.expect(data).to.have.property('emailVerified'); });",
+          "pm.test('emailVerified is false', function () { pm.expect(data.emailVerified).to.equal(false); });"
+        ),
+      }),
+    },
+    {
+      name: '12. Health Check',
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/health',
@@ -477,11 +496,10 @@ const customerCollection = {
       ...request({
         method: 'PUT',
         url: '{{base_url}}/{{api_prefix}}/customers/me',
-        description: 'Updates the customer data and reuses the sample image as an optional replacement photo.',
+        description: 'Updates the customer data and reuses the sample image as an optional replacement photo. NOTE: Email updates must use PUT /account/email endpoint.',
         body: formDataBody([
           textField('firstName', 'Test'),
           textField('lastName', 'Customer'),
-          textField('email', 'test.customer@example.com'),
           textField('address', `${customerLocationText}, India`),
           textField('location', customerLocationGeoJson),
           fileField('photo', 'Attach replacement photo file manually in Postman (optional)'),
@@ -935,8 +953,8 @@ const barberProfileCollection = {
         method: 'PUT',
         url: '{{base_url}}/{{api_prefix}}/shops/me',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody(`{\n  "email": "test.barber.updated@example.com",\n  "firstName": "Test",\n  "lastName": "Barber",\n  "shopOwner": "Test Barber",\n  "dateOfBirth": "1991-01-12",\n  "gender": "Male",\n  "shopName": "Postman Test Barber Studio",\n  "businessCategory": "Barber",\n  "targetCustomers": "male",\n  "shopLocation": "${barberLocationText}",\n  "location": ${barberLocationGeoJson},\n  "amenities": ["Air Conditioning", "Waiting Area", "Parking Area", "Wi-Fi"],\n  "workingDays": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],\n  "workingHours": {\n    "opensAt": "09:00",\n    "closesAt": "20:00"\n  },\n  "breakTimings": [\n    {\n      "startsAt": "13:00",\n      "endsAt": "14:00"\n    }\n  ],\n  "accountHolderName": "Test Barber",\n  "bankName": "HDFC Bank",\n  "upiAddress": "test.barber@upi",\n  "bio": "Updated from the automated Postman profile collection."\n}`),
-        description: 'Updates the barber profile using the onboarding-friendly request shape that the backend validators actually accept.',
+        body: jsonBody(`{\n  "firstName": "Test",\n  "lastName": "Barber",\n  "shopOwner": "Test Barber",\n  "dateOfBirth": "1991-01-12",\n  "gender": "Male",\n  "shopName": "Postman Test Barber Studio",\n  "businessCategory": "Barber",\n  "targetCustomers": "male",\n  "shopLocation": "${barberLocationText}",\n  "location": ${barberLocationGeoJson},\n  "amenities": ["Air Conditioning", "Waiting Area", "Parking Area", "Wi-Fi"],\n  "workingDays": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],\n  "workingHours": {\n    "opensAt": "09:00",\n    "closesAt": "20:00"\n  },\n  "breakTimings": [\n    {\n      "startsAt": "13:00",\n      "endsAt": "14:00"\n    }\n  ],\n  "accountHolderName": "Test Barber",\n  "bankName": "HDFC Bank",\n  "upiAddress": "test.barber@upi",\n  "bio": "Updated from the automated Postman profile collection."\n}`),
+        description: 'Updates the barber profile using the onboarding-friendly request shape that the backend validators actually accept. NOTE: Email updates must use PUT /account/email endpoint.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
     },

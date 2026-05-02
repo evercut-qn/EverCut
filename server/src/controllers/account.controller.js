@@ -1,4 +1,5 @@
 import * as phoneUpdateService from '../services/phone-update.service.js';
+import * as emailUpdateService from '../services/email-update.service.js';
 import { ApiResponse } from '../utils/api-response.js';
 import { getValidatedRequestData } from '../utils/request-validation.utils.js';
 
@@ -26,6 +27,25 @@ export const verifyPhoneUpdateOtp = async (req, res) => {
     return res.status(200).json(
         ApiResponse.success(
             { phoneNumber: result.phoneNumber },
+            result.message,
+        ),
+    );
+};
+
+/**
+ * PUT /account/email
+ * Update user email
+ */
+export const updateEmail = async (req, res) => {
+    const { newEmail } = getValidatedRequestData(req, 'body');
+    const result = await emailUpdateService.updateEmail(req.user._id, newEmail);
+
+    return res.status(200).json(
+        ApiResponse.success(
+            {
+                email: result.email,
+                emailVerified: result.emailVerified,
+            },
             result.message,
         ),
     );

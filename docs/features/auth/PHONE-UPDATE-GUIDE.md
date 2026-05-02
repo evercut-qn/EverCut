@@ -203,9 +203,11 @@ NODE_ENV=production  # Disables test mode
 ```
 server/src/
 ├── controllers/account.controller.js      - HTTP handlers
-├── services/phone-update.service.js       - Business logic
+├── services/phone-update.service.js       - Phone update logic
+├── services/email-update.service.js       - Email update logic
 ├── routes/account.routes.js               - Route definitions
-└── validators/phone.validator.js          - Request validation
+├── validators/phone.validator.js          - Phone validation
+└── validators/email.validator.js          - Email validation
 ```
 
 ---

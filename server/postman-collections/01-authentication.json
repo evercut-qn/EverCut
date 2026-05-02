@@ -541,7 +541,65 @@
       ]
     },
     {
-      "name": "11. Health Check",
+      "name": "11. Update Email (Customer)",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/{{api_prefix}}/account/email",
+        "description": "Update user email. Email is stored with emailVerified: false until verification is implemented.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"newEmail\": \"updated.customer@example.com\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{customer_access_token}}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "});",
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "const response = pm.response.json();",
+              "const data = response.data || {};",
+              "pm.test('response includes email', function () { pm.expect(data).to.have.property('email'); });",
+              "pm.test('response includes emailVerified', function () { pm.expect(data).to.have.property('emailVerified'); });",
+              "pm.test('emailVerified is false', function () { pm.expect(data.emailVerified).to.equal(false); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "12. Health Check",
       "request": {
         "method": "GET",
         "header": [],

@@ -43,7 +43,6 @@ export const getShopByOwner = async (ownerId, userContext) => {
 };
 
 const ALLOWED_UPDATE_FIELDS = [
-    'email',
     'shopName',
     'numberOfEmployees',
     'yearsOfExperience',
@@ -306,23 +305,14 @@ export const updateBusinessInfo = async (ownerId, body, userContext) => {
     const normalizedBody = normalizeUpdateBody(body);
     const updateData = {};
     const errors = [];
-    let emailToUpdate = null;
 
     for (const [key, value] of Object.entries(normalizedBody)) {
         if (!ALLOWED_UPDATE_FIELDS.includes(key)) continue;
         if (value === undefined || value === null) continue;
         if (typeof value === 'string' && value === '' && key !== 'bio') continue;
 
+        // Remove email from update data - email updates must go through /account/email
         if (key === 'email') {
-            const currentUser = await userRepository.findById(ownerId);
-            if (currentUser && currentUser.email !== value) {
-                const existingUser = await userRepository.findByEmail(value);
-                if (existingUser && existingUser._id.toString() !== ownerId.toString()) {
-                    errors.push('Email is already in use');
-                } else {
-                    emailToUpdate = value;
-                }
-            }
             continue;
         }
 
@@ -361,7 +351,7 @@ export const updateBusinessInfo = async (ownerId, body, userContext) => {
     }
 
     if (errors.length) throw new BadRequestError('Validation failed', errors);
-    if (Object.keys(updateData).length === 0 && !emailToUpdate) {
+    if (Object.keys(updateData).length === 0) {
         throw new BadRequestError('No valid fields provided for update');
     }
 
@@ -371,16 +361,9 @@ export const updateBusinessInfo = async (ownerId, body, userContext) => {
     }
     const photos = await photoRepository.findByShopId(updated._id, {});
 
-    if (emailToUpdate) {
-        await userRepository.updateById(ownerId, {
-            email: emailToUpdate,
-            emailVerified: false,
-        });
-    }
-
     return {
         shop: serializeBarberProfile(updated, userContext, { photos }),
-        updatedFields: Object.keys(updateData).concat(emailToUpdate ? ['email'] : []),
+        updatedFields: Object.keys(updateData),
     };
 };
 

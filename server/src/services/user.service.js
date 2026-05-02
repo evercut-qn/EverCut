@@ -25,17 +25,9 @@ export const updateProfile = async (userId, data, file) => {
         }
     }
 
-    let emailToUpdate = null;
-    if (data.email) {
-        const currentUser = await userRepository.findById(userId);
-        if (currentUser && currentUser.email !== data.email) {
-            const existingUser = await userRepository.findByEmail(data.email);
-            if (existingUser && existingUser._id.toString() !== userId.toString()) {
-                throw new BadRequestError('Email is already in use');
-            }
-
-            emailToUpdate = data.email;
-        }
+    // Remove email from update data - email updates must go through /account/email
+    if (data.email !== undefined) {
+        delete data.email;
     }
 
     const nextPhotoCloudinaryId = file ? (file.filename || file.public_id) : null;
@@ -49,13 +41,6 @@ export const updateProfile = async (userId, data, file) => {
     try {
         updated = await customerRepository.updateByUserId(userId, data);
         profileUpdated = true;
-
-        if (emailToUpdate) {
-            await userRepository.updateById(userId, {
-                email: emailToUpdate,
-                emailVerified: false,
-            });
-        }
     } catch (err) {
         if (nextPhotoCloudinaryId && !profileUpdated) {
             try {

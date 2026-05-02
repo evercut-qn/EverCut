@@ -8,6 +8,7 @@ import {
     sendPhoneOtpSchema,
     verifyPhoneOtpSchema,
 } from '../validators/phone.validator.js';
+import { updateEmailSchema } from '../validators/email.validator.js';
 
 const router = Router();
 
@@ -37,6 +38,13 @@ router.post(
     }),
     validate(verifyPhoneOtpSchema, 'body'),
     accountController.verifyPhoneUpdateOtp,
+);
+
+// Email update endpoint
+router.put(
+    '/email',
+    validate(updateEmailSchema, 'body'),
+    accountController.updateEmail,
 );
 
 export default router;
