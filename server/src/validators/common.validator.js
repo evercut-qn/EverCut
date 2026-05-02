@@ -1,5 +1,6 @@
 import Joi from 'joi';
 import mongoose from 'mongoose';
+import { toTwentyFourHourTime } from '../utils/time.utils.js';
 
 /**
  * Common reusable validation rules.
@@ -22,8 +23,17 @@ export const paginationSchema = Joi.object({
 // Date string (YYYY-MM-DD)
 export const dateString = Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/);
 
-// Time string (hh:mm AM/PM)
-export const timeString = Joi.string().pattern(/^(0?[1-9]|1[0-2]):[0-5][0-9]\s(AM|PM)$/i);
+// Time string accepted from either availability APIs (HH:MM) or legacy clients (hh:mm AM/PM).
+export const timeString = Joi.string()
+    .trim()
+    .custom((value, helpers) => {
+        const normalized = toTwentyFourHourTime(value);
+        if (!normalized) return helpers.error('any.custom');
+        return normalized;
+    }, 'time normalization')
+    .messages({
+        'any.custom': 'time must use HH:MM or hh:mm AM/PM format',
+    });
 
 // Location GeoJSON
 export const locationSchema = Joi.object({

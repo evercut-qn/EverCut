@@ -2,10 +2,7 @@ import mongoose from 'mongoose';
 import { ALL_GENDERS } from '../utils/constants.js';
 
 /**
- * Employee model — linked to a Shop via shopId.
- *
- * Key change: `shopId` (ObjectId → Shop) replaces the old `firebaseUid` string.
- * This ensures proper relational integrity and survives account changes.
+ * Employee model - linked to a Shop via shopId.
  */
 const employeeSchema = new mongoose.Schema(
     {
@@ -74,12 +71,20 @@ const employeeSchema = new mongoose.Schema(
 // Indexes
 // ---------------------------------------------------------------------------
 employeeSchema.index({ shopId: 1, isActive: 1 });
-employeeSchema.index({ shopId: 1, phoneNumber: 1 }, { unique: true });
+employeeSchema.index(
+    { shopId: 1, phoneNumber: 1 },
+    {
+        unique: true,
+        partialFilterExpression: {
+            deletedAt: null,
+        },
+    },
+);
 
 // ---------------------------------------------------------------------------
 // Soft-delete query middleware
 // ---------------------------------------------------------------------------
-employeeSchema.pre(/^find/, function () {
+employeeSchema.pre(/^(find|count)/, function () {
     if (!this.getOptions()?.includeDeleted) {
         this.where({ deletedAt: null });
     }

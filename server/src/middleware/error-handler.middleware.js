@@ -22,7 +22,7 @@ const errorHandler = (err, req, res, _next) => {
             LIMIT_UNEXPECTED_FILE: 'Unexpected file field.',
         };
         const message = messages[err.code] || 'File upload error';
-        return res.status(400).json(ApiResponse.error(message, 400));
+        return res.status(400).json(ApiResponse.error(message));
     }
 
     // -----------------------------------------------------------------------
@@ -32,7 +32,7 @@ const errorHandler = (err, req, res, _next) => {
         const errors = Object.values(err.errors).map((e) => e.message);
         return res
             .status(400)
-            .json(ApiResponse.error('Validation failed', 400, errors));
+            .json(ApiResponse.error('Validation failed', { errors }));
     }
 
     // -----------------------------------------------------------------------
@@ -42,7 +42,7 @@ const errorHandler = (err, req, res, _next) => {
         const field = Object.keys(err.keyPattern || {}).join(', ');
         return res
             .status(409)
-            .json(ApiResponse.error(`Duplicate value for: ${field}`, 409));
+            .json(ApiResponse.error(`Duplicate value for: ${field}`));
     }
 
     // -----------------------------------------------------------------------
@@ -51,16 +51,20 @@ const errorHandler = (err, req, res, _next) => {
     if (err.name === 'CastError') {
         return res
             .status(400)
-            .json(ApiResponse.error(`Invalid ${err.path}: ${err.value}`, 400));
+            .json(ApiResponse.error(`Invalid ${err.path}: ${err.value}`));
     }
 
     // -----------------------------------------------------------------------
     // 5. Our custom AppError hierarchy (operational errors)
     // -----------------------------------------------------------------------
     if (err instanceof AppError) {
+        const data = Array.isArray(err.errors) && err.errors.length > 0
+            ? { errors: err.errors }
+            : {};
+
         return res
             .status(err.statusCode)
-            .json(ApiResponse.error(err.message, err.statusCode, err.errors));
+            .json(ApiResponse.error(err.message, data));
     }
 
     // -----------------------------------------------------------------------
@@ -78,7 +82,7 @@ const errorHandler = (err, req, res, _next) => {
             ? 'Internal server error'
             : err.message || 'Internal server error';
 
-    return res.status(500).json(ApiResponse.error(message, 500));
+    return res.status(500).json(ApiResponse.error(message));
 };
 
 export default errorHandler;

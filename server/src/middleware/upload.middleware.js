@@ -20,7 +20,7 @@ const imageFilter = (_req, file, cb) => {
     }
 };
 
-const resolveActorKey = (req) => req.user?._id?.toString() || req.user?.firebaseUid || 'anonymous';
+const resolveActorKey = (req) => req.user?._id?.toString() || req.onboardingContext?.phoneNumber || 'anonymous';
 
 // ── Storage factories ────────────────────────────────────────────────────
 
@@ -45,9 +45,16 @@ const coverStorage = new CloudinaryStorage({
 
 // ── Exported upload middleware ────────────────────────────────────────────
 
-/** Single customer profile photo */
+/** Single customer photo */
 export const uploadCustomerPhoto = multer({
     storage: makeStorage((req) => `evercut/customers/${resolveActorKey(req)}`),
+    limits: { fileSize: config.upload.maxFileSize },
+    fileFilter: imageFilter,
+}).single('photo');
+
+/** Single barber owner profile photo */
+export const uploadBarberProfilePhoto = multer({
+    storage: makeStorage((req) => `evercut/shops/profile/${resolveActorKey(req)}`),
     limits: { fileSize: config.upload.maxFileSize },
     fileFilter: imageFilter,
 }).single('photo');

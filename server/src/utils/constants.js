@@ -21,6 +21,7 @@ export const ALL_ROLES = Object.values(ROLES);
 
 export const BOOKING_STATUS = Object.freeze({
     PENDING: 'pending',
+    AWAITING_CONFIRMATION: 'awaiting_confirmation',
     CONFIRMED: 'confirmed',
     COMPLETED: 'completed',
     CANCELLED: 'cancelled',
@@ -29,17 +30,113 @@ export const BOOKING_STATUS = Object.freeze({
 
 export const ALL_BOOKING_STATUSES = Object.values(BOOKING_STATUS);
 
+export const BOOKING_MILESTONE_TARGETS = Object.freeze([500, 750, 1000]);
+
 // ---------------------------------------------------------------------------
 // Payment Statuses
 // ---------------------------------------------------------------------------
 
 export const PAYMENT_STATUS = Object.freeze({
     PENDING: 'pending',
+    INITIATED: 'initiated',
     SUCCESS: 'success',
     FAILED: 'failed',
+    REFUND_PENDING: 'refund_pending',
+    REFUNDED: 'refunded',
+    REFUND_FAILED: 'refund_failed',
 });
 
 export const ALL_PAYMENT_STATUSES = Object.values(PAYMENT_STATUS);
+
+export const PAYMENT_TRANSACTION_STATUS = Object.freeze({
+    INITIATED: 'initiated',
+    PENDING: 'pending',
+    COMPLETED: 'completed',
+    FAILED: 'failed',
+    EXPIRED: 'expired',
+    REFUND_PENDING: 'refund_pending',
+    REFUNDED: 'refunded',
+    REFUND_FAILED: 'refund_failed',
+});
+
+export const ALL_PAYMENT_TRANSACTION_STATUSES = Object.values(PAYMENT_TRANSACTION_STATUS);
+
+export const PAYOUT_STATUS = Object.freeze({
+    NOT_INITIATED: 'not_initiated',
+    INITIATED: 'initiated',
+    PENDING: 'pending',
+    COMPLETED: 'completed',
+    FAILED: 'failed',
+    REVERSED: 'reversed',
+});
+
+export const ALL_PAYOUT_STATUSES = Object.values(PAYOUT_STATUS);
+
+export const PAYOUT_TRANSACTION_STATUS = Object.freeze({
+    INITIATED: 'INITIATED',
+    PENDING: 'PENDING',
+    SUCCESS: 'SUCCESS',
+    FAILED: 'FAILED',
+    REVERSED: 'REVERSED',
+});
+
+export const ALL_PAYOUT_TRANSACTION_STATUSES = Object.values(PAYOUT_TRANSACTION_STATUS);
+
+export const PHONEPE_WEBHOOK_EVENTS = Object.freeze({
+    ORDER_COMPLETED: 'checkout.order.completed',
+    ORDER_FAILED: 'checkout.order.failed',
+    REFUND_COMPLETED: 'pg.refund.completed',
+    REFUND_FAILED: 'pg.refund.failed',
+});
+
+export const CASHFREE_WEBHOOK_EVENTS = Object.freeze({
+    TRANSFER_SUCCESS: 'TRANSFER_SUCCESS',
+    TRANSFER_FAILED: 'TRANSFER_FAILED',
+    TRANSFER_REVERSED: 'TRANSFER_REVERSED',
+});
+
+export const PAYMENT_GATEWAYS = Object.freeze({
+    PHONEPE: 'phonepe',
+    RAZORPAY: 'razorpay',
+    CASHFREE: 'cashfree',
+    MANUAL: 'manual',
+});
+
+export const PAYOUT_MODES = Object.freeze({
+    UPI: 'upi',
+    IMPS: 'imps',
+    NEFT: 'neft',
+    RTGS: 'rtgs',
+    BANK: 'banktransfer',
+});
+
+export const PLATFORM_FEES = Object.freeze({
+    SINGLE_SERVICE: 3,
+    BUNDLE: 10,
+});
+
+export const REFUND_FEES = Object.freeze({
+    SINGLE_SERVICE: 7,
+    BUNDLE: 15,
+});
+
+// ---------------------------------------------------------------------------
+// Booking Limits
+// ---------------------------------------------------------------------------
+
+export const BOOKING_LIMITS = Object.freeze({
+    MAX_SERVICES_PER_BOOKING: 10,      // Maximum 10 services/bundles per booking
+    MAX_BOOKING_DURATION_MINUTES: 480, // Maximum 8 hours per booking
+    MAX_ADVANCE_BOOKING_DAYS: 7,       // Maximum 7 days in advance
+});
+
+// ---------------------------------------------------------------------------
+// Bundle Rules
+// ---------------------------------------------------------------------------
+
+export const BUNDLE_RULES = Object.freeze({
+    MIN_SERVICE_AMOUNT: 300,
+});
 
 // ---------------------------------------------------------------------------
 // Shop Categories
@@ -139,6 +236,30 @@ export const ALL_GENDERS = Object.values(GENDER);
 // ---------------------------------------------------------------------------
 
 export const SECURITY_PIN_LENGTH = 4;
+
+// ---------------------------------------------------------------------------
+// OTP Rate Limiting
+// ---------------------------------------------------------------------------
+// Used by otp-rate-limiter.middleware.js.
+// OTP length and expiry are configured via msg91.config.js,
+// not duplicated here.
+
+export const OTP_RATE_LIMIT = Object.freeze({
+    windowMs: 15 * 60 * 1000,   // 15 minutes
+    maxSendPerPhone: 5,
+    maxSendPerIp: 10,
+    maxVerifyPerPhone: 10,
+});
+
+// ---------------------------------------------------------------------------
+// Token Types
+// ---------------------------------------------------------------------------
+
+export const TOKEN_TYPE = Object.freeze({
+    ONBOARDING: 'onboarding',
+    ACCESS: 'access',
+    REFRESH: 'refresh',
+});
 
 // ---------------------------------------------------------------------------
 // Miscellaneous

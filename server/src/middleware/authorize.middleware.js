@@ -13,11 +13,6 @@ export const authorize = (...allowedRoles) => {
             return next(new UnauthorizedError('Authentication required'));
         }
 
-        if (req.user.isNewUser) {
-            // New users can only access auth/registration endpoints
-            return next(new ForbiddenError('Please complete your profile first'));
-        }
-
         if (!allowedRoles.includes(req.user.roleType)) {
             return next(
                 new ForbiddenError(

@@ -8,12 +8,10 @@ import {
 } from '../utils/constants.js';
 
 /**
- * Shop / Salon model — replaces the old BarberSetup.
+ * Shop / Salon model - replaces the old BarberSetup.
  *
- * Key changes from old schema:
- *   - `ownerId` (ObjectId → User) replaces `firebaseUid` (String)
- *   - Renamed to "Shop" (domain-neutral term)
- *   - Added soft-delete, proper indexes, and validation
+ * Renamed to "Shop" (domain-neutral term) and includes soft-delete,
+ * indexes, and validation for the current domain model.
  */
 const shopSchema = new mongoose.Schema(
     {
@@ -63,17 +61,6 @@ const shopSchema = new mongoose.Schema(
             enum: ALL_SERVICE_FOR,
             required: true,
         },
-        phoneNumber: {
-            type: String,
-            required: true,
-            trim: true,
-        },
-        emailId: {
-            type: String,
-            required: true,
-            lowercase: true,
-            trim: true,
-        },
         upiId: {
             type: String,
             required: true,
@@ -88,6 +75,37 @@ const shopSchema = new mongoose.Schema(
             type: String,
             required: true,
             trim: true,
+        },
+        payoutConfig: {
+            bankAccount: {
+                type: String,
+                default: null,
+                trim: true,
+            },
+            ifsc: {
+                type: String,
+                default: null,
+                trim: true,
+            },
+            beneficiaryId: {
+                type: String,
+                default: null,
+                index: true,
+            },
+            beneficiaryCreatedAt: {
+                type: Date,
+                default: null,
+            },
+            verifiedAt: {
+                type: Date,
+                default: null,
+            },
+            verificationStatus: {
+                type: String,
+                enum: ['pending', 'verified', 'failed'],
+                default: 'pending',
+            },
+            _id: false,
         },
         bio: {
             type: String,
@@ -158,6 +176,14 @@ const shopSchema = new mongoose.Schema(
             type: String,
             default: null,
         },
+        ownerPhotoUrl: {
+            type: String,
+            default: null,
+        },
+        ownerPhotoCloudinaryId: {
+            type: String,
+            default: null,
+        },
         pinHash: {
             type: String,
             required: true,
@@ -167,6 +193,15 @@ const shopSchema = new mongoose.Schema(
             default: true,
         },
         deletedAt: {
+            type: Date,
+            default: null,
+        },
+        missedConfirmationCount: {
+            type: Number,
+            default: 0,
+            min: 0,
+        },
+        lastMissedConfirmationAt: {
             type: Date,
             default: null,
         },

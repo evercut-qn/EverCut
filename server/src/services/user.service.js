@@ -1,48 +1,22 @@
-import customerProfileRepo from '../repositories/customer-profile.repository.js';
+import customerRepository from '../repositories/customer.repository.js';
 import userRepository from '../repositories/user.repository.js';
 import { NotFoundError, BadRequestError } from '../utils/api-error.js';
 import cloudinary from '../config/cloudinary.config.js';
 
 /**
- * User (Customer) profile service.
+ * Customer-facing profile service.
  */
 
 export const getProfile = async (userId) => {
-    const profile = await customerProfileRepo.findByUserId(userId);
-    if (!profile) throw new NotFoundError('Customer profile');
+    const profile = await customerRepository.findByUserId(userId);
+    if (!profile) throw new NotFoundError('Customer');
     return profile;
 };
 
-export const getHomeProfile = async (userId) => {
-    const profile = await customerProfileRepo.findByUserId(userId);
-    if (!profile) throw new NotFoundError('Customer profile');
-
-    return {
-        photo: profile.photoUrl || null,
-        name: [profile.firstName, profile.lastName].filter(Boolean).join(' '),
-        address: profile.address || '',
-    };
-};
-
 export const updateProfile = async (userId, data, file) => {
-    const profile = await customerProfileRepo.findByUserId(userId);
-    if (!profile) throw new NotFoundError('Customer profile');
+    const profile = await customerRepository.findByUserId(userId);
+    if (!profile) throw new NotFoundError('Customer');
 
-    // Handle photo replacement
-    if (file) {
-        // Delete old photo from Cloudinary
-        if (profile.cloudinaryId) {
-            try {
-                await cloudinary.uploader.destroy(profile.cloudinaryId);
-            } catch {
-                // Non-fatal — log but continue
-            }
-        }
-        data.photoUrl = file.path;
-        data.cloudinaryId = file.filename || file.public_id;
-    }
-
-    // Parse location if string
     if (data.location && typeof data.location === 'string') {
         try {
             data.location = JSON.parse(data.location);
@@ -51,12 +25,39 @@ export const updateProfile = async (userId, data, file) => {
         }
     }
 
-    // Update profile (only provided fields overwrite)
-    const updated = await customerProfileRepo.updateByUserId(userId, data);
+    // Remove email from update data - email updates must go through /account/email
+    if (data.email !== undefined) {
+        delete data.email;
+    }
 
-    // Also update email on User model if changed
-    if (data.email) {
-        await userRepository.updateById(userId, { email: data.email });
+    const nextPhotoCloudinaryId = file ? (file.filename || file.public_id) : null;
+    if (file) {
+        data.photoUrl = file.path;
+        data.cloudinaryId = nextPhotoCloudinaryId;
+    }
+
+    let updated;
+    let profileUpdated = false;
+    try {
+        updated = await customerRepository.updateByUserId(userId, data);
+        profileUpdated = true;
+    } catch (err) {
+        if (nextPhotoCloudinaryId && !profileUpdated) {
+            try {
+                await cloudinary.uploader.destroy(nextPhotoCloudinaryId);
+            } catch {
+                // Non-fatal; preserve the original error
+            }
+        }
+        throw err;
+    }
+
+    if (nextPhotoCloudinaryId && profile.cloudinaryId && profile.cloudinaryId !== nextPhotoCloudinaryId) {
+        try {
+            await cloudinary.uploader.destroy(profile.cloudinaryId);
+        } catch {
+            // Non-fatal; the new photo is already persisted
+        }
     }
 
     return updated;

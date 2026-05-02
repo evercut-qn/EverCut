@@ -88,3 +88,32 @@ export class TooManyRequestsError extends AppError {
         super(message, 429);
     }
 }
+
+export class PaymentError extends AppError {
+    constructor(message = 'Payment gateway error', gatewayCode = null, gatewayMessage = null) {
+        super(message, 502);
+        this.gatewayCode = gatewayCode;
+        this.gatewayMessage = gatewayMessage;
+    }
+}
+
+export class PaymentTimeoutError extends AppError {
+    constructor(merchantOrderId) {
+        super(`Payment session expired for order ${merchantOrderId}`, 408);
+        this.merchantOrderId = merchantOrderId;
+    }
+}
+
+export class PayoutError extends AppError {
+    constructor(message = 'Payout provider error', providerCode = null, providerMessage = null) {
+        super(message, 502);
+        this.providerCode = providerCode;
+        this.providerMessage = providerMessage;
+    }
+}
+
+export class InsufficientWalletBalanceError extends AppError {
+    constructor() {
+        super('Payout wallet has insufficient balance', 503);
+    }
+}

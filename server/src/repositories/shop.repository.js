@@ -1,5 +1,7 @@
 import Shop from '../models/shop.model.js';
 import { NEARBY_DISTANCE_METERS } from '../utils/constants.js';
+import { trustQueryOperators } from '../utils/mongoose-query.utils.js';
+import { escapeRegex } from '../utils/regex.utils.js';
 
 class ShopRepository {
     async create(data) {
@@ -18,29 +20,37 @@ class ShopRepository {
         return Shop.findOneAndUpdate(
             { ownerId },
             { $set: data },
-            { new: true, runValidators: true },
+            { returnDocument: 'after', runValidators: true },
         );
     }
 
     async updateById(id, data) {
-        return Shop.findByIdAndUpdate(id, { $set: data }, { new: true, runValidators: true });
+        return Shop.findByIdAndUpdate(id, { $set: data }, { returnDocument: 'after', runValidators: true });
     }
 
     async findNearby(coordinates, maxDistance = NEARBY_DISTANCE_METERS, selectFields) {
-        const query = Shop.find({
+        const query = Shop.find(trustQueryOperators({
             location: {
                 $near: {
                     $geometry: { type: 'Point', coordinates },
                     $maxDistance: maxDistance,
                 },
             },
-        });
+        }));
         if (selectFields) query.select(selectFields);
         return query;
     }
 
     async findByCategory(category, selectFields) {
         const query = Shop.find({ category });
+        if (selectFields) query.select(selectFields);
+        return query;
+    }
+
+    async searchByName(nameQuery, selectFields) {
+        const query = Shop.find(
+            trustQueryOperators({ shopName: { $regex: new RegExp(escapeRegex(nameQuery), 'i') } }),
+        );
         if (selectFields) query.select(selectFields);
         return query;
     }

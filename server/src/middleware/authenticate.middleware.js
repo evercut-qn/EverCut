@@ -1,61 +1,88 @@
-import admin from '../config/firebase.config.js';
+import * as authService from '../services/auth.service.js';
 import userRepository from '../repositories/user.repository.js';
-import { UnauthorizedError } from '../utils/api-error.js';
+import { AppError, ConflictError, UnauthorizedError } from '../utils/api-error.js';
+import { TOKEN_TYPE } from '../utils/constants.js';
 import logger from '../utils/logger.js';
 
-/**
- * Authenticate middleware — verifies Firebase ID token.
- *
- * On success, attaches to `req.user`:
- *   - _id            (MongoDB ObjectId)
- *   - firebaseUid
- *   - roleType       ('CUSTOMER' | 'BARBER' | 'ADMIN')
- *   - phoneNumber
- *   - email
- *
- * For new users (not yet in DB), attaches a minimal object:
- *   - firebaseUid
- *   - phoneNumber     (from the decoded Firebase token)
- *   - isNewUser: true
- */
-const authenticate = async (req, _res, next) => {
+const extractBearerToken = (req, missingMessage) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) {
+        throw new UnauthorizedError(missingMessage);
+    }
+
+    const token = authHeader.split(' ')[1];
+    if (!token) {
+        throw new UnauthorizedError(missingMessage);
+    }
+
+    return token;
+};
+
+const loadActiveUser = async (userId) => {
+    const user = await userRepository.findById(userId);
+    if (!user || user.deletedAt || user.isActive === false) {
+        throw new UnauthorizedError('Account is inactive or deleted');
+    }
+
+    return user;
+};
+
+export const authenticate = async (req, _res, next) => {
     try {
-        const authHeader = req.headers.authorization;
-        if (!authHeader?.startsWith('Bearer ')) {
-            throw new UnauthorizedError('No token provided');
+        const token = extractBearerToken(req, 'No token provided');
+        const decoded = authService.verifyBearerToken(token);
+
+        if (decoded.type !== TOKEN_TYPE.ACCESS) {
+            throw new UnauthorizedError('Standard account access token required');
         }
 
-        const token = authHeader.split(' ')[1];
-        if (!token) throw new UnauthorizedError('No token provided');
+        const user = await loadActiveUser(decoded.sub);
 
-        // Verify Firebase ID token
-        const decoded = await admin.auth().verifyIdToken(token);
+        req.user = {
+            _id: user._id,
+            roleType: user.roleType,
+            phoneNumber: user.phoneNumber,
+            email: user.email || null,
+            emailVerified: Boolean(user.emailVerified),
+        };
 
-        // Look up the user in our database
-        const user = await userRepository.findByFirebaseUid(decoded.uid);
-
-        if (user) {
-            req.user = {
-                _id: user._id,
-                firebaseUid: user.firebaseUid,
-                roleType: user.roleType,
-                phoneNumber: user.phoneNumber,
-                email: user.email,
-            };
-        } else {
-            // New user — hasn't completed registration yet
-            req.user = {
-                firebaseUid: decoded.uid,
-                phoneNumber: decoded.phone_number,
-                isNewUser: true,
-            };
-        }
-
-        next();
+        return next();
     } catch (err) {
-        if (err instanceof UnauthorizedError) return next(err);
+        if (err instanceof AppError) {
+            return next(err);
+        }
+
         logger.warn('Token verification failed', { error: err.message });
-        next(new UnauthorizedError('Invalid or expired token'));
+        return next(new UnauthorizedError('Invalid or expired token'));
+    }
+};
+
+export const authenticateOnboarding = async (req, _res, next) => {
+    try {
+        const token = extractBearerToken(req, 'No token provided');
+        const decoded = authService.verifyBearerToken(token);
+
+        if (decoded.type !== TOKEN_TYPE.ONBOARDING) {
+            throw new UnauthorizedError('Onboarding token required');
+        }
+
+        const existingUser = await userRepository.findByPhone(decoded.sub);
+        if (existingUser) {
+            throw new ConflictError('Phone number already registered');
+        }
+
+        req.onboardingContext = {
+            phoneNumber: decoded.sub,
+        };
+
+        return next();
+    } catch (err) {
+        if (err instanceof AppError) {
+            return next(err);
+        }
+
+        logger.warn('Token verification failed', { error: err.message });
+        return next(new UnauthorizedError('Invalid or expired token'));
     }
 };
 

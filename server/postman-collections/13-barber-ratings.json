@@ -1,0 +1,272 @@
+{
+  "info": {
+    "name": "EverCut - Barber Ratings",
+    "description": "Focused Postman collection for barber rating routes using seeded mock data and the JWT-authenticated barber user. This remains the reference standard for seeded-ID capture.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{barber_access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": []
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:5000",
+      "type": "string",
+      "description": "Default local API server"
+    },
+    {
+      "key": "api_prefix",
+      "value": "api/v1",
+      "type": "string",
+      "description": "API prefix used by every request"
+    },
+    {
+      "key": "rating_id_add_reply",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "rating_id_update_reply",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "rating_id_remove_rating",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Get Ratings And Capture Seeded IDs",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/{{api_prefix}}/ratings",
+        "description": "Run this first. It captures the three seeded rating IDs created by `node scripts/seed-barber-rating-mock-data.js`."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "});",
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "const response = pm.response.json();",
+              "const ratings = Array.isArray(response.data && response.data.items) ? response.data.items : [];",
+              "const capture = (variableName, marker) => {",
+              "  const match = ratings.find((item) => typeof item.review === 'string' && item.review.includes(marker));",
+              "  const ratingId = match && (match.ratingId || match._id);",
+              "  if (ratingId) { pm.collectionVariables.set(variableName, ratingId); }",
+              "};",
+              "capture('rating_id_add_reply', '[ADD_REPLY_TARGET]');",
+              "capture('rating_id_update_reply', '[UPDATE_REPLY_TARGET]');",
+              "capture('rating_id_remove_rating', '[REMOVE_RATING_TARGET]');",
+              "if (!pm.collectionVariables.get('rating_id_add_reply') || !pm.collectionVariables.get('rating_id_update_reply') || !pm.collectionVariables.get('rating_id_remove_rating')) {",
+              "  console.warn('Seeded rating markers were not found. Run `node scripts/seed-barber-rating-mock-data.js` before using this collection.');",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Get Rating Summary",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/{{api_prefix}}/ratings/summary",
+        "description": "Returns aggregate rating metrics for the authenticated barber shop."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "});",
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Add Reply",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/{{api_prefix}}/ratings/{{rating_id_add_reply}}/reply",
+        "description": "Adds a reply to the seeded rating that has no reply yet. Reruns return 409 once the reply already exists.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"replyText\": \"Thanks for the feedback. We appreciate your visit.\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "});",
+              "pm.test('status is 200 or 409', function () { pm.expect(pm.response.code).to.be.oneOf([200, 409]); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Update Reply",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/{{api_prefix}}/ratings/{{rating_id_update_reply}}/reply",
+        "description": "Updates the seeded reply on the dedicated rating fixture.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"replyText\": \"Updated reply from Postman for the seeded barber rating flow.\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "});",
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Delete Reply",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": "{{base_url}}/{{api_prefix}}/ratings/{{rating_id_update_reply}}/reply",
+        "description": "Deletes the reply from the same seeded rating used by the update step."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "});",
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Remove Rating",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": "{{base_url}}/{{api_prefix}}/ratings/{{rating_id_remove_rating}}",
+        "description": "Deletes the seeded rating dedicated to the remove-rating route."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "});",
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,4 +1,5 @@
 import Employee from '../models/employee.model.js';
+import { trustQueryOperators } from '../utils/mongoose-query.utils.js';
 
 class EmployeeRepository {
     async create(data) {
@@ -9,8 +10,16 @@ class EmployeeRepository {
         return Employee.findById(id);
     }
 
-    async findByShopId(shopId) {
-        return Employee.find({ shopId, isActive: true });
+    async findByShopId(shopId, options = {}) {
+        const query = Employee.find({ shopId });
+        
+        if (options.skip !== undefined) query.skip(options.skip);
+        if (options.limit !== undefined) query.limit(options.limit);
+        return query.sort({ createdAt: -1 });
+    }
+
+    async countByShopId(shopId) {
+        return Employee.countDocuments({ shopId });
     }
 
     async findByShopIdAndPhone(shopId, phoneNumber) {
@@ -21,49 +30,84 @@ class EmployeeRepository {
         return Employee.findOneAndUpdate(
             { _id: id, shopId },
             { $set: data },
-            { new: true, runValidators: true },
+            { returnDocument: 'after', runValidators: true },
         );
     }
 
     /**
-     * Atomically claim a slot for a booking.
-     * Returns null if the slot is already taken or the date is blocked.
+     * Atomically claim every slot marker for a booking.
+     * Returns null if any marker is already taken or the date is blocked.
      */
-    async claimSlot(employeeId, date, time, customerId, serviceIds) {
+    async claimSlots(employeeId, date, times, options = {}) {
+        const slotTimes = [...new Set(times)].filter(Boolean);
+        const queryOptions = { returnDocument: 'after' };
+        if (options.session) queryOptions.session = options.session;
+
+        const query = {
+            _id: employeeId,
+            isActive: true,
+            deletedAt: null,
+            bookedSlots: { $not: { $elemMatch: { date, time: { $in: slotTimes } } } },
+            blockedDates: { $ne: new Date(date) },
+        };
+        if (options.shopId) query.shopId = options.shopId;
+
         return Employee.findOneAndUpdate(
-            {
-                _id: employeeId,
-                bookedSlots: { $not: { $elemMatch: { date, time } } },
-                blockedDates: { $ne: new Date(date) },
-            },
+            trustQueryOperators(query),
             {
                 $push: {
-                    bookedSlots: { date, time },
+                    bookedSlots: {
+                        $each: slotTimes.map((time) => ({ date, time })),
+                    },
                 },
             },
-            { new: true },
+            queryOptions,
         ).select('firstName lastName photoUrl');
     }
 
     /**
-     * Release a previously booked slot.
+     * Backward-compatible single-marker slot claim.
      */
-    async releaseSlot(employeeId, date, time) {
+    async claimSlot(employeeId, date, time, options = {}) {
+        return this.claimSlots(employeeId, date, [time], options);
+    }
+
+    /**
+     * Release previously booked slot markers.
+     */
+    async releaseSlots(employeeId, date, times) {
+        const slotTimes = [...new Set(times)].filter(Boolean);
         return Employee.findByIdAndUpdate(employeeId, {
-            $pull: { bookedSlots: { date, time } },
+            $pull: {
+                bookedSlots: {
+                    date,
+                    time: { $in: slotTimes },
+                },
+            },
         });
     }
 
+    /**
+     * Backward-compatible single-marker slot release.
+     */
+    async releaseSlot(employeeId, date, time) {
+        return this.releaseSlots(employeeId, date, [time]);
+    }
+
     async getIdsForShop(shopId) {
-        const employees = await Employee.find({ shopId, isActive: true }).select('_id');
+        const employees = await Employee.find({ shopId }).select('_id');
         return employees.map((e) => e._id);
     }
 
-    async softDelete(id, shopId) {
+    async softDelete(id, shopId, deletionMarker) {
         return Employee.findOneAndUpdate(
             { _id: id, shopId },
-            { deletedAt: new Date(), isActive: false },
-            { new: true },
+            {
+                deletedAt: new Date(),
+                isActive: false,
+                phoneNumber: deletionMarker,
+            },
+            { returnDocument: 'after' },
         );
     }
 

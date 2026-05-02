@@ -2,7 +2,9 @@ import mongoose from 'mongoose';
 import {
     ALL_BOOKING_STATUSES,
     ALL_PAYMENT_STATUSES,
+    ALL_PAYOUT_STATUSES,
     BOOKING_STATUS,
+    PAYMENT_GATEWAYS,
     PAYMENT_STATUS,
 } from '../utils/constants.js';
 
@@ -20,7 +22,7 @@ const bookingSchema = new mongoose.Schema(
     {
         customerId: {
             type: mongoose.Schema.Types.ObjectId,
-            ref: 'User',
+            ref: 'Customer',
             required: true,
             index: true,
         },
@@ -54,6 +56,17 @@ const bookingSchema = new mongoose.Schema(
             type: Number,
             default: 0,
         },
+        durationMinutes: {
+            type: Number,
+            default: 0,
+            min: 0,
+        },
+        slotLockTimes: [
+            {
+                type: String,
+                trim: true,
+            },
+        ],
         status: {
             type: String,
             enum: ALL_BOOKING_STATUSES,
@@ -64,11 +77,78 @@ const bookingSchema = new mongoose.Schema(
             enum: ALL_PAYMENT_STATUSES,
             default: PAYMENT_STATUS.PENDING,
         },
+        paymentTransactionId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'PaymentTransaction',
+            default: null,
+        },
+        merchantOrderId: {
+            type: String,
+            default: null,
+            index: true,
+        },
+        paymentGateway: {
+            type: String,
+            enum: Object.values(PAYMENT_GATEWAYS),
+            default: PAYMENT_GATEWAYS.PHONEPE,
+        },
+        paidAt: {
+            type: Date,
+            default: null,
+        },
+        paymentMode: {
+            type: String,
+            default: null,
+        },
+        payoutTransactionId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'PayoutTransaction',
+            default: null,
+        },
+        payoutStatus: {
+            type: String,
+            enum: ALL_PAYOUT_STATUSES,
+            default: 'not_initiated',
+            index: true,
+        },
+        payoutCompletedAt: {
+            type: Date,
+            default: null,
+        },
+        barberUtr: {
+            type: String,
+            default: null,
+        },
+        completedAt: {
+            type: Date,
+            default: null,
+        },
+        cancellationNote: {
+            type: String,
+            default: null,
+            maxlength: 500,
+        },
         rescheduleCount: {
             type: Number,
             default: 0,
         },
         cancelledAt: {
+            type: Date,
+            default: null,
+        },
+        barberCancelledAt: {
+            type: Date,
+            default: null,
+        },
+        barberConfirmedAt: {
+            type: Date,
+            default: null,
+        },
+        autoCancelledAt: {
+            type: Date,
+            default: null,
+        },
+        noShowAt: {
             type: Date,
             default: null,
         },
@@ -83,6 +163,7 @@ bookingSchema.index({ customerId: 1, status: 1 });
 bookingSchema.index({ shopId: 1, date: 1 });
 bookingSchema.index({ employeeId: 1, date: 1, time: 1 });
 bookingSchema.index({ customerId: 1, date: 1 });
+bookingSchema.index({ payoutStatus: 1, status: 1, paymentStatus: 1 });
 
 const Booking = mongoose.model('Booking', bookingSchema);
 export default Booking;

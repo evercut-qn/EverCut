@@ -1,20 +1,306 @@
 {
   "info": {
     "name": "EverCut - Barber Employees",
-    "description": "Employee management for barber shops",
+    "description": "Employee CRUD collection with automatic ID capture and a prewired sample image for the optional employee photo. Employee working hours stay in HH:MM 24-hour format and are compared against normalized shop hours.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
-  "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{firebase_token}}", "type": "string"}]},
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{barber_access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Automatically pull IDs from Globals ONLY if user hasn't manually set them in Collection Variables.",
+          "const syncGlobalToCollection = (globalKey, collectionKey = globalKey) => {",
+          "  const globalVal = pm.globals.get(globalKey);",
+          "  const collVal = pm.collectionVariables.get(collectionKey);",
+          "  if (globalVal && !collVal) {",
+          "    pm.collectionVariables.set(collectionKey, globalVal);",
+          "  }",
+          "};",
+          "syncGlobalToCollection('shared_employee_id', 'employee_id');"
+        ]
+      }
+    }
+  ],
   "variable": [
-    {"key": "base_url", "value": "http://localhost:5000", "type": "string"},
-    {"key": "api_prefix", "value": "api/v1", "type": "string"},
-    {"key": "firebase_token", "value": "", "type": "string"},
-    {"key": "employee_id", "value": "", "type": "string"}
+    {
+      "key": "base_url",
+      "value": "http://localhost:5000",
+      "type": "string",
+      "description": "Default local API server"
+    },
+    {
+      "key": "api_prefix",
+      "value": "api/v1",
+      "type": "string",
+      "description": "API prefix used by every request"
+    },
+    {
+      "key": "employee_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "employee_phone",
+      "value": "",
+      "type": "string"
+    }
   ],
   "item": [
-    {"name": "Get All Employees", "request": {"method": "GET", "header": [], "url": {"raw": "{{base_url}}{{api_prefix}}/barber/employees", "host": ["{{base_url}}"], "path": ["{{api_prefix}}", "barber", "employees"]}, "description": "Get all employees for the shop."}},
-    {"name": "Add Employee", "event": [{"listen": "test", "script": {"exec": ["if (pm.response.code === 201) {", "    var jsonData = pm.response.json();", "    if (jsonData.data && jsonData.data._id) {", "        pm.collectionVariables.set('employee_id', jsonData.data._id);", "    }", "}"], "type": "text/javascript"}}], "request": {"method": "POST", "header": [], "url": {"raw": "{{base_url}}{{api_prefix}}/barber/employees", "host": ["{{base_url}}"], "path": ["{{api_prefix}}", "barber", "employees"]}, "body": {"mode": "formdata", "formdata": [{"key": "firstName", "value": "Jane", "type": "text"}, {"key": "lastName", "value": "Smith", "type": "text"}, {"key": "phoneNumber", "value": "+1234567891", "type": "text"}, {"key": "gender", "value": "Female", "type": "text"}, {"key": "dateOfBirth", "value": "1995-05-15", "type": "text"}, {"key": "workingHours", "value": "{\"start\":\"09:00\",\"end\":\"18:00\"}", "type": "text"}, {"key": "photo", "type": "file", "src": ""}]}, "description": "Add new employee with photo."}},
-    {"name": "Update Employee", "request": {"method": "PUT", "header": [{"key": "Content-Type", "value": "application/json"}], "url": {"raw": "{{base_url}}{{api_prefix}}/barber/employees/{{employee_id}}", "host": ["{{base_url}}"], "path": ["{{api_prefix}}", "barber", "employees", "{{employee_id}}"]}, "body": {"mode": "raw", "raw": "{\n  \"firstName\": \"Jane\",\n  \"lastName\": \"Doe\",\n  \"workingHours\": {\"start\": \"10:00\", \"end\": \"19:00\"}\n}", "options": {"raw": {"language": "json"}}}, "description": "Update employee details. All fields are optional."}},
-    {"name": "Delete Employee", "request": {"method": "DELETE", "header": [], "url": {"raw": "{{base_url}}{{api_prefix}}/barber/employees/{{employee_id}}", "host": ["{{base_url}}"], "path": ["{{api_prefix}}", "barber", "employees", "{{employee_id}}"]}, "description": "Delete employee (soft delete)."}}
+    {
+      "name": "1. Get Employees And Capture Existing ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/{{api_prefix}}/employees",
+        "description": "Lists current employees and captures the first Postman employee ID when it already exists."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "});",
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "const response = pm.response.json();",
+              "const employees = Array.isArray(response.data && response.data.items) ? response.data.items : [];",
+              "const preferredEmployee = employees.find((employee) => typeof employee.firstName === 'string' && employee.firstName.includes('Postman')) || employees[0];",
+              "if (preferredEmployee && preferredEmployee._id) { pm.collectionVariables.set('employee_id', preferredEmployee._id); pm.globals.set('shared_employee_id', preferredEmployee._id); }"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Get Employee Details",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/{{api_prefix}}/employees/{{employee_id}}",
+        "description": "Returns comprehensive employee information including profile, today's statistics, all-time statistics, monthly statistics, and upcoming bookings."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "});",
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "const response = pm.response.json();",
+              "const data = response.data || {};",
+              "pm.test('response includes employee profile', function () { pm.expect(data).to.have.property('employee'); });",
+              "pm.test('response includes statistics', function () { pm.expect(data).to.have.property('statistics'); });",
+              "if (data.statistics) {",
+              "  pm.test('statistics includes today', function () { pm.expect(data.statistics).to.have.property('today'); });",
+              "  pm.test('statistics includes allTime', function () { pm.expect(data.statistics).to.have.property('allTime'); });",
+              "  pm.test('statistics includes thisMonth', function () { pm.expect(data.statistics).to.have.property('thisMonth'); });",
+              "  pm.test('statistics includes upcoming', function () { pm.expect(data.statistics).to.have.property('upcoming'); });",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Add Employee",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": "{{base_url}}/{{api_prefix}}/employees",
+        "description": "Creates a new employee with a generated phone number so the request stays rerunnable. Employee working hours remain HH:MM 24-hour values even when the shop was originally created with AM/PM schedule input.",
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "firstName",
+              "value": "Postman",
+              "type": "text"
+            },
+            {
+              "key": "lastName",
+              "value": "Automation",
+              "type": "text"
+            },
+            {
+              "key": "phoneNumber",
+              "value": "{{employee_phone}}",
+              "type": "text"
+            },
+            {
+              "key": "gender",
+              "value": "Female",
+              "type": "text"
+            },
+            {
+              "key": "dateOfBirth",
+              "value": "1995-05-15",
+              "type": "text"
+            },
+            {
+              "key": "workingHours",
+              "value": "{\"start\":\"09:00\",\"end\":\"18:00\"}",
+              "type": "text"
+            },
+            {
+              "key": "photo",
+              "type": "file",
+              "description": "Attach employee photo file manually in Postman (optional)"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const suffix = Date.now().toString().slice(-7);",
+              "pm.collectionVariables.set('employee_phone', `+1555${suffix}`);"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "});",
+              "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
+              "const response = pm.response.json();",
+              "const employeeId = response.data && response.data._id;",
+              "if (employeeId) { pm.collectionVariables.set('employee_id', employeeId); pm.globals.set('shared_employee_id', employeeId); }"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Update Employee",
+      "request": {
+        "method": "PUT",
+        "header": [],
+        "url": "{{base_url}}/{{api_prefix}}/employees/{{employee_id}}",
+        "description": "Updates the captured employee with only fields that the validator supports.",
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "firstName",
+              "value": "Postman",
+              "type": "text"
+            },
+            {
+              "key": "lastName",
+              "value": "Automation Updated",
+              "type": "text"
+            },
+            {
+              "key": "workingHours",
+              "value": "{\"start\":\"10:00\",\"end\":\"19:00\"}",
+              "type": "text"
+            },
+            {
+              "key": "blockedDates",
+              "value": "[]",
+              "type": "text"
+            },
+            {
+              "key": "photo",
+              "type": "file",
+              "description": "Attach employee photo file manually in Postman (optional)"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "});",
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Delete Employee (Terminal)",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": "{{base_url}}/{{api_prefix}}/employees/{{employee_id}}",
+        "description": "Soft-deletes the captured employee. Run this last because later collections may still need the shared employee ID."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "});",
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "pm.collectionVariables.unset('employee_id');",
+              "pm.globals.unset('shared_employee_id');"
+            ]
+          }
+        }
+      ]
+    }
   ]
 }

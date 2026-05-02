@@ -35,6 +35,20 @@ const createApp = () => {
     );
 
     // ── 3. Body parsing ────────────────────────────────────────────────────
+    app.use(
+        `${config.apiPrefix}/payouts/webhook`,
+        express.raw({ type: 'application/json' }),
+        (req, _res, next) => {
+            try {
+                req.rawBody = req.body.toString('utf8');
+                req.body = JSON.parse(req.rawBody);
+                next();
+            } catch (error) {
+                next(error);
+            }
+        },
+    );
+
     app.use(express.json({ limit: '10mb' }));
     app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
@@ -44,7 +58,7 @@ const createApp = () => {
     // ── 5. 404 catch-all ───────────────────────────────────────────────────
     app.use((_req, res) => {
         res.status(404).json(
-            ApiResponse.error('Route not found', 404),
+            ApiResponse.error('Route not found'),
         );
     });
 

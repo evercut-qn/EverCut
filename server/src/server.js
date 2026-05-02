@@ -1,6 +1,10 @@
 import config from './config/index.js';
 import connectDB, { disconnectDB } from './config/database.config.js';
 import createApp from './app.js';
+import { startPaymentPoller, stopPaymentPoller } from './jobs/payment-poller.cron.js';
+import { startPayoutPoller, stopPayoutPoller } from './jobs/payout-poller.cron.js';
+import { startPayoutBatchJob, stopPayoutBatchJob } from './jobs/payout-batch.cron.js';
+import { startAutoCancelJob, stopAutoCancelJob } from './jobs/auto-cancel-bookings.cron.js';
 import logger from './utils/logger.js';
 
 /**
@@ -13,6 +17,10 @@ const start = async () => {
 
         // Create Express app
         const app = createApp();
+        startPaymentPoller();
+        startPayoutPoller();
+        startPayoutBatchJob();
+        startAutoCancelJob();
 
         // Start HTTP server
         const server = app.listen(config.port, () => {
@@ -25,6 +33,11 @@ const start = async () => {
         // ── Graceful shutdown ────────────────────────────────────────────────
         const shutdown = async (signal) => {
             logger.info(`${signal} received. Shutting down gracefully…`);
+
+            stopPaymentPoller();
+            stopPayoutPoller();
+            stopPayoutBatchJob();
+            stopAutoCancelJob();
 
             server.close(async () => {
                 await disconnectDB();

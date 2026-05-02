@@ -1,4 +1,10 @@
+import mongoose from 'mongoose';
 import Rating from '../models/rating.model.js';
+
+const CUSTOMER_POPULATE = {
+    path: 'customerId',
+    select: 'firstName lastName photoUrl',
+};
 
 class RatingRepository {
     async create(data) {
@@ -9,10 +15,18 @@ class RatingRepository {
         return Rating.findOne({ customerId, shopId });
     }
 
-    async findByShop(shopId) {
-        return Rating.find({ shopId })
-            .populate('customerId', 'firstName lastName email')
+    async countByShop(shopId) {
+        return Rating.countDocuments({ shopId });
+    }
+
+    async findByShop(shopId, options = {}) {
+        const query = Rating.find({ shopId })
+            .populate(CUSTOMER_POPULATE)
             .sort({ createdAt: -1 });
+            
+        if (options.skip !== undefined) query.skip(options.skip);
+        if (options.limit !== undefined) query.limit(options.limit);
+        return query;
     }
 
     async findById(id) {
@@ -24,18 +38,45 @@ class RatingRepository {
     }
 
     async getShopSummary(shopId) {
-        const ratings = await Rating.find({ shopId }).lean();
-        const total = ratings.length;
-        const average = total > 0
-            ? +(ratings.reduce((sum, r) => sum + r.rating, 0) / total).toFixed(1)
-            : 0;
+        const normalizedShopId = typeof shopId === 'string'
+            ? new mongoose.Types.ObjectId(shopId)
+            : shopId;
 
-        const stars = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
-        ratings.forEach((r) => {
-            if (r.rating >= 1 && r.rating <= 5) stars[r.rating] += 1;
-        });
+        const [summary] = await Rating.aggregate([
+            { $match: { shopId: normalizedShopId } },
+            {
+                $group: {
+                    _id: '$shopId',
+                    totalReviews: { $sum: 1 },
+                    averageRating: { $avg: '$rating' },
+                    oneStar: { $sum: { $cond: [{ $eq: ['$rating', 1] }, 1, 0] } },
+                    twoStars: { $sum: { $cond: [{ $eq: ['$rating', 2] }, 1, 0] } },
+                    threeStars: { $sum: { $cond: [{ $eq: ['$rating', 3] }, 1, 0] } },
+                    fourStars: { $sum: { $cond: [{ $eq: ['$rating', 4] }, 1, 0] } },
+                    fiveStars: { $sum: { $cond: [{ $eq: ['$rating', 5] }, 1, 0] } },
+                },
+            },
+        ]);
 
-        return { averageRating: average, totalReviews: total, stars };
+        if (!summary) {
+            return {
+                averageRating: 0,
+                totalReviews: 0,
+                stars: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+            };
+        }
+
+        return {
+            averageRating: Number(summary.averageRating.toFixed(1)),
+            totalReviews: summary.totalReviews,
+            stars: {
+                1: summary.oneStar,
+                2: summary.twoStars,
+                3: summary.threeStars,
+                4: summary.fourStars,
+                5: summary.fiveStars,
+            },
+        };
     }
 
     async addReply(ratingId, replyText, repliedBy) {
@@ -48,27 +89,28 @@ class RatingRepository {
                     repliedBy,
                 },
             },
-            { new: true }
-        ).populate('customerId', 'firstName lastName email');
+            { returnDocument: 'after', runValidators: true },
+        ).populate(CUSTOMER_POPULATE);
     }
 
-    async updateReply(ratingId, replyText) {
+    async updateReply(ratingId, replyText, repliedBy) {
         return Rating.findByIdAndUpdate(
             ratingId,
             {
                 'reply.text': replyText,
                 'reply.repliedAt': new Date(),
+                'reply.repliedBy': repliedBy,
             },
-            { new: true }
-        ).populate('customerId', 'firstName lastName email');
+            { returnDocument: 'after', runValidators: true },
+        ).populate(CUSTOMER_POPULATE);
     }
 
     async deleteReply(ratingId) {
         return Rating.findByIdAndUpdate(
             ratingId,
             { $unset: { reply: '' } },
-            { new: true }
-        ).populate('customerId', 'firstName lastName email');
+            { returnDocument: 'after' },
+        ).populate(CUSTOMER_POPULATE);
     }
 }
 

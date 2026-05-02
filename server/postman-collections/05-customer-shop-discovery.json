@@ -1,103 +1,448 @@
 {
   "info": {
     "name": "EverCut - Customer Shop Discovery",
-    "description": "Shop discovery, search, and information endpoints for customers",
+    "description": "Nearby shop discovery, employee list, availability checking, and search requests using the same Bengaluru coordinates as the barber onboarding flow.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
-  "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{firebase_token}}", "type": "string"}]},
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{customer_access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Automatically pull IDs from Globals ONLY if user hasn't manually set them in Collection Variables.",
+          "const syncGlobalToCollection = (globalKey, collectionKey = globalKey) => {",
+          "  const globalVal = pm.globals.get(globalKey);",
+          "  const collVal = pm.collectionVariables.get(collectionKey);",
+          "  if (globalVal && !collVal) {",
+          "    pm.collectionVariables.set(collectionKey, globalVal);",
+          "  }",
+          "};",
+          "syncGlobalToCollection('shared_shop_id', 'shop_id');",
+          "syncGlobalToCollection('shared_service_id', 'service_id');",
+          "syncGlobalToCollection('shared_employee_id', 'employee_id');",
+          "// Smart date/time generation for bookings",
+          "const getNextAvailableDate = (daysAhead, skipSundays = true) => {",
+          "  const date = new Date();",
+          "  date.setHours(0, 0, 0, 0);",
+          "  date.setDate(date.getDate() + daysAhead);",
+          "  if (skipSundays) {",
+          "    while (date.getDay() === 0) { date.setDate(date.getDate() + 1); }",
+          "  }",
+          "  return date;",
+          "};",
+          "const toIsoDate = (date) => {",
+          "  const year = date.getFullYear();",
+          "  const month = String(date.getMonth() + 1).padStart(2, '0');",
+          "  const day = String(date.getDate()).padStart(2, '0');",
+          "  return `${year}-${month}-${day}`;",
+          "};",
+          "const getWorkingHourTime = (hour) => {",
+          "  const clampedHour = Math.max(9, Math.min(20, hour));",
+          "  return `${String(clampedHour).padStart(2, '0')}:00`;",
+          "};",
+          "",
+          "// Check if user has manually set dates/times in Collection Variables",
+          "const hasManualDate = pm.collectionVariables.get('booking_date');",
+          "const hasManualTime = pm.collectionVariables.get('booking_time');",
+          "",
+          "if (!hasManualDate) {",
+          "  pm.collectionVariables.set('booking_date', toIsoDate(getNextAvailableDate(1)));",
+          "  pm.collectionVariables.set('booking_update_date', toIsoDate(getNextAvailableDate(2)));",
+          "  pm.collectionVariables.set('booking_reschedule_date', toIsoDate(getNextAvailableDate(3)));",
+          "  pm.collectionVariables.set('booking_reorder_date', toIsoDate(getNextAvailableDate(4)));",
+          "  pm.collectionVariables.set('calendar_date', toIsoDate(getNextAvailableDate(2)));",
+          "}",
+          "",
+          "if (!hasManualTime) {",
+          "  pm.collectionVariables.set('booking_time', getWorkingHourTime(11));",
+          "  pm.collectionVariables.set('booking_update_time', getWorkingHourTime(12));",
+          "  pm.collectionVariables.set('booking_reschedule_time', getWorkingHourTime(13));",
+          "  pm.collectionVariables.set('booking_reorder_time', getWorkingHourTime(14));",
+          "}"
+        ]
+      }
+    }
+  ],
   "variable": [
-    {"key": "base_url", "value": "http://localhost:5000", "type": "string"},
-    {"key": "api_prefix", "value": "api/v1", "type": "string"},
-    {"key": "firebase_token", "value": "", "type": "string"},
-    {"key": "shop_id", "value": "", "type": "string"}
+    {
+      "key": "base_url",
+      "value": "http://localhost:5000",
+      "type": "string",
+      "description": "Default local API server"
+    },
+    {
+      "key": "api_prefix",
+      "value": "api/v1",
+      "type": "string",
+      "description": "API prefix used by every request"
+    },
+    {
+      "key": "coordinates",
+      "value": "77.5946,12.9716",
+      "type": "string"
+    },
+    {
+      "key": "shop_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "service_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "employee_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "booking_date",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "service_search_query",
+      "value": "Postman",
+      "type": "string"
+    },
+    {
+      "key": "shop_search_query",
+      "value": "Postman",
+      "type": "string"
+    }
   ],
   "item": [
     {
-      "name": "Get Nearby Shops",
+      "name": "1. Get Nearby Shops And Capture Shop ID",
       "request": {
         "method": "GET",
         "header": [],
-        "url": {
-          "raw": "{{base_url}}{{api_prefix}}/customer/shops/nearby?coordinates=-73.935242,40.730610",
-          "host": ["{{base_url}}"],
-          "path": ["{{api_prefix}}", "customer", "shops", "nearby"],
-          "query": [{"key": "coordinates", "value": "-73.935242,40.730610", "description": "longitude,latitude"}]
-        },
-        "description": "Get shops within 2km radius using geospatial query.\n\nQuery Parameters:\n- coordinates: longitude,latitude (required)\n\nResponse includes distance in km from your location."
-      }
-    },
-    {
-      "name": "Get Doorstep Shops",
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": {
-          "raw": "{{base_url}}{{api_prefix}}/customer/shops/doorstep",
-          "host": ["{{base_url}}"],
-          "path": ["{{api_prefix}}", "customer", "shops", "doorstep"]
-        },
-        "description": "Get shops offering doorstep/home services."
-      }
-    },
-    {
-      "name": "Get Shop Info",
+        "url": "{{base_url}}/{{api_prefix}}/shops/nearby?coordinates={{coordinates}}",
+        "description": "Finds nearby shops and captures the Postman barber shop ID when it is present."
+      },
       "event": [
         {
           "listen": "test",
           "script": {
+            "type": "text/javascript",
             "exec": [
-              "if (pm.response.code === 200) {",
-              "    var jsonData = pm.response.json();",
-              "    if (jsonData.data && jsonData.data.shop && jsonData.data.shop._id) {",
-              "        pm.collectionVariables.set('shop_id', jsonData.data.shop._id);",
-              "    }",
-              "}"
-            ],
-            "type": "text/javascript"
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "});",
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "const response = pm.response.json();",
+              "const shops = Array.isArray(response.data) ? response.data : [];",
+              "const preferredShop = shops.find((shop) => typeof shop.shopName === 'string' && shop.shopName.includes('Postman')) || shops[0];",
+              "if (preferredShop && preferredShop._id) { pm.collectionVariables.set('shop_id', preferredShop._id); pm.globals.set('shared_shop_id', preferredShop._id); }"
+            ]
           }
         }
-      ],
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": {
-          "raw": "{{base_url}}{{api_prefix}}/customer/shops/{{shop_id}}",
-          "host": ["{{base_url}}"],
-          "path": ["{{api_prefix}}", "customer", "shops", "{{shop_id}}"]
-        },
-        "description": "Get complete shop information including services, photos, and ratings."
-      }
+      ]
     },
     {
-      "name": "Search Services",
+      "name": "2. Get Shop Info And Capture Service ID",
       "request": {
         "method": "GET",
         "header": [],
-        "url": {
-          "raw": "{{base_url}}{{api_prefix}}/customer/search/services?query=haircut&gender=male",
-          "host": ["{{base_url}}"],
-          "path": ["{{api_prefix}}", "customer", "search", "services"],
-          "query": [
-            {"key": "query", "value": "haircut", "description": "Service name to search"},
-            {"key": "gender", "value": "male", "description": "male, female, or unisex"}
-          ]
-        },
-        "description": "Search services by name and filter by gender."
-      }
+        "url": "{{base_url}}/{{api_prefix}}/shops/{{shop_id}}",
+        "description": "Returns the full customer-facing shop payload and captures the first Postman service ID from the embedded service lists."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "});",
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "const response = pm.response.json();",
+              "const data = response.data || {};",
+              "const single = data.services && Array.isArray(data.services.single) ? data.services.single : [];",
+              "const bundled = data.services && Array.isArray(data.services.bundled) ? data.services.bundled : [];",
+              "const services = [...single, ...bundled];",
+              "const preferredService = services.find((service) => typeof service.serviceName === 'string' && service.serviceName.includes('Postman')) || services[0];",
+              "if (data.shop && data.shop._id) { pm.collectionVariables.set('shop_id', data.shop._id); pm.globals.set('shared_shop_id', data.shop._id); }",
+              "if (preferredService && preferredService._id) { pm.collectionVariables.set('service_id', preferredService._id); pm.globals.set('shared_service_id', preferredService._id); }"
+            ]
+          }
+        }
+      ]
     },
     {
-      "name": "Search Shops",
+      "name": "3. Get Shop Employees And Capture Employee ID",
       "request": {
         "method": "GET",
         "header": [],
-        "url": {
-          "raw": "{{base_url}}{{api_prefix}}/customer/search/shops?query=elite",
-          "host": ["{{base_url}}"],
-          "path": ["{{api_prefix}}", "customer", "search", "shops"],
-          "query": [{"key": "query", "value": "elite", "description": "Shop name to search"}]
-        },
-        "description": "Search shops by name or category."
-      }
+        "url": "{{base_url}}/{{api_prefix}}/shops/{{shop_id}}/employees",
+        "description": "Returns the list of active employees for the shop and captures the first employee ID."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "});",
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "const response = pm.response.json();",
+              "const data = response.data || {};",
+              "const employees = Array.isArray(data.employees) ? data.employees : [];",
+              "const firstEmployee = employees[0];",
+              "if (firstEmployee && firstEmployee.id) { pm.collectionVariables.set('employee_id', firstEmployee.id); pm.globals.set('shared_employee_id', firstEmployee.id); }"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Get Employee Available Slots",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/{{api_prefix}}/employees/{{employee_id}}/available-slots?date={{booking_date}}&serviceId={{service_id}}",
+        "description": "Returns available time slots for the employee considering service duration, booked slots, and blocked dates. 7-day advance booking window applies."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "});",
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "const response = pm.response.json();",
+              "const data = response.data || {};",
+              "pm.test('response includes slot information', function () {",
+              "  pm.expect(data).to.have.property('slots');",
+              "  pm.expect(data).to.have.property('totalAvailable');",
+              "  pm.expect(data).to.have.property('totalSlots');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Get Shop Availability",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/{{api_prefix}}/shops/{{shop_id}}/availability?date={{booking_date}}&serviceId={{service_id}}",
+        "description": "Returns availability across all employees for the shop, including first available slot suggestion. 7-day advance booking window applies."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "});",
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "const response = pm.response.json();",
+              "const data = response.data || {};",
+              "pm.test('response includes employee availability', function () {",
+              "  pm.expect(data).to.have.property('employees');",
+              "  pm.expect(data.employees).to.be.an('array');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Toggle Favorite Shop",
+      "request": {
+        "method": "PATCH",
+        "header": [],
+        "url": "{{base_url}}/{{api_prefix}}/shops/{{shop_id}}/favorite",
+        "description": "Adds or removes the captured shop from the authenticated customer favorite shops list through the shop discovery flow."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "});",
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Get Favorite Shops",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/{{api_prefix}}/shops/favorites",
+        "description": "Lists the authenticated customer favorite shops through the shop discovery flow."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "});",
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Get Doorstep Shops",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/{{api_prefix}}/shops/doorstep",
+        "description": "Lists shops with the Door-Step category."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "});",
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "9. Search Services",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/{{api_prefix}}/services/search?query={{service_search_query}}&gender=male",
+        "description": "Searches the customer-visible service catalogue for the services created by the barber service collection."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "});",
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "10. Search Shops",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/{{api_prefix}}/shops/search?query={{shop_search_query}}",
+        "description": "Searches the customer-visible shop catalogue for the Postman barber shop."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "});",
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
     }
   ]
 }

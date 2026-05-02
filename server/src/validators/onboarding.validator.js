@@ -7,6 +7,7 @@ import {
     DAYS_OF_WEEK,
     SECURITY_PIN_LENGTH,
 } from '../utils/constants.js';
+import { normalizeShopSchedule } from '../utils/shop-schedule.utils.js';
 import { locationSchema } from './common.validator.js';
 
 const daysSchema = Joi.alternatives().try(
@@ -22,19 +23,18 @@ const amenitiesSchema = Joi.alternatives().try(
 const breakTimesSchema = Joi.alternatives().try(
     Joi.array().items(
         Joi.object({
-            start: Joi.string(),
-            end: Joi.string(),
-            startsAt: Joi.string(),
-            endsAt: Joi.string(),
+            start: Joi.string().trim(),
+            end: Joi.string().trim(),
+            startsAt: Joi.string().trim(),
+            endsAt: Joi.string().trim(),
         }),
     ),
-    Joi.string(),
+    Joi.string().trim(),
 );
 
 const targetCustomersSchema = Joi.string().valid(...ALL_SERVICE_FOR, 'men', 'women');
 
 export const customerOnboardingSchema = Joi.object({
-    phoneNumber: Joi.string().required(),
     email: Joi.string().email().required(),
     firstName: Joi.string().trim().min(1).max(50).required(),
     lastName: Joi.string().trim().min(1).max(50).required(),
@@ -45,15 +45,18 @@ export const customerOnboardingSchema = Joi.object({
 });
 
 export const barberOnboardingSchema = Joi.object({
-    phoneNumber: Joi.string(),
     email: Joi.string().email(),
-    emailId: Joi.string().email(),
-    firstName: Joi.string().trim().min(1).max(50).required(),
-    lastName: Joi.string().trim().min(1).max(50).required(),
-    gender: Joi.string().valid(...ALL_GENDERS).required(),
-    dateOfBirth: Joi.date().required(),
+    firstName: Joi.string().trim().min(1).max(50),
+    lastName: Joi.string().trim().min(1).max(50),
+    ownerFirstName: Joi.string().trim().min(1).max(50),
+    ownerLastName: Joi.string().trim().min(1).max(50),
+    gender: Joi.string().valid(...ALL_GENDERS),
+    ownerGender: Joi.string().valid(...ALL_GENDERS),
+    dateOfBirth: Joi.date(),
+    ownerDateOfBirth: Joi.date(),
     shopName: Joi.string().trim().min(1).max(100).required(),
     shopOwner: Joi.string().trim().min(1).max(100),
+    ownerName: Joi.string().trim().min(1).max(100),
     shopCategory: Joi.string().valid(...ALL_SHOP_CATEGORIES),
     businessCategory: Joi.string().valid(...ALL_SHOP_CATEGORIES),
     category: Joi.string().valid(...ALL_SHOP_CATEGORIES),
@@ -72,18 +75,18 @@ export const barberOnboardingSchema = Joi.object({
     amenities: amenitiesSchema,
     availableDays: daysSchema,
     workingDays: daysSchema,
-    openTime: Joi.string(),
-    closeTime: Joi.string(),
-    opensAt: Joi.string(),
-    closesAt: Joi.string(),
+    openTime: Joi.string().trim(),
+    closeTime: Joi.string().trim(),
+    opensAt: Joi.string().trim(),
+    closesAt: Joi.string().trim(),
     workingHours: Joi.alternatives().try(
         Joi.object({
-            openTime: Joi.string(),
-            closeTime: Joi.string(),
-            opensAt: Joi.string(),
-            closesAt: Joi.string(),
+            openTime: Joi.string().trim(),
+            closeTime: Joi.string().trim(),
+            opensAt: Joi.string().trim(),
+            closesAt: Joi.string().trim(),
         }),
-        Joi.string(),
+        Joi.string().trim(),
     ),
     breakTimes: breakTimesSchema,
     breakTimings: breakTimesSchema,
@@ -93,8 +96,12 @@ export const barberOnboardingSchema = Joi.object({
     }),
 })
     .custom((value, helpers) => {
+        value.firstName = value.firstName || value.ownerFirstName;
+        value.lastName = value.lastName || value.ownerLastName;
+        value.gender = value.gender || value.ownerGender;
+        value.dateOfBirth = value.dateOfBirth || value.ownerDateOfBirth;
+        value.shopOwner = value.shopOwner || value.ownerName;
         value.shopCategory = value.shopCategory || value.businessCategory || value.category;
-        value.emailId = value.emailId || value.email;
         value.upiId = value.upiId || value.upiAddress;
         value.address = value.address || value.shopLocation;
         value.facilities = value.facilities ?? value.amenities ?? [];
@@ -129,9 +136,19 @@ export const barberOnboardingSchema = Joi.object({
                 message: 'shopCategory/businessCategory is required',
             });
         }
-        if (!value.emailId) {
+        if (!value.firstName || !value.lastName) {
             return helpers.error('any.custom', {
-                message: 'email or emailId is required',
+                message: 'firstName and lastName are required',
+            });
+        }
+        if (!value.gender || !value.dateOfBirth) {
+            return helpers.error('any.custom', {
+                message: 'gender and dateOfBirth are required',
+            });
+        }
+        if (!value.email) {
+            return helpers.error('any.custom', {
+                message: 'email is required',
             });
         }
         if (!value.upiId) {
@@ -154,6 +171,21 @@ export const barberOnboardingSchema = Joi.object({
                 message: 'openTime and closeTime are required',
             });
         }
+
+        const normalizedSchedule = normalizeShopSchedule({
+            openTime: value.openTime,
+            closeTime: value.closeTime,
+            breakTimes: value.breakTimes ?? [],
+        });
+        if (normalizedSchedule.error) {
+            return helpers.error('any.custom', {
+                message: normalizedSchedule.error,
+            });
+        }
+
+        value.openTime = normalizedSchedule.value.openTime;
+        value.closeTime = normalizedSchedule.value.closeTime;
+        value.breakTimes = normalizedSchedule.value.breakTimes;
 
         return value;
     })

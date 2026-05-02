@@ -9,8 +9,8 @@ class UserRepository {
         return User.findById(id);
     }
 
-    async findByFirebaseUid(firebaseUid) {
-        return User.findOne({ firebaseUid });
+    async findByIdWithRefreshHash(id) {
+        return User.findById(id).select('+refreshTokenHash');
     }
 
     async findByEmail(email) {
@@ -22,7 +22,7 @@ class UserRepository {
     }
 
     async updateById(id, data) {
-        return User.findByIdAndUpdate(id, { $set: data }, { new: true, runValidators: true });
+        return User.findByIdAndUpdate(id, { $set: data }, { returnDocument: 'after', runValidators: true });
     }
 
     async updateLastLogin(id) {

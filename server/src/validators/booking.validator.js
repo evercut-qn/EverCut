@@ -1,5 +1,5 @@
 import Joi from 'joi';
-import { objectId, dateString, timeString } from './common.validator.js';
+import { objectId, dateString, timeString, paginationSchema } from './common.validator.js';
 
 export const bookSalonSchema = Joi.object({
     shopId: objectId.required(),
@@ -10,7 +10,6 @@ export const bookSalonSchema = Joi.object({
     ).required(),
     date: dateString.required(),
     time: timeString.required(),
-    amount: Joi.number().min(0).optional(),
 });
 
 export const rescheduleSchema = Joi.object({
@@ -30,26 +29,39 @@ export const updateBookingSchema = Joi.object({
 });
 
 export const bookingStatusSchema = Joi.object({
-    status: Joi.string().valid('confirmed', 'completed', 'cancelled').required(),
+    status: Joi.string().valid('confirmed', 'completed', 'cancelled', 'no-show').required(),
 });
 
-export const customerBookingsQuerySchema = Joi.object({
+export const customerBookingsQuerySchema = paginationSchema.keys({
     type: Joi.string().valid('past', 'upcoming', 'favorites').required(),
+});
+
+export const bookingListQuerySchema = paginationSchema.keys({
+    type: Joi.string().valid('past', 'upcoming', 'favorites'),
 });
 
 export const bookingIdParamSchema = Joi.object({
     id: objectId.required(),
 });
 
-export const bookingServiceParamsSchema = Joi.object({
-    id: objectId.required(),
-    serviceId: objectId.required(),
-});
-
 export const employeeCalendarQuerySchema = Joi.object({
     date: dateString.required(),
 });
 
-export const bookingsByStatusQuerySchema = Joi.object({
-    status: Joi.string().valid('pending', 'confirmed', 'completed', 'cancelled').required(),
+export const bookingsByStatusQuerySchema = paginationSchema.keys({
+    status: Joi.string().valid('pending', 'awaiting_confirmation', 'confirmed', 'completed', 'cancelled', 'no-show').required(),
+});
+
+export const bookingMilestoneProgressQuerySchema = Joi.object({
+    month: Joi.number().integer().min(1).max(12),
+    year: Joi.number().integer().min(2000).max(9999),
+}).and('month', 'year');
+
+export const paginationQuerySchema = Joi.object({
+    page: Joi.number().integer().min(1).default(1),
+    limit: Joi.number().integer().min(1).max(100).default(10),
+});
+
+export const queueFilterQuerySchema = Joi.object({
+    filter: Joi.string().valid('active', 'upcoming').default('active'),
 });

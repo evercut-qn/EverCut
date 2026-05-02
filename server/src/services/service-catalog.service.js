@@ -1,68 +1,174 @@
 import serviceRepository from '../repositories/service.repository.js';
 import shopRepository from '../repositories/shop.repository.js';
 import cloudinary from '../config/cloudinary.config.js';
-import { NotFoundError, ConflictError } from '../utils/api-error.js';
+import { BadRequestError, NotFoundError, ConflictError } from '../utils/api-error.js';
+import { escapeRegex } from '../utils/regex.utils.js';
+import { buildPagination } from '../utils/pagination.utils.js';
+import { calculateDiscountedPrice, normalizeServicePricing } from '../utils/service-pricing.utils.js';
 
 /**
- * Service-catalog service — manages the salon services (haircut, etc.)
+ * Service-catalog service - manages the salon services (haircut, etc.)
  */
+
+const normalizeBundledServices = (bundledServices = []) => (
+    [...new Set(
+        bundledServices
+            .map((serviceName) => serviceName.trim())
+            .filter(Boolean),
+    )]
+);
+
+const assertValidDiscount = (actualPrice, offerPrice) => {
+    const discountedPrice = calculateDiscountedPrice(actualPrice, offerPrice);
+    if (discountedPrice < 0) {
+        throw new BadRequestError('offerPrice cannot exceed actualPrice');
+    }
+
+    return discountedPrice;
+};
+
+const buildServiceFilters = (queryFilters = {}) => {
+    const filters = {};
+
+    if (queryFilters.serviceType) filters.serviceType = queryFilters.serviceType;
+    if (queryFilters.serviceFor) filters.serviceFor = queryFilters.serviceFor;
+
+    return filters;
+};
+
+const resolveServiceImage = async (serviceName, serviceType) => {
+    const formattedName = serviceName.toLowerCase().replace(/\s+/g, '');
+    const folderPath = serviceType === 'bundled' ? 'evercut/bundled' : 'evercut/single';
+    const publicId = `${folderPath}/${formattedName}`;
+
+    try {
+        const resource = await cloudinary.api.resource(publicId);
+        return resource.secure_url;
+    } catch {
+        return cloudinary.url('evercut/default/service.jpg', { secure: true, resource_type: 'image' });
+    }
+};
+
+const buildServicePayload = (data, existingService = null) => {
+    const existing = existingService ? normalizeServicePricing(existingService) : {};
+    const serviceType = existing.serviceType || data.serviceType;
+    const actualPrice = data.actualPrice ?? existing.actualPrice;
+    const offerPrice = data.offerPrice ?? existing.offerPrice ?? 0;
+    const finalPrice = assertValidDiscount(actualPrice, offerPrice);
+
+    const serviceData = {
+        serviceName: data.serviceName ?? existing.serviceName,
+        serviceType,
+        serviceFor: data.serviceFor ?? existing.serviceFor ?? 'unisex',
+        actualPrice,
+        offerPrice,
+        finalPrice,
+    };
+
+    if (serviceType === 'single') {
+        if (data.duration !== undefined || existing.duration !== undefined) {
+            serviceData.duration = data.duration ?? existing.duration;
+        }
+        return serviceData;
+    }
+
+    const bundledServices = data.bundledServices !== undefined
+        ? normalizeBundledServices(data.bundledServices)
+        : normalizeBundledServices(existing.bundledServices || []);
+
+    if (!bundledServices.length) {
+        throw new BadRequestError('bundledServices must contain at least one service');
+    }
+
+    serviceData.bundledServices = bundledServices;
+    serviceData.totalPrice = finalPrice;
+
+    if (data.totalDuration !== undefined || existing.totalDuration !== undefined) {
+        serviceData.totalDuration = data.totalDuration ?? existing.totalDuration;
+    }
+
+    return serviceData;
+};
+
+const ensureUniqueActiveService = async (shopId, serviceData, currentServiceId = null) => {
+    const duplicateService = await serviceRepository.findByShopIdAndName(shopId, serviceData.serviceName, {
+        serviceType: serviceData.serviceType,
+        serviceFor: serviceData.serviceFor,
+    });
+
+    if (
+        duplicateService
+        && duplicateService._id.toString() !== currentServiceId?.toString()
+    ) {
+        throw new ConflictError('Service already exists for this service type and gender');
+    }
+};
+
+const rethrowDuplicateServiceWrite = (error) => {
+    if (error?.code === 11000) {
+        throw new ConflictError('Service already exists for this service type and gender');
+    }
+
+    throw error;
+};
 
 export const addService = async (ownerId, data) => {
     const shop = await shopRepository.findByOwnerId(ownerId);
     if (!shop) throw new NotFoundError('Shop profile');
 
-    // Check for duplicate
-    const existing = await serviceRepository.findByShopIdAndName(shop._id, data.serviceName);
-    if (existing) throw new ConflictError('Service already exists');
+    const serviceData = buildServicePayload(data);
+    await ensureUniqueActiveService(shop._id, serviceData);
 
-    // Resolve image from Cloudinary
-    const formattedName = data.serviceName.toLowerCase().replace(/\s+/g, '');
-    const folderPath = data.serviceType === 'bundled' ? 'evercut/bundled' : 'evercut/single';
-    const publicId = `${folderPath}/${formattedName}`;
-
-    let imageUrl;
+    let createdService;
     try {
-        const resource = await cloudinary.api.resource(publicId);
-        imageUrl = resource.secure_url;
-    } catch {
-        imageUrl = cloudinary.url('evercut/default/service.jpg', { secure: true, resource_type: 'image' });
+        createdService = await serviceRepository.create({
+            shopId: shop._id,
+            imageUrl: await resolveServiceImage(serviceData.serviceName, serviceData.serviceType),
+            ...serviceData,
+        });
+    } catch (error) {
+        rethrowDuplicateServiceWrite(error);
     }
 
-    const serviceData = {
-        shopId: shop._id,
-        serviceName: data.serviceName,
-        serviceType: data.serviceType,
-        serviceFor: data.serviceFor || 'unisex',
-        imageUrl,
-        actualPrice: data.actualPrice,
-        offerPrice: data.offerPrice || 0,
-    };
-
-    if (data.serviceType === 'single') {
-        serviceData.duration = data.duration;
-        serviceData.finalPrice = Number(data.actualPrice) - Number(data.offerPrice || 0);
-    } else {
-        serviceData.bundledServices = data.bundledServices || [];
-        serviceData.totalDuration = data.totalDuration;
-        serviceData.totalPrice = Number(data.actualPrice) - Number(data.offerPrice || 0);
-    }
-
-    return serviceRepository.create(serviceData);
+    return normalizeServicePricing(createdService);
 };
 
-export const getServices = async (ownerId) => {
+export const getServices = async (ownerId, queryFilters = {}) => {
     const shop = await shopRepository.findByOwnerId(ownerId);
     if (!shop) throw new NotFoundError('Shop profile');
-    return serviceRepository.findByShopId(shop._id);
+
+    const filters = buildServiceFilters(queryFilters);
+    const total = await serviceRepository.countByShopId(shop._id, filters);
+    const { skip, limit, pagination } = buildPagination(queryFilters, total);
+
+    const items = await serviceRepository.findByShopId(shop._id, filters, { skip, limit });
+    return { items: items.map(normalizeServicePricing), pagination };
 };
 
 export const updateService = async (ownerId, serviceId, data) => {
     const shop = await shopRepository.findByOwnerId(ownerId);
     if (!shop) throw new NotFoundError('Shop profile');
 
-    const updated = await serviceRepository.updateById(serviceId, shop._id, data);
+    const existingService = await serviceRepository.findById(serviceId);
+    if (!existingService || existingService.shopId.toString() !== shop._id.toString()) {
+        throw new NotFoundError('Service');
+    }
+
+    const updateData = buildServicePayload(data, existingService);
+    await ensureUniqueActiveService(shop._id, updateData, existingService._id);
+
+    if (updateData.serviceName !== existingService.serviceName) {
+        updateData.imageUrl = await resolveServiceImage(updateData.serviceName, updateData.serviceType);
+    }
+
+    let updated;
+    try {
+        updated = await serviceRepository.updateById(serviceId, shop._id, updateData);
+    } catch (error) {
+        rethrowDuplicateServiceWrite(error);
+    }
     if (!updated) throw new NotFoundError('Service');
-    return updated;
+    return normalizeServicePricing(updated);
 };
 
 export const deleteService = async (ownerId, serviceId) => {
@@ -76,18 +182,14 @@ export const deleteService = async (ownerId, serviceId) => {
 
 export const searchServices = async (query, gender) => {
     const filters = {};
-    if (gender) filters.serviceFor = { $regex: new RegExp(`^${gender}$`, 'i') };
+    if (gender) filters.serviceFor = { $regex: new RegExp(`^${escapeRegex(gender)}$`, 'i') };
     return serviceRepository.searchByName(query, filters, 'serviceName serviceFor shopId');
 };
 
 export const searchShops = async (query) => {
-    const Shop = (await import('../models/shop.model.js')).default;
-    return Shop.find({ shopName: { $regex: query, $options: 'i' } })
-        .select('shopName address location phoneNumber category coverUrl');
+    return shopRepository.searchByName(query, 'shopName address location category coverUrl');
 };
 
 export const getServicesByGender = async (gender) => {
-    const Service = (await import('../models/service.model.js')).default;
-    return Service.find({ serviceFor: gender, isActive: true })
-        .select('serviceName shopId serviceFor serviceType');
+    return serviceRepository.findByGender(gender, 'serviceName shopId serviceFor serviceType');
 };

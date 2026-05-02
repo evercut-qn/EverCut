@@ -1,4 +1,6 @@
 import { BadRequestError } from '../utils/api-error.js';
+import { storeValidatedRequestData } from '../utils/request-validation.utils.js';
+import { cleanupUploadedAssets } from '../utils/upload-cleanup.utils.js';
 
 /**
  * Generic validation middleware factory.
@@ -8,9 +10,14 @@ import { BadRequestError } from '../utils/api-error.js';
  *
  * Usage:
  *   router.post('/booking', validate(bookingSchema, 'body'), controller);
+ *   router.get('/services', validate(serviceListQuerySchema, 'query'), controller);
+ *
+ * Sanitized values are stored only under `req.validated[source]`.
+ * Native Express request properties are left untouched so controllers can
+ * explicitly choose validated input and avoid mutating framework-owned state.
  */
 export const validate = (schema, source = 'body') => {
-    return (req, _res, next) => {
+    return async (req, _res, next) => {
         const { error, value } = schema.validate(req[source], {
             abortEarly: false,
             allowUnknown: false,
@@ -19,11 +26,11 @@ export const validate = (schema, source = 'body') => {
 
         if (error) {
             const errors = error.details.map((d) => d.message);
+            await cleanupUploadedAssets(req, `validate:${source}`);
             return next(new BadRequestError('Validation failed', errors));
         }
 
-        // Replace source with the sanitised/stripped value
-        req[source] = value;
+        storeValidatedRequestData(req, source, value);
         next();
     };
 };

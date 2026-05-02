@@ -1,447 +1,354 @@
-# EverCut API - Postman Collections
+# EverCut API — Postman Collections
 
-## 📁 Collection Organization
-
-This folder contains **12 modular Postman collections** organized by feature/module for the EverCut Salon & Barber Booking Platform API.
-
-### Collections Overview
-
-| # | Collection Name | Endpoints | Description |
-|---|----------------|-----------|-------------|
-| 01 | **Authentication** | 2 | Firebase session bootstrap and health check |
-| 02 | **Onboarding** | 2 | Customer and barber profile creation |
-| 03 | **Customer Profile** | 4 | Profile management, homepage, services by gender |
-| 04 | **Customer Bookings** | 10 | Book, cancel, reschedule, reorder, favorites, employee calendar |
-| 05 | **Customer Shop Discovery** | 5 | Nearby shops, doorstep services, search |
-| 06 | **Customer Ratings** | 3 | Add ratings, view ratings with replies, rating summary |
-| 07 | **Barber Profile & Shop** | 5 | Shop profile, business info, PIN, cover, status |
-| 08 | **Barber Employees** | 4 | Employee CRUD operations |
-| 09 | **Barber Services** | 5 | Service catalog management (single/bundled) |
-| 10 | **Barber Bookings** | 5 | Booking management, stats, status updates |
-| 11 | **Barber Photos** | 5 | Photo gallery management |
-| 12 | **Barber Earnings** | 6 | Earnings tracking, rating management with replies |
-
-**Total: 56 endpoints** across 12 collections
+A complete set of Postman collections for the EverCut API, with shared-variable automation, pre-wired file uploads, OTP/JWT token capture, and reusable IDs so requests can be run sequentially without manual copy-pasting.
 
 ---
 
-## 🚀 Quick Start
+## Response Envelope
 
-### Step 1: Import Collections into Postman
+All collections now assume the backend returns the same JSON envelope for both success and error responses:
 
-**Option A: Import All Collections at Once**
-1. Open Postman
-2. Click **Import** button (top left)
-3. Select **Folder** tab
-4. Choose the `postman-collections` folder
-5. Click **Import** - all 12 collections will be imported
-
-**Option B: Import Individual Collections**
-1. Open Postman
-2. Click **Import** button
-3. Select individual JSON files (01-authentication.json, 02-onboarding.json, etc.)
-4. Click **Import**
-
-### Step 2: Configure Collection Variables
-
-Each collection has built-in variables that need to be configured:
-
-```
-base_url: http://localhost:5000
-api_prefix: /api/v1
-firebase_token: YOUR_FIREBASE_ID_TOKEN_HERE
-```
-
-**To set variables:**
-1. Click on a collection name
-2. Go to **Variables** tab
-3. Update **Current Value** for each variable
-4. Click **Save**
-
-**For production:**
-- Change `base_url` to your production API URL (e.g., `https://api.evercut.com`)
-
----
-
-## 🔐 Authentication Flow
-
-### 1. Get Firebase Token (Client-side)
-
-```javascript
-// In your mobile/web app
-firebase.auth().signInWithPhoneNumber(phoneNumber)
-  .then(confirmationResult => confirmationResult.confirm(otpCode))
-  .then(result => result.user.getIdToken())
-  .then(idToken => {
-    console.log('Firebase Token:', idToken);
-    // Use this token in Postman
-  });
-```
-
-### 2. Set Token in Postman
-
-1. Copy the Firebase ID token
-2. In each collection, go to **Variables** tab
-3. Set `firebase_token` to the copied token
-4. Save
-
-### 3. Test Authentication
-
-**For Customer:**
-1. Run `01-authentication` → **Create Session**
-2. If new user, run `02-onboarding` → **Complete Customer Profile**
-3. Now you can use all Customer collections (03-06)
-
-**For Barber:**
-1. Run `01-authentication` → **Create Session**
-2. If new user, run `02-onboarding` → **Complete Barber Profile**
-3. Now you can use all Barber collections (07-12)
-
----
-
-## 📋 Testing Workflows
-
-### Customer Workflow
-
-```
-01-Authentication
-  ↓ Create Session
-02-Onboarding
-  ↓ Complete Customer Profile
-03-Customer Profile
-  ↓ Get Profile → Update Profile
-05-Customer Shop Discovery
-  ↓ Get Nearby Shops → Get Shop Info
-04-Customer Bookings
-  ↓ Get Employee Calendar → Book Salon → Get Booking Details
-06-Customer Ratings
-  ↓ Add Rating
-```
-
-### Barber Workflow
-
-```
-01-Authentication
-  ↓ Create Session
-02-Onboarding
-  ↓ Complete Barber Profile (multipart + 3 shop images)
-07-Barber Profile & Shop
-  ↓ Get Profile → Update Business Info → Update Cover Image
-08-Barber Employees
-  ↓ Add Employee (repeat for multiple employees)
-09-Barber Services
-  ↓ Add Single Service / Add Bundled Service (repeat)
-11-Barber Photos
-  ↓ Upload Photos
-10-Barber Bookings
-  ↓ Get All Bookings → Update Booking Status
-12-Barber Earnings
-  ↓ Get Earnings
-```
-
----
-
-## 🔄 Collection Variables
-
-### Shared Variables (All Collections)
-- `base_url` - API server URL
-- `api_prefix` - API version prefix (/api/v1)
-- `firebase_token` - Firebase ID token for authentication
-
-### Collection-Specific Variables
-- `booking_id` - Set automatically after creating a booking (Collections 04, 10)
-- `shop_id` - Set automatically after getting shop info (Collections 05, 06)
-- `employee_id` - Set automatically after adding employee (Collection 08)
-- `service_id` - Set automatically after adding service (Collection 09)
-- `photo_id` - Set automatically after uploading photos (Collection 11)
-- `rating_id` - For rating removal (Collection 12)
-
-**Note:** Variables are automatically set using Test Scripts when you create resources.
-
----
-
-## 📝 Request Examples
-
-### Example 1: Complete Customer Registration
-
-```http
-POST {{base_url}}{{api_prefix}}/onboarding/customers
-Authorization: Bearer {{firebase_token}}
-Content-Type: multipart/form-data
-
-firstName: John
-lastName: Doe
-phoneNumber: +1234567890
-email: john@example.com
-gender: Male
-dateOfBirth: 1990-01-01
-address: 123 Main St, New York, NY
-location: {"type":"Point","coordinates":[-73.935242,40.730610]}
-photo: [file]
-```
-
-### Example 2: Book a Salon
-
-```http
-POST {{base_url}}{{api_prefix}}/customer/bookings
-Authorization: Bearer {{firebase_token}}
-Content-Type: application/json
-
-{
-  "serviceId": ["service_id_1", "service_id_2"],
-  "employeeId": "employee_id",
-  "shopId": "shop_id",
-  "date": "2024-03-15",
-  "time": "14:30",
-  "amount": 500
-}
-```
-
-### Example 3: Get Nearby Shops
-
-```http
-GET {{base_url}}{{api_prefix}}/customer/shops/nearby?coordinates=-73.935242,40.730610
-Authorization: Bearer {{firebase_token}}
-```
-
----
-
-## ⚙️ Advanced Features
-
-### Test Scripts
-
-Collections include test scripts that automatically:
-- Save resource IDs to variables after creation
-- Validate response status codes
-- Extract data for subsequent requests
-
-**Example:** After running "Book Salon", the `booking_id` is automatically saved and can be used in "Get Booking Details".
-
-### Pre-request Scripts
-
-Some requests include pre-request scripts for:
-- Dynamic date generation
-- Token validation
-- Parameter formatting
-
----
-
-## 🎯 Business Rules & Constraints
-
-### Booking Rules
-- Cannot book in the past
-- Must be within shop hours (check shop openTime/closeTime)
-- Employee must be available (check employee calendar first)
-- Cancellation: At least 2 hours before appointment
-- Reschedule: Maximum 1 time per booking
-- Reorder: Unlimited (creates new booking)
-
-### Service Rules
-- Service types: `single` or `bundled`
-- Service gender: `male`, `female`, or `unisex`
-- Single service: requires duration, actualPrice, offerPrice, finalPrice
-- Bundled service: requires bundledServices array, totalDuration, totalPrice
-
-### Photo Rules
-- Maximum 10 photos per shop
-- Photo types: shop_interior, shop_exterior, work_sample, team_photo, certificate, other
-- Files uploaded to Cloudinary
-- Max file size: 5MB per photo
-
-### Rating Rules
-- One rating per customer per shop
-- Rating: 1-5 (integer)
-- Review: Optional, max 500 characters
-- Updating: If rating exists, it will be updated
-- Replies: Shop owners can reply to ratings (max 500 characters)
-- Reply Management: Shop owners can add, update, or delete their replies
-
-### PIN Rules
-- Exactly 4 digits only
-- Required for barber shop access
-- Stored as bcrypt hash
-
----
-
-## 🔍 Response Format
-
-All API responses follow this standard format:
-
-**Success Response:**
 ```json
 {
   "success": true,
-  "statusCode": 200,
-  "message": "Operation successful",
-  "data": { /* resource data */ }
+  "message": "Human-readable status",
+  "data": {}
 }
 ```
 
-**Error Response:**
-```json
-{
-  "success": false,
-  "statusCode": 400,
-  "message": "Validation failed",
-  "errors": [
-    {
-      "field": "email",
-      "message": "Invalid email format"
-    }
-  ]
-}
+Validation and field-level failures are returned inside `data.errors`.
+
+---
+
+## Files in This Directory
+
+| File | Collection name | Description |
+|---|---|---|
+| `01-authentication.json` | EverCut - Authentication | OTP authentication for customer and barber test users, token capture, and health check |
+| `02-onboarding.json` | EverCut - Onboarding | First-run customer and barber onboarding using onboarding JWTs, with shop schedule normalization to 24-hour storage |
+| `03-customer-profile.json` | EverCut - Customer | Profile read/update and homepage endpoints |
+| `04-customer-bookings.json` | EverCut - Customer Bookings | Full booking lifecycle: create, update, reschedule, reorder, cancel |
+| `05-customer-shop-discovery.json` | EverCut - Customer Shop Discovery | Nearby shop/service search and keyword search |
+| `06-customer-ratings.json` | EverCut - Customer Ratings | Submit a rating and read shop rating data |
+| `07-barber-profile-shop.json` | EverCut - Barber Profile & Shop | Shop management: info, UPI, status, images, PIN, and account actions |
+| `08-barber-employees.json` | EverCut - Barber Employees | Employee CRUD with optional photo upload and 24-hour employee schedule examples |
+| `09-barber-services.json` | EverCut - Barber Services | Service catalogue CRUD (single and bundled services) |
+| `10-barber-bookings.json` | EverCut - Barber Bookings | Booking administration: list, stats, monthly milestone progress, status update, cancellation |
+| `11-barber-photos.json` | EverCut - Barber Photos | Shop gallery: upload, list, stats, delete |
+| `12-barber-earnings.json` | EverCut - Barber Earnings | Earnings summary (requires completed bookings for non-zero values) |
+| `13-barber-ratings.json` | EverCut - Barber Ratings | Rating listing, summary, reply management, and rating removal |
+| `14-dashboard.json` | EverCut - Dashboard | Dashboard analytics: overview, pulse metrics, staff availability, today's queue |
+| `15-payments-payouts.json` | EverCut - Payments & Payouts | Native PhonePe SDK payment initiation/verification/status/refund requests and Cashfree payout retry |
+| `EverCut.postman_environment.json` | — | Active environment with OTP/JWT variables for local testing |
+| `assets/sample-upload.png` | — | Sample image pre-wired into file-upload requests |
+
+---
+
+## Collection Request Reference
+
+### `01-authentication.json`
+
+| # | Method | Endpoint | Description |
+|---|---|---|---|
+| 1 | POST | `/api/v1/auth/otp/send` | Send OTP to customer |
+| 2 | POST | `/api/v1/auth/otp/verify` | Verify customer OTP - captures onboarding or session tokens |
+| 3 | POST | `/api/v1/auth/otp/send` | Send OTP to barber |
+| 4 | POST | `/api/v1/auth/otp/verify` | Verify barber OTP - captures onboarding or session tokens |
+| 5 | POST | `/api/v1/auth/token/refresh` | Refresh customer access token |
+| 6 | POST | `/api/v1/auth/token/refresh` | Refresh barber access token |
+| 7 | POST | `/api/v1/auth/logout` | Logout customer *(Terminal)* |
+| 8 | POST | `/api/v1/auth/otp/resend` | Resend OTP (text channel) |
+| 9 | GET | `/api/v1/health` | Health check |
+
+### `02-onboarding.json`
+
+Shop opening, closing, and break times may be sent as either `HH:MM` or `hh:mm AM/PM`. The backend normalizes those values to `HH:MM` before persisting the shop profile.
+
+| # | Method | Endpoint | Description |
+|---|---|---|---|
+| 1 | POST | `/api/v1/onboarding/customers` | Complete customer onboarding *(first run only)* |
+| 2 | POST | `/api/v1/onboarding/barbers` | Complete barber profile *(first run only)* |
+
+### `03-customer-profile.json`
+
+| # | Method | Endpoint | Description |
+|---|---|---|---|
+| 1 | GET | `/api/v1/customers/me` | Get profile |
+| 2 | PUT | `/api/v1/customers/me` | Update profile |
+| 3 | GET | `/api/v1/customers/me/home` | Get homepage |
+| 4 | GET | `/api/v1/shops/nearby/services` | Get services by gender - also captures shared shop/service IDs |
+
+### `04-customer-bookings.json`
+
+| # | Method | Endpoint | Description |
+|---|---|---|---|
+| 1 | GET | `/api/v1/bookings?type=upcoming` | List upcoming bookings - captures booking ID |
+| 2 | GET | `/api/v1/employees/{{employee_id}}/calendar` | Get employee availability |
+| 3 | POST | `/api/v1/bookings` | Create a booking |
+| 4 | GET | `/api/v1/bookings/{{booking_id}}` | Get booking details |
+| 5 | GET | `/api/v1/bookings/{{booking_id}}/confirmation` | Get booking confirmation |
+| 6 | PATCH | `/api/v1/bookings/{{booking_id}}/favorite` | Toggle booking favorite |
+| 6B | GET | `/api/v1/bookings?type=favorites` | List favorite bookings |
+| 7 | PUT | `/api/v1/bookings/{{booking_id}}` | Update booking |
+| 8 | PUT | `/api/v1/bookings/{{booking_id}}/reschedule` | Reschedule booking |
+| 9 | POST | `/api/v1/bookings/{{booking_id}}/reorder` | Reorder booking |
+| 10 | POST | `/api/v1/bookings/{{booking_id}}/cancel` | Cancel booking |
+
+### `05-customer-shop-discovery.json`
+
+| # | Method | Endpoint | Description |
+|---|---|---|---|
+| 1 | GET | `/api/v1/shops/nearby` | Get nearby shops - captures shop ID |
+| 2 | GET | `/api/v1/shops/{{shop_id}}` | Get shop details - captures service ID |
+| 3 | GET | `/api/v1/shops/{{shop_id}}/employees` | Get shop employees - captures employee ID |
+| 4 | GET | `/api/v1/employees/{{employee_id}}/available-slots` | Get employee available slots |
+| 5 | GET | `/api/v1/shops/{{shop_id}}/availability` | Get shop-wide availability |
+| 6 | PATCH | `/api/v1/shops/{{shop_id}}/favorite` | Toggle favorite shop |
+| 7 | GET | `/api/v1/shops/favorites` | List favorite shops |
+| 8 | GET | `/api/v1/shops/doorstep` | Get doorstep shops |
+| 9 | GET | `/api/v1/services/search` | Search services by keyword and gender |
+| 10 | GET | `/api/v1/shops/search` | Search shops by keyword |
+
+### `06-customer-ratings.json`
+
+| # | Method | Endpoint | Description |
+|---|---|---|---|
+| 1 | GET | `/api/v1/bookings?type=past&limit=100` | Bootstrap: capture a shop ID from a completed past booking |
+| 2 | POST | `/api/v1/ratings` | Submit a rating *(once per customer/shop - returns 409 on rerun)* |
+| 3 | GET | `/api/v1/ratings/shop/{{shop_id}}` | List shop ratings |
+| 4 | GET | `/api/v1/ratings/shop/{{shop_id}}/summary` | Get rating summary |
+
+### `07-barber-profile-shop.json`
+
+| # | Method | Endpoint | Description |
+|---|---|---|---|
+| 1 | GET | `/api/v1/shops/me` | Get profile - captures shop ID |
+| 2 | PUT | `/api/v1/shops/me` | Update business info |
+| 3 | GET | `/api/v1/shops/me/upi` | Get UPI details |
+| 4 | PUT | `/api/v1/shops/me/upi` | Update UPI details |
+| 5 | PUT | `/api/v1/shops/me/status` | Ensure shop is open |
+| 6 | PUT | `/api/v1/shops/me/picture` | Update profile picture |
+| 7 | PUT | `/api/v1/shops/me/cover` | Update cover image |
+| 8 | PUT | `/api/v1/shops/me/pin` | Update PIN |
+| 9A | POST | `/api/v1/shops/me/sign-out-everywhere` | Sign out everywhere *(Terminal)* |
+| 9B | DELETE | `/api/v1/shops/me` | Delete account *(Terminal)* |
+
+### `08-barber-employees.json`
+
+Employee `workingHours.start` and `workingHours.end` remain `HH:MM` 24-hour values. Those hours are now compared against normalized shop hours, so legacy AM/PM shop schedules no longer cause false validation failures.
+
+| # | Method | Endpoint | Description |
+|---|---|---|---|
+| 1 | GET | `/api/v1/employees` | List employees - captures employee ID |
+| 2 | GET | `/api/v1/employees/{{employee_id}}` | Get employee details with statistics |
+| 3 | POST | `/api/v1/employees` | Add employee |
+| 4 | PUT | `/api/v1/employees/{{employee_id}}` | Update employee |
+| 5 | DELETE | `/api/v1/employees/{{employee_id}}` | Delete employee *(Terminal)* |
+
+### `09-barber-services.json`
+
+| # | Method | Endpoint | Description |
+|---|---|---|---|
+| 1 | GET | `/api/v1/services` | List services - captures service ID |
+| 2 | POST | `/api/v1/services` | Add a single service |
+| 3 | POST | `/api/v1/services` | Add a bundled service |
+| 4 | PUT | `/api/v1/services/{{service_id}}` | Update service |
+| 5 | DELETE | `/api/v1/services/{{service_id}}` | Delete service *(Terminal)* |
+
+### `10-barber-bookings.json`
+
+| # | Method | Endpoint | Description |
+|---|---|---|---|
+| 1 | GET | `/api/v1/bookings` | List all bookings - captures IDs for status update and cancellation |
+| 2 | GET | `/api/v1/bookings/stats` | Get booking stats |
+| 3 | GET | `/api/v1/bookings/progress` | Get the monthly completed-booking milestone progress card data |
+| 4 | GET | `/api/v1/bookings/status?status=confirmed` | Filter bookings by status |
+| 5 | PUT | `/api/v1/bookings/{{booking_id_status}}/status` | Update booking status |
+| 6 | POST | `/api/v1/bookings/{{booking_id_delete}}/cancel` | Cancel a paid booking *(Terminal)* |
+
+### `11-barber-photos.json`
+
+| # | Method | Endpoint | Description |
+|---|---|---|---|
+| 1 | GET | `/api/v1/photos` | List gallery photos - captures photo ID |
+| 2 | POST | `/api/v1/photos` | Upload photos |
+| 3 | GET | `/api/v1/photos/stats` | Get photo stats |
+| 4 | GET | `/api/v1/photos/{{photo_id}}` | Get photo by ID |
+| 5 | DELETE | `/api/v1/photos/{{photo_id}}` | Delete photo *(Terminal)* |
+
+### `12-barber-earnings.json`
+
+| # | Method | Endpoint | Description |
+|---|---|---|---|
+| 1 | GET | `/api/v1/earnings` | Get earnings summary |
+
+### `13-barber-ratings.json`
+
+| # | Method | Endpoint | Description |
+|---|---|---|---|
+| 1 | GET | `/api/v1/ratings` | List ratings - captures seeded IDs for reply/remove operations |
+| 2 | GET | `/api/v1/ratings/summary` | Get the authenticated barber shop's rating summary |
+| 3 | POST | `/api/v1/ratings/{{rating_id_add_reply}}/reply` | Add reply to a rating *(returns 409 on rerun once a reply exists)* |
+| 4 | PUT | `/api/v1/ratings/{{rating_id_update_reply}}/reply` | Update an existing reply |
+| 5 | DELETE | `/api/v1/ratings/{{rating_id_update_reply}}/reply` | Delete a reply |
+| 6 | DELETE | `/api/v1/ratings/{{rating_id_remove_rating}}` | Remove a rating |
+
+### `14-dashboard.json`
+
+| # | Method | Endpoint | Description |
+|---|---|---|---|
+| 1 | GET | `/api/v1/dashboard/overview` | Get complete dashboard overview (pulse + staff + queue) |
+| 2 | GET | `/api/v1/dashboard/pulse` | Get today's pulse metrics (occupancy + status breakdown) |
+| 3 | GET | `/api/v1/dashboard/staff` | Get staff availability and progress tracking |
+| 4 | GET | `/api/v1/dashboard/queue?filter=active` | Get today's active queue (within ±30 minutes) |
+| 5 | GET | `/api/v1/dashboard/queue?filter=upcoming` | Get today's upcoming queue (future appointments) |
+
+### `15-payments-payouts.json`
+
+| # | Method | Endpoint | Description |
+|---|---|---|---|
+| 1 | POST | `/api/v1/payments` | Create native PhonePe SDK order for a pending customer booking |
+| 2 | GET | `/api/v1/payments/{{payment_id}}` | Read and poll payment status |
+| 2B | GET | `/api/v1/payments` | List visible payments for the authenticated actor |
+| 3 | POST | `/api/v1/payments/{{payment_id}}/verify` | Verify Flutter SDK callback through backend/PhonePe Order Status |
+| 4 | GET | `/api/v1/bookings/{{payment_booking_id}}/payment` | Get latest payment for a booking |
+| 5 | POST | `/api/v1/bookings/{{payment_booking_id}}/refund` | Initiate refund before payout starts |
+| 6 | POST | `/api/v1/payouts/{{payout_id}}/retry` | Retry failed or reversed payout as admin |
+
+---
+
+### Prerequisites
+
+1. In `src/config/index.js`, set `testMode: true` inside the `msg91` config block to skip real SMS in development. The default is `false`; the inline comment says `flip to true in dev to skip real SMS`.
+2. The test OTP is hardcoded as `123456` via `testOtp: '123456'` in the same config block - no env var needed.
+3. From `server/`, start the API with `npm run dev`.
+
+No manual token generation needed - the authentication and onboarding collections handle token capture automatically.
+
+### Import into Postman
+
+1. Import every `.json` collection from this folder.
+2. Import `EverCut.postman_environment.json` as the active environment.
+3. Verify `test_customer_mobile`, `test_barber_mobile`, and `test_otp` are set in the environment.
+4. Run `01-authentication.json` requests 1-4 to send and verify OTP for both test users.
+5. Returning users get access tokens immediately; brand-new users get onboarding tokens first and then receive access tokens from `02-onboarding.json`.
+6. Run the other collections in order.
+
+> Access tokens expire after 15 minutes once onboarding is complete. Run the **Refresh Token** requests (5-6) or re-run requests 1-4 to get fresh tokens. Tokens are auto-captured - no manual copy-paste.
+
+### Test Users
+
+| Role | MongoDB `_id` | Email | Phone |
+|---|---|---|---|
+| Customer | *(auto-generated on first successful onboarding)* | `test.customer@example.com` | `9876543210` |
+| Barber | *(auto-generated on first successful onboarding)* | `test.barber@example.com` | `9876543211` |
+
+### Environment Variables
+
+| Variable | Value |
+|---|---|
+| `base_url` | `http://localhost:5000` |
+| `api_prefix` | `api/v1` |
+| `test_customer_mobile` | `9876543210` |
+| `test_barber_mobile` | `9876543211` |
+| `test_otp` | `123456` |
+| `customer_access_token` | *(auto-set by 01-authentication.json for returning users or by 02-onboarding.json after first-time signup)* |
+| `customer_refresh_token` | *(auto-set by 01-authentication.json for returning users or by 02-onboarding.json after first-time signup)* |
+| `barber_access_token` | *(auto-set by 01-authentication.json for returning users or by 02-onboarding.json after first-time signup)* |
+| `barber_refresh_token` | *(auto-set by 01-authentication.json for returning users or by 02-onboarding.json after first-time signup)* |
+| `customer_onboarding_token` | *(auto-set by 01-authentication.json)* |
+| `barber_onboarding_token` | *(auto-set by 01-authentication.json)* |
+| `admin_access_token` | Manual ADMIN JWT for payout retry |
+| `payment_booking_id` | Booking ID to pay for; can be copied from `shared_booking_id` |
+| `payment_id` | Auto-set by `15-payments-payouts.json` request 1 |
+| `merchant_order_id` | Auto-set by `15-payments-payouts.json` request 1 |
+| `merchant_refund_id` | Auto-set by `15-payments-payouts.json` request 5 |
+| `refund_id` | Auto-set by `15-payments-payouts.json` request 5 |
+| `payout_id` | Manual payout transaction ID for retry tests |
+| `payout_transfer_id` | Manual app transfer ID from a payout transaction for Cashfree webhook tests |
+| `gateway_transfer_id` | Provider transfer ID used in Cashfree webhook samples |
+| `phonepe_webhook_username` | Must match `PHONEPE_WEBHOOK_USERNAME`; defaults to local fallback |
+| `phonepe_webhook_password` | Must match `PHONEPE_WEBHOOK_PASSWORD`; defaults to local fallback |
+| `cashfree_webhook_secret` | Must match `CASHFREE_PAYOUT_CLIENT_SECRET`; defaults to local fallback |
+
+### Auth Collection Requests
+
+| # | Method | Endpoint | Description |
+|---|---|---|---|
+| 1 | POST | `/api/v1/auth/otp/send` | Send OTP to customer |
+| 2 | POST | `/api/v1/auth/otp/verify` | Verify customer OTP - captures onboarding or session tokens |
+| 3 | POST | `/api/v1/auth/otp/send` | Send OTP to barber |
+| 4 | POST | `/api/v1/auth/otp/verify` | Verify barber OTP - captures onboarding or session tokens |
+| 5 | POST | `/api/v1/auth/token/refresh` | Refresh customer access token |
+| 6 | POST | `/api/v1/auth/token/refresh` | Refresh barber access token |
+| 7 | POST | `/api/v1/auth/logout` | Logout customer *(Terminal)* |
+| 8 | POST | `/api/v1/auth/otp/resend` | Resend OTP (text channel) |
+| 9 | GET | `/api/v1/health` | Health check |
+
+### Recommended Run Order
+
+**Barber side** (must run first to create bookable data):
+
+1. `01-authentication.json` → **3. Send Barber OTP** → **4. Verify Barber OTP**
+2. `02-onboarding.json` → **2. Complete Barber Profile** *(first run only)*
+3. Continue with barber collections in order.
+
+**Customer side:**
+
+1. `01-authentication.json` → **1. Send Customer OTP** → **2. Verify Customer OTP**
+2. `02-onboarding.json` → **1. Complete Customer** *(first run only)*
+3. Continue with customer collections in order.
+4. Run `15-payments-payouts.json` after a pending booking has been created. Request 1 captures the payment references needed by the status, refund, and webhook requests.
+
+> Requests marked ***(Terminal)*** are destructive. Run them last within their collection and avoid them if you still need the related account or data for later requests.
+
+---
+
+## Shared Automation
+
+Collections capture and share the following Postman globals automatically:
+
+| Global | Set by | Used by |
+|---|---|---|
+| `shared_shop_id` | `07-barber-profile-shop.json` request 1 | Customer collections and ratings |
+| `shared_employee_id` | `08-barber-employees.json` requests 1 and 2 | Customer bookings |
+| `shared_service_id` | `09-barber-services.json` requests 1 and 2 | Customer bookings |
+| `shared_booking_id` | `04-customer-bookings.json` requests 1 and 3 | Booking detail requests |
+| `shared_photo_id` | `11-barber-photos.json` requests 1 and 2 | Photo detail and delete |
+| `shared_barber_pin` | `07-barber-profile-shop.json` request 8 | Future PIN-gated requests |
+
+---
+
+## Special Cases
+
+### `13-barber-ratings.json` — Seed Data Required
+
+The rating reply and remove requests each need ratings in different states (no reply, has reply, removable). The live API cannot manufacture these on demand. Run the seed script first:
+
+```bash
+cd server
+node scripts/seed-barber-rating-mock-data.js
 ```
 
-**Paginated Response:**
-```json
-{
-  "success": true,
-  "statusCode": 200,
-  "message": "Items fetched",
-  "data": [ /* items */ ],
-  "pagination": {
-    "page": 1,
-    "limit": 10,
-    "total": 50,
-    "totalPages": 5
-  }
-}
-```
+Request 1 captures seeded IDs from the serialized `ratingId` field returned by the API.
 
----
+### `06-customer-ratings.json` — Add Rating (Request 2)
 
-## 🐛 Troubleshooting
+This collection now captures `shop_id` from `GET /bookings?type=past`, not from nearby shop discovery. The authenticated customer must already have at least one completed past booking, otherwise request 1 fails intentionally because the backend now allows ratings only for shops the customer has actually completed a booking with.
 
-### Issue: "No token provided"
-**Solution:** Set the `firebase_token` variable in the collection
+Request 2 succeeds once per customer/shop pair. It returns `409 Conflict` on subsequent runs because the API allows only one rating per customer per shop.
 
-### Issue: "Invalid or expired token"
-**Solution:** Firebase tokens expire after 1 hour. Get a new token and update the variable
+### Shop Schedule Input
 
-### Issue: "Access denied. Required role(s): CUSTOMER"
-**Solution:** You're using a barber token on a customer endpoint or vice versa. Check your token's role.
+Barber onboarding and shop schedule updates accept either `HH:MM` or `hh:mm AM/PM` values for `openTime`, `closeTime`, and break times. The backend normalizes shop schedule storage to `HH:MM`, while employee working hours stay `HH:MM` and are validated against that normalized schedule.
 
-### Issue: "Shop is currently closed"
-**Solution:** Use "Toggle Shop Status" in Collection 07 to open the shop
+### `13-barber-ratings.json` — Add Reply (Request 2)
 
-### Issue: "Cannot book in the past"
-**Solution:** Use future dates in your booking requests (date must be >= today)
+In the current collection this is request 3, because request 2 now fetches `GET /ratings/summary`.
 
-### Issue: "Employee not available at this date/time"
-**Solution:** 
-1. Run "Get Employee Calendar" first to see available slots
-2. Choose an available time slot
-3. Ensure the time is within employee's working hours
+This succeeds once for the seeded no-reply fixture. It returns `409 Conflict` on subsequent runs because `POST /ratings/:id/reply` no longer overwrites an existing reply.
 
-### Issue: "Cancellation not allowed within 2 hours of appointment"
-**Solution:** Bookings can only be cancelled at least 2 hours before the appointment time
+### `10-barber-bookings.json` — Cancel Paid Booking (Request 6)
 
-### Issue: "You can only reschedule once"
-**Solution:** Use "Reorder Booking" instead, which creates a new booking
+This is destructive and should be left until the end of a test cycle, after any booking status, earnings, or customer confirmation checks are complete.
 
----
-
-## 📦 Files in This Folder
-
-### Collection Files (Import these)
-- `01-authentication.json` - Authentication endpoints
-- `02-onboarding.json` - Customer and barber onboarding
-- `03-customer-profile.json` - Customer profile management
-- `04-customer-bookings.json` - Customer booking operations
-- `05-customer-shop-discovery.json` - Shop discovery and search
-- `06-customer-ratings.json` - Rating and review management
-- `07-barber-profile-shop.json` - Barber shop management
-- `08-barber-employees.json` - Employee management
-- `09-barber-services.json` - Service catalog management
-- `10-barber-bookings.json` - Barber booking management
-- `11-barber-photos.json` - Photo gallery management
-- `12-barber-earnings.json` - Earnings and analytics
-
-### Documentation Files
-- `README.md` - This file
-- `POSTMAN_COLLECTION_README.md` - Detailed API documentation
-- `.postman.json` - Metadata file
-
-### Archive Files (Reference only)
-- `evercut-postman-collection.json` - Original monolithic collection
-- `evercut-collection-formatted.json` - Formatted version
-
----
-
-## 🌐 Will Collections Appear in Postman App?
-
-**Yes!** Once you import the collections:
-
-1. **Desktop App:** Collections appear immediately in the left sidebar under "Collections"
-2. **Web App:** Collections sync automatically if you're signed in
-3. **Mobile App:** Collections sync across all devices
-
-**Workspace:** Collections will be imported into your currently selected workspace. To import into a specific workspace:
-1. Switch to the desired workspace first
-2. Then import the collections
-
-**Sharing:** To share with your team:
-1. Right-click on a collection
-2. Select "Share Collection"
-3. Choose team members or generate a link
-
----
-
-## 📊 Collection Statistics
-
-```
-Total Collections: 12
-Total Endpoints: 56
-Authentication: 2 endpoints
-Onboarding: 2 endpoints
-Customer Features: 22 endpoints
-Barber Features: 30 endpoints
-
-File Size: ~160KB total
-Format: Postman Collection v2.1.0
-```
-
----
-
-## 🔗 Related Documentation
-
-- **API Architecture:** `../docs/BACKEND_ARCHITECTURE_BLUEPRINT.md`
-- **Implementation Plan:** `../docs/IMPLEMENTATION_PLAN.md`
-- **Role-Based Auth:** `../docs/ROLE_BASED_AUTHENTICATION_ARCHITECTURE.md`
-
----
-
-## 📞 Support
-
-For API issues or questions:
-- Check the detailed documentation in `POSTMAN_COLLECTION_README.md`
-- Review the architecture documentation in `../docs/` folder
-- Test endpoints in the order specified in the workflows above
-
----
-
-## ✅ Testing Checklist
-
-Before deploying to production, test:
-
-- [ ] Authentication flow (both customer and barber)
-- [ ] Customer registration with photo upload
-- [ ] Barber registration with all required fields and exactly 3 shop images
-- [ ] Booking creation and validation
-- [ ] Booking cancellation (with 2-hour rule)
-- [ ] Booking reschedule (max 1 time)
-- [ ] Employee calendar availability
-- [ ] Nearby shops geospatial query
-- [ ] Service search by gender
-- [ ] Rating submission (one per customer per shop)
-- [ ] Photo upload (multiple files)
-- [ ] Shop status toggle (open/close)
-- [ ] Earnings calculation
-- [ ] All error scenarios (invalid data, expired tokens, etc.)
-
----
-
-**Version:** 1.0.0  
-**Last Updated:** 2024  
-**API Version:** v1  
-**Format:** Postman Collection v2.1.0

@@ -1,19 +1,31 @@
-import userRepository from '../repositories/user.repository.js';
-import customerProfileRepo from '../repositories/customer-profile.repository.js';
+import customerRepository from '../repositories/customer.repository.js';
 import photoRepository from '../repositories/photo.repository.js';
 import shopRepository from '../repositories/shop.repository.js';
+import userRepository from '../repositories/user.repository.js';
+import { serializeBarberProfile } from '../utils/barber-profile.utils.js';
 import {
     ALL_SERVICE_FOR,
     ALL_SHOP_AMENITIES,
     DAYS_OF_WEEK,
     ROLES,
 } from '../utils/constants.js';
-import { ConflictError, BadRequestError } from '../utils/api-error.js';
+import { BadRequestError, ConflictError } from '../utils/api-error.js';
+import { normalizeShopSchedule } from '../utils/shop-schedule.utils.js';
+import * as authService from './auth.service.js';
 import { hashPin, validatePinCreation } from './pin.service.js';
 
 /**
  * Onboarding service - handles first-time user and barber profile creation.
  */
+
+const normalizeVerifiedPhoneNumber = (phoneNumber) => String(phoneNumber ?? '').trim();
+
+const issueAuthenticationTokens = async (user) => {
+    const tokens = authService.generateTokenPair(user._id, user.roleType);
+    const refreshHash = authService.hashToken(tokens.refreshToken);
+    await userRepository.updateById(user._id, { refreshTokenHash: refreshHash });
+    return tokens;
+};
 
 const parseJsonIfString = (value, fieldName) => {
     if (typeof value !== 'string') return value;
@@ -76,7 +88,7 @@ const normalizeLocation = (value) => {
     return parsed;
 };
 
-const normalizeBreakTimes = (value) => {
+const parseBreakTimes = (value) => {
     const times = toArray(value, 'breakTimes');
     return times.map((entry, index) => {
         const raw = parseJsonIfString(entry, `breakTimes[${index}]`);
@@ -105,13 +117,13 @@ const extractShopImages = (files) => {
 };
 
 const normalizeBarberOnboardingInput = (authUser, shopData) => {
-    const firstName = String(shopData.firstName || '').trim();
-    const lastName = String(shopData.lastName || '').trim();
+    const firstName = String(shopData.firstName || shopData.ownerFirstName || '').trim();
+    const lastName = String(shopData.lastName || shopData.ownerLastName || '').trim();
     const ownerNameFromNameParts = `${firstName} ${lastName}`.trim();
-    const ownerName = String(shopData.shopOwner || ownerNameFromNameParts).trim();
+    const ownerName = String(shopData.shopOwner || shopData.ownerName || ownerNameFromNameParts).trim();
 
-    const emailId = String(shopData.emailId || shopData.email || '').trim().toLowerCase();
-    const phoneNumber = String(shopData.phoneNumber || authUser?.phoneNumber || '').trim();
+    const email = String(shopData.email || authUser?.email || '').trim().toLowerCase();
+    const phoneNumber = String(authUser?.phoneNumber || '').trim();
     const category = shopData.shopCategory || shopData.businessCategory || shopData.category;
     const address = String(shopData.address || shopData.shopLocation || '').trim();
     const upiId = String(shopData.upiId || shopData.upiAddress || '').trim();
@@ -151,7 +163,7 @@ const normalizeBarberOnboardingInput = (authUser, shopData) => {
     }
 
     const breakTimesInput = shopData.breakTimes ?? shopData.breakTimings ?? [];
-    const breakTimes = normalizeBreakTimes(breakTimesInput);
+    const breakTimes = parseBreakTimes(breakTimesInput);
 
     const targetCustomersRaw = String(shopData.targetCustomers || '').trim().toLowerCase();
     const targetCustomers = {
@@ -169,10 +181,16 @@ const normalizeBarberOnboardingInput = (authUser, shopData) => {
     if (!firstName || !lastName) {
         throw new BadRequestError('firstName and lastName are required');
     }
-    if (!ownerName) {
-        throw new BadRequestError('shopOwner or name fields are required');
+    if (!shopData.gender && !shopData.ownerGender) {
+        throw new BadRequestError('gender is required');
     }
-    if (!emailId) {
+    if (!shopData.dateOfBirth && !shopData.ownerDateOfBirth) {
+        throw new BadRequestError('dateOfBirth is required');
+    }
+    if (!ownerName) {
+        throw new BadRequestError('shopOwner/ownerName or firstName + lastName are required');
+    }
+    if (!email) {
         throw new BadRequestError('email is required');
     }
     if (!phoneNumber) {
@@ -197,17 +215,22 @@ const normalizeBarberOnboardingInput = (authUser, shopData) => {
         throw new BadRequestError('accountHolderName and bankName are required');
     }
 
+    const normalizedSchedule = normalizeShopSchedule({ openTime, closeTime, breakTimes });
+    if (normalizedSchedule.error) {
+        throw new BadRequestError(normalizedSchedule.error);
+    }
+
     return {
         firstName,
         lastName,
-        gender: shopData.gender,
-        dateOfBirth: shopData.dateOfBirth,
+        gender: shopData.gender || shopData.ownerGender,
+        dateOfBirth: shopData.dateOfBirth || shopData.ownerDateOfBirth,
         ownerName,
         shopName: String(shopData.shopName || '').trim(),
         category,
         targetCustomers,
         phoneNumber,
-        emailId,
+        email,
         accountHolderName,
         bankName,
         upiId,
@@ -218,37 +241,54 @@ const normalizeBarberOnboardingInput = (authUser, shopData) => {
         yearsOfExperience: toNonNegativeInteger(shopData.yearsOfExperience, 0),
         facilities,
         availableDays,
-        openTime,
-        closeTime,
-        breakTimes,
+        openTime: normalizedSchedule.value.openTime,
+        closeTime: normalizedSchedule.value.closeTime,
+        breakTimes: normalizedSchedule.value.breakTimes,
         pin: shopData.pin,
         confirmPin: shopData.confirmPin,
     };
 };
 
-export const createCustomerOnboarding = async (firebaseUid, profileData, file) => {
-    const existing = await userRepository.findByFirebaseUid(firebaseUid);
-    if (existing) throw new ConflictError('User already exists');
+const ensureUniqueUserIdentity = async ({ email, phoneNumber }) => {
+    const normalizedEmail = email ? String(email).trim().toLowerCase() : null;
+    const normalizedPhoneNumber = phoneNumber ? String(phoneNumber).trim() : null;
 
-    if (!file) throw new BadRequestError('Profile photo is required');
+    const [emailOwner, phoneOwner] = await Promise.all([
+        normalizedEmail ? userRepository.findByEmail(normalizedEmail) : null,
+        normalizedPhoneNumber ? userRepository.findByPhone(normalizedPhoneNumber) : null,
+    ]);
 
-    let location = profileData.location;
-    if (location && typeof location === 'string') {
-        try {
-            location = JSON.parse(location);
-        } catch {
-            throw new BadRequestError('Invalid location format');
-        }
+    if (emailOwner) {
+        throw new ConflictError('Email already registered');
     }
 
+    if (phoneOwner) {
+        throw new ConflictError('Phone number already registered');
+    }
+};
+
+export const createCustomerOnboarding = async (phoneNumber, profileData, file) => {
+    const verifiedPhoneNumber = normalizeVerifiedPhoneNumber(phoneNumber);
+    if (!verifiedPhoneNumber) {
+        throw new BadRequestError('Verified phone number is required');
+    }
+    if (!file) {
+        throw new BadRequestError('Profile photo is required');
+    }
+
+    await ensureUniqueUserIdentity({
+        email: profileData.email,
+        phoneNumber: verifiedPhoneNumber,
+    });
+    const location = normalizeLocation(profileData.location);
+
     const user = await userRepository.create({
-        firebaseUid,
-        phoneNumber: profileData.phoneNumber,
+        phoneNumber: verifiedPhoneNumber,
         email: profileData.email,
         roleType: ROLES.CUSTOMER,
     });
 
-    const profile = await customerProfileRepo.create({
+    const profile = await customerRepository.create({
         userId: user._id,
         firstName: profileData.firstName,
         lastName: profileData.lastName,
@@ -260,14 +300,24 @@ export const createCustomerOnboarding = async (firebaseUid, profileData, file) =
         cloudinaryId: file.filename || file.public_id,
     });
 
-    return { user, profile };
+    const tokens = await issueAuthenticationTokens(user);
+
+    return { user, profile, tokens };
 };
 
-export const createBarberOnboarding = async (firebaseUid, authUser, shopData, files) => {
-    const existing = await userRepository.findByFirebaseUid(firebaseUid);
-    if (existing) throw new ConflictError('Barber already exists');
+export const createBarberOnboarding = async (phoneNumber, shopData, files) => {
+    const verifiedPhoneNumber = normalizeVerifiedPhoneNumber(phoneNumber);
+    if (!verifiedPhoneNumber) {
+        throw new BadRequestError('Verified phone number is required');
+    }
 
-    const normalized = normalizeBarberOnboardingInput(authUser, shopData);
+    const authContext = { phoneNumber: verifiedPhoneNumber, email: null };
+    const normalized = normalizeBarberOnboardingInput(authContext, shopData);
+
+    await ensureUniqueUserIdentity({
+        email: normalized.email,
+        phoneNumber: normalized.phoneNumber,
+    });
 
     const onboardingImages = extractShopImages(files);
     if (onboardingImages.length !== 3) {
@@ -275,7 +325,9 @@ export const createBarberOnboarding = async (firebaseUid, authUser, shopData, fi
     }
 
     const pinResult = validatePinCreation(normalized.pin, normalized.confirmPin);
-    if (!pinResult.isValid) throw new BadRequestError(pinResult.message);
+    if (!pinResult.isValid) {
+        throw new BadRequestError(pinResult.message);
+    }
 
     const pinHash = await hashPin(normalized.pin);
 
@@ -284,9 +336,8 @@ export const createBarberOnboarding = async (firebaseUid, authUser, shopData, fi
     const coverCloudinaryId = coverImage.public_id || coverImage.filename;
 
     const user = await userRepository.create({
-        firebaseUid,
         phoneNumber: normalized.phoneNumber,
-        email: normalized.emailId,
+        email: normalized.email,
         roleType: ROLES.BARBER,
     });
 
@@ -300,8 +351,6 @@ export const createBarberOnboarding = async (firebaseUid, authUser, shopData, fi
         ownerDateOfBirth: normalized.dateOfBirth,
         category: normalized.category,
         targetCustomers: normalized.targetCustomers,
-        phoneNumber: normalized.phoneNumber,
-        emailId: normalized.emailId,
         accountHolderName: normalized.accountHolderName,
         bankName: normalized.bankName,
         upiId: normalized.upiId,
@@ -320,8 +369,6 @@ export const createBarberOnboarding = async (firebaseUid, authUser, shopData, fi
         pinHash,
     });
 
-    const { pinHash: _pinHash, ...shop } = createdShop.toObject();
-
     const photos = [];
     for (const [index, file] of onboardingImages.entries()) {
         const photo = await photoRepository.create({
@@ -337,5 +384,12 @@ export const createBarberOnboarding = async (firebaseUid, authUser, shopData, fi
         photos.push(photo);
     }
 
-    return { user, shop, photos };
+    const tokens = await issueAuthenticationTokens(user);
+
+    return {
+        user,
+        shop: serializeBarberProfile(createdShop, user, { photos }),
+        photos,
+        tokens,
+    };
 };
