@@ -11,12 +11,14 @@ import payoutRoutes from './payout.routes.js';
 import ratingsRoutes from './ratings.routes.js';
 import servicesRoutes from './services.routes.js';
 import shopsRoutes from './shops.routes.js';
+import accountRoutes from './account.routes.js';
 import { ApiResponse } from '../utils/api-response.js';
 
 const router = Router();
 
 router.use('/auth', authRoutes);
 router.use('/onboarding', onboardingRoutes);
+router.use('/account', accountRoutes);
 router.use('/customers', customersRoutes);
 router.use('/shops', shopsRoutes);
 router.use('/employees', employeesRoutes);

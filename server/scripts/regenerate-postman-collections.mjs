@@ -320,7 +320,36 @@ const authenticationCollection = {
       }),
     },
     {
-      name: '9. Health Check',
+      name: '9. Send Phone Update OTP (Customer)',
+      ...request({
+        method: 'POST',
+        url: '{{base_url}}/{{api_prefix}}/account/phone/send-otp',
+        auth: bearerAuth('customer_access_token'),
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "newMobile": "9876543299"\n}`),
+        description: 'Send OTP to new phone number for verification. Requires authentication. Use a different number than the current one.',
+        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
+      }),
+    },
+    {
+      name: '10. Verify Phone Update OTP (Customer)',
+      ...request({
+        method: 'POST',
+        url: '{{base_url}}/{{api_prefix}}/account/phone/verify-otp',
+        auth: bearerAuth('customer_access_token'),
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "newMobile": "9876543299",\n  "otp": "{{test_otp}}"\n}`),
+        description: 'Verify OTP and update phone number atomically. Phone number is updated only after successful OTP verification.',
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          "const response = pm.response.json();",
+          "const data = response.data || {};",
+          "pm.test('response includes phoneNumber', function () { pm.expect(data).to.have.property('phoneNumber'); });"
+        ),
+      }),
+    },
+    {
+      name: '11. Health Check',
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/health',
