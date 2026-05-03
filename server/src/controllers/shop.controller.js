@@ -47,6 +47,25 @@ export const updateMyUpiDetails = async (req, res, next) => {
     }
 };
 
+export const getBankDetails = async (req, res, next) => {
+    try {
+        const details = await shopService.getBankDetails(req.user._id);
+        return res.status(200).json(ApiResponse.success(details, 'Bank details fetched'));
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const updateBankDetails = async (req, res, next) => {
+    try {
+        const body = getValidatedRequestData(req, 'body');
+        const details = await shopService.updateBankDetails(req.user._id, body);
+        return res.status(200).json(ApiResponse.success(details, 'Bank details updated successfully'));
+    } catch (err) {
+        next(err);
+    }
+};
+
 export const updateMyPin = async (req, res, next) => {
     try {
         const { currentPin, newPin, confirmNewPin } = getValidatedRequestData(req, 'body');

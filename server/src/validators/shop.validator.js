@@ -289,3 +289,19 @@ export const shopAvailabilityQuerySchema = Joi.object({
         Joi.array().items(objectId).min(1),
     ).required(),
 });
+
+export const updateBankDetailsSchema = Joi.object({
+    accountHolderName: Joi.string().trim().min(1).max(100).required(),
+    bankName: Joi.string().trim().min(1).max(120).required(),
+    bankAccount: Joi.string().trim().pattern(/^\d{6,34}$/).required().messages({
+        'string.pattern.base': 'bankAccount must be 6-34 digits',
+    }),
+    ifsc: Joi.string().trim().pattern(/^[A-Z]{4}0[A-Z0-9]{6}$/i).required().messages({
+        'string.pattern.base': 'ifsc must be a valid IFSC code (e.g., SBIN0001234)',
+    }),
+    upiId: Joi.string().trim().required(),
+    // Strip any fields that should not be user-controlled
+    verificationStatus: Joi.any().strip(),
+    beneficiaryId: Joi.any().strip(),
+    verifiedAt: Joi.any().strip(),
+});

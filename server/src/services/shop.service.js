@@ -5,7 +5,7 @@ import photoRepository from '../repositories/photo.repository.js';
 import ratingRepository from '../repositories/rating.repository.js';
 import userRepository from '../repositories/user.repository.js';
 import { BadRequestError, NotFoundError } from '../utils/api-error.js';
-import { serializeBarberProfile, serializeUpiDetails } from '../utils/barber-profile.utils.js';
+import { serializeBarberProfile, serializeUpiDetails, serializeBankDetails } from '../utils/barber-profile.utils.js';
 import { escapeRegex } from '../utils/regex.utils.js';
 import { serializeRating } from '../utils/rating-response.utils.js';
 import { buildPagination } from '../utils/pagination.utils.js';
@@ -377,6 +377,55 @@ export const getUpiDetails = async (ownerId) => {
 export const updateUpiDetails = async (ownerId, body, userContext) => {
     const result = await updateBusinessInfo(ownerId, body, userContext);
     return serializeUpiDetails(result.shop);
+};
+
+export const getBankDetails = async (ownerId) => {
+    const shop = await shopRepository.findByOwnerId(ownerId);
+    if (!shop) throw new NotFoundError('Shop profile');
+
+    return serializeBankDetails(shop);
+};
+
+export const updateBankDetails = async (ownerId, body) => {
+    const shop = await shopRepository.findByOwnerId(ownerId);
+    if (!shop) throw new NotFoundError('Shop profile');
+
+    // Validate required fields
+    if (!body.accountHolderName || !body.bankName || !body.bankAccount || !body.ifsc || !body.upiId) {
+        throw new BadRequestError('All bank details fields are required');
+    }
+
+    // Check if bank details are changing
+    const currentPayoutConfig = shop.payoutConfig || {};
+    const isBankAccountChanging = currentPayoutConfig.bankAccount !== body.bankAccount;
+    const isIfscChanging = currentPayoutConfig.ifsc !== body.ifsc;
+    const isBankDetailsChanging = isBankAccountChanging || isIfscChanging;
+
+    const updateData = {
+        accountHolderName: body.accountHolderName,
+        bankName: body.bankName,
+        upiId: body.upiId,
+        payoutConfig: {
+            ...(shop.payoutConfig || {}),
+            bankAccount: body.bankAccount,
+            ifsc: body.ifsc,
+        },
+    };
+
+    // If bank details are changing, reset verification status
+    if (isBankDetailsChanging) {
+        updateData.payoutConfig.verificationStatus = 'pending';
+        updateData.payoutConfig.verifiedAt = null;
+        // Keep beneficiaryId for tracking, but it will need re-verification
+    }
+
+    const updated = await shopRepository.updateByOwnerId(ownerId, updateData);
+
+    // TODO: Trigger beneficiary creation/update in payout gateway
+    // This should be handled by the payout service when needed
+    // await payoutService.createOrUpdateBeneficiary(updated);
+
+    return serializeBankDetails(updated);
 };
 
 export const toggleShopStatus = async (ownerId, requestedStatus) => {

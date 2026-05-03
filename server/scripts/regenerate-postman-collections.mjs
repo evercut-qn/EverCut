@@ -979,7 +979,42 @@ const barberProfileCollection = {
       }),
     },
     {
-      name: '5. Ensure Shop Is Open',
+      name: '5. Get Bank Details',
+      ...request({
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/shops/me/bank-details',
+        description: 'Reads the complete bank account details with verification status. Account number is masked for security.',
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          "const response = pm.response.json();",
+          "const data = response.data || {};",
+          "pm.test('response includes accountHolderName', function () { pm.expect(data).to.have.property('accountHolderName'); });",
+          "pm.test('response includes bankAccount (masked)', function () { pm.expect(data).to.have.property('bankAccount'); });",
+          "pm.test('response includes ifsc', function () { pm.expect(data).to.have.property('ifsc'); });",
+          "pm.test('response includes verificationStatus', function () { pm.expect(data).to.have.property('verificationStatus'); });",
+          "pm.test('response includes canReceivePayouts', function () { pm.expect(data).to.have.property('canReceivePayouts'); });"
+        ),
+      }),
+    },
+    {
+      name: '6. Update Bank Details',
+      ...request({
+        method: 'PUT',
+        url: '{{base_url}}/{{api_prefix}}/shops/me/bank-details',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "accountHolderName": "Test Barber",\n  "bankName": "HDFC Bank",\n  "bankAccount": "12345678901234",\n  "ifsc": "HDFC0001234",\n  "upiId": "test.barber@upi"\n}`),
+        description: 'Updates complete bank account details including account number and IFSC. Verification status resets to pending on change.',
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          "const response = pm.response.json();",
+          "const data = response.data || {};",
+          "pm.test('bankAccount is masked', function () { pm.expect(data.bankAccount).to.match(/\\*{4,}\\d{4}/); });",
+          "pm.test('verificationStatus is pending after update', function () { pm.expect(data.verificationStatus).to.equal('pending'); });"
+        ),
+      }),
+    },
+    {
+      name: '7. Ensure Shop Is Open',
       ...request({
         method: 'PUT',
         url: '{{base_url}}/{{api_prefix}}/shops/me/status',
@@ -990,7 +1025,7 @@ const barberProfileCollection = {
       }),
     },
     {
-      name: '6. Update Profile Picture',
+      name: '8. Update Profile Picture',
       ...request({
         method: 'PUT',
         url: '{{base_url}}/{{api_prefix}}/shops/me/picture',
@@ -1000,7 +1035,7 @@ const barberProfileCollection = {
       }),
     },
     {
-      name: '7. Update Cover Image',
+      name: '9. Update Cover Image',
       ...request({
         method: 'PUT',
         url: '{{base_url}}/{{api_prefix}}/shops/me/cover',
@@ -1010,7 +1045,7 @@ const barberProfileCollection = {
       }),
     },
     {
-      name: '8. Update PIN',
+      name: '10. Update PIN',
       ...request({
         method: 'PUT',
         url: '{{base_url}}/{{api_prefix}}/shops/me/pin',
@@ -1033,7 +1068,7 @@ const barberProfileCollection = {
       }),
     },
     {
-      name: '9. Sign-Out Everywhere (Terminal)',
+      name: '11. Sign-Out Everywhere (Terminal)',
       ...request({
         method: 'POST',
         url: '{{base_url}}/{{api_prefix}}/shops/me/sign-out-everywhere',
@@ -1042,7 +1077,7 @@ const barberProfileCollection = {
       }),
     },
     {
-      name: '10. Delete Account (Terminal)',
+      name: '12. Delete Account (Terminal)',
       ...request({
         method: 'DELETE',
         url: '{{base_url}}/{{api_prefix}}/shops/me',

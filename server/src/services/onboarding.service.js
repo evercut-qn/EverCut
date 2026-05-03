@@ -335,13 +335,21 @@ export const createBarberOnboarding = async (phoneNumber, shopData, files) => {
     const coverUrl = coverImage.path;
     const coverCloudinaryId = coverImage.public_id || coverImage.filename;
 
+    // Prepare payout config if bank details are provided
+    const payoutConfig = {};
+    if (shopData.bankAccount && shopData.ifsc) {
+        payoutConfig.bankAccount = String(shopData.bankAccount).trim();
+        payoutConfig.ifsc = String(shopData.ifsc).trim().toUpperCase();
+        payoutConfig.verificationStatus = 'pending';
+    }
+
     const user = await userRepository.create({
         phoneNumber: normalized.phoneNumber,
         email: normalized.email,
         roleType: ROLES.BARBER,
     });
 
-    const createdShop = await shopRepository.create({
+    const shopCreateData = {
         ownerId: user._id,
         shopName: normalized.shopName,
         ownerName: normalized.ownerName,
@@ -367,7 +375,14 @@ export const createBarberOnboarding = async (phoneNumber, shopData, files) => {
         coverUrl,
         coverCloudinaryId,
         pinHash,
-    });
+    };
+
+    // Only add payoutConfig if bank details were provided
+    if (Object.keys(payoutConfig).length > 0) {
+        shopCreateData.payoutConfig = payoutConfig;
+    }
+
+    const createdShop = await shopRepository.create(shopCreateData);
 
     const photos = [];
     for (const [index, file] of onboardingImages.entries()) {

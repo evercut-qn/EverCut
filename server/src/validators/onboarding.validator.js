@@ -65,6 +65,8 @@ export const barberOnboardingSchema = Joi.object({
     upiAddress: Joi.string(),
     accountHolderName: Joi.string().trim().min(1).max(100).required(),
     bankName: Joi.string().trim().min(1).max(120).required(),
+    bankAccount: Joi.string().trim().pattern(/^\d{6,34}$/).optional(),
+    ifsc: Joi.string().trim().pattern(/^[A-Z]{4}0[A-Z0-9]{6}$/i).optional(),
     bio: Joi.string().max(500).allow('').default(''),
     address: Joi.string().trim(),
     shopLocation: Joi.string().trim(),

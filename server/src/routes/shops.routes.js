@@ -21,6 +21,7 @@ import {
     updateBusinessSchema,
     updatePinSchema,
     updateUpiDetailsSchema,
+    updateBankDetailsSchema,
 } from '../validators/shop.validator.js';
 
 const router = Router();
@@ -29,6 +30,8 @@ router.get('/me', authenticate, authorize(ROLES.BARBER), shopController.getMySho
 router.put('/me', authenticate, authorize(ROLES.BARBER), validate(updateBusinessSchema, 'body'), shopController.updateMyShop);
 router.get('/me/upi', authenticate, authorize(ROLES.BARBER), shopController.getMyUpiDetails);
 router.put('/me/upi', authenticate, authorize(ROLES.BARBER), validate(updateUpiDetailsSchema, 'body'), shopController.updateMyUpiDetails);
+router.get('/me/bank-details', authenticate, authorize(ROLES.BARBER), shopController.getBankDetails);
+router.put('/me/bank-details', authenticate, authorize(ROLES.BARBER), validate(updateBankDetailsSchema, 'body'), shopController.updateBankDetails);
 router.put('/me/pin', authenticate, authorize(ROLES.BARBER), validate(updatePinSchema, 'body'), shopController.updateMyPin);
 router.put('/me/picture', authenticate, authorize(ROLES.BARBER), uploadBarberProfilePhoto, shopController.updateMyPicture);
 router.put('/me/cover', authenticate, authorize(ROLES.BARBER), uploadShopCover, shopController.updateMyCover);

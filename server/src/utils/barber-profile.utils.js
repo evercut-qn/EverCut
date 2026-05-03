@@ -78,6 +78,34 @@ export const serializeUpiDetails = (shop) => {
 };
 
 /**
+ * Serialize complete bank details with verification status
+ * @param {Object} shop - Shop document
+ * @returns {Object} Complete bank details
+ */
+export const serializeBankDetails = (shop) => {
+    const plainShop = toPlainObject(shop);
+    if (!plainShop) return null;
+
+    const payoutConfig = plainShop.payoutConfig || {};
+    const verificationStatus = payoutConfig.verificationStatus || 'pending';
+    const isVerified = verificationStatus === 'verified';
+
+    return {
+        accountHolderName: plainShop.accountHolderName || null,
+        bankName: plainShop.bankName || null,
+        bankAccount: maskBankAccount(payoutConfig.bankAccount),
+        ifsc: payoutConfig.ifsc || null,
+        upiId: plainShop.upiId || null,
+        verificationStatus,
+        isVerified,
+        verifiedAt: payoutConfig.verifiedAt || null,
+        beneficiaryId: payoutConfig.beneficiaryId || null,
+        beneficiaryCreatedAt: payoutConfig.beneficiaryCreatedAt || null,
+        canReceivePayouts: isVerified,
+    };
+};
+
+/**
  * Returns the canonical shop document plus the onboarding-friendly aliases
  * used by the updated barber onboarding/profile flow.
  */
@@ -122,5 +150,9 @@ export const serializeBarberProfile = (shop, userContext = {}, { photos } = {}) 
         profilePhotoUrl: safeShop.ownerPhotoUrl || null,
         ownerPhotoUrl: safeShop.ownerPhotoUrl || null,
         shopImages: toShopImages(photos),
+        missedConfirmations: {
+            count: safeShop.missedConfirmationCount || 0,
+            lastMissedAt: safeShop.lastMissedConfirmationAt || null,
+        },
     };
 };
