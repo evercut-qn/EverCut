@@ -2223,6 +2223,130 @@ const dashboardCollection = {
   ],
 };
 
+const notificationsCollection = {
+  info: {
+    name: 'EverCut - Notifications',
+    description: 'Hybrid FCM + REST notification APIs for device token registration, notification history, unread counts, and read tracking. Use this with either a customer or barber access token.',
+    schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
+  },
+  auth: bearerAuth('customer_access_token'),
+  event: collectionPreRequest({
+    syncPairs: [
+      ['shared_notification_id', 'notification_id'],
+    ],
+  }),
+  variable: [
+    ...baseVariables(
+      textVariable('notification_id', '', 'Notification ID captured from the list endpoint.'),
+      textVariable('fcm_token', 'postman-fcm-token-{{$timestamp}}', 'Synthetic FCM token for backend token-management testing. Use a real device token when testing actual Firebase delivery.'),
+    ),
+  ],
+  item: [
+    {
+      name: '1. Register FCM Token',
+      ...request({
+        method: 'POST',
+        url: '{{base_url}}/{{api_prefix}}/notifications/tokens',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "token": "{{fcm_token}}",\n  "platform": "android",\n  "deviceId": "postman-device-1",\n  "appVersion": "1.0.0",\n  "locale": "en-IN"\n}`),
+        description: 'Registers or refreshes an FCM token for the authenticated user. Multiple devices are supported by registering different tokens. Reusing a token reassigns ownership to the current authenticated user.',
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          "pm.test('token document returned', function () {",
+          "  const response = pm.response.json();",
+          "  pm.expect(response.success).to.equal(true);",
+          "  pm.expect(response.data).to.have.property('token');",
+          "});"
+        ),
+      }),
+    },
+    {
+      name: '2. List Notifications And Capture ID',
+      ...request({
+        method: 'GET',
+        url: {
+          raw: '{{base_url}}/{{api_prefix}}/notifications?page=1&limit=20',
+          host: ['{{base_url}}'],
+          path: ['{{api_prefix}}', 'notifications'],
+          query: [
+            { key: 'page', value: '1', description: 'Page number' },
+            { key: 'limit', value: '20', description: 'Page size' },
+            { key: 'read', value: 'false', description: 'Optional read filter', disabled: true },
+            { key: 'type', value: 'hybrid', description: 'Optional notification type filter', disabled: true },
+            { key: 'eventType', value: 'booking.confirmed', description: 'Optional event filter', disabled: true },
+          ],
+        },
+        description: 'Returns notification history from MongoDB. FCM is only the real-time trigger; clients should use this REST endpoint as source of truth.',
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          "const response = pm.response.json();",
+          "pm.test('response uses paginated envelope', function () {",
+          "  pm.expect(response.data).to.have.property('items');",
+          "  pm.expect(response.data).to.have.property('pagination');",
+          "});",
+          "const notifications = Array.isArray(response.data && response.data.items) ? response.data.items : [];",
+          "const first = notifications[0];",
+          "if (first && (first.notificationId || first._id)) {",
+          "  const notificationId = first.notificationId || first._id;",
+          "  pm.collectionVariables.set('notification_id', notificationId);",
+          "  pm.globals.set('shared_notification_id', notificationId);",
+          "}"
+        ),
+      }),
+    },
+    {
+      name: '3. Get Unread Count',
+      ...request({
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/notifications/unread-count',
+        description: 'Returns the unread notification count for the authenticated user.',
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          "pm.test('unreadCount is present', function () {",
+          "  const response = pm.response.json();",
+          "  pm.expect(response.data).to.have.property('unreadCount');",
+          "});"
+        ),
+      }),
+    },
+    {
+      name: '4. Mark Notification Read',
+      ...request({
+        method: 'PATCH',
+        url: '{{base_url}}/{{api_prefix}}/notifications/{{notification_id}}/read',
+        description: 'Marks one notification as read. Run the list request first to capture notification_id, or set it manually.',
+        event: testEvent("pm.test('status is 200 or 404', function () { pm.expect(pm.response.code).to.be.oneOf([200, 404]); });"),
+      }),
+    },
+    {
+      name: '5. Mark All Notifications Read',
+      ...request({
+        method: 'PATCH',
+        url: '{{base_url}}/{{api_prefix}}/notifications/read-all',
+        description: 'Marks all unread notifications for the authenticated user as read.',
+        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
+      }),
+    },
+    {
+      name: '6. Unregister FCM Token',
+      ...request({
+        method: 'DELETE',
+        url: '{{base_url}}/{{api_prefix}}/notifications/tokens',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "token": "{{fcm_token}}"\n}`),
+        description: 'Revokes the current user device token. The token must belong to the authenticated user; otherwise the operation is a no-op.',
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          "pm.test('revoked flag is present', function () {",
+          "  const response = pm.response.json();",
+          "  pm.expect(response.data).to.have.property('revoked');",
+          "});"
+        ),
+      }),
+    },
+  ],
+};
+
 const environmentTemplate = {
   id: 'evercut-local-environment',
   name: 'EverCut Local',
@@ -2239,6 +2363,7 @@ const environmentTemplate = {
     { key: 'barber_refresh_token', value: '', enabled: true },
     { key: 'barber_onboarding_token', value: '', enabled: true },
     { key: 'admin_access_token', value: '', enabled: true },
+    { key: 'fcm_token', value: '', enabled: true },
     { key: 'phonepe_webhook_username', value: 'test-phonepe-webhook-user', enabled: true },
     { key: 'phonepe_webhook_password', value: 'test-phonepe-webhook-password', enabled: true },
     { key: 'cashfree_webhook_secret', value: 'test-cashfree-client-secret', enabled: true },
@@ -2263,4 +2388,5 @@ writeCollection('12-barber-earnings.json', barberEarningsCollection);
 writeCollection('13-barber-ratings.json', barberRatingsCollection);
 writeCollection('14-dashboard.json', dashboardCollection);
 writeCollection('15-payments-payouts.json', paymentsPayoutsCollection);
+writeCollection('16-notifications.json', notificationsCollection);
 writeFileSync(resolve(COLLECTIONS_DIR, 'EverCut.postman_environment.json'), `${JSON.stringify(environmentTemplate, null, 2)}\n`);

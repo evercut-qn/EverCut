@@ -2,6 +2,7 @@ import customerRepository from '../repositories/customer.repository.js';
 import userRepository from '../repositories/user.repository.js';
 import { NotFoundError, BadRequestError } from '../utils/api-error.js';
 import cloudinary from '../config/cloudinary.config.js';
+import notificationEvents from './notification-events.service.js';
 
 /**
  * Customer-facing profile service.
@@ -59,6 +60,11 @@ export const updateProfile = async (userId, data, file) => {
             // Non-fatal; the new photo is already persisted
         }
     }
+
+    await notificationEvents.notifyAccountUpdated({
+        userId,
+        updateType: 'customer_profile',
+    });
 
     return updated;
 };

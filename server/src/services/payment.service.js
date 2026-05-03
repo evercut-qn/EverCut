@@ -8,6 +8,7 @@ import paymentRepository from '../repositories/payment.repository.js';
 import serviceRepository from '../repositories/service.repository.js';
 import shopRepository from '../repositories/shop.repository.js';
 import phonePeAdapter from '../adapters/phonepe/phonepe.adapter.js';
+import notificationEvents from './notification-events.service.js';
 import logger from '../utils/logger.js';
 import {
     BadRequestError,
@@ -369,6 +370,11 @@ const rejectPaymentAmountMismatch = async (payment, webhookData) => {
         payment.bookingId,
         'Payment verification failed. Please create a new booking.',
     );
+    await notificationEvents.notifyPaymentFailed({
+        bookingId: payment.bookingId,
+        paymentId: payment._id,
+        reason: 'Payment verification failed',
+    });
 
     logger.error('[PaymentService] Payment amount mismatch', {
         bookingId: payment.bookingId,
@@ -899,6 +905,10 @@ async function handlePaymentSuccess(webhookData) {
         paidAt: new Date(),
         paymentMode: firstPayment?.paymentMode || webhookData.paymentMode || null,
     });
+    await notificationEvents.notifyBookingAwaitingConfirmation({
+        bookingId: payment.bookingId,
+        paymentId: payment._id,
+    });
 
     logger.info('[PaymentService] Payment completed', {
         bookingId: payment.bookingId,
@@ -957,6 +967,11 @@ async function handlePaymentFailure(webhookData) {
         payment.bookingId,
         'Payment failed before confirmation. Please create a new booking.',
     );
+    await notificationEvents.notifyPaymentFailed({
+        bookingId: payment.bookingId,
+        paymentId: payment._id,
+        reason: webhookData.errorCode || webhookData.errorContext?.description || 'Payment failed',
+    });
 
     logger.warn('[PaymentService] Payment failed', {
         bookingId: payment.bookingId,
@@ -1009,6 +1024,12 @@ async function handleRefundSuccess(webhookData) {
 
     await bookingRepository.updateById(payment.bookingId, {
         paymentStatus: PAYMENT_STATUS.REFUNDED,
+    });
+    await notificationEvents.notifyRefundStatus({
+        bookingId: payment.bookingId,
+        paymentId: payment._id,
+        status: PAYMENT_STATUS.REFUNDED,
+        amountInRupees: Number(webhookData.amount || payment.refund?.amount || 0) / 100 || null,
     });
 
     return { processed: true, event: PHONEPE_WEBHOOK_EVENTS.REFUND_COMPLETED };
@@ -1065,6 +1086,11 @@ async function handleRefundFailure(webhookData) {
 
     await bookingRepository.updateById(payment.bookingId, {
         paymentStatus: PAYMENT_STATUS.REFUND_FAILED,
+    });
+    await notificationEvents.notifyRefundStatus({
+        bookingId: payment.bookingId,
+        paymentId: payment._id,
+        status: PAYMENT_STATUS.REFUND_FAILED,
     });
 
     return { processed: true, event: PHONEPE_WEBHOOK_EVENTS.REFUND_FAILED };
@@ -1151,6 +1177,11 @@ export const initiateRefund = async (bookingId, reason, actor = null, isBarberCa
         await bookingRepository.updateById(bookingId, {
             paymentStatus: PAYMENT_STATUS.REFUND_FAILED,
         });
+        await notificationEvents.notifyRefundStatus({
+            bookingId,
+            paymentId: payment._id,
+            status: PAYMENT_STATUS.REFUND_FAILED,
+        });
 
         logger.error('[PaymentService] Refund initiation failed', {
             bookingId,
@@ -1182,6 +1213,12 @@ export const initiateRefund = async (bookingId, reason, actor = null, isBarberCa
 
     await bookingRepository.updateById(bookingId, {
         paymentStatus: PAYMENT_STATUS.REFUND_PENDING,
+    });
+    await notificationEvents.notifyRefundStatus({
+        bookingId,
+        paymentId: payment._id,
+        status: PAYMENT_STATUS.REFUND_PENDING,
+        amountInRupees: refundAmountInPaisa / 100,
     });
 
     logger.info('[PaymentService] Refund initiated', {
@@ -1278,6 +1315,11 @@ export const pollPendingPayments = async () => {
             payment.bookingId,
             'Payment session expired before confirmation. Please create a new booking.',
         );
+        await notificationEvents.notifyPaymentFailed({
+            bookingId: payment.bookingId,
+            paymentId: payment._id,
+            reason: 'Payment session expired',
+        });
     }
 
     if (expirablePayments.length > 0) {
