@@ -52,6 +52,22 @@ const bookingSchema = new mongoose.Schema(
             type: String,
             required: true,
         },
+        endTime: {
+            type: String,
+            required: true,
+        },
+        startMinute: {
+            type: Number,
+            required: true,
+            min: 0,
+            max: 1439,
+        },
+        endMinute: {
+            type: Number,
+            required: true,
+            min: 1,
+            max: 1440,
+        },
         totalAmount: {
             type: Number,
             default: 0,
@@ -152,6 +168,12 @@ const bookingSchema = new mongoose.Schema(
             type: Date,
             default: null,
         },
+        idempotencyKey: {
+            type: String,
+            trim: true,
+            default: null,
+            maxlength: 128,
+        },
     },
     { timestamps: true },
 );
@@ -162,8 +184,18 @@ const bookingSchema = new mongoose.Schema(
 bookingSchema.index({ customerId: 1, status: 1 });
 bookingSchema.index({ shopId: 1, date: 1 });
 bookingSchema.index({ employeeId: 1, date: 1, time: 1 });
+bookingSchema.index({ employeeId: 1, date: 1, startMinute: 1, endMinute: 1 });
 bookingSchema.index({ customerId: 1, date: 1 });
 bookingSchema.index({ payoutStatus: 1, status: 1, paymentStatus: 1 });
+bookingSchema.index(
+    { customerId: 1, idempotencyKey: 1 },
+    {
+        unique: true,
+        partialFilterExpression: {
+            idempotencyKey: { $type: 'string' },
+        },
+    },
+);
 
 const Booking = mongoose.model('Booking', bookingSchema);
 export default Booking;

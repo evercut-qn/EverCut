@@ -47,9 +47,9 @@
           "  const day = String(date.getDate()).padStart(2, '0');",
           "  return `${year}-${month}-${day}`;",
           "};",
-          "const getWorkingHourTime = (hour) => {",
+          "const getWorkingHourTime = (hour, minute = 0) => {",
           "  const clampedHour = Math.max(9, Math.min(20, hour));",
-          "  return `${String(clampedHour).padStart(2, '0')}:00`;",
+          "  return `${String(clampedHour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;",
           "};",
           "",
           "// Check if user has manually set dates/times in Collection Variables",
@@ -65,10 +65,10 @@
           "}",
           "",
           "if (!hasManualTime) {",
-          "  pm.collectionVariables.set('booking_time', getWorkingHourTime(11));",
-          "  pm.collectionVariables.set('booking_update_time', getWorkingHourTime(12));",
-          "  pm.collectionVariables.set('booking_reschedule_time', getWorkingHourTime(13));",
-          "  pm.collectionVariables.set('booking_reorder_time', getWorkingHourTime(14));",
+          "  pm.collectionVariables.set('booking_time', getWorkingHourTime(11, 5));",
+          "  pm.collectionVariables.set('booking_update_time', getWorkingHourTime(12, 10));",
+          "  pm.collectionVariables.set('booking_reschedule_time', getWorkingHourTime(14, 15));",
+          "  pm.collectionVariables.set('booking_reorder_time', getWorkingHourTime(15, 20));",
           "}"
         ]
       }
@@ -234,7 +234,7 @@
         "method": "GET",
         "header": [],
         "url": "{{base_url}}/{{api_prefix}}/employees/{{employee_id}}/available-slots?date={{booking_date}}&serviceId={{service_id}}",
-        "description": "Returns available time slots for the employee considering service duration, booked slots, and blocked dates. 7-day advance booking window applies."
+        "description": "Returns exact-range availability for the employee, including bookable starts, free windows, break blocking, booked ranges, blocked dates, and the 7-day advance booking window."
       },
       "event": [
         {
@@ -256,6 +256,7 @@
               "const data = response.data || {};",
               "pm.test('response includes slot information', function () {",
               "  pm.expect(data).to.have.property('slots');",
+              "  pm.expect(data).to.have.property('availableWindows');",
               "  pm.expect(data).to.have.property('totalAvailable');",
               "  pm.expect(data).to.have.property('totalSlots');",
               "});"
@@ -270,7 +271,7 @@
         "method": "GET",
         "header": [],
         "url": "{{base_url}}/{{api_prefix}}/shops/{{shop_id}}/availability?date={{booking_date}}&serviceId={{service_id}}",
-        "description": "Returns availability across all employees for the shop, including first available slot suggestion. 7-day advance booking window applies."
+        "description": "Returns exact-range availability across all employees for the shop, including first available slot suggestion and the 7-day advance booking window."
       },
       "event": [
         {

@@ -6,6 +6,20 @@
 
 ---
 
+## May 3, 2026 Implementation Update
+
+This document is retained as historical issue analysis. The implemented booking redesign does not use this document's marker-based solution. EverCut now uses exact minute ranges as the booking source of truth:
+
+- `Booking` stores `time`, `endTime`, `startMinute`, `endMinute`, `durationMinutes`, and compatibility `slotLockTimes`.
+- `Employee.bookedRanges[]` is claimed atomically with a range-overlap query: existing `startMinute < newEnd && existing endMinute > newStart`.
+- Availability uses the same exact ranges and returns `availableWindows[]`, so a 65-minute booking ending at `13:35` can be followed by another booking at `13:35`.
+- Shop breaks, employee hours, shop hours, blocked dates, and end-of-day boundaries are enforced before the atomic claim.
+- Legacy `bookedSlots[]` remains compatibility metadata only and is cleaned together with range locks.
+
+The prior slot-duration mismatch is closed by replacing the slot-marker model, not by tightening marker checks.
+
+---
+
 ## Executive Summary
 
 ### Problem Statement Cases

@@ -104,7 +104,7 @@ Select **"EverCut Local"** environment in Postman and verify:
 **Manual Override:** Set in environment:
 ```
 booking_date = 2026-05-15  (YYYY-MM-DD)
-booking_time = 14:30       (HH:MM, 24-hour)
+booking_time = 14:15       (HH:MM, 24-hour; avoid shop break windows)
 ```
 
 **Reset:** Clear variables to resume auto-generation.
@@ -187,7 +187,8 @@ Body:
   "employeeId": "{{employee_id}}",
   "shopId": "{{shop_id}}",
   "date": "{{booking_date}}",
-  "time": "{{booking_time}}"
+  "time": "{{booking_time}}",
+  "idempotencyKey": "{{booking_idempotency_key}}"
 }
 
 Expected Response:
@@ -415,7 +416,7 @@ if (receivedAuth !== expectedAuth) {
 **Expected:**
 - Payment → failed
 - Booking → payment_failed
-- Slot lock released
+- Exact time-range lock released
 
 ---
 

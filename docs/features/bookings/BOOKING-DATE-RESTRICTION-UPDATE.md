@@ -9,6 +9,8 @@
 
 The booking system has been updated to restrict bookings to a 7-day advance window. Customers can now only book appointments from today up to 7 days in advance.
 
+**May 3, 2026 scheduling note:** the 7-day window now runs alongside exact time-range validation. Date checks still happen before availability or booking claims, and generated Postman times avoid the default `13:00-14:00` shop break.
+
 **ANALYSIS RESULT:** ✅ **This is the OPTIMAL solution** for the business model.
 
 ---

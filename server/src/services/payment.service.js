@@ -381,6 +381,22 @@ const rejectPaymentAmountMismatch = async (payment, webhookData) => {
 const releaseBookingSlot = async (booking) => {
     if (!booking?.employeeId || !booking?.date) return;
 
+    const startMinute = Number(booking.startMinute);
+    const endMinute = Number(booking.endMinute);
+    if (Number.isFinite(startMinute) && Number.isFinite(endMinute) && startMinute < endMinute) {
+        await employeeRepository.releaseTimeRange(
+            booking.employeeId,
+            {
+                bookingId: booking._id,
+                date: toDateOnlyString(booking.date),
+                startMinute,
+                endMinute,
+                slotLockTimes: getBookingSlotLockTimes(booking),
+            },
+        );
+        return;
+    }
+
     await employeeRepository.releaseSlots(
         booking.employeeId,
         toDateOnlyString(booking.date),

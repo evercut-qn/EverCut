@@ -97,7 +97,7 @@ Based on backend analysis, common issues in booking flows include:
 
 5. Initial Availability Check
    ├─ GET /employees/:id/available-slots?date=TODAY&serviceId[]=Y
-   ├─ Display available time slots
+   ├─ Display available time slots and exact availableWindows
    └─ Cache results for current employee+date
 
 6. Employee Selection Change
@@ -243,6 +243,7 @@ Future<BookingResult> createBooking({
   required List<String> serviceIds,
   required String date,
   required String time,
+  String? idempotencyKey,
 }) async {
   try {
     final response = await _dio.post('/api/v1/bookings', data: {
@@ -251,6 +252,7 @@ Future<BookingResult> createBooking({
       'serviceId[]': serviceIds, // Always send as array for consistency
       'date': date,
       'time': time,
+      if (idempotencyKey != null) 'idempotencyKey': idempotencyKey,
     });
 
     return BookingResult.fromJson(response.data);
@@ -265,6 +267,8 @@ Future<BookingResult> createBooking({
   }
 }
 ```
+
+**Backend contract update (May 3, 2026):** booking creation returns exact range metadata (`time`, `endTime`, `startMinute`, `endMinute`, `durationMinutes`). Availability returns `availableWindows[]` in addition to `slots[]`. Flutter should trust these backend values and should not locally infer continuous availability.
 
 ### 5. **Payment APIs**
 

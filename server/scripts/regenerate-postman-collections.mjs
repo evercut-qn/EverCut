@@ -118,9 +118,9 @@ const collectionPreRequest = ({
       "  const day = String(date.getDate()).padStart(2, '0');",
       "  return `${year}-${month}-${day}`;",
       "};",
-      "const getWorkingHourTime = (hour) => {",
+      "const getWorkingHourTime = (hour, minute = 0) => {",
       "  const clampedHour = Math.max(9, Math.min(20, hour));",
-      "  return `${String(clampedHour).padStart(2, '0')}:00`;",
+      "  return `${String(clampedHour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;",
       "};",
       "",
       "// Check if user has manually set dates/times in Collection Variables",
@@ -136,10 +136,10 @@ const collectionPreRequest = ({
       "}",
       "",
       "if (!hasManualTime) {",
-      "  pm.collectionVariables.set('booking_time', getWorkingHourTime(11));",
-      "  pm.collectionVariables.set('booking_update_time', getWorkingHourTime(12));",
-      "  pm.collectionVariables.set('booking_reschedule_time', getWorkingHourTime(13));",
-      "  pm.collectionVariables.set('booking_reorder_time', getWorkingHourTime(14));",
+      "  pm.collectionVariables.set('booking_time', getWorkingHourTime(11, 5));",
+      "  pm.collectionVariables.set('booking_update_time', getWorkingHourTime(12, 10));",
+      "  pm.collectionVariables.set('booking_reschedule_time', getWorkingHourTime(14, 15));",
+      "  pm.collectionVariables.set('booking_reorder_time', getWorkingHourTime(15, 20));",
       "}"
     );
   }
@@ -559,6 +559,7 @@ const customerBookingsCollection = {
       textVariable('booking_update_time', ''),
       textVariable('booking_reschedule_time', ''),
       textVariable('booking_reorder_time', ''),
+      textVariable('booking_idempotency_key', ''),
       textVariable('reordered_booking_id', ''),
     ),
   ],
@@ -593,13 +594,25 @@ const customerBookingsCollection = {
         method: 'POST',
         url: '{{base_url}}/{{api_prefix}}/bookings',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody(`{\n  "serviceId": ["{{service_id}}"],\n  "employeeId": "{{employee_id}}",\n  "shopId": "{{shop_id}}",\n  "date": "{{booking_date}}",\n  "time": "{{booking_time}}"\n}`),
-        description: 'Creates a new future booking using the shared shop, employee, and service IDs. The body matches the real validator shape.',
-        event: testEvent(
-          "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
-          "const response = pm.response.json();",
-          "const bookingId = response.data && response.data.bookingId;",
-          "if (bookingId) { pm.collectionVariables.set('booking_id', bookingId); pm.globals.set('shared_booking_id', bookingId); }"
+        body: jsonBody(`{\n  "serviceId": ["{{service_id}}"],\n  "employeeId": "{{employee_id}}",\n  "shopId": "{{shop_id}}",\n  "date": "{{booking_date}}",\n  "time": "{{booking_time}}",\n  "idempotencyKey": "{{booking_idempotency_key}}"\n}`),
+        description: 'Creates a new future booking using exact time-range locking. The optional idempotency key makes client retries safe without creating duplicate bookings.',
+        event: mergedEvents(
+          [
+            "pm.collectionVariables.set('booking_idempotency_key', `postman-booking-${Date.now()}`);"
+          ],
+          [
+            "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
+            "const response = pm.response.json();",
+            "const bookingId = response.data && response.data.bookingId;",
+            "if (bookingId) { pm.collectionVariables.set('booking_id', bookingId); pm.globals.set('shared_booking_id', bookingId); }",
+            "pm.test('booking response includes exact range metadata', function () {",
+            "  const data = response.data || {};",
+            "  pm.expect(data).to.have.property('time');",
+            "  pm.expect(data).to.have.property('endTime');",
+            "  pm.expect(data).to.have.property('startMinute');",
+            "  pm.expect(data).to.have.property('endMinute');",
+            "});"
+          ]
         ),
       }),
     },
@@ -682,7 +695,7 @@ const customerBookingsCollection = {
       ...request({
         method: 'POST',
         url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id}}/cancel',
-        description: 'Cancels the currently captured booking and releases its locked slot markers. This stays last because it is destructive.',
+        description: 'Cancels the currently captured booking and releases its exact locked time range. This stays last because it is destructive.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
     },
@@ -771,13 +784,14 @@ const customerShopDiscoveryCollection = {
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/employees/{{employee_id}}/available-slots?date={{booking_date}}&serviceId={{service_id}}',
-        description: 'Returns available time slots for the employee considering service duration, booked slots, and blocked dates. 7-day advance booking window applies.',
+        description: 'Returns exact-range availability for the employee, including bookable starts, free windows, break blocking, booked ranges, blocked dates, and the 7-day advance booking window.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           "const response = pm.response.json();",
           "const data = response.data || {};",
           "pm.test('response includes slot information', function () {",
           "  pm.expect(data).to.have.property('slots');",
+          "  pm.expect(data).to.have.property('availableWindows');",
           "  pm.expect(data).to.have.property('totalAvailable');",
           "  pm.expect(data).to.have.property('totalSlots');",
           "});"
@@ -789,7 +803,7 @@ const customerShopDiscoveryCollection = {
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/shops/{{shop_id}}/availability?date={{booking_date}}&serviceId={{service_id}}',
-        description: 'Returns availability across all employees for the shop, including first available slot suggestion. 7-day advance booking window applies.',
+        description: 'Returns exact-range availability across all employees for the shop, including first available slot suggestion and the 7-day advance booking window.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           "const response = pm.response.json();",

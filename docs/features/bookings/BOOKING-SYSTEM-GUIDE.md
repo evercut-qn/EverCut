@@ -288,6 +288,10 @@ Authorization: Bearer <token>
     { "time": "10:30", "available": false, "reason": "blocked_by_previous" },
     { "time": "11:00", "available": true }
   ],
+  "availableWindows": [
+    { "startTime": "09:00", "endTime": "10:00", "startMinute": 540, "endMinute": 600 },
+    { "startTime": "11:00", "endTime": "13:00", "startMinute": 660, "endMinute": 780 }
+  ],
   "totalAvailable": 15,
   "totalSlots": 18
 }
@@ -376,6 +380,10 @@ Content-Type: application/json
   "status": "pending",
   "paymentStatus": "pending",
   "paymentRequired": true,
+  "time": "10:00",
+  "endTime": "10:30",
+  "startMinute": 600,
+  "endMinute": 630,
   "durationMinutes": 30,
   "slotLockTimes": ["10:00"],
   "totalAmount": 300
@@ -383,7 +391,7 @@ Content-Type: application/json
 ```
 
 **What Happens:**
-- ✅ Slot is **atomically claimed** (prevents double booking)
+- ✅ Exact time range is **atomically claimed** on the employee document (prevents double booking)
 - ✅ Booking created with status `PENDING`
 - ✅ Customer must pay to proceed
 
@@ -567,8 +575,8 @@ Platform Loses: ₹3 (platform fee) + gateway fees
 ### Rule 7: No Refund After Service
 Once service is completed, no refund. Customer can dispute separately.
 
-### Rule 8: Slot Management
-Slot claimed on booking creation. Slot released on cancellation or completion. Prevents double booking.
+### Rule 8: Exact Range Management
+The booking source of truth is `Employee.bookedRanges[]`, a continuous `[startMinute, endMinute)` lock claimed with a single MongoDB `findOneAndUpdate`. Legacy `bookedSlots[]` markers remain only for compatibility. Ranges are released on cancellation, payment expiry, auto-cancel, completion, and no-show.
 
 ### Rule 9: No-Show Policy
 Customer charged full amount. Barber receives payment. Protects barber from lost income.

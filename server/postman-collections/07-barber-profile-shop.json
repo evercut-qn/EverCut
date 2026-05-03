@@ -212,7 +212,90 @@
       ]
     },
     {
-      "name": "5. Ensure Shop Is Open",
+      "name": "5. Get Bank Details",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/{{api_prefix}}/shops/me/bank-details",
+        "description": "Reads the complete bank account details with verification status. Account number is masked for security."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "});",
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "const response = pm.response.json();",
+              "const data = response.data || {};",
+              "pm.test('response includes accountHolderName', function () { pm.expect(data).to.have.property('accountHolderName'); });",
+              "pm.test('response includes bankAccount (masked)', function () { pm.expect(data).to.have.property('bankAccount'); });",
+              "pm.test('response includes ifsc', function () { pm.expect(data).to.have.property('ifsc'); });",
+              "pm.test('response includes verificationStatus', function () { pm.expect(data).to.have.property('verificationStatus'); });",
+              "pm.test('response includes canReceivePayouts', function () { pm.expect(data).to.have.property('canReceivePayouts'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Update Bank Details",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/{{api_prefix}}/shops/me/bank-details",
+        "description": "Updates complete bank account details including account number and IFSC. Verification status resets to pending on change.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"accountHolderName\": \"Test Barber\",\n  \"bankName\": \"HDFC Bank\",\n  \"bankAccount\": \"12345678901234\",\n  \"ifsc\": \"HDFC0001234\",\n  \"upiId\": \"test.barber@upi\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "});",
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "const response = pm.response.json();",
+              "const data = response.data || {};",
+              "pm.test('bankAccount is masked', function () { pm.expect(data.bankAccount).to.match(/\\*{4,}\\d{4}/); });",
+              "pm.test('verificationStatus is pending after update', function () { pm.expect(data.verificationStatus).to.equal('pending'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Ensure Shop Is Open",
       "request": {
         "method": "PUT",
         "header": [
@@ -255,7 +338,7 @@
       ]
     },
     {
-      "name": "6. Update Profile Picture",
+      "name": "8. Update Profile Picture",
       "request": {
         "method": "PUT",
         "header": [],
@@ -294,7 +377,7 @@
       ]
     },
     {
-      "name": "7. Update Cover Image",
+      "name": "9. Update Cover Image",
       "request": {
         "method": "PUT",
         "header": [],
@@ -333,7 +416,7 @@
       ]
     },
     {
-      "name": "8. Update PIN",
+      "name": "10. Update PIN",
       "request": {
         "method": "PUT",
         "header": [
@@ -390,7 +473,7 @@
       ]
     },
     {
-      "name": "9. Sign-Out Everywhere (Terminal)",
+      "name": "11. Sign-Out Everywhere (Terminal)",
       "request": {
         "method": "POST",
         "header": [],
@@ -419,7 +502,7 @@
       ]
     },
     {
-      "name": "10. Delete Account (Terminal)",
+      "name": "12. Delete Account (Terminal)",
       "request": {
         "method": "DELETE",
         "header": [

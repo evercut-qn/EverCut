@@ -10,6 +10,7 @@ export const bookSalonSchema = Joi.object({
     ).required(),
     date: dateString.required(),
     time: timeString.required(),
+    idempotencyKey: Joi.string().trim().max(128),
 });
 
 export const rescheduleSchema = Joi.object({

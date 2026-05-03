@@ -1,102 +1,191 @@
 /**
- * Slot Calculator Utility
- * 
- * Calculates available time slots for bookings considering:
- * - Shop hours
- * - Employee working hours
- * - Service duration
- * - Booked slots
- * - Blocked dates
- * - Past times (if today)
+ * Exact-range availability engine.
+ *
+ * Slots are display suggestions. The source of truth is the continuous
+ * [startMinute, endMinute) range used here and by the booking repository.
  */
 
-import { parseTimeToMinutes } from './time.utils.js';
+import {
+    buildTimeRange,
+    doTimeRangesOverlap,
+    minutesToTimeString,
+    normalizeBreakTimeRanges,
+    parseTimeToMinutes,
+} from './time.utils.js';
 
-const SLOT_INTERVAL_MINUTES = 30;
+export const SLOT_INTERVAL_MINUTES = 5;
 
-/**
- * Convert minutes since midnight to HH:MM format
- */
-const minutesToTimeString = (minutes) => {
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+const BOOKING_FALLBACK_DURATION_MINUTES = 30;
+
+const isSameDate = (value, date) => {
+    if (!value) return false;
+    return new Date(value).toISOString().slice(0, 10) === date;
 };
 
-/**
- * Generate all possible time slots between start and end time
- * 
- * @param {string} startTime - Start time in HH:MM format
- * @param {string} endTime - End time in HH:MM format
- * @param {number} serviceDuration - Service duration in minutes
- * @param {number} intervalMinutes - Slot interval in minutes (default: 30)
- * @returns {string[]} Array of time slots in HH:MM format
- */
-export const generateTimeSlots = (startTime, endTime, serviceDuration, intervalMinutes = SLOT_INTERVAL_MINUTES) => {
-    const startMinutes = parseTimeToMinutes(startTime);
-    const endMinutes = parseTimeToMinutes(endTime);
+const normalizeRange = (range, fallbackDate) => {
+    const startMinute = Number(range?.startMinute);
+    const endMinute = Number(range?.endMinute);
 
-    if (startMinutes === null || endMinutes === null || startMinutes >= endMinutes) {
-        return [];
+    if (
+        Number.isFinite(startMinute)
+        && Number.isFinite(endMinute)
+        && startMinute < endMinute
+    ) {
+        return {
+            date: range.date || fallbackDate,
+            startTime: range.startTime || minutesToTimeString(startMinute),
+            endTime: range.endTime || minutesToTimeString(endMinute),
+            startMinute,
+            endMinute,
+            bookingId: range.bookingId,
+        };
     }
 
-    const slots = [];
-    let currentMinutes = startMinutes;
+    const duration = Number(range?.durationMinutes) > 0
+        ? Number(range.durationMinutes)
+        : BOOKING_FALLBACK_DURATION_MINUTES;
+    const builtRange = buildTimeRange(range?.time || range?.startTime, duration);
+    if (!builtRange) return null;
 
-    // Generate slots where service can be completed before end time
-    while (currentMinutes + serviceDuration <= endMinutes) {
-        slots.push(minutesToTimeString(currentMinutes));
-        currentMinutes += intervalMinutes;
-    }
-
-    return slots;
+    return {
+        date: range.date || fallbackDate,
+        startTime: builtRange.startTime,
+        endTime: builtRange.endTime,
+        startMinute: builtRange.startMinute,
+        endMinute: builtRange.endMinute,
+        bookingId: range.bookingId || range._id,
+    };
 };
 
-/**
- * Check if a slot overlaps with any booked slots considering service duration
- * 
- * @param {string} slotTime - Time slot to check
- * @param {Array} bookedSlots - Array of booked slots {date, time}
- * @param {number} serviceDuration - Service duration in minutes
- * @returns {boolean} True if slot is blocked
- */
-const isSlotBlocked = (slotTime, bookedSlots, serviceDuration) => {
-    const slotMinutes = parseTimeToMinutes(slotTime);
-    if (slotMinutes === null) return true;
+export const normalizeBookedRanges = ({
+    date,
+    bookedRanges = [],
+    bookedSlots = [],
+}) => {
+    const ranges = [];
 
-    const slotEndMinutes = slotMinutes + serviceDuration;
-
-    for (const booked of bookedSlots) {
-        const bookedMinutes = parseTimeToMinutes(booked.time);
-        if (bookedMinutes === null) continue;
-
-        const bookedDuration = Number(booked.durationMinutes) > 0
-            ? Number(booked.durationMinutes)
-            : serviceDuration;
-        const bookedEndMinutes = bookedMinutes + bookedDuration;
-
-        // Check if slots overlap
-        // Slot overlaps if: slotStart < bookedEnd AND slotEnd > bookedStart
-        if (slotMinutes < bookedEndMinutes && slotEndMinutes > bookedMinutes) {
-            return true;
+    for (const range of bookedRanges || []) {
+        const normalized = normalizeRange(range, date);
+        if (normalized && (!normalized.date || isSameDate(normalized.date, date))) {
+            ranges.push(normalized);
         }
     }
 
-    return false;
+    for (const booking of bookedSlots || []) {
+        const normalized = normalizeRange(booking, date);
+        if (normalized && (!normalized.date || isSameDate(normalized.date, date))) {
+            ranges.push(normalized);
+        }
+    }
+
+    return ranges;
+};
+
+const sortRanges = (ranges = []) => (
+    [...ranges].sort((a, b) => a.startMinute - b.startMinute || a.endMinute - b.endMinute)
+);
+
+const mergeRanges = (ranges = []) => {
+    const sorted = sortRanges(ranges);
+    const merged = [];
+
+    for (const range of sorted) {
+        const previous = merged.at(-1);
+        if (!previous || range.startMinute > previous.endMinute) {
+            merged.push({ ...range });
+            continue;
+        }
+
+        previous.endMinute = Math.max(previous.endMinute, range.endMinute);
+        previous.endTime = minutesToTimeString(previous.endMinute);
+    }
+
+    return merged;
+};
+
+const subtractBlockedRanges = (windowRange, blockedRanges = []) => {
+    let windows = [{ ...windowRange }];
+
+    for (const block of mergeRanges(blockedRanges)) {
+        const nextWindows = [];
+
+        for (const window of windows) {
+            if (!doTimeRangesOverlap(window.startMinute, window.endMinute, block.startMinute, block.endMinute)) {
+                nextWindows.push(window);
+                continue;
+            }
+
+            if (block.startMinute > window.startMinute) {
+                nextWindows.push({
+                    startMinute: window.startMinute,
+                    endMinute: Math.min(block.startMinute, window.endMinute),
+                });
+            }
+
+            if (block.endMinute < window.endMinute) {
+                nextWindows.push({
+                    startMinute: Math.max(block.endMinute, window.startMinute),
+                    endMinute: window.endMinute,
+                });
+            }
+        }
+
+        windows = nextWindows;
+    }
+
+    return windows
+        .filter((window) => window.startMinute < window.endMinute)
+        .map((window) => ({
+            startTime: minutesToTimeString(window.startMinute),
+            endTime: minutesToTimeString(window.endMinute),
+            startMinute: window.startMinute,
+            endMinute: window.endMinute,
+        }));
+};
+
+const generateTimeSlotsFromMinutes = (
+    startMinutes,
+    endMinutes,
+    serviceDuration,
+    intervalMinutes = SLOT_INTERVAL_MINUTES,
+) => {
+    if (
+        !Number.isFinite(startMinutes)
+        || !Number.isFinite(endMinutes)
+        || !Number.isFinite(serviceDuration)
+        || startMinutes >= endMinutes
+    ) {
+        return [];
+    }
+
+    const slots = new Set();
+    for (
+        let currentMinutes = startMinutes;
+        currentMinutes + serviceDuration <= endMinutes;
+        currentMinutes += intervalMinutes
+    ) {
+        slots.add(minutesToTimeString(currentMinutes));
+    }
+
+    return [...slots].filter(Boolean);
 };
 
 /**
- * Check if a time slot is in the past (for today's date)
- * 
- * @param {string} slotTime - Time slot in HH:MM format
- * @param {string} date - Date in YYYY-MM-DD format
- * @param {Date} now - Current date/time
- * @returns {boolean} True if slot is in the past
+ * Generate all possible display slots between start and end time.
  */
+export const generateTimeSlots = (
+    startTime,
+    endTime,
+    serviceDuration,
+    intervalMinutes = SLOT_INTERVAL_MINUTES,
+) => {
+    const startMinutes = parseTimeToMinutes(startTime);
+    const endMinutes = parseTimeToMinutes(endTime);
+    return generateTimeSlotsFromMinutes(startMinutes, endMinutes, serviceDuration, intervalMinutes);
+};
+
 const isSlotInPast = (slotTime, date, now = new Date()) => {
     const todayStr = now.toISOString().slice(0, 10);
-    
-    // If date is not today, slot is not in past
     if (date !== todayStr) return false;
 
     const slotMinutes = parseTimeToMinutes(slotTime);
@@ -106,61 +195,115 @@ const isSlotInPast = (slotTime, date, now = new Date()) => {
     return slotMinutes <= currentMinutes;
 };
 
-/**
- * Calculate available slots for an employee on a specific date
- * 
- * @param {Object} params - Parameters
- * @param {string} params.date - Date in YYYY-MM-DD format
- * @param {Object} params.shopHours - Shop hours {openTime, closeTime}
- * @param {Object} params.employeeHours - Employee hours {start, end}
- * @param {number} params.serviceDuration - Service duration in minutes
- * @param {Array} params.bookedSlots - Booked slots [{date, time}]
- * @param {Array} params.blockedDates - Blocked dates [Date objects]
- * @param {Date} params.now - Current date/time (for testing)
- * @returns {Object} Slot availability information
- */
+const getSlotBlockReason = ({
+    slotTime,
+    date,
+    serviceDuration,
+    bookedRanges,
+    breakRanges,
+    effectiveStartMinutes,
+    effectiveEndMinutes,
+    now,
+}) => {
+    const slotRange = buildTimeRange(slotTime, serviceDuration);
+    if (!slotRange) return 'invalid_time';
+
+    if (
+        slotRange.startMinute < effectiveStartMinutes
+        || slotRange.endMinute > effectiveEndMinutes
+    ) {
+        return 'outside_hours';
+    }
+
+    if (isSlotInPast(slotTime, date, now)) return 'past';
+
+    if (breakRanges.some((breakRange) => (
+        doTimeRangesOverlap(
+            slotRange.startMinute,
+            slotRange.endMinute,
+            breakRange.startMinute,
+            breakRange.endMinute,
+        )
+    ))) {
+        return 'break';
+    }
+
+    if (bookedRanges.some((bookedRange) => (
+        doTimeRangesOverlap(
+            slotRange.startMinute,
+            slotRange.endMinute,
+            bookedRange.startMinute,
+            bookedRange.endMinute,
+        )
+    ))) {
+        return 'booked';
+    }
+
+    return null;
+};
+
+const addExactFreeWindowStarts = (candidateTimes, availableWindows, serviceDuration) => {
+    for (const window of availableWindows) {
+        if (window.startMinute + serviceDuration <= window.endMinute) {
+            candidateTimes.add(window.startTime);
+        }
+    }
+};
+
 export const calculateAvailableSlots = ({
     date,
     shopHours,
     employeeHours,
     serviceDuration,
     bookedSlots = [],
+    bookedRanges = [],
+    breakTimes = [],
     blockedDates = [],
     now = new Date(),
+    intervalMinutes = SLOT_INTERVAL_MINUTES,
 }) => {
-    // Check if date is blocked
-    const dateObj = new Date(date);
-    const isDateBlocked = blockedDates.some((blockedDate) => {
-        const blocked = new Date(blockedDate);
-        return blocked.toISOString().slice(0, 10) === date;
-    });
+    const isDateBlocked = blockedDates.some((blockedDate) => isSameDate(blockedDate, date));
 
     if (isDateBlocked) {
         return {
             slots: [],
+            availableWindows: [],
             totalSlots: 0,
             totalAvailable: 0,
             reason: 'date_blocked',
         };
     }
 
-    // Calculate effective working hours (intersection of shop and employee hours)
-    const shopStartMinutes = parseTimeToMinutes(shopHours.openTime);
-    const shopEndMinutes = parseTimeToMinutes(shopHours.closeTime);
-    const employeeStartMinutes = parseTimeToMinutes(employeeHours.start);
-    const employeeEndMinutes = parseTimeToMinutes(employeeHours.end);
+    const shopStartMinutes = parseTimeToMinutes(shopHours?.openTime);
+    const shopEndMinutes = parseTimeToMinutes(shopHours?.closeTime);
+    const employeeStartMinutes = parseTimeToMinutes(employeeHours?.start);
+    const employeeEndMinutes = parseTimeToMinutes(employeeHours?.end);
 
     if (
-        shopStartMinutes === null ||
-        shopEndMinutes === null ||
-        employeeStartMinutes === null ||
-        employeeEndMinutes === null
+        shopStartMinutes === null
+        || shopEndMinutes === null
+        || employeeStartMinutes === null
+        || employeeEndMinutes === null
+        || shopStartMinutes >= shopEndMinutes
+        || employeeStartMinutes >= employeeEndMinutes
     ) {
         return {
             slots: [],
+            availableWindows: [],
             totalSlots: 0,
             totalAvailable: 0,
             reason: 'invalid_hours',
+        };
+    }
+
+    const duration = Number(serviceDuration);
+    if (!Number.isFinite(duration) || duration <= 0) {
+        return {
+            slots: [],
+            availableWindows: [],
+            totalSlots: 0,
+            totalAvailable: 0,
+            reason: 'invalid_duration',
         };
     }
 
@@ -170,57 +313,77 @@ export const calculateAvailableSlots = ({
     if (effectiveStartMinutes >= effectiveEndMinutes) {
         return {
             slots: [],
+            availableWindows: [],
             totalSlots: 0,
             totalAvailable: 0,
             reason: 'no_overlap',
         };
     }
 
-    const effectiveStart = minutesToTimeString(effectiveStartMinutes);
-    const effectiveEnd = minutesToTimeString(effectiveEndMinutes);
+    const normalizedBookedRanges = normalizeBookedRanges({ date, bookedRanges, bookedSlots });
+    const breakRanges = normalizeBreakTimeRanges(breakTimes)
+        .filter((breakRange) => (
+            doTimeRangesOverlap(
+                effectiveStartMinutes,
+                effectiveEndMinutes,
+                breakRange.startMinute,
+                breakRange.endMinute,
+            )
+        ));
+    const effectiveWindow = {
+        startMinute: effectiveStartMinutes,
+        endMinute: effectiveEndMinutes,
+    };
+    const availableWindows = subtractBlockedRanges(effectiveWindow, [
+        ...breakRanges,
+        ...normalizedBookedRanges,
+    ]).filter((window) => window.startMinute + duration <= window.endMinute);
 
-    // Generate all possible slots
-    const allSlots = generateTimeSlots(effectiveStart, effectiveEnd, serviceDuration);
+    const candidateTimes = new Set(generateTimeSlotsFromMinutes(
+        effectiveStartMinutes,
+        effectiveEndMinutes,
+        duration,
+        intervalMinutes,
+    ));
+    addExactFreeWindowStarts(candidateTimes, availableWindows, duration);
 
-    // Mark each slot as available or not
-    const slots = allSlots.map((time) => {
-        let available = true;
-        let reason = null;
+    const slots = [...candidateTimes]
+        .map((time) => {
+            const startMinute = parseTimeToMinutes(time);
+            return { time, startMinute };
+        })
+        .filter((slot) => slot.startMinute !== null)
+        .sort((a, b) => a.startMinute - b.startMinute)
+        .map(({ time }) => {
+            const reason = getSlotBlockReason({
+                slotTime: time,
+                date,
+                serviceDuration: duration,
+                bookedRanges: normalizedBookedRanges,
+                breakRanges,
+                effectiveStartMinutes,
+                effectiveEndMinutes,
+                now,
+            });
 
-        // Check if slot is in the past
-        if (isSlotInPast(time, date, now)) {
-            available = false;
-            reason = 'past';
-        }
-        // Check if slot is blocked by existing bookings
-        else if (isSlotBlocked(time, bookedSlots, serviceDuration)) {
-            available = false;
-            reason = 'booked';
-        }
-
-        return {
-            time,
-            available,
-            ...(reason && { reason }),
-        };
-    });
+            return {
+                time,
+                available: !reason,
+                ...(reason && { reason }),
+            };
+        });
 
     const totalAvailable = slots.filter((slot) => slot.available).length;
 
     return {
         slots,
+        availableWindows,
         totalSlots: slots.length,
         totalAvailable,
-        slotInterval: SLOT_INTERVAL_MINUTES,
+        slotInterval: intervalMinutes,
     };
 };
 
-/**
- * Get only available slot times (convenience function)
- * 
- * @param {Object} params - Same as calculateAvailableSlots
- * @returns {string[]} Array of available time slots
- */
 export const getAvailableSlotTimes = (params) => {
     const result = calculateAvailableSlots(params);
     return result.slots
@@ -228,12 +391,6 @@ export const getAvailableSlotTimes = (params) => {
         .map((slot) => slot.time);
 };
 
-/**
- * Find the first available slot
- * 
- * @param {Object} params - Same as calculateAvailableSlots
- * @returns {string|null} First available time slot or null
- */
 export const findFirstAvailableSlot = (params) => {
     const result = calculateAvailableSlots(params);
     const firstAvailable = result.slots.find((slot) => slot.available);

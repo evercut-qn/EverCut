@@ -22,9 +22,9 @@ CREATE → PENDING → PAYMENT → AWAITING_CONFIRMATION → CONFIRMED → COMPL
 
 ✅ **24-hour auto-cancel** - Bookings auto-cancel if barber doesn't respond  
 ✅ **Full refund on auto-cancel** - Customer gets 100% refund  
-✅ **Atomic slot claiming** - Prevents double booking  
+✅ **Atomic exact-range claiming** - Prevents double booking without rounding service time  
 ✅ **Multi-service support** - Book multiple services in one booking  
-✅ **Smart availability** - Backend calculates available slots  
+✅ **Continuous availability** - Backend calculates exact free windows and bookable starts  
 ✅ **Flexible cancellation** - Customer can cancel with partial refund
 
 ---
@@ -168,6 +168,15 @@ GET    /api/v1/bookings/pending-confirmations  List pending (barber)
 PATCH  /api/v1/bookings/:id/confirm            Confirm (barber)
 POST   /api/v1/bookings/:id/cancel             Cancel
 ```
+
+### Scheduling Engine
+
+As of May 3, 2026, booking availability and booking creation use the same exact time-range model:
+
+- Bookings persist `time`, `endTime`, `startMinute`, and `endMinute`.
+- `Employee.bookedRanges[]` is the atomic lock source. Legacy `bookedSlots[]` is retained only as compatibility metadata.
+- Availability responses include `availableWindows[]` plus `slots[]`; a slot can resume at an exact boundary such as `13:35` after a 65-minute service.
+- Shop breaks, employee hours, shop hours, blocked dates, past times, and the 7-day booking window are all validated before a booking range is claimed.
 
 ### Payment Endpoints (Native SDK)
 ```

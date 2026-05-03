@@ -28,6 +28,8 @@ import Booking from '../src/models/booking.model.js';
 import Rating from '../src/models/rating.model.js';
 import { hashPin } from '../src/services/pin.service.js';
 import { BOOKING_STATUS, PAYMENT_STATUS, ROLES } from '../src/utils/constants.js';
+import { buildSlotLockTimes } from '../src/utils/slot-lock.utils.js';
+import { buildTimeRange } from '../src/utils/time.utils.js';
 
 const BARBER_FIXTURE = {
     phoneNumber: '+919876543211',
@@ -239,14 +241,21 @@ const createBookingsAndRatings = async (shop, barberUser, employee, service, cus
     const fixtures = {};
 
     for (const customer of customers) {
+        const durationMinutes = Number(service.duration) || 30;
+        const timeRange = buildTimeRange(customer.fixture.booking.time, durationMinutes);
         const booking = await Booking.create({
             customerId: customer.profile._id,
             shopId: shop._id,
             employeeId: employee._id,
             serviceIds: [service._id],
             date: customer.fixture.booking.date,
-            time: customer.fixture.booking.time,
+            time: timeRange.startTime,
+            endTime: timeRange.endTime,
+            startMinute: timeRange.startMinute,
+            endMinute: timeRange.endMinute,
             totalAmount: customer.fixture.booking.totalAmount,
+            durationMinutes,
+            slotLockTimes: buildSlotLockTimes(timeRange.startTime, durationMinutes),
             status: BOOKING_STATUS.COMPLETED,
             paymentStatus: PAYMENT_STATUS.SUCCESS,
         });

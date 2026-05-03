@@ -2,6 +2,12 @@ import Booking from '../models/booking.model.js';
 import { BOOKING_STATUS, PAYMENT_STATUS, PAYOUT_STATUS } from '../utils/constants.js';
 import { trustQueryOperators } from '../utils/mongoose-query.utils.js';
 
+const ACTIVE_BOOKING_STATUSES = [
+    BOOKING_STATUS.PENDING,
+    BOOKING_STATUS.AWAITING_CONFIRMATION,
+    BOOKING_STATUS.CONFIRMED,
+];
+
 const EMPLOYEE_POPULATE = {
     path: 'employeeId',
     select: 'firstName lastName photoUrl',
@@ -25,6 +31,15 @@ class BookingRepository {
 
     async findById(id, options = {}) {
         return Booking.findById(id).session(options.session || null);
+    }
+
+    async findByIdempotencyKey(customerId, idempotencyKey) {
+        if (!idempotencyKey) return null;
+        return Booking.findOne(trustQueryOperators({
+            customerId,
+            idempotencyKey,
+            status: { $ne: BOOKING_STATUS.CANCELLED },
+        }));
     }
 
     async findByIds(ids, options = {}) {
@@ -209,6 +224,22 @@ class BookingRepository {
             employeeId,
             date,
             status: { $nin: [BOOKING_STATUS.CANCELLED] },
+        })).lean();
+    }
+
+    async findBlockingByEmployeeAndDate(employeeId, date) {
+        return Booking.find(trustQueryOperators({
+            employeeId,
+            date,
+            status: { $in: ACTIVE_BOOKING_STATUSES },
+        })).lean();
+    }
+
+    async findBlockingByEmployeeIdsAndDate(employeeIds, date) {
+        return Booking.find(trustQueryOperators({
+            employeeId: { $in: employeeIds },
+            date,
+            status: { $in: ACTIVE_BOOKING_STATUSES },
         })).lean();
     }
 

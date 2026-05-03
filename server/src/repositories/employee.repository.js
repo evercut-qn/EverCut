@@ -66,6 +66,124 @@ class EmployeeRepository {
     }
 
     /**
+     * Atomically claim an exact half-open time range: [startMinute, endMinute).
+     *
+     * This is the primary booking lock. It prevents overlaps without rounding
+     * service durations up to coarse slot markers.
+     */
+    async claimTimeRange(employeeId, range, options = {}) {
+        const queryOptions = { returnDocument: 'after', runValidators: true };
+        if (options.session) queryOptions.session = options.session;
+
+        const {
+            bookingId,
+            date,
+            startTime,
+            endTime,
+            startMinute,
+            endMinute,
+            slotLockTimes = [],
+        } = range;
+        const legacySlotTimes = [...new Set(slotLockTimes)].filter(Boolean);
+
+        const query = {
+            _id: employeeId,
+            isActive: true,
+            deletedAt: null,
+            blockedDates: { $ne: new Date(date) },
+            $and: [
+                {
+                    bookedRanges: {
+                        $not: {
+                            $elemMatch: {
+                                date,
+                                startMinute: { $lt: endMinute },
+                                endMinute: { $gt: startMinute },
+                            },
+                        },
+                    },
+                },
+            ],
+        };
+        if (options.shopId) query.shopId = options.shopId;
+
+        return Employee.findOneAndUpdate(
+            trustQueryOperators(query),
+            {
+                $push: {
+                    bookedRanges: {
+                        bookingId,
+                        date,
+                        startTime,
+                        endTime,
+                        startMinute,
+                        endMinute,
+                    },
+                    ...(legacySlotTimes.length > 0 && {
+                        bookedSlots: {
+                            $each: legacySlotTimes.map((time) => ({ date, time })),
+                        },
+                    }),
+                },
+            },
+            queryOptions,
+        ).select('firstName lastName photoUrl workingHours');
+    }
+
+    async moveTimeRange(employeeId, range, options = {}) {
+        const queryOptions = { returnDocument: 'after', runValidators: true };
+        if (options.session) queryOptions.session = options.session;
+
+        const {
+            bookingId,
+            date,
+            startTime,
+            endTime,
+            startMinute,
+            endMinute,
+        } = range;
+        const query = {
+            _id: employeeId,
+            isActive: true,
+            deletedAt: null,
+            blockedDates: { $ne: new Date(date) },
+            $and: [
+                { bookedRanges: { $elemMatch: { bookingId } } },
+                {
+                    bookedRanges: {
+                        $not: {
+                            $elemMatch: {
+                                date,
+                                bookingId: { $ne: bookingId },
+                                startMinute: { $lt: endMinute },
+                                endMinute: { $gt: startMinute },
+                            },
+                        },
+                    },
+                },
+            ],
+        };
+        if (options.shopId) query.shopId = options.shopId;
+
+        return Employee.findOneAndUpdate(
+            trustQueryOperators(query),
+            {
+                $set: {
+                    'bookedRanges.$[bookingRange].date': date,
+                    'bookedRanges.$[bookingRange].startTime': startTime,
+                    'bookedRanges.$[bookingRange].endTime': endTime,
+                    'bookedRanges.$[bookingRange].startMinute': startMinute,
+                    'bookedRanges.$[bookingRange].endMinute': endMinute,
+                },
+            },
+            {
+                ...queryOptions,
+                arrayFilters: [{ 'bookingRange.bookingId': bookingId }],
+            },
+        ).select('firstName lastName photoUrl workingHours');
+    }
+
+    /**
      * Backward-compatible single-marker slot claim.
      */
     async claimSlot(employeeId, date, time, options = {}) {
@@ -85,6 +203,38 @@ class EmployeeRepository {
                 },
             },
         });
+    }
+
+    async releaseTimeRange(employeeId, range) {
+        const { bookingId, date, startMinute, endMinute, slotLockTimes = [] } = range;
+        const pullRange = bookingId
+            ? { bookingId }
+            : { date, startMinute, endMinute };
+        const legacySlotTimes = [...new Set(slotLockTimes)].filter(Boolean);
+
+        return Employee.findByIdAndUpdate(employeeId, {
+            $pull: {
+                bookedRanges: pullRange,
+                ...(legacySlotTimes.length > 0 && {
+                    bookedSlots: {
+                        date,
+                        time: { $in: legacySlotTimes },
+                    },
+                }),
+            },
+        });
+    }
+
+    async cleanupPastTimeLocks(cutoffDate) {
+        return Employee.updateMany(
+            {},
+            {
+                $pull: {
+                    bookedSlots: { date: { $lt: cutoffDate } },
+                    bookedRanges: { date: { $lt: cutoffDate } },
+                },
+            },
+        );
     }
 
     /**

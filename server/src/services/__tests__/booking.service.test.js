@@ -177,6 +177,7 @@ test('bookSalon creates a pending booking that requires payment before confirmat
         openTime: '09:00',
         closeTime: '21:00',
         availableDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
+        breakTimes: [],
     }));
 
     t.mock.method(serviceRepository, 'findByIds', async () => ([
@@ -189,22 +190,26 @@ test('bookSalon creates a pending booking that requires payment before confirmat
         },
     ]));
 
-    const originalClaimSlots = employeeRepository.claimSlots;
-    if (!employeeRepository.claimSlots) employeeRepository.claimSlots = async () => null;
-    t.after(() => {
-        if (originalClaimSlots) employeeRepository.claimSlots = originalClaimSlots;
-        else delete employeeRepository.claimSlots;
-    });
+    t.mock.method(employeeRepository, 'findByIdLean', async () => ({
+        _id: 'employee-1',
+        shopId: 'shop-1',
+        isActive: true,
+        workingHours: { start: '09:00', end: '21:00' },
+        blockedDates: [],
+    }));
 
     let capturedClaim = null;
-    t.mock.method(employeeRepository, 'claimSlots', async (employeeId, date, times, options) => {
-        capturedClaim = { employeeId, date, times, options };
+    t.mock.method(employeeRepository, 'claimTimeRange', async (employeeId, range, options) => {
+        capturedClaim = { employeeId, range, options };
         return {
             _id: employeeId,
         };
     });
     t.mock.method(employeeRepository, 'claimSlot', async () => {
-        throw new Error('bookSalon should claim normalized slot markers with claimSlots');
+        throw new Error('bookSalon should claim exact ranges, not single slots');
+    });
+    t.mock.method(employeeRepository, 'claimSlots', async () => {
+        throw new Error('bookSalon should claim exact ranges, not marker slots');
     });
 
     const originalReleaseSlots = employeeRepository.releaseSlots;
@@ -215,8 +220,8 @@ test('bookSalon creates a pending booking that requires payment before confirmat
     });
 
     let capturedRelease = null;
-    t.mock.method(employeeRepository, 'releaseSlots', async (employeeId, date, times) => {
-        capturedRelease = { employeeId, date, times };
+    t.mock.method(employeeRepository, 'releaseTimeRange', async (employeeId, range) => {
+        capturedRelease = { employeeId, range };
         return { acknowledged: true };
     });
 
@@ -245,27 +250,31 @@ test('bookSalon creates a pending booking that requires payment before confirmat
         time: '10:00 AM',
     });
 
-    assert.deepEqual(capturedClaim, {
-        employeeId: 'employee-1',
-        date: bookingDate,
-        times: ['10:00'],
-        options: { shopId: 'shop-1' },
-    });
+    assert.equal(capturedClaim.employeeId, 'employee-1');
+    assert.equal(capturedClaim.range.date, bookingDate);
+    assert.equal(capturedClaim.range.startTime, '10:00');
+    assert.equal(capturedClaim.range.endTime, '10:30');
+    assert.equal(capturedClaim.range.startMinute, 600);
+    assert.equal(capturedClaim.range.endMinute, 630);
+    assert.deepEqual(capturedClaim.range.slotLockTimes, ['10:00']);
+    assert.deepEqual(capturedClaim.options, { shopId: 'shop-1' });
     assert.equal(capturedRelease, null);
-    assert.deepEqual(createdBookingPayload, {
-        customerId: 'customer-1',
-        serviceIds: ['service-1'],
-        employeeId: 'employee-1',
-        shopId: 'shop-1',
-        date: bookingDate,
-        time: '10:00',
-        totalAmount: 120,
-        durationMinutes: 30,
-        slotLockTimes: ['10:00'],
-        status: 'pending',
-        paymentStatus: 'pending',
-        payoutStatus: 'not_initiated',
-    });
+    assert.ok(createdBookingPayload._id);
+    assert.equal(createdBookingPayload.customerId, 'customer-1');
+    assert.deepEqual(createdBookingPayload.serviceIds, ['service-1']);
+    assert.equal(createdBookingPayload.employeeId, 'employee-1');
+    assert.equal(createdBookingPayload.shopId, 'shop-1');
+    assert.equal(createdBookingPayload.date, bookingDate);
+    assert.equal(createdBookingPayload.time, '10:00');
+    assert.equal(createdBookingPayload.endTime, '10:30');
+    assert.equal(createdBookingPayload.startMinute, 600);
+    assert.equal(createdBookingPayload.endMinute, 630);
+    assert.equal(createdBookingPayload.totalAmount, 120);
+    assert.equal(createdBookingPayload.durationMinutes, 30);
+    assert.deepEqual(createdBookingPayload.slotLockTimes, ['10:00']);
+    assert.equal(createdBookingPayload.status, 'pending');
+    assert.equal(createdBookingPayload.paymentStatus, 'pending');
+    assert.equal(createdBookingPayload.payoutStatus, 'not_initiated');
     assert.equal(result.status, 'pending');
     assert.equal(result.paymentRequired, true);
     assert.equal(result.paymentStatus, 'pending');
@@ -281,6 +290,7 @@ test('bookSalon claims every slot marker covered by the selected service duratio
         openTime: '09:00',
         closeTime: '21:00',
         availableDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
+        breakTimes: [],
     }));
 
     t.mock.method(serviceRepository, 'findByIds', async () => ([
@@ -293,22 +303,26 @@ test('bookSalon claims every slot marker covered by the selected service duratio
         },
     ]));
 
-    const originalClaimSlots = employeeRepository.claimSlots;
-    if (!employeeRepository.claimSlots) employeeRepository.claimSlots = async () => null;
-    t.after(() => {
-        if (originalClaimSlots) employeeRepository.claimSlots = originalClaimSlots;
-        else delete employeeRepository.claimSlots;
-    });
+    t.mock.method(employeeRepository, 'findByIdLean', async () => ({
+        _id: 'employee-1',
+        shopId: 'shop-1',
+        isActive: true,
+        workingHours: { start: '09:00', end: '21:00' },
+        blockedDates: [],
+    }));
 
-    let claimedTimes = null;
-    t.mock.method(employeeRepository, 'claimSlots', async (_employeeId, _date, times) => {
-        claimedTimes = times;
+    let claimedRange = null;
+    t.mock.method(employeeRepository, 'claimTimeRange', async (_employeeId, range) => {
+        claimedRange = range;
         return {
             _id: 'employee-1',
         };
     });
     t.mock.method(employeeRepository, 'claimSlot', async () => {
         throw new Error('bookSalon should not use start-only claimSlot for duration-based bookings');
+    });
+    t.mock.method(employeeRepository, 'claimSlots', async () => {
+        throw new Error('bookSalon should not use marker-only claimSlots for duration-based bookings');
     });
 
     t.mock.method(bookingRepository, 'create', async (payload) => ({
@@ -325,7 +339,201 @@ test('bookSalon claims every slot marker covered by the selected service duratio
         time: '10:00',
     });
 
-    assert.deepEqual(claimedTimes, ['10:00', '10:30']);
+    assert.equal(claimedRange.startTime, '10:00');
+    assert.equal(claimedRange.endTime, '11:00');
+    assert.equal(claimedRange.startMinute, 600);
+    assert.equal(claimedRange.endMinute, 660);
+    assert.deepEqual(claimedRange.slotLockTimes, ['10:00', '10:30']);
+});
+
+test('bookSalon rejects bookings whose exact end time exceeds the employee or shop window before claiming', async (t) => {
+    t.mock.method(customerRepository, 'findByUserId', async () => ({ _id: 'customer-1' }));
+
+    t.mock.method(shopRepository, 'findByIdWithFields', async () => ({
+        _id: 'shop-1',
+        isOpen: true,
+        openTime: '09:00',
+        closeTime: '18:00',
+        availableDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
+        breakTimes: [],
+    }));
+
+    t.mock.method(employeeRepository, 'findByIdLean', async () => ({
+        _id: 'employee-1',
+        shopId: 'shop-1',
+        isActive: true,
+        workingHours: { start: '09:00', end: '18:00' },
+        blockedDates: [],
+    }));
+
+    t.mock.method(serviceRepository, 'findByIds', async () => ([
+        {
+            _id: 'service-1',
+            shopId: 'shop-1',
+            finalPrice: 120,
+            serviceType: 'single',
+            duration: 60,
+        },
+    ]));
+
+    const originalClaimTimeRange = employeeRepository.claimTimeRange;
+    if (!employeeRepository.claimTimeRange) employeeRepository.claimTimeRange = async () => null;
+    t.after(() => {
+        if (originalClaimTimeRange) employeeRepository.claimTimeRange = originalClaimTimeRange;
+        else delete employeeRepository.claimTimeRange;
+    });
+
+    const claimRangeMock = t.mock.method(employeeRepository, 'claimTimeRange', async () => {
+        throw new Error('booking should be rejected before claiming an exact range');
+    });
+    t.mock.method(employeeRepository, 'claimSlots', async () => {
+        throw new Error('booking should not use marker-only claiming');
+    });
+
+    await assert.rejects(
+        bookingService.bookSalon('user-1', {
+            shopId: 'shop-1',
+            employeeId: 'employee-1',
+            serviceId: 'service-1',
+            date: getInWindowBookingDate(),
+            time: '17:30',
+        }),
+        /past closing time|outside employee working hours/i,
+    );
+    assert.equal(claimRangeMock.mock.calls.length, 0);
+});
+
+test('bookSalon rejects bookings that overlap a shop break before claiming', async (t) => {
+    t.mock.method(customerRepository, 'findByUserId', async () => ({ _id: 'customer-1' }));
+
+    t.mock.method(shopRepository, 'findByIdWithFields', async () => ({
+        _id: 'shop-1',
+        isOpen: true,
+        openTime: '09:00',
+        closeTime: '18:00',
+        availableDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
+        breakTimes: [{ start: '13:00', end: '14:00' }],
+    }));
+
+    t.mock.method(employeeRepository, 'findByIdLean', async () => ({
+        _id: 'employee-1',
+        shopId: 'shop-1',
+        isActive: true,
+        workingHours: { start: '09:00', end: '18:00' },
+        blockedDates: [],
+    }));
+
+    t.mock.method(serviceRepository, 'findByIds', async () => ([
+        {
+            _id: 'service-1',
+            shopId: 'shop-1',
+            finalPrice: 120,
+            serviceType: 'single',
+            duration: 60,
+        },
+    ]));
+
+    const originalClaimTimeRange = employeeRepository.claimTimeRange;
+    if (!employeeRepository.claimTimeRange) employeeRepository.claimTimeRange = async () => null;
+    t.after(() => {
+        if (originalClaimTimeRange) employeeRepository.claimTimeRange = originalClaimTimeRange;
+        else delete employeeRepository.claimTimeRange;
+    });
+
+    const claimRangeMock = t.mock.method(employeeRepository, 'claimTimeRange', async () => {
+        throw new Error('booking should be rejected before claiming an exact range');
+    });
+    t.mock.method(employeeRepository, 'claimSlots', async () => {
+        throw new Error('booking should not use marker-only claiming');
+    });
+
+    await assert.rejects(
+        bookingService.bookSalon('user-1', {
+            shopId: 'shop-1',
+            employeeId: 'employee-1',
+            serviceId: 'service-1',
+            date: getInWindowBookingDate(),
+            time: '12:30',
+        }),
+        /break/i,
+    );
+    assert.equal(claimRangeMock.mock.calls.length, 0);
+});
+
+test('bookSalon claims an exact minute range and persists exact end metadata', async (t) => {
+    t.mock.method(customerRepository, 'findByUserId', async () => ({ _id: 'customer-1' }));
+
+    t.mock.method(shopRepository, 'findByIdWithFields', async () => ({
+        _id: 'shop-1',
+        isOpen: true,
+        openTime: '09:00',
+        closeTime: '21:00',
+        availableDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
+        breakTimes: [],
+    }));
+
+    t.mock.method(employeeRepository, 'findByIdLean', async () => ({
+        _id: 'employee-1',
+        shopId: 'shop-1',
+        isActive: true,
+        workingHours: { start: '09:00', end: '21:00' },
+        blockedDates: [],
+    }));
+
+    t.mock.method(serviceRepository, 'findByIds', async () => ([
+        {
+            _id: 'service-1',
+            shopId: 'shop-1',
+            finalPrice: 120,
+            serviceType: 'single',
+            duration: 65,
+        },
+    ]));
+
+    const originalClaimTimeRange = employeeRepository.claimTimeRange;
+    if (!employeeRepository.claimTimeRange) employeeRepository.claimTimeRange = async () => null;
+    t.after(() => {
+        if (originalClaimTimeRange) employeeRepository.claimTimeRange = originalClaimTimeRange;
+        else delete employeeRepository.claimTimeRange;
+    });
+
+    let capturedRange = null;
+    t.mock.method(employeeRepository, 'claimTimeRange', async (employeeId, range, options) => {
+        capturedRange = { employeeId, range, options };
+        return { _id: employeeId, firstName: 'Postman', lastName: 'Employee' };
+    });
+    t.mock.method(employeeRepository, 'claimSlots', async () => {
+        throw new Error('exact range bookings must not use marker-only claiming');
+    });
+
+    let createdBookingPayload = null;
+    t.mock.method(bookingRepository, 'create', async (payload) => {
+        createdBookingPayload = payload;
+        return { ...payload };
+    });
+
+    const bookingDate = getInWindowBookingDate();
+    await bookingService.bookSalon('user-1', {
+        shopId: 'shop-1',
+        employeeId: 'employee-1',
+        serviceId: 'service-1',
+        date: bookingDate,
+        time: '12:30',
+    });
+
+    assert.equal(capturedRange.employeeId, 'employee-1');
+    assert.equal(capturedRange.options.shopId, 'shop-1');
+    assert.equal(capturedRange.range.date, bookingDate);
+    assert.equal(capturedRange.range.startTime, '12:30');
+    assert.equal(capturedRange.range.endTime, '13:35');
+    assert.equal(capturedRange.range.startMinute, 750);
+    assert.equal(capturedRange.range.endMinute, 815);
+    assert.ok(capturedRange.range.bookingId);
+    assert.equal(createdBookingPayload.time, '12:30');
+    assert.equal(createdBookingPayload.endTime, '13:35');
+    assert.equal(createdBookingPayload.startMinute, 750);
+    assert.equal(createdBookingPayload.endMinute, 815);
+    assert.deepEqual(createdBookingPayload.slotLockTimes, ['12:30', '13:00', '13:30']);
 });
 
 test('updateBooking rejects paid bookings before releasing the existing slot', async (t) => {
@@ -432,6 +640,55 @@ test('cancelBooking returns a customer-friendly manual-refund message when payou
         result.cancellationNote,
         'Refund window has closed. Please request a manual refund.',
     );
+});
+
+test('updateBookingStatus releases the exact booking range when a booking is completed', async (t) => {
+    t.mock.method(shopRepository, 'findByOwnerId', async () => ({ _id: 'shop-1' }));
+    t.mock.method(bookingRepository, 'findById', async () => ({
+        _id: 'booking-1',
+        shopId: 'shop-1',
+        employeeId: 'employee-1',
+        date: new Date('2099-01-01T00:00:00.000Z'),
+        time: '10:00',
+        endTime: '10:45',
+        startMinute: 600,
+        endMinute: 645,
+        status: 'confirmed',
+        paymentStatus: 'success',
+        payoutStatus: 'not_initiated',
+        slotLockTimes: ['10:00', '10:30'],
+    }));
+
+    const originalReleaseTimeRange = employeeRepository.releaseTimeRange;
+    if (!employeeRepository.releaseTimeRange) employeeRepository.releaseTimeRange = async () => null;
+    t.after(() => {
+        if (originalReleaseTimeRange) employeeRepository.releaseTimeRange = originalReleaseTimeRange;
+        else delete employeeRepository.releaseTimeRange;
+    });
+
+    let releasedRange = null;
+    t.mock.method(employeeRepository, 'releaseTimeRange', async (employeeId, range) => {
+        releasedRange = { employeeId, range };
+        return { acknowledged: true };
+    });
+    t.mock.method(employeeRepository, 'releaseSlots', async () => ({ acknowledged: true }));
+    t.mock.method(bookingRepository, 'updateById', async (id, update) => ({
+        _id: id,
+        ...update,
+    }));
+
+    await bookingService.updateBookingStatus('booking-1', 'completed', 'owner-1');
+
+    assert.deepEqual(releasedRange, {
+        employeeId: 'employee-1',
+        range: {
+            bookingId: 'booking-1',
+            date: '2099-01-01',
+            startMinute: 600,
+            endMinute: 645,
+            slotLockTimes: ['10:00', '10:30'],
+        },
+    });
 });
 
 test('getFavoriteBookings returns a paginated customer booking favorites list', async (t) => {

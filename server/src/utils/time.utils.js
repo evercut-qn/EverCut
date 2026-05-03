@@ -5,7 +5,8 @@
 const TWELVE_HOUR_TIME_PATTERN = /^(0?[1-9]|1[0-2]):([0-5]\d)\s*([AaPp][Mm])$/;
 const TWENTY_FOUR_HOUR_TIME_PATTERN = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
-const toTwentyFourHourText = (totalMinutes) => {
+export const minutesToTimeString = (totalMinutes) => {
+    if (!Number.isFinite(totalMinutes) || totalMinutes < 0 || totalMinutes > 24 * 60) return null;
     const hours = String(Math.floor(totalMinutes / 60)).padStart(2, '0');
     const minutes = String(totalMinutes % 60).padStart(2, '0');
     return `${hours}:${minutes}`;
@@ -47,7 +48,81 @@ export const parseTimeToMinutes = (timeStr) => {
 export const toTwentyFourHourTime = (timeStr) => {
     const minutes = parseTimeToMinutes(timeStr);
     if (minutes === null) return null;
-    return toTwentyFourHourText(minutes);
+    return minutesToTimeString(minutes);
+};
+
+export const addMinutesToTime = (timeStr, minutesToAdd) => {
+    const startMinutes = parseTimeToMinutes(timeStr);
+    const duration = Number(minutesToAdd);
+    if (startMinutes === null || !Number.isFinite(duration)) return null;
+    return minutesToTimeString(startMinutes + duration);
+};
+
+export const doTimeRangesOverlap = (startA, endA, startB, endB) => (
+    startA < endB && endA > startB
+);
+
+export const isTimeRangeWithinWindow = (startMinutes, endMinutes, windowStartMinutes, windowEndMinutes) => (
+    Number.isFinite(startMinutes)
+    && Number.isFinite(endMinutes)
+    && Number.isFinite(windowStartMinutes)
+    && Number.isFinite(windowEndMinutes)
+    && startMinutes >= windowStartMinutes
+    && endMinutes <= windowEndMinutes
+    && startMinutes < endMinutes
+);
+
+export const normalizeBreakTimeRanges = (breakTimes = []) => (
+    (Array.isArray(breakTimes) ? breakTimes : [])
+        .map((breakTime) => {
+            const startMinute = parseTimeToMinutes(breakTime?.start);
+            const endMinute = parseTimeToMinutes(breakTime?.end);
+            if (startMinute === null || endMinute === null || startMinute >= endMinute) return null;
+            return {
+                startTime: minutesToTimeString(startMinute),
+                endTime: minutesToTimeString(endMinute),
+                startMinute,
+                endMinute,
+            };
+        })
+        .filter(Boolean)
+);
+
+export const getOverlappingBreakRange = (startMinutes, endMinutes, breakTimes = []) => (
+    normalizeBreakTimeRanges(breakTimes).find((breakRange) => (
+        doTimeRangesOverlap(startMinutes, endMinutes, breakRange.startMinute, breakRange.endMinute)
+    )) || null
+);
+
+export const isTimeRangeOverlappingBreak = (startMinutes, endMinutes, breakTimes = []) => (
+    Boolean(getOverlappingBreakRange(startMinutes, endMinutes, breakTimes))
+);
+
+export const buildTimeRange = (startTime, durationMinutes) => {
+    const normalizedStartTime = toTwentyFourHourTime(startTime);
+    const startMinute = parseTimeToMinutes(normalizedStartTime);
+    const duration = Number(durationMinutes);
+
+    if (
+        !normalizedStartTime
+        || startMinute === null
+        || !Number.isFinite(duration)
+        || duration <= 0
+    ) {
+        return null;
+    }
+
+    const endMinute = startMinute + duration;
+    const endTime = minutesToTimeString(endMinute);
+    if (!endTime) return null;
+
+    return {
+        startTime: normalizedStartTime,
+        endTime,
+        startMinute,
+        endMinute,
+        durationMinutes: duration,
+    };
 };
 
 /**

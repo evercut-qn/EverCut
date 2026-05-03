@@ -4,6 +4,20 @@
 
 ---
 
+## Implementation Status - May 3, 2026
+
+The production code has moved beyond the redesign proposed in this analysis. The implemented architecture is an exact time-range engine:
+
+- Core model: exact `[startMinute, endMinute)` ranges on `Employee.bookedRanges[]`.
+- Availability: derives `availableWindows[]` and `slots[]` from the same range-overlap logic used by booking creation.
+- Booking: computes aggregate service duration, exact `endTime`, and atomically claims the employee range before persistence.
+- Conflict prevention: MongoDB single-document `findOneAndUpdate` rejects overlaps under concurrency; optional `idempotencyKey` protects client retries.
+- Time handling: shop hours, employee hours, shop breaks, blocked dates, past times, 7-day window, and end boundaries are validated before claim.
+
+The rest of this file remains useful for understanding the old system's issues.
+
+---
+
 ## 1. Executive Summary
 
 The EverCut booking system is a **slot-marker-based** scheduling engine for a salon marketplace. It handles multi-service bookings, atomic slot claiming via MongoDB `findOneAndUpdate`, a payment-gated confirmation flow, and auto-cancellation. After analyzing every file in the booking path, I identified **3 critical**, **4 major**, and **3 moderate** issues. The most dangerous is the **availability ↔ booking logic divergence**: the availability API uses time-range overlap checks while the booking engine uses discrete slot-marker claiming — leading to false availability and failed bookings at payment time.
