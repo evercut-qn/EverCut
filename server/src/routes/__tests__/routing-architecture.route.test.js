@@ -36,6 +36,7 @@ test('route index mounts feature-oriented resources instead of legacy role prefi
         '/earnings',
         '/payments',
         '/payouts',
+        '/notifications',
     ]) {
         assert.match(source, new RegExp(`router\\.use\\('${routePrefix.replace('/', '\\/')}`));
     }
@@ -94,6 +95,7 @@ test('feature routes and controllers use simple direct files instead of module i
         'routes/payout.routes.js',
         'routes/photos.routes.js',
         'routes/ratings.routes.js',
+        'routes/notifications.routes.js',
         'routes/services.routes.js',
         'routes/shops.routes.js',
         'controllers/auth.controller.js',
@@ -106,6 +108,7 @@ test('feature routes and controllers use simple direct files instead of module i
         'controllers/payout.controller.js',
         'controllers/photo.controller.js',
         'controllers/rating.controller.js',
+        'controllers/notification.controller.js',
         'controllers/service.controller.js',
         'controllers/shop.controller.js',
     ];

@@ -10,6 +10,7 @@ import {
 } from '../utils/api-error.js';
 import { buildPagination } from '../utils/pagination.utils.js';
 import { serializeRating } from '../utils/rating-response.utils.js';
+import notificationEvents from './notification-events.service.js';
 
 /**
  * Rating service.
@@ -83,6 +84,7 @@ export const addRating = async (userId, shopId, rating, review) => {
             rating,
             review: normalizedReview,
         });
+        await notificationEvents.notifyRatingReceived({ ratingId: createdRating._id });
 
         return {
             ratingId: createdRating._id,
@@ -149,6 +151,7 @@ export const addReplyToRating = async (ratingId, replyText, ownerId) => {
     }
 
     const updatedRating = await ratingRepository.addReply(ratingId, normalizedReplyText, ownerId);
+    await notificationEvents.notifyRatingReply({ ratingId, actorUserId: ownerId });
     return serializeRating(updatedRating);
 };
 

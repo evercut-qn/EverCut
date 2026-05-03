@@ -1,3 +1,5 @@
+import mongoose from 'mongoose';
+
 import bookingRepository from '../repositories/booking.repository.js';
 import employeeRepository from '../repositories/employee.repository.js';
 import serviceRepository from '../repositories/service.repository.js';
@@ -33,6 +35,7 @@ import { getEffectiveServicePrice, normalizeServicePricing } from '../utils/serv
 import { buildSlotLockTimes, toDateOnlyString } from '../utils/slot-lock.utils.js';
 import { calculateAvailableSlots, getAvailableSlotTimes, normalizeBookedRanges } from '../utils/slot-calculator.utils.js';
 import logger from '../utils/logger.js';
+import notificationEvents from './notification-events.service.js';
 
 /**
  * Booking service — all booking business logic.
@@ -453,8 +456,11 @@ export const bookSalon = async (userId, data) => {
         durationMinutes,
     });
 
-    // Create booking first - MongoDB auto-generates the _id
+    const bookingId = new mongoose.Types.ObjectId();
+
+    // Create booking first, with the same id that will be used in the range lock.
     const booking = await bookingRepository.create(buildBookingPersistencePayload({
+        bookingId,
         customerId,
         serviceIds,
         employeeId,
@@ -595,6 +601,12 @@ export const cancelBooking = async (bookingId, userId) => {
         cancellationNote,
     });
     await releaseBookingSlotLock(booking);
+    await notificationEvents.notifyBookingCancelled({
+        bookingId,
+        actorUserId: userId,
+        cancelledBy: 'customer',
+        reason: cancellationNote,
+    });
     return updated;
 };
 
@@ -1411,6 +1423,12 @@ export const updateBookingStatus = async (bookingId, status, ownerId) => {
         await releaseBookingSlotLock(booking);
     }
 
+    await notificationEvents.notifyBookingStatusChanged({
+        bookingId,
+        status,
+        actorUserId: ownerId,
+    });
+
     return updated;
 };
 
@@ -1557,6 +1575,11 @@ export const confirmBookingByBarber = async (bookingId, ownerId) => {
         ownerId,
     });
 
+    await notificationEvents.notifyBookingConfirmed({
+        bookingId,
+        actorUserId: ownerId,
+    });
+
     return updated;
 };
 
@@ -1609,6 +1632,12 @@ export const cancelBookingByBarber = async (bookingId, ownerId) => {
             bookingId,
             shopId: shop._id,
             ownerId,
+        });
+
+        await notificationEvents.notifyBookingCancelled({
+            bookingId,
+            actorUserId: ownerId,
+            cancelledBy: 'barber',
         });
 
         return updated;
@@ -1694,6 +1723,9 @@ export const autoCancelAwaitingBookings = async () => {
                 cancelledAt: new Date(),
             });
             await releaseBookingSlotLock(booking);
+            await notificationEvents.notifyBookingAutoCancelled({
+                bookingId: booking._id,
+            });
 
             // Update shop stats (increment missed confirmation count)
             await shopRepository.updateById(booking.shopId, {

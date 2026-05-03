@@ -11,6 +11,7 @@ import { serializeRating } from '../utils/rating-response.utils.js';
 import { buildPagination } from '../utils/pagination.utils.js';
 import { normalizeServicePricing } from '../utils/service-pricing.utils.js';
 import { normalizeShopSchedule } from '../utils/shop-schedule.utils.js';
+import notificationEvents from './notification-events.service.js';
 import {
     ALL_SERVICE_FOR,
     ALL_SHOP_AMENITIES,
@@ -360,6 +361,10 @@ export const updateBusinessInfo = async (ownerId, body, userContext) => {
         updated = await shopRepository.updateByOwnerId(ownerId, updateData);
     }
     const photos = await photoRepository.findByShopId(updated._id, {});
+    await notificationEvents.notifyAccountUpdated({
+        userId: ownerId,
+        updateType: 'shop_profile',
+    });
 
     return {
         shop: serializeBarberProfile(updated, userContext, { photos }),
@@ -420,6 +425,10 @@ export const updateBankDetails = async (ownerId, body) => {
     }
 
     const updated = await shopRepository.updateByOwnerId(ownerId, updateData);
+    await notificationEvents.notifyAccountUpdated({
+        userId: ownerId,
+        updateType: 'payout_details',
+    });
 
     // TODO: Trigger beneficiary creation/update in payout gateway
     // This should be handled by the payout service when needed
@@ -445,6 +454,11 @@ export const toggleShopStatus = async (ownerId, requestedStatus) => {
 
     shop.isOpen = isOpen;
     await shop.save();
+    await notificationEvents.notifyShopStatusUpdated({
+        ownerId,
+        shopId: shop._id,
+        isOpen: shop.isOpen,
+    });
 
     return { isOpen: shop.isOpen };
 };

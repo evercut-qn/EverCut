@@ -39,6 +39,7 @@ Validation and field-level failures are returned inside `data.errors`.
 | `13-barber-ratings.json` | EverCut - Barber Ratings | Rating listing, summary, reply management, and rating removal |
 | `14-dashboard.json` | EverCut - Dashboard | Dashboard analytics: overview, pulse metrics, staff availability, today's queue |
 | `15-payments-payouts.json` | EverCut - Payments & Payouts | Native PhonePe SDK payment initiation/verification/status/refund requests and Cashfree payout retry |
+| `16-notifications.json` | EverCut - Notifications | FCM token management, notification history, unread counts, and read tracking |
 | `EverCut.postman_environment.json` | — | Active environment with OTP/JWT variables for local testing |
 | `assets/sample-upload.png` | — | Sample image pre-wired into file-upload requests |
 
@@ -215,6 +216,17 @@ Employee `workingHours.start` and `workingHours.end` remain `HH:MM` 24-hour valu
 | 5 | POST | `/api/v1/bookings/{{payment_booking_id}}/refund` | Initiate refund before payout starts |
 | 6 | POST | `/api/v1/payouts/{{payout_id}}/retry` | Retry failed or reversed payout as admin |
 
+### `16-notifications.json`
+
+| # | Method | Endpoint | Description |
+|---|---|---|---|
+| 1 | POST | `/api/v1/notifications/tokens` | Register or refresh an FCM token for the authenticated user |
+| 2 | GET | `/api/v1/notifications?page=1&limit=20` | List notification history and capture a notification ID |
+| 3 | GET | `/api/v1/notifications/unread-count` | Get unread notification count |
+| 4 | PATCH | `/api/v1/notifications/{{notification_id}}/read` | Mark one notification read |
+| 5 | PATCH | `/api/v1/notifications/read-all` | Mark all notifications read |
+| 6 | DELETE | `/api/v1/notifications/tokens` | Revoke the authenticated user's FCM token |
+
 ---
 
 ### Prerequisites
@@ -351,4 +363,3 @@ This succeeds once for the seeded no-reply fixture. It returns `409 Conflict` on
 ### `10-barber-bookings.json` — Cancel Paid Booking (Request 6)
 
 This is destructive and should be left until the end of a test cycle, after any booking status, earnings, or customer confirmation checks are complete.
-

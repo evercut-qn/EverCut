@@ -4,6 +4,7 @@ import payoutRepository from '../repositories/payout.repository.js';
 import shopRepository from '../repositories/shop.repository.js';
 import userRepository from '../repositories/user.repository.js';
 import cashfreePayoutAdapter from '../adapters/cashfree/cashfree-payout.adapter.js';
+import notificationEvents from './notification-events.service.js';
 import logger from '../utils/logger.js';
 import {
     BadRequestError,
@@ -93,6 +94,12 @@ const applyPayoutSuccess = async (payout, { utr, updatedAt }) => {
     });
 
     await paymentRepository.markSettledByIds(payout.paymentTransactionIds, processedAt);
+    await notificationEvents.notifyPayoutStatus({
+        payoutId: payout._id,
+        barberId: payout.barberId,
+        status: PAYOUT_TRANSACTION_STATUS.SUCCESS,
+        amountInRupees: payout.amountInRupees,
+    });
 };
 
 const applyPayoutFailure = async (payout, status, { failureReason, errorCode = null }) => {
@@ -121,6 +128,14 @@ const applyPayoutFailure = async (payout, status, { failureReason, errorCode = n
     ) {
         await paymentRepository.markUnsettledByIds(payout.paymentTransactionIds);
     }
+
+    await notificationEvents.notifyPayoutStatus({
+        payoutId: payout._id,
+        barberId: payout.barberId,
+        status,
+        amountInRupees: payout.amountInRupees,
+        failureReason: failureReason || status,
+    });
 };
 
 const ensureRetryable = (error) => !NON_RETRYABLE_ERROR_CODES.has(error?.providerCode || error?.code);
