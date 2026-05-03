@@ -136,7 +136,7 @@ Between when a customer sees a slot as "available" and when they submit the book
 ```
 Employee schedule:  [10:00 FREE] [10:30 BOOKED] [11:00 FREE] [11:30 FREE]
 Customer picks: 60-min service starting at 10:00
-Availability API: isSlotBlocked checks range [10:00, 11:00) vs [10:30, 11:00)
+Availability API: isSlotBlocked checks range [10:00, 11:00] vs [10:30, 11:00]
   → Overlap detected: 10:00 < 11:00 && 11:00 > 10:30 → BLOCKED ✅ (works here)
 ```
 
@@ -145,10 +145,10 @@ But consider:
 Employee schedule:  [10:00 FREE] [10:30 FREE] [11:00 BOOKED(30min)] [11:30 FREE]
 Customer picks: 90-min service starting at 10:00
 Required markers: [10:00, 10:30, 11:00]
-Availability API: checks [10:00, 11:30) vs [11:00, 11:30) → overlap → BLOCKED ✅
+Availability API: checks [10:00, 11:30] vs [11:00, 11:30] → overlap → BLOCKED ✅
 
 But if the booked slot at 11:00 was only 30min and stored durationMinutes=30:
-Availability: [10:00, 11:30) vs [11:00, 11:30) → 10:00 < 11:30 && 11:30 > 11:00 → BLOCKED ✅
+Availability: [10:00, 11:30] vs [11:00, 11:30] → 10:00 < 11:30 && 11:30 > 11:00 → BLOCKED ✅
 ```
 
 The overlap check **happens to work** for some cases but fails for the "gap" scenario:
@@ -157,8 +157,8 @@ The overlap check **happens to work** for some cases but fails for the "gap" sce
 Employee schedule:  [11:30 FREE] [12:00 BOOKED(30min)] [12:30 FREE] [13:00 BOOKED(30min)]
 Customer picks: 90-min starting at 11:30
 Required markers: [11:30, 12:00, 12:30]
-Availability: checks [11:30, 13:00) vs each booked:
-  - vs [12:00, 12:30): 11:30 < 12:30 && 13:00 > 12:00 → BLOCKED ✅
+Availability: checks [11:30, 13:00] vs each booked:
+  - vs [12:00, 12:30]: 11:30 < 12:30 && 13:00 > 12:00 → BLOCKED ✅
 ```
 
 Actually in this case the overlap catches it. The **real failure** is:
@@ -166,7 +166,7 @@ Actually in this case the overlap catches it. The **real failure** is:
 ```
 Employee schedule:  [11:30 FREE] [12:00 BOOKED(30min)] [12:30 FREE] [13:00 FREE]
 Customer picks: 30-min starting at 12:30
-Availability: [12:30, 13:00) vs [12:00, 12:30) → 12:30 < 12:30? NO → AVAILABLE ✅
+Availability: [12:30, 13:00] vs [12:00, 12:30] → 12:30 < 12:30? NO → AVAILABLE ✅
 This is correct.
 ```
 
