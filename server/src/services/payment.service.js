@@ -34,6 +34,11 @@ import {
 } from '../utils/service-pricing.utils.js';
 import { buildPagination } from '../utils/pagination.utils.js';
 import { toDateOnlyString } from '../utils/slot-lock.utils.js';
+import {
+    serializePayment,
+    serializePaymentInitiation,
+    serializePaymentStatus,
+} from '../serializers/payment.serializer.js';
 
 const toObjectIdString = (value) => String(value?._id || value || '');
 
@@ -243,29 +248,7 @@ const assertPaymentAccess = async (actorOrUserId, payment) => {
     throw new ForbiddenError('You are not allowed to access payments');
 };
 
-const buildPaymentListItem = (payment) => ({
-    _id: payment._id,
-    paymentId: payment._id,
-    bookingId: payment.bookingId?._id || payment.bookingId,
-    booking: payment.bookingId?._id ? payment.bookingId : null,
-    customerId: payment.customerId?._id || payment.customerId,
-    customer: payment.customerId?._id ? payment.customerId : null,
-    shopId: payment.shopId?._id || payment.shopId,
-    shop: payment.shopId?._id ? payment.shopId : null,
-    merchantOrderId: payment.merchantOrderId,
-    orderId: payment.gatewayOrderId || null,
-    status: payment.status,
-    gatewayState: payment.gatewayState || null,
-    amountInPaisa: payment.amount,
-    amountInRupees: payment.amountInRupees,
-    currency: payment.currency || 'INR',
-    paymentMode: payment.paymentMode || null,
-    transactionId: payment.gatewayTransactionId || null,
-    refund: payment.refund || null,
-    settlement: payment.settlement || null,
-    createdAt: payment.createdAt,
-    updatedAt: payment.updatedAt,
-});
+const buildPaymentListItem = (payment) => serializePayment(payment);
 
 const loadBookedServices = async (booking) => {
     if (!Array.isArray(booking.serviceIds) || booking.serviceIds.length === 0) {
@@ -419,17 +402,18 @@ const cancelUnpaidBookingAndReleaseSlot = async (bookingId, cancellationNote) =>
         || booking.status === BOOKING_STATUS.COMPLETED
         || booking.paymentStatus === PAYMENT_STATUS.SUCCESS
     ) {
-        return booking;
+        return null;
     }
 
     await releaseBookingSlot(booking);
 
-    return bookingRepository.updateById(bookingId, {
+    await bookingRepository.updateById(bookingId, {
         status: BOOKING_STATUS.CANCELLED,
         paymentStatus: PAYMENT_STATUS.FAILED,
         cancelledAt: new Date(),
         cancellationNote,
     });
+    return null;
 };
 
 const assertRefundPermission = async (actor, booking) => {
@@ -461,27 +445,7 @@ const dateToEpochMs = (value) => {
     return Number.isFinite(timestamp) ? timestamp : null;
 };
 
-const buildNativePaymentInitiationResponse = ({
-    payment,
-    bookingId,
-    gatewayResponse = null,
-    reusable = false,
-}) => ({
-    paymentId: payment._id,
-    bookingId,
-    merchantOrderId: payment.merchantOrderId,
-    orderId: gatewayResponse?.orderId || payment.gatewayOrderId || null,
-    token: gatewayResponse?.token || payment.sdkOrderToken || null,
-    merchantId: config.phonepe.merchantId,
-    amountInPaisa: payment.amount,
-    amountInRupees: payment.amountInRupees,
-    currency: payment.currency || 'INR',
-    state: gatewayResponse?.state || payment.gatewayState || 'PENDING',
-    expiresAt: dateToEpochMs(gatewayResponse?.expiresAt || payment.expiresAt),
-    gateway: PAYMENT_GATEWAYS.PHONEPE,
-    paymentFlow: 'PHONEPE_SDK',
-    reusable,
-});
+const buildNativePaymentInitiationResponse = (payload) => serializePaymentInitiation(payload);
 
 const mapBookingPaymentStatus = (paymentStatus) => {
     switch (paymentStatus) {
@@ -508,36 +472,13 @@ const buildPaymentStatusResponse = async (payment, gatewayStatus = null, sdkCont
     const booking = await bookingRepository.findById(payment.bookingId);
     const firstPayment = gatewayStatus?.paymentDetails?.[0] || null;
 
-    return {
-        _id: payment._id,
-        paymentId: payment._id,
-        bookingId: payment.bookingId,
-        merchantOrderId: payment.merchantOrderId,
-        orderId: gatewayStatus?.orderId || payment.gatewayOrderId || null,
-        status: payment.status,
-        gatewayState: gatewayStatus?.state || payment.gatewayState || null,
-        amountInPaisa: payment.amount,
-        amountInRupees: payment.amountInRupees,
-        currency: payment.currency || 'INR',
-        paymentMode: firstPayment?.paymentMode || payment.paymentMode || null,
-        transactionId: firstPayment?.transactionId || payment.gatewayTransactionId || null,
-        bookingStatus: booking?.status || null,
-        paymentStatus: booking?.paymentStatus || mapBookingPaymentStatus(payment.status),
-        sdkStatus: sdkContext.sdkStatus || null,
-        sdkResponseCode: sdkContext.sdkResponseCode || null,
-        sdkMessage: sdkContext.sdkMessage || null,
-        error: payment.errorCode || payment.errorDescription
-            ? {
-                code: payment.errorCode || null,
-                detailedCode: payment.detailedErrorCode || null,
-                source: payment.errorSource || null,
-                stage: payment.errorStage || null,
-                description: payment.errorDescription || null,
-            }
-            : null,
-        createdAt: payment.createdAt,
-        updatedAt: payment.updatedAt,
-    };
+    return serializePaymentStatus({
+        payment,
+        booking,
+        gatewayStatus,
+        sdkContext,
+        bookingPaymentStatus: mapBookingPaymentStatus(payment.status),
+    });
 };
 
 const syncPaymentWithGateway = async (payment, sdkContext = {}) => {
@@ -807,33 +748,6 @@ export const verifyPayment = async (userId, paymentId, sdkContext = {}) => {
         const latestPayment = await paymentRepository.findById(paymentId);
         return buildPaymentStatusResponse(latestPayment, null, sdkContext);
     }
-};
-
-export const getPaymentByBooking = async (userId, bookingId) => {
-    const { customer } = await loadBookingWithCustomerAccess(userId, bookingId);
-    const payment = await paymentRepository.findLatestByBookingId(bookingId);
-
-    if (!payment) {
-        throw new NotFoundError('Payment for this booking');
-    }
-
-    if (toObjectIdString(payment.customerId) !== toObjectIdString(customer._id)) {
-        throw new ForbiddenError('You can only access your own payments');
-    }
-
-    return {
-        _id: payment._id,
-        paymentId: payment._id,
-        bookingId: payment.bookingId,
-        merchantOrderId: payment.merchantOrderId,
-        orderId: payment.gatewayOrderId || null,
-        status: payment.status,
-        gatewayState: payment.gatewayState || null,
-        amountInPaisa: payment.amount,
-        amountInRupees: payment.amountInRupees,
-        paymentMode: payment.paymentMode,
-        createdAt: payment.createdAt,
-    };
 };
 
 async function handlePaymentSuccess(webhookData) {

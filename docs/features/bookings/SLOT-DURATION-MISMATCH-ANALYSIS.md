@@ -783,7 +783,7 @@ const markers = booked.slotLockTimes || buildSlotLockTimes(
 ### Before (Current)
 
 ```
-1. Frontend: GET /employees/:id/available-slots?date=2026-05-03&serviceId=service1
+1. Frontend: GET /employees/:id/availability?date=2026-05-03&serviceId=service1
 2. Backend: Calculate serviceDuration = 90 mins
 3. Backend: Generate candidate slots (11:30, 12:00, 12:30, ...)
 4. Backend: For each slot, check if [slotStart, slotEnd] overlaps with bookings
@@ -802,7 +802,7 @@ const markers = booked.slotLockTimes || buildSlotLockTimes(
 ### After (Proposed)
 
 ```
-1. Frontend: GET /employees/:id/available-slots?date=2026-05-03&serviceId=service1
+1. Frontend: GET /employees/:id/availability?date=2026-05-03&serviceId=service1
 2. Backend: Calculate serviceDuration = 90 mins
 3. Backend: Generate candidate slots (11:30, 12:00, 12:30, ...)
 4. Backend: For each slot:

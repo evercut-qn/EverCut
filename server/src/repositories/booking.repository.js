@@ -56,7 +56,8 @@ class BookingRepository {
                 path: 'customerId',
                 select: 'firstName lastName userId',
                 populate: { path: 'userId', select: 'email phoneNumber' },
-            });
+            })
+            .lean();
     }
 
     async updateById(id, data) {
@@ -86,7 +87,8 @@ class BookingRepository {
             .populate('serviceIds')
             .populate(EMPLOYEE_POPULATE)
             .populate('shopId', 'shopName address coverUrl')
-            .sort({ date: -1 });
+            .sort({ date: -1 })
+            .lean();
     }
 
     async findUpcomingByCustomer(customerId, today, options = {}) {
@@ -101,7 +103,7 @@ class BookingRepository {
 
         if (options.skip !== undefined) query.skip(options.skip);
         if (options.limit !== undefined) query.limit(options.limit);
-        return query;
+        return query.lean();
     }
 
     async countUpcomingByCustomer(customerId, today) {
@@ -120,7 +122,7 @@ class BookingRepository {
 
         if (options.skip !== undefined) query.skip(options.skip);
         if (options.limit !== undefined) query.limit(options.limit);
-        return query;
+        return query.lean();
     }
 
     async countPastByCustomer(customerId, today) {
@@ -139,7 +141,7 @@ class BookingRepository {
 
         if (options.skip !== undefined) query.skip(options.skip);
         if (options.limit !== undefined) query.limit(options.limit);
-        return query;
+        return query.lean();
     }
 
     async findByShopId(shopId, filters = {}, options = {}) {
@@ -155,7 +157,7 @@ class BookingRepository {
 
         if (options.skip !== undefined) query.skip(options.skip);
         if (options.limit !== undefined) query.limit(options.limit);
-        return query;
+        return query.lean();
     }
 
     async countAll(filter = {}) {
@@ -271,7 +273,8 @@ class BookingRepository {
         }))
             .populate('serviceIds', 'serviceName offerPrice duration')
             .populate(EMPLOYEE_NAME_POPULATE)
-            .populate('shopId', 'shopName address');
+            .populate('shopId', 'shopName address')
+            .lean();
     }
 
     async hasCompletedBookingForCustomer(customerId, shopId) {

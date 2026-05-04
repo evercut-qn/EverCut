@@ -59,7 +59,6 @@ All routes are mounted under `/api/v1`.
 | Bookings | GET | `/bookings/stats` | Barber | `bookingController.getBookingStats` |
 | Bookings | GET | `/bookings/progress` | Barber | `bookingController.getBookingMilestoneProgress` |
 | Bookings | GET | `/bookings/:id` | Customer/Barber | `bookingController.getBookingById` |
-| Bookings | GET | `/bookings/:id/payment` | Customer | `paymentController.getPaymentByBooking` |
 | Bookings | GET | `/bookings/:id/confirmation` | Customer | `bookingController.getBookingConfirmation` |
 | Bookings | PUT | `/bookings/:id` | Customer | `bookingController.updateBooking` |
 | Bookings | PUT | `/bookings/:id/reschedule` | Customer | `bookingController.rescheduleBooking` |
@@ -150,7 +149,6 @@ All routes are mounted under `/api/v1`.
 
 - `GET /api/v1/shops/:id/employees`
 - `GET /api/v1/shops/:id/availability`
-- `GET /api/v1/bookings/:id/payment`
 - `POST /api/v1/bookings/:id/cancel`
 - `POST /api/v1/bookings/:id/refund`
 - `POST /api/v1/payments`
@@ -162,7 +160,8 @@ All routes are mounted under `/api/v1`.
 - Replaced `GET /api/v1/bookings/shops/:id/availability` with `GET /api/v1/shops/:id/availability`.
 - Replaced `POST /api/v1/payments/initiate` with `POST /api/v1/payments`.
 - Replaced `GET /api/v1/payments/:id/status` with `GET /api/v1/payments/:id`.
-- Replaced `GET /api/v1/payments/booking/:bookingId` with `GET /api/v1/bookings/:id/payment`.
+- Removed `GET /api/v1/bookings/:id/payment` (redundant with `GET /api/v1/payments/:id`).
+- Removed `GET /api/v1/payments/booking/:bookingId` (redundant with `GET /api/v1/payments/:id`).
 - Replaced `POST /api/v1/payments/:bookingId/refund` with `POST /api/v1/bookings/:id/refund`.
 - Replaced `DELETE /api/v1/bookings/:id` with `POST /api/v1/bookings/:id/cancel`.
 

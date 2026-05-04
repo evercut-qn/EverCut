@@ -13,6 +13,9 @@ import { BadRequestError, ConflictError } from '../utils/api-error.js';
 import { normalizeShopSchedule } from '../utils/shop-schedule.utils.js';
 import * as authService from './auth.service.js';
 import { hashPin, validatePinCreation } from './pin.service.js';
+import { serializeCustomerProfile } from '../serializers/customer.serializer.js';
+import { serializePhotos } from '../serializers/photo.serializer.js';
+import { serializeUser } from '../serializers/user.serializer.js';
 
 /**
  * Onboarding service - handles first-time user and barber profile creation.
@@ -302,7 +305,11 @@ export const createCustomerOnboarding = async (phoneNumber, profileData, file) =
 
     const tokens = await issueAuthenticationTokens(user);
 
-    return { user, profile, tokens };
+    return {
+        user: serializeUser(user),
+        profile: serializeCustomerProfile(profile),
+        tokens,
+    };
 };
 
 export const createBarberOnboarding = async (phoneNumber, shopData, files) => {
@@ -402,9 +409,9 @@ export const createBarberOnboarding = async (phoneNumber, shopData, files) => {
     const tokens = await issueAuthenticationTokens(user);
 
     return {
-        user,
+        user: serializeUser(user),
         shop: serializeBarberProfile(createdShop, user, { photos }),
-        photos,
+        photos: serializePhotos(photos),
         tokens,
     };
 };

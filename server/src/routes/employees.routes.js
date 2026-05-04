@@ -9,39 +9,32 @@ import { ROLES } from '../utils/constants.js';
 import { paginationSchema } from '../validators/common.validator.js';
 import {
     addEmployeeSchema,
-    availableSlotsQuerySchema,
+    employeeAvailabilityQuerySchema,
     employeeIdParamSchema,
     toggleEmployeeStatusSchema,
     updateEmployeeSchema,
 } from '../validators/employee.validator.js';
-import { employeeCalendarQuerySchema } from '../validators/booking.validator.js';
 
 const router = Router();
 
-router.get(
-    '/:id/calendar',
-    authenticate,
-    validate(employeeIdParamSchema, 'params'),
-    validate(employeeCalendarQuerySchema, 'query'),
-    employeeController.getEmployeeCalendar,
-);
+router.use(authenticate);
+
+router.get('/analytics/availability', authorize(ROLES.BARBER), employeeController.getStaffAvailability);
 
 router.get(
-    '/:id/available-slots',
-    authenticate,
+    '/:id/availability',
     validate(employeeIdParamSchema, 'params'),
-    validate(availableSlotsQuerySchema, 'query'),
-    employeeController.getAvailableSlots,
+    validate(employeeAvailabilityQuerySchema, 'query'),
+    employeeController.getEmployeeAvailability,
 );
 
-router.use(authenticate, authorize(ROLES.BARBER));
+router.use(authorize(ROLES.BARBER));
 
 router.get('/', validate(paginationSchema, 'query'), employeeController.getEmployees);
-router.get('/availability', employeeController.getStaffAvailability);
 router.get('/:id', validate(employeeIdParamSchema, 'params'), employeeController.getEmployeeById);
 router.post('/', uploadEmployeePhoto, validate(addEmployeeSchema, 'body'), employeeController.addEmployee);
-router.put('/:id', validate(employeeIdParamSchema, 'params'), uploadEmployeePhoto, validate(updateEmployeeSchema, 'body'), employeeController.updateEmployee);
-router.put('/:id/status', validate(employeeIdParamSchema, 'params'), validate(toggleEmployeeStatusSchema, 'body'), employeeController.toggleEmployeeStatus);
+router.patch('/:id', validate(employeeIdParamSchema, 'params'), uploadEmployeePhoto, validate(updateEmployeeSchema, 'body'), employeeController.updateEmployee);
+router.patch('/:id/status', validate(employeeIdParamSchema, 'params'), validate(toggleEmployeeStatusSchema, 'body'), employeeController.toggleEmployeeStatus);
 router.delete('/:id', validate(employeeIdParamSchema, 'params'), employeeController.deleteEmployee);
 
 export default router;

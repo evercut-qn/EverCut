@@ -1,7 +1,7 @@
 # Booking System - Complete Guide
 
 **Version:** 3.0  
-**Last Updated:** April 28, 2026  
+**Last Updated:** May 4, 2026  
 **Status:** ✅ Production Ready
 
 ---
@@ -32,7 +32,7 @@ START: Need to check availability?
 ├─ Has the customer selected an employee?
 │
 ├─ YES → Use Employee-Specific API
-│   └─ GET /employees/:id/available-slots
+│   └─ GET /employees/:id/availability
 │   └─ Benefits:
 │       ├─ Displays all slots with availability status
 │       ├─ Provides reasons for unavailability
@@ -112,12 +112,11 @@ COMPLETED (Service Done)
 
 | Method | Endpoint | Auth | Purpose |
 |--------|----------|------|---------|
-| GET | `/api/v1/shops/nearby` | No | Find nearby shops |
+| GET | `/api/v1/shops?coordinates=lng,lat` | No | Find nearby shops |
 | GET | `/api/v1/shops/:id` | No | Shop details |
 | GET | `/api/v1/shops/:id/employees` | No | List employees |
-| GET | `/api/v1/employees/:id/available-slots` | Yes | Employee availability (recommended) |
+| GET | `/api/v1/employees/:id/availability` | Yes | Employee availability (recommended) |
 | GET | `/api/v1/shops/:id/availability` | Yes | Shop-wide availability |
-| GET | `/api/v1/employees/:id/calendar` | Yes | Raw calendar data (legacy) |
 
 ### Booking Management (Customer)
 
@@ -126,25 +125,23 @@ COMPLETED (Service Done)
 | POST | `/api/v1/bookings` | CUSTOMER | Create booking |
 | GET | `/api/v1/bookings` | CUSTOMER | List bookings |
 | GET | `/api/v1/bookings/:id` | CUSTOMER | Get booking details |
-| PUT | `/api/v1/bookings/:id` | CUSTOMER | Update booking (before payment) |
-| PUT | `/api/v1/bookings/:id/reschedule` | CUSTOMER | Reschedule booking |
-| POST | `/api/v1/bookings/:id/reorder` | CUSTOMER | Reorder booking |
-| POST | `/api/v1/bookings/:id/cancel` | CUSTOMER | Cancel booking |
-| GET | `/api/v1/bookings/:id/confirmation` | CUSTOMER | Get confirmation |
-| PATCH | `/api/v1/bookings/:id/favorite` | CUSTOMER | Toggle favorite |
+| PATCH | `/api/v1/bookings/:id` | CUSTOMER | Update schedule or cancel with `status=cancelled` |
+| POST | `/api/v1/bookings` | CUSTOMER | Reorder from `sourceBookingId` |
+| PUT | `/api/v1/bookings/:id/favorite` | CUSTOMER | Add favorite |
+| DELETE | `/api/v1/bookings/:id/favorite` | CUSTOMER | Remove favorite |
 
 ### Booking Management (Barber)
 
 | Method | Endpoint | Auth | Purpose |
 |--------|----------|------|---------|
 | GET | `/api/v1/bookings` | BARBER | List all bookings |
-| GET | `/api/v1/bookings/pending-confirmations` | BARBER | List pending confirmations |
-| GET | `/api/v1/bookings/status` | BARBER | Get bookings by status |
-| GET | `/api/v1/bookings/stats` | BARBER | Get statistics |
-| GET | `/api/v1/bookings/progress` | BARBER | Get milestone progress |
-| PATCH | `/api/v1/bookings/:id/confirm` | BARBER | Confirm booking |
-| PUT | `/api/v1/bookings/:id/status` | BARBER | Update status |
-| POST | `/api/v1/bookings/:id/cancel` | BARBER | Cancel unpaid booking |
+| GET | `/api/v1/bookings?status=awaiting_confirmation&paymentStatus=success` | BARBER | List pending confirmations |
+| GET | `/api/v1/bookings?status=confirmed` | BARBER | Get bookings by status |
+| GET | `/api/v1/bookings/analytics/summary` | BARBER | Get statistics |
+| GET | `/api/v1/bookings/analytics/milestones` | BARBER | Get milestone progress |
+| GET | `/api/v1/bookings/analytics/today` | BARBER | Get today's dashboard summary |
+| GET | `/api/v1/bookings/analytics/queue` | BARBER | Get today's queue |
+| PATCH | `/api/v1/bookings/:id` | BARBER | Confirm, complete, no-show, or cancel |
 
 ### Payment & Refunds
 
@@ -154,8 +151,7 @@ COMPLETED (Service Done)
 | POST | `/api/v1/payments/:id/verify` | CUSTOMER | Verify payment after SDK callback |
 | GET | `/api/v1/payments` | CUSTOMER/BARBER/ADMIN | List visible payments |
 | GET | `/api/v1/payments/:id` | CUSTOMER/BARBER/ADMIN | Get payment status |
-| GET | `/api/v1/bookings/:id/payment` | CUSTOMER | Get payment details for booking |
-| POST | `/api/v1/bookings/:id/refund` | ADMIN/BARBER | Initiate refund |
+| POST | `/api/v1/bookings/:id/refunds` | ADMIN/BARBER | Initiate refund |
 
 ---
 
@@ -208,7 +204,7 @@ CREATE → PENDING → PAYMENT → AWAITING_CONFIRMATION → CONFIRMED → COMPL
 **Customer provides location:**
 
 ```http
-GET /api/v1/shops/nearby?latitude=12.9716&longitude=77.5946
+GET /api/v1/shops?longitude=77.5946&latitude=12.9716
 ```
 
 **Returns:** List of nearby shops with distance, ratings, and basic info
@@ -266,7 +262,7 @@ GET /api/v1/shops/:shopId/employees
 #### Option A: Employee-Specific (Customer selected employee)
 
 ```http
-GET /api/v1/employees/:employeeId/available-slots?date=2026-04-28&serviceId=service1
+GET /api/v1/employees/:employeeId/availability?date=2026-04-28&serviceId=service1
 Authorization: Bearer <token>
 ```
 
@@ -468,8 +464,13 @@ Content-Type: application/json
 ### Step 8: Barber Confirms (Within 24 Hours)
 
 ```http
-PATCH /api/v1/bookings/:bookingId/confirm
+PATCH /api/v1/bookings/:bookingId
 Authorization: Bearer <barber_token>
+Content-Type: application/json
+
+{
+  "status": "confirmed"
+}
 ```
 
 **Returns:**
@@ -784,5 +785,5 @@ Barber can only cancel PENDING (unpaid) bookings. After payment, only auto-cance
 ---
 
 **Document Status:** ✅ Complete  
-**Last Updated:** April 28, 2026  
+**Last Updated:** May 4, 2026  
 **Next Steps:** Use these APIs in your application

@@ -26,7 +26,7 @@ class RatingRepository {
             
         if (options.skip !== undefined) query.skip(options.skip);
         if (options.limit !== undefined) query.limit(options.limit);
-        return query;
+        return query.lean();
     }
 
     async findById(id) {

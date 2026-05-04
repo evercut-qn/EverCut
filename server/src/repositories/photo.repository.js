@@ -11,11 +11,11 @@ class PhotoRepository {
         
         if (options.skip !== undefined) mongoQuery.skip(options.skip);
         if (options.limit !== undefined) mongoQuery.limit(options.limit);
-        return mongoQuery;
+        return mongoQuery.lean();
     }
 
     async findByIdAndShop(id, shopId) {
-        return Photo.findOne({ _id: id, shopId, isActive: true });
+        return Photo.findOne({ _id: id, shopId, isActive: true }).lean();
     }
 
     async deleteByIdAndShop(id, shopId) {

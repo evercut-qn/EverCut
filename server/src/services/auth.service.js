@@ -9,6 +9,8 @@ import { UnauthorizedError } from '../utils/api-error.js';
 import { serializeBarberProfile } from '../utils/barber-profile.utils.js';
 import { ROLES, TOKEN_TYPE } from '../utils/constants.js';
 import logger, { maskPhoneNumber } from '../utils/logger.js';
+import { serializeCustomerProfile } from '../serializers/customer.serializer.js';
+import { serializeUser } from '../serializers/user.serializer.js';
 
 const normalizePhoneNumber = (phoneNumber) => {
     const value = String(phoneNumber ?? '').trim();
@@ -32,7 +34,8 @@ const loadUserProfile = async (user) => {
     if (!user) return null;
 
     if (user.roleType === ROLES.CUSTOMER) {
-        return customerRepository.findByUserId(user._id);
+        const customer = await customerRepository.findByUserId(user._id);
+        return serializeCustomerProfile(customer);
     }
 
     if (user.roleType === ROLES.BARBER) {
@@ -132,7 +135,12 @@ export const resolveOtpSession = async (phoneNumber) => {
         const user = authenticatedUser || existingUser;
         const profile = await loadUserProfile(user);
 
-        return { isNewUser: false, user, profile, tokens };
+        return {
+            isNewUser: false,
+            user: serializeUser(user),
+            profile,
+            tokens,
+        };
     }
 
     const onboardingToken = generateOnboardingToken(formattedPhoneNumber);

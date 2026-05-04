@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { updateBusinessSchema, updateUpiDetailsSchema } from '../shop.validator.js';
+import { updateBusinessSchema, updatePayoutDetailsSchema } from '../shop.validator.js';
 
 test('updateBusinessSchema normalizes shop hour updates from AM/PM to 24-hour values', () => {
     const result = updateBusinessSchema.validate({
@@ -32,8 +32,12 @@ test('updateBusinessSchema rejects invalid shop-hour strings', () => {
     assert.match(result.error?.message || '', /openTime must use HH:MM or hh:mm AM\/PM format/);
 });
 
-test('updateUpiDetailsSchema strips provider-managed beneficiary identifiers', () => {
-    const result = updateUpiDetailsSchema.validate({
+test('updatePayoutDetailsSchema strips provider-managed beneficiary identifiers', () => {
+    const result = updatePayoutDetailsSchema.validate({
+        accountHolderName: 'Postman Barber',
+        bankName: 'HDFC Bank',
+        bankAccount: '12345678901234',
+        ifsc: 'HDFC0001234',
         upiId: 'barber@upi',
         beneficiaryId: 'beneficiary-1',
     }, {

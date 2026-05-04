@@ -88,12 +88,6 @@ export const updateBusinessSchema = Joi.object({
     dateOfBirth: Joi.date(),
     numberOfEmployees: Joi.number().integer().min(1),
     yearsOfExperience: Joi.number().integer().min(0),
-    upiId: Joi.string(),
-    upiAddress: Joi.string(),
-    accountHolderName: Joi.string().trim().min(1).max(100),
-    bankName: Joi.string().trim().min(1).max(120),
-    bankAccount: bankAccountSchema,
-    ifsc: ifscSchema,
     bio: Joi.string().max(500).allow(''),
     address: Joi.string().trim(),
     shopLocation: Joi.string().trim(),
@@ -134,7 +128,6 @@ export const updateBusinessSchema = Joi.object({
         value.ownerLastName = value.ownerLastName || value.lastName;
         value.ownerGender = value.ownerGender || value.gender;
         value.ownerDateOfBirth = value.ownerDateOfBirth || value.dateOfBirth;
-        value.upiId = value.upiId || value.upiAddress;
         value.address = value.address || value.shopLocation;
         value.category = value.category || value.shopCategory || value.businessCategory;
         value.facilities = value.facilities ?? value.amenities;
@@ -218,23 +211,6 @@ export const updateBusinessSchema = Joi.object({
     })
     .min(1);
 
-export const updateUpiDetailsSchema = Joi.object({
-    upiId: Joi.string().trim(),
-    upiAddress: Joi.string().trim(),
-    accountHolderName: Joi.string().trim().min(1).max(100),
-    bankName: Joi.string().trim().min(1).max(120),
-    bankAccount: bankAccountSchema,
-    ifsc: ifscSchema,
-    isVerified: Joi.any().strip(),
-    verificationStatus: Joi.any().strip(),
-    beneficiaryId: Joi.any().strip(),
-})
-    .custom((value) => {
-        value.upiId = value.upiId || value.upiAddress;
-        return value;
-    })
-    .min(1);
-
 export const toggleStatusSchema = Joi.object({
     status: Joi.alternatives().try(Joi.boolean(), Joi.string()).optional(),
     isOpen: Joi.any().strip(),
@@ -253,12 +229,19 @@ export const shopIdParamSchema = Joi.object({
     id: objectId.required(),
 });
 
-export const nearbyShopsQuerySchema = Joi.object({
+export const shopListQuerySchema = Joi.object({
     longitude: Joi.number().min(-180).max(180),
     latitude: Joi.number().min(-90).max(90),
     coordinates: Joi.string().pattern(coordinatesPattern),
+    query: Joi.string().trim().min(1).max(100),
+    category: Joi.string().valid(...ALL_SHOP_CATEGORIES),
 })
-    .custom(normalizeCoordinates, 'coordinates normalization')
+    .custom((value, helpers) => {
+        if (value.coordinates || value.longitude !== undefined || value.latitude !== undefined) {
+            return normalizeCoordinates(value, helpers);
+        }
+        return value;
+    }, 'shop list query normalization')
     .messages({ 'any.custom': '{{#message}}' });
 
 export const servicesByGenderQuerySchema = Joi.object({
@@ -276,10 +259,6 @@ export const searchServicesQuerySchema = Joi.object({
     gender: Joi.string().valid(...ALL_SERVICE_FOR),
 });
 
-export const searchShopsQuerySchema = Joi.object({
-    query: Joi.string().trim().min(1).max(100).required(),
-});
-
 export const shopAvailabilityQuerySchema = Joi.object({
     date: Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/).required().messages({
         'string.pattern.base': 'date must be in YYYY-MM-DD format',
@@ -290,7 +269,7 @@ export const shopAvailabilityQuerySchema = Joi.object({
     ).required(),
 });
 
-export const updateBankDetailsSchema = Joi.object({
+export const updatePayoutDetailsSchema = Joi.object({
     accountHolderName: Joi.string().trim().min(1).max(100).required(),
     bankName: Joi.string().trim().min(1).max(120).required(),
     bankAccount: Joi.string().trim().pattern(/^\d{6,34}$/).required().messages({

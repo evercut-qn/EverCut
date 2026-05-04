@@ -3,30 +3,31 @@ import customerRepository from '../repositories/customer.repository.js';
 import serviceRepository from '../repositories/service.repository.js';
 import photoRepository from '../repositories/photo.repository.js';
 import ratingRepository from '../repositories/rating.repository.js';
-import userRepository from '../repositories/user.repository.js';
 import { BadRequestError, NotFoundError } from '../utils/api-error.js';
-import { serializeBarberProfile, serializeUpiDetails, serializeBankDetails } from '../utils/barber-profile.utils.js';
+import { serializeBarberProfile, serializeBankDetails } from '../utils/barber-profile.utils.js';
 import { escapeRegex } from '../utils/regex.utils.js';
 import { serializeRating } from '../utils/rating-response.utils.js';
 import { buildPagination } from '../utils/pagination.utils.js';
 import { normalizeServicePricing } from '../utils/service-pricing.utils.js';
 import { normalizeShopSchedule } from '../utils/shop-schedule.utils.js';
 import notificationEvents from './notification-events.service.js';
+import * as serviceCatalogService from './service-catalog.service.js';
+import { serializeEmployee } from '../serializers/employee.serializer.js';
+import { serializePhotos } from '../serializers/photo.serializer.js';
+import { serializeServices } from '../serializers/service.serializer.js';
+import { serializeShopProfile, serializeShopSummary } from '../serializers/shop.serializer.js';
 import {
     ALL_SERVICE_FOR,
     ALL_SHOP_AMENITIES,
     ALL_SHOP_CATEGORIES,
     DAYS_OF_WEEK,
     NEARBY_DISTANCE_METERS,
-    SHOP_CATEGORY,
 } from '../utils/constants.js';
 
 /**
  * Shop service business logic for barber profile management and customer discovery.
  */
 
-const toObjectIdString = (value) => String(value?._id || value || '');
-const isIdInList = (ids = [], id) => ids.some((item) => toObjectIdString(item) === toObjectIdString(id));
 const paginateArray = (items, query = {}) => {
     const { skip, limit, pagination } = buildPagination(query, items.length);
     return {
@@ -52,11 +53,6 @@ const ALLOWED_UPDATE_FIELDS = [
     'ownerLastName',
     'ownerGender',
     'ownerDateOfBirth',
-    'upiId',
-    'accountHolderName',
-    'bankName',
-    'bankAccount',
-    'ifsc',
     'location',
     'bio',
     'address',
@@ -67,11 +63,6 @@ const ALLOWED_UPDATE_FIELDS = [
     'openTime',
     'closeTime',
     'breakTimes',
-];
-
-const LEGACY_SHOP_CONTACT_FIELDS = [
-    ['email', 'Id'].join(''),
-    ['phone', 'Number'].join(''),
 ];
 
 const parseJsonIfString = (value) => {
@@ -128,7 +119,6 @@ const normalizeUpdateBody = (body = {}) => {
     normalized.ownerLastName = normalized.ownerLastName || normalized.lastName;
     normalized.ownerGender = normalized.ownerGender || normalized.gender;
     normalized.ownerDateOfBirth = normalized.ownerDateOfBirth || normalized.dateOfBirth;
-    normalized.upiId = normalized.upiId || normalized.upiAddress;
     normalized.address = normalized.address || normalized.shopLocation;
     normalized.category = normalized.category || normalized.shopCategory || normalized.businessCategory;
     normalized.facilities = normalized.facilities ?? normalized.amenities;
@@ -268,32 +258,6 @@ const validateAndAssign = (key, value, updateData, errors) => {
             return;
         }
 
-        case 'bankAccount': {
-            const bankAccount = String(value).replace(/\s+/g, '');
-            if (bankAccount.length < 6) {
-                errors.push('bankAccount must be at least 6 digits');
-                return;
-            }
-            updateData.payoutConfig = {
-                ...(updateData.payoutConfig || {}),
-                bankAccount,
-            };
-            return;
-        }
-
-        case 'ifsc': {
-            const ifsc = String(value).trim().toUpperCase();
-            if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc)) {
-                errors.push('ifsc must be a valid IFSC code');
-                return;
-            }
-            updateData.payoutConfig = {
-                ...(updateData.payoutConfig || {}),
-                ifsc,
-            };
-            return;
-        }
-
         default:
             updateData[key] = value;
     }
@@ -324,13 +288,6 @@ export const updateBusinessInfo = async (ownerId, body, userContext) => {
         const firstName = updateData.ownerFirstName || shop.ownerFirstName;
         const lastName = updateData.ownerLastName || shop.ownerLastName;
         updateData.ownerName = `${firstName || ''} ${lastName || ''}`.trim();
-    }
-
-    if (updateData.payoutConfig) {
-        updateData.payoutConfig = {
-            ...(shop.payoutConfig || {}),
-            ...updateData.payoutConfig,
-        };
     }
 
     const scheduleFieldsTouched = ['openTime', 'closeTime', 'breakTimes']
@@ -372,26 +329,14 @@ export const updateBusinessInfo = async (ownerId, body, userContext) => {
     };
 };
 
-export const getUpiDetails = async (ownerId) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
-    if (!shop) throw new NotFoundError('Shop profile');
-
-    return serializeUpiDetails(shop);
-};
-
-export const updateUpiDetails = async (ownerId, body, userContext) => {
-    const result = await updateBusinessInfo(ownerId, body, userContext);
-    return serializeUpiDetails(result.shop);
-};
-
-export const getBankDetails = async (ownerId) => {
+export const getPayoutDetails = async (ownerId) => {
     const shop = await shopRepository.findByOwnerId(ownerId);
     if (!shop) throw new NotFoundError('Shop profile');
 
     return serializeBankDetails(shop);
 };
 
-export const updateBankDetails = async (ownerId, body) => {
+export const updatePayoutDetails = async (ownerId, body) => {
     const shop = await shopRepository.findByOwnerId(ownerId);
     if (!shop) throw new NotFoundError('Shop profile');
 
@@ -485,25 +430,13 @@ export const getShopInfoForCustomer = async (shopId) => {
     const ratings = await ratingRepository.findByShop(shopId);
     const formattedRatings = ratings.map(serializeRating);
 
-    const safeShop = shop.toObject();
-    delete safeShop.pinHash;
-    delete safeShop.coverCloudinaryId;
-    delete safeShop.ownerPhotoCloudinaryId;
-    delete safeShop.upiId;
-    delete safeShop.accountHolderName;
-    delete safeShop.bankName;
-    delete safeShop.payoutConfig;
-    for (const field of LEGACY_SHOP_CONTACT_FIELDS) {
-        delete safeShop[field];
-    }
-
     return {
-        shop: safeShop,
+        shop: serializeShopProfile(shop, { privateView: false }),
         services: {
-            single: singleServices.map(normalizeServicePricing),
-            bundled: bundledServices.map(normalizeServicePricing),
+            single: serializeServices(singleServices.map(normalizeServicePricing)),
+            bundled: serializeServices(bundledServices.map(normalizeServicePricing)),
         },
-        photos,
+        photos: serializePhotos(photos),
         ratings: { ...ratingSummary, details: formattedRatings },
     };
 };
@@ -518,15 +451,8 @@ export const getEmployeesByShopId = async (shopId) => {
     // Return only public employee information
     return employees
         .filter((emp) => emp.isActive && !emp.deletedAt)
-        .map((emp) => ({
-            id: emp._id,
-            firstName: emp.firstName,
-            lastName: emp.lastName,
-            photoUrl: emp.photoUrl,
-            gender: emp.gender,
-            workingHours: emp.workingHours,
-            isActive: emp.isActive,
-        }));
+        .map((emp) => serializeEmployee(emp, { publicView: true }))
+        .filter(Boolean);
 };
 
 const loadCustomer = async (userId) => {
@@ -538,13 +464,13 @@ const loadCustomer = async (userId) => {
 const assertShopExists = async (shopId) => {
     const shop = await shopRepository.findById(shopId);
     if (!shop) throw new NotFoundError('Shop');
-    return shop;
+    return undefined;
 };
 
 export const getFavoriteShops = async (userId, query = {}) => {
     const customer = await customerRepository.findFavoriteShopsByUserId(userId);
     if (!customer) throw new NotFoundError('Customer profile');
-    return paginateArray(customer.favoriteShops || [], query);
+    return paginateArray((customer.favoriteShops || []).map(serializeShopSummary).filter(Boolean), query);
 };
 
 export const addFavoriteShop = async (userId, shopId) => {
@@ -568,38 +494,31 @@ export const removeFavoriteShop = async (userId, shopId) => {
     };
 };
 
-export const toggleFavoriteShop = async (userId, shopId) => {
-    const customer = await loadCustomer(userId);
-    await assertShopExists(shopId);
-
-    if (isIdInList(customer.favoriteShops, shopId)) {
-        await customerRepository.removeFavoriteShop(userId, shopId);
-        return {
-            favorite: false,
-            shopId,
-        };
+export const getShops = async (query = {}) => {
+    if (query.query) {
+        return serviceCatalogService.searchShops(query.query);
     }
 
-    await customerRepository.addFavoriteShop(userId, shopId);
-    return {
-        favorite: true,
-        shopId,
-    };
+    if (query.category) {
+        return (await shopRepository.findByCategory(
+            query.category,
+            'shopName location coverUrl address',
+        )).map(serializeShopSummary).filter(Boolean);
+    }
+
+    if (query.longitude !== undefined && query.latitude !== undefined) {
+        return getNearbyShops([Number(query.longitude), Number(query.latitude)]);
+    }
+
+    return [];
 };
 
 export const getNearbyShops = async (coordinates) => {
-    return shopRepository.findNearby(
+    return (await shopRepository.findNearby(
         coordinates,
         NEARBY_DISTANCE_METERS,
         'shopName address coverUrl facilities',
-    );
-};
-
-export const getDoorstepShops = async () => {
-    return shopRepository.findByCategory(
-        SHOP_CATEGORY.DOOR_STEP,
-        'shopName location coverUrl address',
-    );
+    )).map(serializeShopSummary).filter(Boolean);
 };
 
 export const getNearbyServicesByGender = async (coordinates, gender, searchTerm) => {
@@ -621,5 +540,8 @@ export const getNearbyServicesByGender = async (coordinates, gender, searchTerm)
         'serviceName shopId serviceFor imageUrl serviceType',
     );
 
-    return { shops: nearbyShops, services };
+    return {
+        shops: nearbyShops.map(serializeShopSummary).filter(Boolean),
+        services: serializeServices(services, { includeShop: true }),
+    };
 };

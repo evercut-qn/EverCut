@@ -38,13 +38,13 @@ class ShopRepository {
             },
         }));
         if (selectFields) query.select(selectFields);
-        return query;
+        return query.lean();
     }
 
     async findByCategory(category, selectFields) {
         const query = Shop.find({ category });
         if (selectFields) query.select(selectFields);
-        return query;
+        return query.lean();
     }
 
     async searchByName(nameQuery, selectFields) {
@@ -52,7 +52,7 @@ class ShopRepository {
             trustQueryOperators({ shopName: { $regex: new RegExp(escapeRegex(nameQuery), 'i') } }),
         );
         if (selectFields) query.select(selectFields);
-        return query;
+        return query.lean();
     }
 
     async findByIdWithFields(id, fields) {

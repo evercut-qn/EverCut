@@ -79,8 +79,8 @@ eventType=booking.confirmed
 Expected:
 
 - `200`
-- `data.items` contains notifications for the authenticated user only.
-- `data.pagination` contains normal pagination metadata.
+- `data` is an array of notification DTOs for the authenticated user only.
+- `meta.pagination` contains normal pagination metadata.
 
 ## Flow 4: Read Unread Count
 

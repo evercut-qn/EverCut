@@ -86,10 +86,15 @@
               "  pm.expect(response).to.have.property('message');",
               "  pm.expect(response.message).to.be.a('string');",
               "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
               "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
               "const response = pm.response.json();",
-              "const shopId = response.data && response.data._id;",
+              "const shopId = response.data && (response.data.shopId || response.data.id);",
               "if (shopId) { pm.collectionVariables.set('shop_id', shopId); pm.globals.set('shared_shop_id', shopId); }"
             ]
           }
@@ -99,7 +104,7 @@
     {
       "name": "2. Update Business Info",
       "request": {
-        "method": "PUT",
+        "method": "PATCH",
         "header": [
           {
             "key": "Content-Type",
@@ -107,10 +112,10 @@
           }
         ],
         "url": "{{base_url}}/{{api_prefix}}/shops/me",
-        "description": "Updates the barber profile using the onboarding-friendly request shape that the backend validators actually accept. NOTE: Email updates must use PUT /account/email endpoint.",
+        "description": "Updates only barber profile and business fields. Payout details are managed through /shops/me/payout-details. NOTE: Email updates must use PUT /account/email endpoint.",
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"firstName\": \"Test\",\n  \"lastName\": \"Barber\",\n  \"shopOwner\": \"Test Barber\",\n  \"dateOfBirth\": \"1991-01-12\",\n  \"gender\": \"Male\",\n  \"shopName\": \"Postman Test Barber Studio\",\n  \"businessCategory\": \"Barber\",\n  \"targetCustomers\": \"male\",\n  \"shopLocation\": \"MG Road, Bengaluru\",\n  \"location\": {\"type\":\"Point\",\"coordinates\":[77.5946,12.9716]},\n  \"amenities\": [\"Air Conditioning\", \"Waiting Area\", \"Parking Area\", \"Wi-Fi\"],\n  \"workingDays\": [\"Monday\", \"Tuesday\", \"Wednesday\", \"Thursday\", \"Friday\", \"Saturday\"],\n  \"workingHours\": {\n    \"opensAt\": \"09:00\",\n    \"closesAt\": \"20:00\"\n  },\n  \"breakTimings\": [\n    {\n      \"startsAt\": \"13:00\",\n      \"endsAt\": \"14:00\"\n    }\n  ],\n  \"accountHolderName\": \"Test Barber\",\n  \"bankName\": \"HDFC Bank\",\n  \"upiAddress\": \"test.barber@upi\",\n  \"bio\": \"Updated from the automated Postman profile collection.\"\n}",
+          "raw": "{\n  \"firstName\": \"Test\",\n  \"lastName\": \"Barber\",\n  \"shopOwner\": \"Test Barber\",\n  \"dateOfBirth\": \"1991-01-12\",\n  \"gender\": \"Male\",\n  \"shopName\": \"Postman Test Barber Studio\",\n  \"businessCategory\": \"Barber\",\n  \"targetCustomers\": \"male\",\n  \"shopLocation\": \"MG Road, Bengaluru\",\n  \"location\": {\"type\":\"Point\",\"coordinates\":[77.5946,12.9716]},\n  \"amenities\": [\"Air Conditioning\", \"Waiting Area\", \"Parking Area\", \"Wi-Fi\"],\n  \"workingDays\": [\"Monday\", \"Tuesday\", \"Wednesday\", \"Thursday\", \"Friday\", \"Saturday\"],\n  \"workingHours\": {\n    \"opensAt\": \"09:00\",\n    \"closesAt\": \"20:00\"\n  },\n  \"breakTimings\": [\n    {\n      \"startsAt\": \"13:00\",\n      \"endsAt\": \"14:00\"\n    }\n  ],\n  \"bio\": \"Updated from the automated Postman profile collection.\"\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -132,6 +137,11 @@
               "  pm.expect(response).to.have.property('message');",
               "  pm.expect(response.message).to.be.a('string');",
               "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
               "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
             ]
@@ -140,12 +150,12 @@
       ]
     },
     {
-      "name": "3. Get UPI Details",
+      "name": "3. Get Payout Details",
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/shops/me/upi",
-        "description": "Reads the dedicated UPI payload."
+        "url": "{{base_url}}/{{api_prefix}}/shops/me/payout-details",
+        "description": "Reads the complete payout account details with verification status. Account number is masked for security."
       },
       "event": [
         {
@@ -161,78 +171,11 @@
               "  pm.expect(response).to.have.property('message');",
               "  pm.expect(response.message).to.be.a('string');",
               "  pm.expect(response).to.have.property('data');",
-              "});",
-              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "4. Update UPI Details",
-      "request": {
-        "method": "PUT",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          }
-        ],
-        "url": "{{base_url}}/{{api_prefix}}/shops/me/upi",
-        "description": "Updates only the dedicated payment fields.",
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"accountHolderName\": \"Test Barber\",\n  \"bankName\": \"HDFC Bank\",\n  \"upiAddress\": \"test.barber+verified@upi\"\n}",
-          "options": {
-            "raw": {
-              "language": "json"
-            }
-          }
-        }
-      },
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "pm.test('response uses the standard envelope', function () {",
-              "  const response = pm.response.json();",
-              "  pm.expect(response).to.be.an('object');",
-              "  pm.expect(response).to.have.property('success');",
-              "  pm.expect(response.success).to.be.a('boolean');",
-              "  pm.expect(response).to.have.property('message');",
-              "  pm.expect(response.message).to.be.a('string');",
-              "  pm.expect(response).to.have.property('data');",
-              "});",
-              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "5. Get Bank Details",
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/shops/me/bank-details",
-        "description": "Reads the complete bank account details with verification status. Account number is masked for security."
-      },
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "pm.test('response uses the standard envelope', function () {",
-              "  const response = pm.response.json();",
-              "  pm.expect(response).to.be.an('object');",
-              "  pm.expect(response).to.have.property('success');",
-              "  pm.expect(response.success).to.be.a('boolean');",
-              "  pm.expect(response).to.have.property('message');",
-              "  pm.expect(response.message).to.be.a('string');",
-              "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
               "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
               "const response = pm.response.json();",
@@ -248,17 +191,17 @@
       ]
     },
     {
-      "name": "6. Update Bank Details",
+      "name": "4. Update Payout Details",
       "request": {
-        "method": "PUT",
+        "method": "PATCH",
         "header": [
           {
             "key": "Content-Type",
             "value": "application/json"
           }
         ],
-        "url": "{{base_url}}/{{api_prefix}}/shops/me/bank-details",
-        "description": "Updates complete bank account details including account number and IFSC. Verification status resets to pending on change.",
+        "url": "{{base_url}}/{{api_prefix}}/shops/me/payout-details",
+        "description": "Updates complete payout account details including account number and IFSC. Verification status resets to pending on change.",
         "body": {
           "mode": "raw",
           "raw": "{\n  \"accountHolderName\": \"Test Barber\",\n  \"bankName\": \"HDFC Bank\",\n  \"bankAccount\": \"12345678901234\",\n  \"ifsc\": \"HDFC0001234\",\n  \"upiId\": \"test.barber@upi\"\n}",
@@ -283,6 +226,11 @@
               "  pm.expect(response).to.have.property('message');",
               "  pm.expect(response.message).to.be.a('string');",
               "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
               "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
               "const response = pm.response.json();",
@@ -295,9 +243,9 @@
       ]
     },
     {
-      "name": "7. Ensure Shop Is Open",
+      "name": "5. Ensure Shop Is Open",
       "request": {
-        "method": "PUT",
+        "method": "PATCH",
         "header": [
           {
             "key": "Content-Type",
@@ -330,6 +278,11 @@
               "  pm.expect(response).to.have.property('message');",
               "  pm.expect(response.message).to.be.a('string');",
               "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
               "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
             ]
@@ -338,9 +291,9 @@
       ]
     },
     {
-      "name": "8. Update Profile Picture",
+      "name": "6. Update Profile Picture",
       "request": {
-        "method": "PUT",
+        "method": "PATCH",
         "header": [],
         "url": "{{base_url}}/{{api_prefix}}/shops/me/picture",
         "description": "Uploads or replaces the owner profile picture.",
@@ -369,6 +322,11 @@
               "  pm.expect(response).to.have.property('message');",
               "  pm.expect(response.message).to.be.a('string');",
               "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
               "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
             ]
@@ -377,9 +335,9 @@
       ]
     },
     {
-      "name": "9. Update Cover Image",
+      "name": "7. Update Cover Image",
       "request": {
-        "method": "PUT",
+        "method": "PATCH",
         "header": [],
         "url": "{{base_url}}/{{api_prefix}}/shops/me/cover",
         "description": "Uploads or replaces the shop cover image.",
@@ -408,6 +366,11 @@
               "  pm.expect(response).to.have.property('message');",
               "  pm.expect(response.message).to.be.a('string');",
               "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
               "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
             ]
@@ -416,9 +379,9 @@
       ]
     },
     {
-      "name": "10. Update PIN",
+      "name": "8. Update PIN",
       "request": {
-        "method": "PUT",
+        "method": "PATCH",
         "header": [
           {
             "key": "Content-Type",
@@ -462,6 +425,11 @@
               "  pm.expect(response).to.have.property('message');",
               "  pm.expect(response.message).to.be.a('string');",
               "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
               "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
               "const nextPin = pm.collectionVariables.get('barber_next_pin');",
@@ -473,11 +441,11 @@
       ]
     },
     {
-      "name": "11. Sign-Out Everywhere (Terminal)",
+      "name": "9. Sign-Out Everywhere (Terminal)",
       "request": {
-        "method": "POST",
+        "method": "DELETE",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/shops/me/sign-out-everywhere",
+        "url": "{{base_url}}/{{api_prefix}}/account/sessions",
         "description": "Revokes the JWT refresh token, invalidating all sessions. Run this only when you are finished testing."
       },
       "event": [
@@ -494,6 +462,11 @@
               "  pm.expect(response).to.have.property('message');",
               "  pm.expect(response.message).to.be.a('string');",
               "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
               "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
             ]
@@ -502,7 +475,7 @@
       ]
     },
     {
-      "name": "12. Delete Account (Terminal)",
+      "name": "10. Delete Account (Terminal)",
       "request": {
         "method": "DELETE",
         "header": [
@@ -511,7 +484,7 @@
             "value": "application/json"
           }
         ],
-        "url": "{{base_url}}/{{api_prefix}}/shops/me",
+        "url": "{{base_url}}/{{api_prefix}}/account",
         "description": "Soft-deletes the barber account and revokes the JWT refresh token. Run this instead of the sign-out request when you want the account deleted.",
         "body": {
           "mode": "raw",
@@ -537,6 +510,11 @@
               "  pm.expect(response).to.have.property('message');",
               "  pm.expect(response.message).to.be.a('string');",
               "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
               "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
             ]

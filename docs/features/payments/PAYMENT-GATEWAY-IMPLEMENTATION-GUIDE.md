@@ -1862,26 +1862,6 @@ export const getPaymentStatus = async (userId, paymentId) => {
     };
 };
 
-/**
- * Get payment status by booking ID.
- */
-export const getPaymentByBooking = async (userId, bookingId) => {
-    const payment = await paymentRepository.findLatestByBookingId(bookingId);
-    if (!payment) {
-        throw new NotFoundError('Payment for this booking');
-    }
-    if (String(payment.customerId) !== String(userId)) {
-        throw new BadRequestError('Unauthorized');
-    }
-    return {
-        _id: payment._id,
-        bookingId: payment.bookingId,
-        status: payment.status,
-        amountInRupees: payment.amountInRupees,
-        paymentMode: payment.paymentMode,
-    };
-};
-
 // ─── Internal Webhook Handlers ───
 
 async function _handlePaymentSuccess(webhookData) {
@@ -2626,16 +2606,6 @@ export const getPaymentStatus = async (req, res, next) => {
     }
 };
 
-export const getPaymentByBooking = async (req, res, next) => {
-    try {
-        const { bookingId } = getValidatedRequestData(req, 'params');
-        const result = await paymentService.getPaymentByBooking(req.user._id, bookingId);
-        return res.status(200).json(ApiResponse.success(result, 'Payment details'));
-    } catch (err) {
-        next(err);
-    }
-};
-
 export const handleRedirect = async (req, res, next) => {
     try {
         const { bookingId } = req.query;
@@ -2820,15 +2790,8 @@ router.get(
     paymentController.getPaymentStatus,
 );
 
-router.get(
-    '/booking/:bookingId',
-    authenticate,
-    validate(bookingIdParamSchema, 'params'),
-    paymentController.getPaymentByBooking,
-);
-
 router.post(
-    '/:bookingId/refund',
+    '/bookings/:id/refunds',
     authenticate,
     authorize(ROLES.ADMIN, ROLES.BARBER),
     validate(bookingIdParamSchema, 'params'),
@@ -3350,7 +3313,7 @@ stopPayoutBatchJob();
 | Trigger | Who Initiates | API |
 |---|---|---|
 | Booking cancelled by customer (before service) | Customer | Automatic via `cancelBooking()` |
-| Booking cancelled by barber | Barber | `POST /payments/:bookingId/refund` |
+| Booking cancelled by barber | Barber | `POST /bookings/:id/refunds` |
 | Service dispute | Admin | Dashboard action |
 | Payment error (double charge) | System | Automatic detection |
 
@@ -3856,12 +3819,10 @@ export class MockCashfreePayoutAdapter extends PayoutGatewayAdapter {
 
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
-| `POST` | `/api/v1/payments/initiate` | Customer | Initiate payment for a booking |
-| `GET` | `/api/v1/payments/:id/status` | Customer | Check payment status |
-| `GET` | `/api/v1/payments/booking/:bookingId` | Customer | Get payment by booking |
-| `GET` | `/api/v1/payments/redirect` | Public | Handle post-payment redirect |
+| `POST` | `/api/v1/payments` | Customer | Initiate payment for a booking |
+| `GET` | `/api/v1/payments/:id` | Customer | Check payment status |
 | `POST` | `/api/v1/payments/webhook` | Public* | PhonePe webhook endpoint |
-| `POST` | `/api/v1/payments/:bookingId/refund` | Admin/Barber | Initiate refund |
+| `POST` | `/api/v1/bookings/:id/refunds` | Admin/Barber | Initiate refund |
 
 ### Payout Endpoints (Cashfree Disbursement)
 

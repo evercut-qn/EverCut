@@ -66,7 +66,10 @@ test('registerFcmToken upserts a token for the authenticated user and device', a
             locale: 'en-IN',
         },
     });
-    assert.equal(result._id, 'token-doc-1');
+    assert.equal(result.id, 'token-doc-1');
+    assert.equal(result.tokenId, 'token-doc-1');
+    assert.equal('token' in result, false);
+    assert.equal('_id' in result, false);
     assert.equal(result.revokedAt, null);
 });
 

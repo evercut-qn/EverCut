@@ -7,6 +7,8 @@ import cloudinary from '../config/cloudinary.config.js';
 import { buildPagination } from '../utils/pagination.utils.js';
 import { parseTimeToMinutes } from '../utils/time.utils.js';
 import { normalizeShopSchedule } from '../utils/shop-schedule.utils.js';
+import { serializeEmployee, serializeEmployees } from '../serializers/employee.serializer.js';
+import { toIdString } from '../serializers/core.serializer.js';
 
 /**
  * Employee service â€” CRUD operations for shop employees.
@@ -216,7 +218,8 @@ export const addEmployee = async (ownerId, data, file) => {
     }
 
     try {
-        return await employeeRepository.create(employeeData);
+        const created = await employeeRepository.create(employeeData);
+        return serializeEmployee(created);
     } catch (error) {
         await rethrowDuplicateEmployeeWrite(error, employeeData.cloudinaryId);
     }
@@ -229,7 +232,7 @@ export const getEmployees = async (ownerId, query = {}) => {
     const total = await employeeRepository.countByShopId(shop._id);
     const { skip, limit, pagination } = buildPagination(query, total);
 
-    const items = await employeeRepository.findByShopId(shop._id, { skip, limit });
+    const items = serializeEmployees(await employeeRepository.findByShopId(shop._id, { skip, limit }));
     return { items, pagination };
 };
 
@@ -305,7 +308,9 @@ export const getEmployeeById = async (ownerId, employeeId) => {
 
     return {
         employee: {
-            _id: employee._id,
+            ...serializeEmployee(employee),
+            id: toIdString(employee._id),
+            employeeId: toIdString(employee._id),
             firstName: employee.firstName,
             lastName: employee.lastName,
             fullName: `${employee.firstName} ${employee.lastName}`,
@@ -335,7 +340,7 @@ export const getEmployeeById = async (ownerId, employeeId) => {
             upcoming: {
                 count: upcomingBookings.length,
                 bookings: upcomingBookings.slice(0, 5).map((b) => ({
-                    bookingId: b._id,
+                    bookingId: toIdString(b._id),
                     date: b.date,
                     time: b.time,
                     customer: {
@@ -399,7 +404,7 @@ export const updateEmployee = async (ownerId, employeeId, data, file) => {
         await destroyCloudinaryAsset(employee.cloudinaryId, 'replace-photo');
     }
 
-    return updated;
+    return serializeEmployee(updated);
 };
 
 export const deleteEmployee = async (ownerId, employeeId) => {
@@ -475,7 +480,7 @@ export const getStaffAvailability = async (ownerId) => {
                 totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
             return {
-                employeeId: employee._id,
+                employeeId: toIdString(employee._id),
                 name: `${employee.firstName} ${employee.lastName}`,
                 photoUrl: employee.photoUrl,
                 progress: {
@@ -538,7 +543,7 @@ export const toggleEmployeeStatus = async (ownerId, employeeId, status) => {
     });
 
     return {
-        employeeId: updated._id,
+        employeeId: toIdString(updated._id),
         name: `${updated.firstName} ${updated.lastName}`,
         isActive: updated.isActive,
     };

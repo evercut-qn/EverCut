@@ -146,6 +146,7 @@ test('updateReplyToRating trims reply text and omits customer email from the res
     assert.deepEqual(result.user, {
         firstName: 'Ava',
         lastName: 'Customer',
+        fullName: 'Ava Customer',
         photoUrl: 'https://example.com/customer.jpg',
     });
     assert.equal('email' in result.user, false);

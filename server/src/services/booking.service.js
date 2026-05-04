@@ -29,6 +29,7 @@ import {
     CANCELLATION_WINDOW_HOURS,
     PAYMENT_STATUS,
     PAYOUT_STATUS,
+    ROLES,
     SERVICE_TYPE,
 } from '../utils/constants.js';
 import { getEffectiveServicePrice, normalizeServicePricing } from '../utils/service-pricing.utils.js';
@@ -36,16 +37,20 @@ import { buildSlotLockTimes, toDateOnlyString } from '../utils/slot-lock.utils.j
 import { calculateAvailableSlots, getAvailableSlotTimes, normalizeBookedRanges } from '../utils/slot-calculator.utils.js';
 import logger from '../utils/logger.js';
 import notificationEvents from './notification-events.service.js';
+import {
+    serializeBooking,
+    serializeBookingCreation,
+    serializeBookingDetails,
+} from '../serializers/booking.serializer.js';
 
 /**
  * Booking service — all booking business logic.
  */
 
-// ── Customer: book a salon ───────────────────────────────────────────────
+// ── Customer: create booking ─────────────────────────────────────────────
 
 const normalizeBookedServices = (services = []) => services.map(normalizeServicePricing);
 const toObjectIdString = (value) => String(value?._id || value || '');
-const isIdInList = (ids = [], id) => ids.some((item) => toObjectIdString(item) === toObjectIdString(id));
 const paginateArray = (items, query = {}) => {
     const { skip, limit, pagination } = buildPagination(query, items.length);
     return {
@@ -321,20 +326,10 @@ const buildBookingDetailsPayload = async (booking) => {
     const isBundled = isBundleSelection(services);
     const platformFee = isBundled ? 10 : 3;
 
-    return {
+    return serializeBookingDetails({
         bookingId: booking._id,
-        customer: {
-            ...booking.customerId,
-            fullName: booking.customerId
-                ? `${booking.customerId.firstName || ''} ${booking.customerId.lastName || ''}`.trim()
-                : null,
-        },
-        employee: {
-            ...booking.employeeId,
-            fullName: booking.employeeId
-                ? `${booking.employeeId.firstName || ''} ${booking.employeeId.lastName || ''}`.trim()
-                : null,
-        },
+        customer: booking.customerId,
+        employee: booking.employeeId,
         shop: booking.shopId,
         date: booking.date,
         time: booking.time,
@@ -353,11 +348,15 @@ const buildBookingDetailsPayload = async (booking) => {
         slotLockTimes: booking.slotLockTimes,
         paymentTransactionId: booking.paymentTransactionId,
         merchantOrderId: booking.merchantOrderId,
-    };
+    });
 };
 
-export const bookSalon = async (userId, data) => {
-    const { serviceId, employeeId, shopId, date, time, idempotencyKey } = data;
+export const createBooking = async (userId, data) => {
+    if (data.sourceBookingId) {
+        return reorderBooking(userId, data.sourceBookingId, data.date, data.time);
+    }
+
+    const { serviceIds, employeeId, shopId, date, time, idempotencyKey } = data;
     const normalizedTime = normalizeBookingTime(time);
 
     const customer = await customerRepository.findByUserId(userId);
@@ -367,7 +366,7 @@ export const bookSalon = async (userId, data) => {
     if (idempotencyKey) {
         const existing = await bookingRepository.findByIdempotencyKey(customerId, idempotencyKey);
         if (existing) {
-            return {
+            return serializeBookingCreation({
                 bookingId: existing._id,
                 shopId: existing.shopId,
                 customerId: existing.customerId,
@@ -384,7 +383,7 @@ export const bookSalon = async (userId, data) => {
                 payoutStatus: existing.payoutStatus,
                 paymentRequired: existing.paymentStatus === PAYMENT_STATUS.PENDING,
                 idempotentReplay: true,
-            };
+            });
         }
     }
 
@@ -403,9 +402,6 @@ export const bookSalon = async (userId, data) => {
     );
     if (!shop) throw new NotFoundError('Shop');
     assertShopAcceptsDate(shop, date);
-
-    // Normalize serviceIds
-    const serviceIds = Array.isArray(serviceId) ? serviceId : [serviceId];
 
     // Validate: No duplicates
     const uniqueServiceIds = new Set(serviceIds);
@@ -495,7 +491,7 @@ export const bookSalon = async (userId, data) => {
         throw error;
     }
 
-    return {
+    return serializeBookingCreation({
         bookingId: booking._id,
         shopId,
         customerId,
@@ -513,12 +509,12 @@ export const bookSalon = async (userId, data) => {
         paymentStatus: booking.paymentStatus,
         payoutStatus: booking.payoutStatus,
         paymentRequired: true,
-    };
+    });
 };
 
 // ── Customer: get booking details ────────────────────────────────────────
 
-export const getBookingDetails = async (bookingId, userId) => {
+const getBookingDetailsForCustomer = async (bookingId, userId) => {
     const booking = await bookingRepository.findByIdPopulated(bookingId);
     if (!booking) throw new NotFoundError('Booking');
 
@@ -530,7 +526,7 @@ export const getBookingDetails = async (bookingId, userId) => {
     return buildBookingDetailsPayload(booking);
 };
 
-export const getBookingDetailsForShopOwner = async (bookingId, ownerId) => {
+const getBookingDetailsForShopOwner = async (bookingId, ownerId) => {
     const booking = await bookingRepository.findByIdPopulated(bookingId);
     if (!booking) throw new NotFoundError('Booking');
 
@@ -545,9 +541,21 @@ export const getBookingDetailsForShopOwner = async (bookingId, ownerId) => {
     return buildBookingDetailsPayload(booking);
 };
 
+export const getBookingDetailsForUser = async (bookingId, user) => {
+    if (user.roleType === ROLES.CUSTOMER) {
+        return getBookingDetailsForCustomer(bookingId, user._id);
+    }
+
+    if (user.roleType === ROLES.BARBER) {
+        return getBookingDetailsForShopOwner(bookingId, user._id);
+    }
+
+    throw new ForbiddenError('This endpoint is available only to customers and barbers');
+};
+
 // ── Customer: cancel booking ─────────────────────────────────────────────
 
-export const cancelBooking = async (bookingId, userId) => {
+const cancelBookingByCustomer = async (bookingId, userId) => {
     const booking = await bookingRepository.findById(bookingId);
     if (!booking) throw new NotFoundError('Booking');
 
@@ -607,124 +615,16 @@ export const cancelBooking = async (bookingId, userId) => {
         cancelledBy: 'customer',
         reason: cancellationNote,
     });
-    return updated;
+    return serializeBooking(updated);
 };
 
-// ── Customer: reschedule booking ─────────────────────────────────────────
+// ── Customer: schedule changes ───────────────────────────────────────────
 
-export const rescheduleBooking = async (bookingId, userId, newDate, newTime) => {
-    const normalizedNewTime = normalizeBookingTime(newTime);
-    const booking = await bookingRepository.findById(bookingId);
-    if (!booking) throw new NotFoundError('Booking');
+// Schedule changes are handled by updateBookingSchedule.
 
-    const customer = await customerRepository.findByUserId(userId);
-    if (!customer || (booking.customerId._id || booking.customerId).toString() !== customer._id.toString()) {
-        throw new ForbiddenError('You can only reschedule your own bookings');
-    }
+// ── Customer: create booking from source ─────────────────────────────────
 
-    assertBookingCanChangeBeforePayment(booking);
-
-    if (!isBookingInFuture(booking.date.toISOString().split('T')[0], booking.time)) {
-        throw new BadRequestError('Appointment has already passed');
-    }
-
-    if (!isValidBookingDateTime(newDate, normalizedNewTime, BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS)) {
-        if (!isBookingInFuture(newDate, normalizedNewTime)) {
-            throw new BadRequestError('Cannot reschedule to a past date/time');
-        }
-        throw new BadRequestError(`Bookings can only be made up to ${BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS} days in advance.`);
-    }
-
-    if (isWithinCancellationWindow(booking.date, booking.time, CANCELLATION_WINDOW_HOURS)) {
-        throw new BadRequestError(`Reschedule not allowed within ${CANCELLATION_WINDOW_HOURS} hours of appointment`);
-    }
-
-    if (booking.rescheduleCount >= MAX_RESCHEDULE_COUNT) {
-        throw new BadRequestError('You can only reschedule once');
-    }
-
-    const oldDate = booking.date.toISOString().split('T')[0];
-    const durationMinutes = booking.durationMinutes || sumServiceDurations(
-        normalizeBookedServices(
-            await serviceRepository.findByIds(
-                booking.serviceIds,
-                'serviceType duration totalDuration',
-            ),
-        ),
-    );
-    assertValidServiceDuration(durationMinutes);
-    const oldSlotLockTimes = getBookingSlotLockTimes(booking);
-    const shop = await shopRepository.findByIdWithFields(
-        booking.shopId,
-        'shopName address isOpen openTime closeTime availableDays breakTimes',
-    );
-    if (!shop) throw new NotFoundError('Shop');
-    assertShopAcceptsDate(shop, newDate);
-    const employeeForScheduling = await loadEmployeeForScheduling(booking.employeeId, booking.shopId);
-    const schedulePlan = buildSchedulingPlan({
-        shop,
-        employee: employeeForScheduling,
-        date: newDate,
-        time: normalizedNewTime,
-        durationMinutes,
-    });
-
-    const oldRangeLock = getBookingTimeRangeLock(booking);
-    let claimed = null;
-    if (Number.isFinite(oldRangeLock.startMinute) && Number.isFinite(oldRangeLock.endMinute)) {
-        claimed = await employeeRepository.moveTimeRange(
-            booking.employeeId,
-            {
-                bookingId: booking._id,
-                date: newDate,
-                startTime: schedulePlan.startTime,
-                endTime: schedulePlan.endTime,
-                startMinute: schedulePlan.startMinute,
-                endMinute: schedulePlan.endMinute,
-                slotLockTimes: schedulePlan.slotLockTimes,
-            },
-            { shopId: booking.shopId },
-        );
-    } else {
-        await employeeRepository.releaseSlots(booking.employeeId, oldDate, oldSlotLockTimes);
-        claimed = await employeeRepository.claimTimeRange(
-            booking.employeeId,
-            {
-                bookingId: booking._id,
-                date: newDate,
-                startTime: schedulePlan.startTime,
-                endTime: schedulePlan.endTime,
-                startMinute: schedulePlan.startMinute,
-                endMinute: schedulePlan.endMinute,
-                slotLockTimes: schedulePlan.slotLockTimes,
-            },
-            { shopId: booking.shopId },
-        );
-        if (!claimed) {
-            await employeeRepository.claimSlots(booking.employeeId, oldDate, oldSlotLockTimes, { shopId: booking.shopId });
-        }
-    }
-
-    if (!claimed) {
-        throw new BadRequestError('Employee not available at the new date/time');
-    }
-
-    booking.date = newDate;
-    booking.time = schedulePlan.startTime;
-    booking.endTime = schedulePlan.endTime;
-    booking.startMinute = schedulePlan.startMinute;
-    booking.endMinute = schedulePlan.endMinute;
-    booking.durationMinutes = durationMinutes;
-    booking.slotLockTimes = schedulePlan.slotLockTimes;
-    booking.rescheduleCount += 1;
-    await booking.save();
-
-    return booking;
-};
-
-// ── Customer: reorder (re-book) ──────────────────────────────────────────
-
-export const reorderBooking = async (userId, bookingId, newDate, newTime) => {
+const reorderBooking = async (userId, bookingId, newDate, newTime) => {
     const normalizedNewTime = normalizeBookingTime(newTime);
     const customer = await customerRepository.findByUserId(userId);
     if (!customer) throw new NotFoundError('Customer profile');
@@ -814,7 +714,7 @@ export const reorderBooking = async (userId, bookingId, newDate, newTime) => {
         throw err;
     }
 
-    return {
+    return serializeBookingCreation({
         bookingId: newBooking._id,
         employee,
         services,
@@ -829,12 +729,12 @@ export const reorderBooking = async (userId, bookingId, newDate, newTime) => {
         paymentStatus: newBooking.paymentStatus,
         payoutStatus: newBooking.payoutStatus,
         paymentRequired: true,
-    }
+    });
 };
 
-// ── Customer: list bookings (past/upcoming/favorites) ────────────────────
+// ── Customer: list bookings ──────────────────────────────────────────────
 
-export const getCustomerBookings = async (userId, type, query = {}) => {
+export const getCustomerBookings = async (userId, query = {}) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -842,23 +742,30 @@ export const getCustomerBookings = async (userId, type, query = {}) => {
     if (!customer) throw new NotFoundError('Customer profile');
     const customerId = customer._id;
 
-    if (type === 'past') {
-        const total = await bookingRepository.countPastByCustomer(customerId, today);
-        const { skip, limit, pagination } = buildPagination(query, total);
-        const items = await bookingRepository.findPastByCustomer(customerId, today, { skip, limit });
-        return { items, pagination };
-    }
-    if (type === 'upcoming') {
-        const total = await bookingRepository.countUpcomingByCustomer(customerId, today);
-        const { skip, limit, pagination } = buildPagination(query, total);
-        const items = await bookingRepository.findUpcomingByCustomer(customerId, today, { skip, limit });
-        return { items, pagination };
-    }
-    if (type === 'favorites') {
+    if (query.favorite) {
         return getFavoriteBookings(userId, query);
     }
 
-    throw new BadRequestError('Invalid filter type. Use: past, upcoming, or favorites');
+    const period = query.period || 'upcoming';
+
+    if (period === 'past') {
+        const total = await bookingRepository.countPastByCustomer(customerId, today);
+        const { skip, limit, pagination } = buildPagination(query, total);
+        const items = (await bookingRepository.findPastByCustomer(customerId, today, { skip, limit }))
+            .map(serializeBooking)
+            .filter(Boolean);
+        return { items, pagination };
+    }
+    if (period === 'upcoming') {
+        const total = await bookingRepository.countUpcomingByCustomer(customerId, today);
+        const { skip, limit, pagination } = buildPagination(query, total);
+        const items = (await bookingRepository.findUpcomingByCustomer(customerId, today, { skip, limit }))
+            .map(serializeBooking)
+            .filter(Boolean);
+        return { items, pagination };
+    }
+
+    throw new BadRequestError('Invalid period. Use: past or upcoming');
 };
 
 const loadCustomer = async (userId) => {
@@ -875,13 +782,13 @@ const assertBookingBelongsToCustomer = async (customer, bookingId) => {
         throw new ForbiddenError('You can only favorite your own bookings');
     }
 
-    return booking;
+    return undefined;
 };
 
 export const getFavoriteBookings = async (userId, query = {}) => {
     const customer = await customerRepository.findFavoriteBookingsByUserId(userId);
     if (!customer) throw new NotFoundError('Customer profile');
-    return paginateArray(customer.favoriteBookings || [], query);
+    return paginateArray((customer.favoriteBookings || []).map(serializeBooking).filter(Boolean), query);
 };
 
 export const addFavoriteBooking = async (userId, bookingId) => {
@@ -905,59 +812,9 @@ export const removeFavoriteBooking = async (userId, bookingId) => {
     };
 };
 
-export const toggleFavoriteBooking = async (userId, bookingId) => {
-    const customer = await loadCustomer(userId);
-    await assertBookingBelongsToCustomer(customer, bookingId);
+// ── Customer: update booking schedule ────────────────────────────────────
 
-    if (isIdInList(customer.favoriteBookings, bookingId)) {
-        await customerRepository.removeFavoriteBooking(userId, bookingId);
-        return {
-            favorite: false,
-            bookingId,
-        };
-    }
-
-    await customerRepository.addFavoriteBooking(userId, bookingId);
-    return {
-        favorite: true,
-        bookingId,
-    };
-};
-
-
-// ── Customer: booking confirmation ───────────────────────────────────────
-
-export const getBookingConfirmation = async (bookingId, userId) => {
-    const booking = await bookingRepository.findByIdPopulated(bookingId);
-    if (!booking) throw new NotFoundError('Booking');
-
-    const customer = await customerRepository.findByUserId(userId);
-    if (!customer || (booking.customerId._id || booking.customerId).toString() !== customer._id.toString()) {
-        throw new ForbiddenError('You can only access your own bookings');
-    }
-
-    const services = normalizeBookedServices(
-        await serviceRepository.findByIds(
-            booking.serviceIds,
-            'serviceName finalPrice totalPrice actualPrice offerPrice serviceType duration totalDuration',
-        ),
-    );
-    const totalAmount = sumServicePrices(services);
-
-    return {
-        shopCoverUrl: booking.shopId?.coverUrl,
-        date: booking.date,
-        time: booking.time,
-        endTime: booking.endTime,
-        services: services.map((s) => s.serviceName),
-        totalAmount,
-        totalServices: services.length,
-    };
-};
-
-// ── Customer: update booking ─────────────────────────────────────────────
-
-export const updateBooking = async (bookingId, userId, { employeeId, date, time }) => {
+export const updateBookingSchedule = async (bookingId, userId, { employeeId, date, time }) => {
     const normalizedTime = normalizeBookingTime(time);
     const booking = await bookingRepository.findById(bookingId);
     if (!booking) throw new NotFoundError('Booking');
@@ -982,7 +839,19 @@ export const updateBooking = async (bookingId, userId, { employeeId, date, time 
         && booking.time === normalizedTime;
 
     // Nothing to update if the slot hasn't changed
-    if (isSameSlot) return booking;
+    if (isSameSlot) return serializeBooking(booking);
+
+    if (!isBookingInFuture(booking.date.toISOString().split('T')[0], booking.time)) {
+        throw new BadRequestError('Appointment has already passed');
+    }
+
+    if (isWithinCancellationWindow(booking.date, booking.time, CANCELLATION_WINDOW_HOURS)) {
+        throw new BadRequestError(`Booking updates are not allowed within ${CANCELLATION_WINDOW_HOURS} hours of appointment`);
+    }
+
+    if ((booking.rescheduleCount || 0) >= MAX_RESCHEDULE_COUNT) {
+        throw new BadRequestError('You can only reschedule once');
+    }
 
     const durationMinutes = booking.durationMinutes || sumServiceDurations(
         normalizeBookedServices(
@@ -1061,59 +930,13 @@ export const updateBooking = async (bookingId, userId, { employeeId, date, time 
     booking.endMinute = schedulePlan.endMinute;
     booking.durationMinutes = durationMinutes;
     booking.slotLockTimes = schedulePlan.slotLockTimes;
+    booking.rescheduleCount = (booking.rescheduleCount || 0) + 1;
     await booking.save();
 
-    return booking;
+    return serializeBooking(booking);
 };
 
-// ── Customer: employee calendar ──────────────────────────────────────────
-
-export const getEmployeeCalendar = async (employeeId, date) => {
-    if (!date) throw new BadRequestError('Date query parameter is required');
-
-    const employee = await employeeRepository.findByIdLean(employeeId, 'firstName lastName blockedDates workingHours');
-    if (!employee) throw new NotFoundError('Employee');
-
-    const now = new Date();
-    const todayStr = now.toISOString().slice(0, 10);
-
-    if (date < todayStr) throw new BadRequestError('Cannot fetch past bookings');
-
-    // Check if date is within booking window
-    if (!isWithinBookingWindow(date, BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS, now)) {
-        throw new BadRequestError(`Calendar can only be viewed up to ${BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS} days in advance.`);
-    }
-
-    let bookings = await bookingRepository.findByEmployeeAndDate(employeeId, date);
-
-    // For today, filter to future-only slots
-    if (date === todayStr) {
-        const { parseTimeToMinutes } = await import('../utils/time.utils.js');
-        const currentMinutes = now.getHours() * 60 + now.getMinutes();
-        bookings = bookings.filter((b) => {
-            const m = parseTimeToMinutes(b.time);
-            return m !== null && m > currentMinutes;
-        });
-    }
-
-    return {
-        employeeId,
-        name: `${employee.firstName} ${employee.lastName}`,
-        workingHours: employee.workingHours,
-        blockedDates: employee.blockedDates,
-        bookedSlots: bookings.map((b) => ({
-            date: b.date,
-            time: b.time,
-            endTime: b.endTime,
-            startMinute: b.startMinute,
-            endMinute: b.endMinute,
-            durationMinutes: b.durationMinutes,
-            bookingId: b._id,
-        })),
-    };
-};
-
-// ── Customer: available slots ────────────────────────────────────────────
+// ── Availability ─────────────────────────────────────────────────────────
 
 export const getAvailableSlots = async (employeeId, date, serviceId) => {
     if (!date) throw new BadRequestError('Date query parameter is required');
@@ -1362,23 +1185,30 @@ export const getBookingsByShop = async (ownerId, query = {}) => {
     const shop = await shopRepository.findByOwnerId(ownerId);
     if (!shop) throw new NotFoundError('Shop');
 
-    const total = await bookingRepository.countAll({ shopId: shop._id });
+    const filters = {};
+    if (query.status) filters.status = query.status;
+    if (query.paymentStatus) filters.paymentStatus = query.paymentStatus;
+
+    const total = await bookingRepository.countAll({ shopId: shop._id, ...filters });
     const { skip, limit, pagination } = buildPagination(query, total);
 
     const [bookings, numCustomers, numberOfEmployees] = await Promise.all([
-        bookingRepository.findByShopId(shop._id, {}, { skip, limit }),
+        bookingRepository.findByShopId(shop._id, filters, { skip, limit }),
         bookingRepository.getUniqueCustomerCountForShop(shop._id),
         employeeRepository.countByShopId(shop._id),
     ]);
 
-    return { items: bookings, pagination, numberOfEmployees, numberOfCustomers: numCustomers };
+    return {
+        items: bookings.map(serializeBooking).filter(Boolean),
+        pagination,
+        numberOfEmployees,
+        numberOfCustomers: numCustomers,
+    };
 };
 
-export const updateBookingStatus = async (bookingId, status, ownerId) => {
+const updateBookingStatusForShopOwner = async (bookingId, status, ownerId) => {
     const allowed = [
-        BOOKING_STATUS.CANCELLED,
         BOOKING_STATUS.COMPLETED,
-        BOOKING_STATUS.CONFIRMED,
         BOOKING_STATUS.NO_SHOW,
     ];
     if (!allowed.includes(status)) throw new BadRequestError(`Invalid status. Allowed: ${allowed.join(', ')}`);
@@ -1393,24 +1223,15 @@ export const updateBookingStatus = async (bookingId, status, ownerId) => {
 
     // Prevent manual status changes for bookings awaiting confirmation
     if (booking.status === BOOKING_STATUS.AWAITING_CONFIRMATION) {
-        throw new BadRequestError('Use the confirm or cancel endpoints for bookings awaiting confirmation');
-    }
-
-    if (status === BOOKING_STATUS.CONFIRMED && booking.paymentStatus !== PAYMENT_STATUS.SUCCESS) {
-        throw new BadRequestError('Cannot confirm a booking before payment succeeds');
+        throw new BadRequestError('Confirm or cancel bookings awaiting confirmation before closing them');
     }
 
     if ([BOOKING_STATUS.COMPLETED, BOOKING_STATUS.NO_SHOW].includes(status) && booking.paymentStatus !== PAYMENT_STATUS.SUCCESS) {
         throw new BadRequestError('Cannot close a booking before payment succeeds');
     }
 
-    if (status === BOOKING_STATUS.CANCELLED && booking.paymentStatus === PAYMENT_STATUS.SUCCESS) {
-        throw new BadRequestError('Paid bookings must be refunded through the payment refund flow');
-    }
-
     const updated = await bookingRepository.updateById(bookingId, {
         status,
-        cancelledAt: status === BOOKING_STATUS.CANCELLED ? new Date() : booking.cancelledAt,
         completedAt: status === BOOKING_STATUS.COMPLETED ? new Date() : booking.completedAt,
         noShowAt: status === BOOKING_STATUS.NO_SHOW ? new Date() : booking.noShowAt,
         payoutStatus: [BOOKING_STATUS.COMPLETED, BOOKING_STATUS.NO_SHOW].includes(status)
@@ -1419,7 +1240,7 @@ export const updateBookingStatus = async (bookingId, status, ownerId) => {
     });
     if (!updated) throw new NotFoundError('Booking');
 
-    if ([BOOKING_STATUS.COMPLETED, BOOKING_STATUS.NO_SHOW, BOOKING_STATUS.CANCELLED].includes(status)) {
+    if ([BOOKING_STATUS.COMPLETED, BOOKING_STATUS.NO_SHOW].includes(status)) {
         await releaseBookingSlotLock(booking);
     }
 
@@ -1429,10 +1250,29 @@ export const updateBookingStatus = async (bookingId, status, ownerId) => {
         actorUserId: ownerId,
     });
 
-    return updated;
+    return serializeBooking(updated);
 };
 
-// Removed: deleteBookingAfterPayment - merged into cancelBookingByBarber
+export const updateBookingStatus = async (bookingId, user, status) => {
+    if (user.roleType === ROLES.CUSTOMER) {
+        if (status !== BOOKING_STATUS.CANCELLED) {
+            throw new ForbiddenError('Customers can only cancel bookings through this field');
+        }
+        return cancelBookingByCustomer(bookingId, user._id);
+    }
+
+    if (user.roleType === ROLES.BARBER) {
+        if (status === BOOKING_STATUS.CANCELLED) {
+            return cancelBookingByBarber(bookingId, user._id);
+        }
+        if (status === BOOKING_STATUS.CONFIRMED) {
+            return confirmBookingByBarber(bookingId, user._id);
+        }
+        return updateBookingStatusForShopOwner(bookingId, status, user._id);
+    }
+
+    throw new ForbiddenError('This endpoint is available only to customers and barbers');
+};
 
 export const getBookingStats = async (ownerId) => {
     const shop = await shopRepository.findByOwnerId(ownerId);
@@ -1505,47 +1345,15 @@ export const getBookingMilestoneProgress = async (ownerId, query = {}) => {
     };
 };
 
-export const getBookingsByStatusDetailed = async (ownerId, status, query = {}) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
-    if (!shop) throw new NotFoundError('Shop');
-
-    const total = await bookingRepository.countByStatusForShop(shop._id, status);
-    const { skip, limit, pagination } = buildPagination(query, total);
-
-    const items = await bookingRepository.findByStatusForShop(shop._id, status, { skip, limit });
-    return { items, pagination };
-};
+// Status-filtered booking lists are served by getBookingsByShop(query).
 
 // ── Barber: Get Pending Confirmations ────────────────────────────────────
 
-export const getPendingConfirmations = async (ownerId, query = {}) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
-    if (!shop) throw new NotFoundError('Shop');
-
-    const filter = {
-        shopId: shop._id,
-        status: BOOKING_STATUS.AWAITING_CONFIRMATION,
-        paymentStatus: PAYMENT_STATUS.SUCCESS,
-    };
-
-    const total = await bookingRepository.countAll(filter);
-    const { skip, limit, pagination } = buildPagination(query, total);
-
-    const items = await bookingRepository.findByShopId(
-        shop._id,
-        {
-            status: BOOKING_STATUS.AWAITING_CONFIRMATION,
-            paymentStatus: PAYMENT_STATUS.SUCCESS,
-        },
-        { skip, limit, sort: { paidAt: -1 } },
-    );
-
-    return { items, pagination };
-};
+// Pending confirmations are served by getBookingsByShop({ status, paymentStatus }).
 
 // ── Barber: Confirm Booking ──────────────────────────────────────────────
 
-export const confirmBookingByBarber = async (bookingId, ownerId) => {
+const confirmBookingByBarber = async (bookingId, ownerId) => {
     const booking = await bookingRepository.findById(bookingId);
     if (!booking) throw new NotFoundError('Booking');
 
@@ -1580,12 +1388,12 @@ export const confirmBookingByBarber = async (bookingId, ownerId) => {
         actorUserId: ownerId,
     });
 
-    return updated;
+    return serializeBooking(updated);
 };
 
 // ── Barber: Cancel Booking (Paid or Unpaid) ──────────────────────────────
 
-export const cancelBookingByBarber = async (bookingId, ownerId) => {
+const cancelBookingByBarber = async (bookingId, ownerId) => {
     const booking = await bookingRepository.findById(bookingId);
     if (!booking) throw new NotFoundError('Booking');
 
@@ -1640,7 +1448,7 @@ export const cancelBookingByBarber = async (bookingId, ownerId) => {
             cancelledBy: 'barber',
         });
 
-        return updated;
+        return serializeBooking(updated);
     }
 
     // Handle UNPAID bookings - just delete
@@ -1914,13 +1722,16 @@ export const getTodaysQueue = async (ownerId, filter = 'active') => {
         const bookingMinutes = parseTimeToMinutes(booking.time);
         if (bookingMinutes === null) return;
 
-        // Active: within 30 minutes before or currently happening
-        // Upcoming: more than 30 minutes in the future
+        // Calculate time difference (negative = past, positive = future)
         const timeDiff = bookingMinutes - currentMinutes;
 
-        if (timeDiff >= -30 && timeDiff <= 30) {
+        // Active: bookings happening now or in the past (not yet completed)
+        // Upcoming: bookings more than 30 minutes in the future
+        if (timeDiff <= 30) {
+            // Booking is now or in the past, or within 30 minutes in the future
             activeBookings.push(booking);
-        } else if (timeDiff > 30) {
+        } else {
+            // Booking is more than 30 minutes in the future
             upcomingBookings.push(booking);
         }
     });
@@ -1937,7 +1748,7 @@ export const getTodaysQueue = async (ownerId, filter = 'active') => {
 
     // Format queue items
     const formatQueueItem = (booking) => ({
-        bookingId: booking._id,
+        bookingId: toObjectIdString(booking._id),
         customer: {
             name: `${booking.customerId?.firstName || ''} ${booking.customerId?.lastName || ''}`.trim(),
         },

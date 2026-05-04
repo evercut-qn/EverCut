@@ -22,7 +22,7 @@ All phone and email updates are now centralized under the `/account` endpoint. T
 ### Before (Scattered Updates)
 ```
 ❌ PUT /customers/me { email: "new@email.com" }
-❌ PUT /shops/me { email: "new@email.com" }
+❌ PATCH /shops/me { email: "new@email.com" }
 ❌ Multiple locations, inconsistent validation
 ```
 
@@ -115,7 +115,7 @@ photo: [file]
 
 ### Barber Profile Update
 ```http
-PUT /api/v1/shops/me
+PATCH /api/v1/shops/me
 Authorization: Bearer {accessToken}
 Content-Type: application/json
 

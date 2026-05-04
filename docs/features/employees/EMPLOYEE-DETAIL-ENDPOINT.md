@@ -39,7 +39,8 @@ Authorization: Bearer <jwt_token>
   "success": true,
   "data": {
     "employee": {
-      "_id": "507f1f77bcf86cd799439011",
+      "id": "507f1f77bcf86cd799439011",
+      "employeeId": "507f1f77bcf86cd799439011",
       "firstName": "Ram",
       "lastName": "Kumar",
       "fullName": "Ram Kumar",
@@ -124,7 +125,8 @@ Authorization: Bearer <jwt_token>
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `_id` | String | Employee unique identifier |
+| `id` | String | Public employee unique identifier |
+| `employeeId` | String | Employee ID alias used by clients |
 | `firstName` | String | Employee first name |
 | `lastName` | String | Employee last name |
 | `fullName` | String | Full name (firstName + lastName) |
@@ -373,11 +375,10 @@ const fetchEmployeeDetails = async (employeeId) => {
 
 - `GET /api/employees` - List all employees
 - `POST /api/employees` - Add new employee
-- `PUT /api/employees/:id` - Update employee
-- `PUT /api/employees/:id/status` - Toggle employee availability status
+- `PATCH /api/employees/:id` - Update employee
+- `PATCH /api/employees/:id/status` - Toggle employee availability status
 - `DELETE /api/employees/:id` - Delete employee
-- `GET /api/employees/:id/calendar` - Employee calendar
-- `GET /api/employees/:id/available-slots` - Available time slots
+- `GET /api/employees/:id/availability` - Employee availability
 
 ---
 

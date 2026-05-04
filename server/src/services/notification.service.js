@@ -8,6 +8,10 @@ import {
     NOTIFICATION_STATUS,
     NOTIFICATION_TYPE,
 } from '../utils/constants.js';
+import {
+    serializeFcmTokenRegistration,
+    serializeNotification,
+} from '../serializers/notification.serializer.js';
 
 const toObjectIdString = (value) => String(value?._id || value || '');
 
@@ -22,36 +26,17 @@ const buildNotificationFilter = (query = {}) => {
     return filter;
 };
 
-const serializeNotification = (notification) => ({
-    _id: notification._id,
-    notificationId: notification._id,
-    recipientUserId: notification.recipientUserId,
-    actorUserId: notification.actorUserId || null,
-    type: notification.type,
-    eventType: notification.eventType,
-    title: notification.title,
-    body: notification.body,
-    data: notification.data || {},
-    entityType: notification.entityType || null,
-    entityId: notification.entityId || null,
-    status: notification.status,
-    delivery: notification.delivery || { successCount: 0, failureCount: 0 },
-    readAt: notification.readAt || null,
-    deliveredAt: notification.deliveredAt || null,
-    createdAt: notification.createdAt,
-    updatedAt: notification.updatedAt,
-});
-
-export const registerFcmToken = async (userId, payload) => fcmTokenRepository.upsertForUserAndToken(
-    userId,
-    {
+export const registerFcmToken = async (userId, payload) => {
+    const token = await fcmTokenRepository.upsertForUserAndToken(userId, {
         token: payload.token,
         platform: payload.platform,
         deviceId: payload.deviceId,
         appVersion: payload.appVersion,
         locale: payload.locale,
-    },
-);
+    });
+
+    return serializeFcmTokenRegistration(token);
+};
 
 export const unregisterFcmToken = async (userId, token) => {
     const revoked = await fcmTokenRepository.revokeTokenForUser(userId, token);
@@ -91,7 +76,8 @@ export const markAllNotificationsRead = async (userId) => {
 
 const updateDelivery = async (notificationId, updates) => {
     try {
-        return await notificationRepository.updateDeliveryStatus(notificationId, updates);
+        await notificationRepository.updateDeliveryStatus(notificationId, updates);
+        return null;
     } catch (error) {
         logger.error('[NotificationService] Failed to update notification delivery status', {
             notificationId,

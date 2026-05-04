@@ -61,7 +61,7 @@ Customer Request (POST /bookings)
 ### 2.3 Availability API Flow
 
 ```
-GET /employees/:id/available-slots?date=...&serviceId=...
+GET /employees/:id/availability?date=...&serviceId=...
   │
   ├─ Fetch employee, shop, services
   ├─ Sum service durations → serviceDuration

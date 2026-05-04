@@ -17,6 +17,7 @@ import {
     PAYOUT_STATUS,
     PAYOUT_TRANSACTION_STATUS,
 } from '../utils/constants.js';
+import { serializePayout } from '../serializers/payout.serializer.js';
 
 const NON_RETRYABLE_ERROR_CODES = new Set([
     'INSUFFICIENT_BALANCE',
@@ -339,9 +340,10 @@ export const triggerBarberPayout = async (barberId, bookingIds, totalPayoutInPai
             transferId,
         });
 
-        return payoutRepository.updateById(payoutTransaction._id, {
+        const updatedPayout = await payoutRepository.updateById(payoutTransaction._id, {
             gatewayTransferId: transferResponse.gatewayTransferId,
         });
+        return serializePayout(updatedPayout);
     } catch (error) {
         await payoutRepository.updateById(payoutTransaction._id, {
             status: PAYOUT_TRANSACTION_STATUS.FAILED,
@@ -507,7 +509,7 @@ export const retryPayout = async (payoutId) => {
             payoutStatus: PAYOUT_STATUS.PENDING,
         });
 
-        return payoutRepository.findById(payout._id);
+        return serializePayout(await payoutRepository.findById(payout._id));
     } catch (error) {
         await payoutRepository.updateById(payout._id, {
             status: PAYOUT_TRANSACTION_STATUS.FAILED,

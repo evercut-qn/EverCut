@@ -15,7 +15,7 @@ class EmployeeRepository {
         
         if (options.skip !== undefined) query.skip(options.skip);
         if (options.limit !== undefined) query.limit(options.limit);
-        return query.sort({ createdAt: -1 });
+        return query.sort({ createdAt: -1 }).lean();
     }
 
     async countByShopId(shopId) {

@@ -3,6 +3,7 @@ import userRepository from '../repositories/user.repository.js';
 import { NotFoundError, BadRequestError } from '../utils/api-error.js';
 import cloudinary from '../config/cloudinary.config.js';
 import notificationEvents from './notification-events.service.js';
+import { serializeCustomerProfile } from '../serializers/customer.serializer.js';
 
 /**
  * Customer-facing profile service.
@@ -11,7 +12,7 @@ import notificationEvents from './notification-events.service.js';
 export const getProfile = async (userId) => {
     const profile = await customerRepository.findByUserId(userId);
     if (!profile) throw new NotFoundError('Customer');
-    return profile;
+    return serializeCustomerProfile(profile);
 };
 
 export const updateProfile = async (userId, data, file) => {
@@ -66,5 +67,5 @@ export const updateProfile = async (userId, data, file) => {
         updateType: 'customer_profile',
     });
 
-    return updated;
+    return serializeCustomerProfile(updated);
 };
