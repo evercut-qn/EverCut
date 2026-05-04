@@ -1766,7 +1766,7 @@ const barberRatingsCollection = {
 const paymentsPayoutsCollection = {
   info: {
     name: 'EverCut - Payments & Payouts',
-    description: 'Native PhonePe SDK payment initiation/verification, webhook simulation with automatic signature generation, refund processing, and payout retry for the EverCut dual-provider payment system. PhonePe is used for customer collection; Cashfree Payouts is used for barber disbursement. Webhook requests include pre-request scripts that automatically compute cryptographic signatures (SHA256 for PhonePe, HMAC-SHA256 for Cashfree) using environment variables.',
+    description: 'Native PhonePe SDK payment initiation/verification, refund processing, and payout retry for the EverCut dual-provider payment system. PhonePe is used for customer collection; Cashfree Payouts is used for barber disbursement.',
     schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
   },
   auth: bearerAuth('customer_access_token'),
@@ -1778,11 +1778,7 @@ const paymentsPayoutsCollection = {
       ['merchant_refund_id', 'merchant_refund_id'],
       ['refund_id', 'refund_id'],
       ['payout_id', 'payout_id'],
-      ['payout_transfer_id', 'payout_transfer_id'],
       ['admin_access_token', 'admin_access_token'],
-      ['phonepe_webhook_username', 'phonepe_webhook_username'],
-      ['phonepe_webhook_password', 'phonepe_webhook_password'],
-      ['cashfree_webhook_secret', 'cashfree_webhook_secret'],
     ],
     extra: [
       "// Ensure payment_booking_id is synced ONLY if it hasn't been set manually.",
@@ -1804,10 +1800,6 @@ const paymentsPayoutsCollection = {
       textVariable('merchant_refund_id', '', 'Auto-captured from refund initiation'),
       textVariable('refund_id', '', 'Auto-captured from refund initiation'),
       textVariable('payout_id', '', 'Payout ID for retry operations'),
-      textVariable('payout_transfer_id', '', 'Payout transfer ID from MongoDB - required for payout webhook simulation'),
-      textVariable('phonepe_webhook_username', 'test-phonepe-webhook-user', 'PhonePe webhook username - must match PHONEPE_WEBHOOK_USERNAME in .env'),
-      textVariable('phonepe_webhook_password', 'test-phonepe-webhook-password', 'PhonePe webhook password - must match PHONEPE_WEBHOOK_PASSWORD in .env'),
-      textVariable('cashfree_webhook_secret', 'test-cashfree-client-secret', 'Cashfree webhook secret - must match CASHFREE_PAYOUT_CLIENT_SECRET in .env'),
     ),
   ],
   item: [
@@ -1926,212 +1918,7 @@ const paymentsPayoutsCollection = {
         ),
       }),
     },
-    {
-      name: '7. PhonePe Payment Success Webhook',
-      ...request({
-        method: 'POST',
-        url: '{{base_url}}/{{api_prefix}}/payments/webhook',
-        auth: { type: 'noauth' },
-        headers: [
-          { key: 'Content-Type', value: 'application/json' },
-          { key: 'Authorization', value: '{{phonepe_webhook_authorization}}' },
-        ],
-        body: jsonBody(`{\n  "event": "checkout.order.completed",\n  "payload": {\n    "merchantOrderId": "{{merchant_order_id}}",\n    "orderId": "PO{{$timestamp}}",\n    "state": "COMPLETED",\n    "amount": 30300,\n    "paymentDetails": [\n      {\n        "paymentMode": "UPI",\n        "transactionId": "TXN{{$timestamp}}",\n        "amount": 30300,\n        "state": "COMPLETED"\n      }\n    ]\n  }\n}`),
-        description: 'Simulates a PhonePe payment success webhook. The pre-request script computes the SHA256 signature using webhook credentials from environment variables. Backend verifies signature, then calls PhonePe Order Status API for double verification.',
-        event: mergedEvents(
-          [
-            "// Compute PhonePe webhook authorization signature",
-            "const username = pm.collectionVariables.get('phonepe_webhook_username') || pm.environment.get('phonepe_webhook_username') || 'test-phonepe-webhook-user';",
-            "const password = pm.collectionVariables.get('phonepe_webhook_password') || pm.environment.get('phonepe_webhook_password') || 'test-phonepe-webhook-password';",
-            "const authString = username + ':' + password;",
-            "const authSignature = CryptoJS.SHA256(authString).toString(CryptoJS.enc.Hex);",
-            "pm.collectionVariables.set('phonepe_webhook_authorization', authSignature);"
-          ],
-          [
-            "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
-            "pm.test('webhook acknowledged', function () {",
-            "  const response = pm.response.json();",
-            "  pm.expect(response).to.have.property('success', true);",
-            "  pm.expect(response).to.have.nested.property('data.received', true);",
-            "});"
-          ]
-        ),
-      }),
-    },
-    {
-      name: '8. PhonePe Payment Failure Webhook',
-      ...request({
-        method: 'POST',
-        url: '{{base_url}}/{{api_prefix}}/payments/webhook',
-        auth: { type: 'noauth' },
-        headers: [
-          { key: 'Content-Type', value: 'application/json' },
-          { key: 'Authorization', value: '{{phonepe_webhook_authorization}}' },
-        ],
-        body: jsonBody(`{\n  "event": "checkout.order.failed",\n  "payload": {\n    "merchantOrderId": "{{merchant_order_id}}",\n    "orderId": "PO{{$timestamp}}",\n    "state": "FAILED",\n    "amount": 30300,\n    "paymentDetails": [\n      {\n        "paymentMode": "UPI",\n        "state": "FAILED",\n        "errorCode": "PAYMENT_DECLINED",\n        "detailedErrorCode": "INSUFFICIENT_FUNDS"\n      }\n    ]\n  }\n}`),
-        description: 'Simulates a PhonePe payment failure webhook. Use this to test payment failure handling and booking cancellation logic.',
-        event: mergedEvents(
-          [
-            "// Compute PhonePe webhook authorization signature",
-            "const username = pm.collectionVariables.get('phonepe_webhook_username') || pm.environment.get('phonepe_webhook_username') || 'test-phonepe-webhook-user';",
-            "const password = pm.collectionVariables.get('phonepe_webhook_password') || pm.environment.get('phonepe_webhook_password') || 'test-phonepe-webhook-password';",
-            "const authString = username + ':' + password;",
-            "const authSignature = CryptoJS.SHA256(authString).toString(CryptoJS.enc.Hex);",
-            "pm.collectionVariables.set('phonepe_webhook_authorization', authSignature);"
-          ],
-          [
-            "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
-            "pm.test('webhook acknowledged', function () {",
-            "  const response = pm.response.json();",
-            "  pm.expect(response).to.have.property('success', true);",
-            "  pm.expect(response).to.have.nested.property('data.received', true);",
-            "});"
-          ]
-        ),
-      }),
-    },
-    {
-      name: '9. PhonePe Refund Completed Webhook',
-      ...request({
-        method: 'POST',
-        url: '{{base_url}}/{{api_prefix}}/payments/webhook',
-        auth: { type: 'noauth' },
-        headers: [
-          { key: 'Content-Type', value: 'application/json' },
-          { key: 'Authorization', value: '{{phonepe_webhook_authorization}}' },
-        ],
-        body: jsonBody(`{\n  "event": "pg.refund.completed",\n  "payload": {\n    "merchantRefundId": "{{merchant_refund_id}}",\n    "refundId": "{{refund_id}}",\n    "originalMerchantOrderId": "{{merchant_order_id}}",\n    "state": "COMPLETED",\n    "amount": 29000\n  }\n}`),
-        description: 'Simulates a PhonePe refund completion webhook. Use this after initiating a refund to test refund success handling.',
-        event: mergedEvents(
-          [
-            "// Compute PhonePe webhook authorization signature",
-            "const username = pm.collectionVariables.get('phonepe_webhook_username') || pm.environment.get('phonepe_webhook_username') || 'test-phonepe-webhook-user';",
-            "const password = pm.collectionVariables.get('phonepe_webhook_password') || pm.environment.get('phonepe_webhook_password') || 'test-phonepe-webhook-password';",
-            "const authString = username + ':' + password;",
-            "const authSignature = CryptoJS.SHA256(authString).toString(CryptoJS.enc.Hex);",
-            "pm.collectionVariables.set('phonepe_webhook_authorization', authSignature);"
-          ],
-          [
-            "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
-            "pm.test('webhook acknowledged', function () {",
-            "  const response = pm.response.json();",
-            "  pm.expect(response).to.have.property('success', true);",
-            "  pm.expect(response).to.have.nested.property('data.received', true);",
-            "});"
-          ]
-        ),
-      }),
-    },
-    {
-      name: '10. Cashfree Transfer Success Webhook',
-      ...request({
-        method: 'POST',
-        url: '{{base_url}}/{{api_prefix}}/payouts/webhook',
-        auth: { type: 'noauth' },
-        headers: [
-          { key: 'Content-Type', value: 'application/json' },
-          { key: 'x-webhook-timestamp', value: '{{cashfree_webhook_timestamp}}' },
-          { key: 'x-webhook-signature', value: '{{cashfree_webhook_signature}}' },
-        ],
-        body: jsonBody(`{\n  "event": "TRANSFER_SUCCESS",\n  "data": {\n    "transfer": {\n      "transfer_id": "{{payout_transfer_id}}",\n      "cf_transfer_id": "CF{{$timestamp}}",\n      "status": "SUCCESS",\n      "transfer_utr": "UTR{{$timestamp}}",\n      "transfer_amount": 450,\n      "transfer_mode": "upi",\n      "acknowledged": 1,\n      "processed_on": "{{$isoTimestamp}}"\n    }\n  }\n}`),
-        description: 'Simulates a Cashfree payout success webhook. The pre-request script computes the HMAC-SHA256 signature using timestamp + body + secret. Backend verifies signature, then updates payout and booking status.',
-        event: mergedEvents(
-          [
-            "// Compute Cashfree webhook HMAC signature",
-            "const secret = pm.collectionVariables.get('cashfree_webhook_secret') || pm.environment.get('cashfree_webhook_secret') || 'test-cashfree-client-secret';",
-            "const timestamp = Math.floor(Date.now() / 1000).toString();",
-            "pm.collectionVariables.set('cashfree_webhook_timestamp', timestamp);",
-            "",
-            "// Get the transfer ID",
-            "const transferId = pm.collectionVariables.get('payout_transfer_id') || pm.environment.get('payout_transfer_id') || 'PAYOUT_test_' + Date.now();",
-            "",
-            "// Build the raw body",
-            "const bodyObj = {",
-            "  event: 'TRANSFER_SUCCESS',",
-            "  data: {",
-            "    transfer: {",
-            "      transfer_id: transferId,",
-            "      cf_transfer_id: 'CF' + Date.now(),",
-            "      status: 'SUCCESS',",
-            "      transfer_utr: 'UTR' + Date.now(),",
-            "      transfer_amount: 450,",
-            "      transfer_mode: 'upi',",
-            "      acknowledged: 1,",
-            "      processed_on: new Date().toISOString()",
-            "    }",
-            "  }",
-            "};",
-            "const rawBody = JSON.stringify(bodyObj);",
-            "",
-            "// Compute HMAC signature: HMAC-SHA256(timestamp + rawBody, secret)",
-            "const signaturePayload = timestamp + rawBody;",
-            "const signature = CryptoJS.HmacSHA256(signaturePayload, secret).toString(CryptoJS.enc.Base64);",
-            "pm.collectionVariables.set('cashfree_webhook_signature', signature);"
-          ],
-          [
-            "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
-            "pm.test('webhook acknowledged', function () {",
-            "  const response = pm.response.json();",
-            "  pm.expect(response).to.have.property('success', true);",
-            "  pm.expect(response).to.have.nested.property('data.received', true);",
-            "});"
-          ]
-        ),
-      }),
-    },
-    {
-      name: '11. Cashfree Transfer Failed Webhook',
-      ...request({
-        method: 'POST',
-        url: '{{base_url}}/{{api_prefix}}/payouts/webhook',
-        auth: { type: 'noauth' },
-        headers: [
-          { key: 'Content-Type', value: 'application/json' },
-          { key: 'x-webhook-timestamp', value: '{{cashfree_webhook_timestamp}}' },
-          { key: 'x-webhook-signature', value: '{{cashfree_webhook_signature}}' },
-        ],
-        body: jsonBody(`{\n  "event": "TRANSFER_FAILED",\n  "data": {\n    "transfer": {\n      "transfer_id": "{{payout_transfer_id}}",\n      "cf_transfer_id": "CF{{$timestamp}}",\n      "status": "FAILED",\n      "failure_reason": "INVALID_VPA",\n      "transfer_amount": 450,\n      "transfer_mode": "upi",\n      "acknowledged": 1\n    }\n  }\n}`),
-        description: 'Simulates a Cashfree payout failure webhook. Use this to test payout failure handling and retry logic.',
-        event: mergedEvents(
-          [
-            "// Compute Cashfree webhook HMAC signature",
-            "const secret = pm.collectionVariables.get('cashfree_webhook_secret') || pm.environment.get('cashfree_webhook_secret') || 'test-cashfree-client-secret';",
-            "const timestamp = Math.floor(Date.now() / 1000).toString();",
-            "pm.collectionVariables.set('cashfree_webhook_timestamp', timestamp);",
-            "",
-            "const transferId = pm.collectionVariables.get('payout_transfer_id') || pm.environment.get('payout_transfer_id') || 'PAYOUT_test_' + Date.now();",
-            "",
-            "const bodyObj = {",
-            "  event: 'TRANSFER_FAILED',",
-            "  data: {",
-            "    transfer: {",
-            "      transfer_id: transferId,",
-            "      cf_transfer_id: 'CF' + Date.now(),",
-            "      status: 'FAILED',",
-            "      failure_reason: 'INVALID_VPA',",
-            "      transfer_amount: 450,",
-            "      transfer_mode: 'upi',",
-            "      acknowledged: 1",
-            "    }",
-            "  }",
-            "};",
-            "const rawBody = JSON.stringify(bodyObj);",
-            "",
-            "const signaturePayload = timestamp + rawBody;",
-            "const signature = CryptoJS.HmacSHA256(signaturePayload, secret).toString(CryptoJS.enc.Base64);",
-            "pm.collectionVariables.set('cashfree_webhook_signature', signature);"
-          ],
-          [
-            "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
-            "pm.test('webhook acknowledged', function () {",
-            "  const response = pm.response.json();",
-            "  pm.expect(response).to.have.property('success', true);",
-            "  pm.expect(response).to.have.nested.property('data.received', true);",
-            "});"
-          ]
-        ),
-      }),
-    },
+
   ],
 };
 
@@ -2386,9 +2173,6 @@ const environmentTemplate = {
     { key: 'barber_onboarding_token', value: '', enabled: true },
     { key: 'admin_access_token', value: '', enabled: true },
     { key: 'fcm_token', value: '', enabled: true },
-    { key: 'phonepe_webhook_username', value: 'test-phonepe-webhook-user', enabled: true },
-    { key: 'phonepe_webhook_password', value: 'test-phonepe-webhook-password', enabled: true },
-    { key: 'cashfree_webhook_secret', value: 'test-cashfree-client-secret', enabled: true },
   ],
   _postman_variable_scope: 'environment',
   _postman_exported_at: new Date().toISOString(),

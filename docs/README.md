@@ -92,7 +92,7 @@ Detailed guides for implementing specific features.
 | [POSTMAN-BOOKING-PAYMENT-GUIDE.md](./testing/POSTMAN-BOOKING-PAYMENT-GUIDE.md) | Postman testing guide for booking & payment flow | ✅ Production Ready |
 | [PAYMENT-GATEWAY-IMPLEMENTATION-GUIDE.md](./features/payments/PAYMENT-GATEWAY-IMPLEMENTATION-GUIDE.md) | PhonePe payment gateway implementation details | 📋 Implementation Guide |
 | [PAYMENT-GATEWAY-RESEARCH-GUIDE.md](./features/payments/PAYMENT-GATEWAY-RESEARCH-GUIDE.md) | Payment gateway research and comparison | 📊 Research |
-| [HOOKDECK-DAILY-WORKFLOW.md](./features/payments/HOOKDECK-DAILY-WORKFLOW.md) | Webhook testing workflow using Hookdeck | 📋 Testing Guide |
+| [HOOKDECK-DAILY-WORKFLOW.md](./features/payments/HOOKDECK-DAILY-WORKFLOW.md) | Webhook development workflow using Hookdeck | 📋 Development Guide |
 | [old-method/](./features/payments/old-method/) | Archived web redirect/payment-link documentation | 📦 Archived |
 
 > **Note:** EverCut migrated from web redirect payment flow to native PhonePe Flutter SDK in April 2026. Old redirect-based documentation is archived in `features/payments/old-method/` for historical reference only.

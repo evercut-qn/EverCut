@@ -207,7 +207,7 @@ All routes are mounted under `/api/v1`.
 - API inventory verified from route files.
 - Route -> controller -> service -> repository -> model dependency map verified from imports.
 - Booking flow verified against validators, booking service, employee repository, payment service, and tests.
-- Payment flow verified against payment service, payment repository, and webhook tests.
+- Payment flow verified against payment service, payment repository, and unit tests.
 - Postman generator updated and regenerated.
 - Old renamed API URLs removed from Postman generator and collections.
 - `npm test` passes: 89 tests, 0 failures.

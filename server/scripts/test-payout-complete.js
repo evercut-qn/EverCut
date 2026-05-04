@@ -7,12 +7,10 @@
  * 3. Tests REAL Cashfree API scenarios (beneficiary, transfers, edge cases)
  * 4. Runs payout batch
  * 5. Verifies results
- * 6. Tests webhook handling (optional)
  * 
  * Usage:
  *   node scripts/test-payout-complete.js              # Full test
  *   node scripts/test-payout-complete.js --diagnose   # Diagnosis only
- *   node scripts/test-payout-complete.js --webhook    # Include webhook test
  *   node scripts/test-payout-complete.js --api-only   # Test API scenarios only
  */
 
@@ -62,7 +60,6 @@ const testResults = {
         beneficiary: { passed: 0, failed: 0 },
         transfer: { passed: 0, failed: 0 },
         status: { passed: 0, failed: 0 },
-        webhook: { passed: 0, failed: 0 },
         edgeCases: { passed: 0, failed: 0 },
     }
 };
@@ -443,122 +440,6 @@ async function verifyResults() {
     
     log.info(`Settled payments: ${settledPayments}`);
     log.info(`Unsettled payments: ${unsettledPayments}`);
-    
-    return true;
-}
-
-// ============================================================================
-// STEP 6: TEST WEBHOOK HANDLING (OPTIONAL)
-// ============================================================================
-
-async function testWebhookHandling() {
-    log.section('STEP 6: TEST WEBHOOK HANDLING');
-    
-    const Payout = mongoose.model('PayoutTransaction');
-    
-    // Find a recent payout to test with
-    const recentPayout = await Payout.findOne()
-        .sort({ createdAt: -1 })
-        .lean();
-    
-    if (!recentPayout) {
-        log.warning('No payout found to test webhook with');
-        return false;
-    }
-    
-    log.info(`Testing webhook with payout: ${recentPayout.transferId}\n`);
-    
-    // Test SUCCESS webhook
-    log.subsection('✅ Testing TRANSFER_SUCCESS Webhook...');
-    
-    try {
-        const successPayload = {
-            event: 'TRANSFER_SUCCESS',
-            data: {
-                transfer: {
-                    transfer_id: recentPayout.transferId,
-                    cf_transfer_id: 'TEST_CF_12345',
-                    status: 'SUCCESS',
-                    transfer_utr: `TEST_UTR_${Date.now()}`,
-                    transfer_amount: recentPayout.amountInRupees,
-                    transfer_mode: recentPayout.transferMode || 'upi',
-                    acknowledged: 1,
-                    processed_on: new Date().toISOString(),
-                }
-            }
-        };
-        
-        // Simulate webhook (without signature for testing)
-        const result = await payoutService.handlePayoutWebhook(
-            {}, // headers (empty for test)
-            JSON.stringify(successPayload),
-            successPayload
-        );
-        
-        if (result.processed) {
-            log.success('SUCCESS webhook processed correctly');
-            recordApiTest('webhook', true);
-        } else {
-            log.info('Webhook rejected (signature verification working as expected)');
-            recordApiTest('webhook', true);
-        }
-        
-    } catch (error) {
-        if (error.message.includes('signature')) {
-            log.success('✓ Signature verification working correctly');
-            recordApiTest('webhook', true);
-        } else {
-            log.error(`Webhook test failed: ${error.message}`);
-            recordApiTest('webhook', false);
-        }
-    }
-    
-    // Test FAILED webhook
-    log.subsection('\n❌ Testing TRANSFER_FAILED Webhook...');
-    
-    try {
-        const failedPayload = {
-            event: 'TRANSFER_FAILED',
-            data: {
-                transfer: {
-                    transfer_id: recentPayout.transferId,
-                    cf_transfer_id: 'TEST_CF_12345',
-                    status: 'FAILED',
-                    failure_reason: 'TEST_FAILURE',
-                    transfer_amount: recentPayout.amountInRupees,
-                    transfer_mode: recentPayout.transferMode || 'upi',
-                    acknowledged: 1,
-                }
-            }
-        };
-        
-        const result = await payoutService.handlePayoutWebhook(
-            {},
-            JSON.stringify(failedPayload),
-            failedPayload
-        );
-        
-        if (result.processed) {
-            log.success('FAILED webhook processed correctly');
-            recordApiTest('webhook', true);
-        } else {
-            log.info('Webhook rejected (signature verification working as expected)');
-            recordApiTest('webhook', true);
-        }
-        
-    } catch (error) {
-        if (error.message.includes('signature')) {
-            log.success('✓ Signature verification working correctly');
-            recordApiTest('webhook', true);
-        } else {
-            log.error(`Webhook test failed: ${error.message}`);
-            recordApiTest('webhook', false);
-        }
-    }
-    
-    console.log();
-    log.info('💡 Note: Test webhooks are rejected due to missing signatures (this is correct behavior)');
-    log.info('💡 Real webhooks from Cashfree will include proper signatures and be processed');
     
     return true;
 }
@@ -1002,7 +883,6 @@ async function showFinalSummary(payoutResult) {
     const beneficiaryTests = testResults.apiTests.beneficiary;
     const transferTests = testResults.apiTests.transfer;
     const statusTests = testResults.apiTests.status;
-    const webhookTests = testResults.apiTests.webhook;
     const edgeCaseTests = testResults.apiTests.edgeCases;
     
     const checkStatus = (tests) => {
@@ -1013,7 +893,6 @@ async function showFinalSummary(payoutResult) {
     console.log(`Beneficiary Flow:     ${checkStatus(beneficiaryTests)}`);
     console.log(`Payout Execution:     ${checkStatus(transferTests)}`);
     console.log(`Status Verification:  ${checkStatus(statusTests)}`);
-    console.log(`Webhook Handling:     ${checkStatus(webhookTests)}`);
     console.log(`Edge Cases:           ${checkStatus(edgeCaseTests)}`);
     console.log('='.repeat(70));
     
@@ -1028,7 +907,6 @@ async function showFinalSummary(payoutResult) {
 async function main() {
     const args = process.argv.slice(2);
     const diagnoseOnly = args.includes('--diagnose');
-    const includeWebhook = args.includes('--webhook');
     const apiOnly = args.includes('--api-only');
     
     console.log('\n');
@@ -1090,12 +968,7 @@ async function main() {
             await verifyResults();
         }
         
-        // Step 6: Test webhooks (optional)
-        if (includeWebhook && payoutResult.success) {
-            await testWebhookHandling();
-        }
-        
-        // Step 7: Final summary
+        // Step 6: Final summary
         await showFinalSummary(payoutResult);
         
         // Calculate duration

@@ -320,7 +320,7 @@ payment: Object.freeze({
 }),
 ```
 
-> **Alignment Note:** The existing config uses `Object.freeze()`, `requireEnv()`, and `optionalEnv()` — not `getEnvVar()`. URLs are computed at config creation time rather than using getter functions, because getters do not work inside `Object.freeze()`. The local defaults use port `5000` so runtime config, Postman, and webhook-testing docs stay aligned.
+> **Alignment Note:** The existing config uses `Object.freeze()`, `requireEnv()`, and `optionalEnv()` — not `getEnvVar()`. URLs are computed at config creation time rather than using getter functions, because getters do not work inside `Object.freeze()`. The local defaults use port `5000` so runtime config and Postman docs stay aligned.
 >
 > **Why hardcoded?** Platform fees, refund fees, and bundle minimums are **business constants**, not environment-specific configuration. They should be the same across dev/staging/production. Putting them in `.env` would risk inconsistent values across environments. If these values ever need to change, update them directly in `config/index.js` — see [Payment-Payout-Logic.md](./Payment-Payout-Logic.md) for the canonical definitions.
 

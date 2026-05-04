@@ -279,11 +279,6 @@ No manual token generation needed - the authentication and onboarding collection
 | `merchant_refund_id` | Auto-set by `15-payments-payouts.json` request 5 |
 | `refund_id` | Auto-set by `15-payments-payouts.json` request 5 |
 | `payout_id` | Manual payout transaction ID for retry tests |
-| `payout_transfer_id` | Manual app transfer ID from a payout transaction for Cashfree webhook tests |
-| `gateway_transfer_id` | Provider transfer ID used in Cashfree webhook samples |
-| `phonepe_webhook_username` | Must match `PHONEPE_WEBHOOK_USERNAME`; defaults to local fallback |
-| `phonepe_webhook_password` | Must match `PHONEPE_WEBHOOK_PASSWORD`; defaults to local fallback |
-| `cashfree_webhook_secret` | Must match `CASHFREE_PAYOUT_CLIENT_SECRET`; defaults to local fallback |
 
 ### Auth Collection Requests
 
