@@ -1203,7 +1203,24 @@ const barberEmployeesCollection = {
       }),
     },
     {
-      name: '5. Delete Employee (Terminal)',
+      name: '5. Toggle Employee Status',
+      ...request({
+        method: 'PUT',
+        url: '{{base_url}}/{{api_prefix}}/employees/{{employee_id}}/status',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "status": false\n}`),
+        description: 'Toggles employee availability status. Accepts boolean (true/false) or string values (yes/no, on/off). Omit status field to toggle current state.',
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          "const response = pm.response.json();",
+          "const data = response.data || {};",
+          "pm.test('response includes isActive', function () { pm.expect(data).to.have.property('isActive'); });",
+          "pm.test('isActive is boolean', function () { pm.expect(data.isActive).to.be.a('boolean'); });"
+        ),
+      }),
+    },
+    {
+      name: '6. Delete Employee (Terminal)',
       ...request({
         method: 'DELETE',
         url: '{{base_url}}/{{api_prefix}}/employees/{{employee_id}}',

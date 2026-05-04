@@ -134,7 +134,7 @@ Authorization: Bearer <jwt_token>
 | `photoUrl` | String | Profile photo URL (Cloudinary) |
 | `workingHours` | Object | Working hours (start/end times) |
 | `blockedDates` | Array | List of blocked dates |
-| `isActive` | Boolean | Whether employee is active |
+| `isActive` | Boolean | Whether employee is active/available |
 | `createdAt` | Date | Account creation date |
 
 ### Statistics Object
@@ -374,6 +374,7 @@ const fetchEmployeeDetails = async (employeeId) => {
 - `GET /api/employees` - List all employees
 - `POST /api/employees` - Add new employee
 - `PUT /api/employees/:id` - Update employee
+- `PUT /api/employees/:id/status` - Toggle employee availability status
 - `DELETE /api/employees/:id` - Delete employee
 - `GET /api/employees/:id/calendar` - Employee calendar
 - `GET /api/employees/:id/available-slots` - Available time slots
@@ -388,5 +389,5 @@ const fetchEmployeeDetails = async (employeeId) => {
 
 ---
 
-**Last Updated:** April 30, 2026
+**Last Updated:** May 4, 2026
 **Status:** ✅ Implemented and Production-Ready

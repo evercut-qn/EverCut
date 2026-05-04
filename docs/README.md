@@ -76,6 +76,12 @@ Detailed guides for implementing specific features.
 | [BOOKING-DATE-RESTRICTION-UPDATE.md](./features/bookings/BOOKING-DATE-RESTRICTION-UPDATE.md) | Booking date window restrictions | 📋 Implementation Guide |
 | [README.md](./features/bookings/README.md) | Booking system quick reference | ✅ Reference |
 
+### Employee Management
+
+| Document | Description | Status |
+|----------|-------------|--------|
+| [EMPLOYEE-DETAIL-ENDPOINT.md](./features/employees/EMPLOYEE-DETAIL-ENDPOINT.md) | Employee detail endpoint implementation | ✅ Production Ready |
+
 ### Payment Integration
 
 | Document | Description | Status |
@@ -109,6 +115,7 @@ Reports documenting issues found and fixes applied.
 |----------|-------------|--------|
 | [BACKEND-INTEGRITY-FIXES-REPORT.md](./reports/BACKEND-INTEGRITY-FIXES-REPORT.md) | Backend integrity issues and fixes applied | ✅ Completed |
 | [E2E-BACKEND-VERIFICATION-REPORT.md](./reports/E2E-BACKEND-VERIFICATION-REPORT.md) | Full authenticated backend verification and follow-up fixes | ✅ Completed |
+| [EMPLOYEE-AVAILABILITY-STATUS-IMPLEMENTATION-REPORT.md](./reports/EMPLOYEE-AVAILABILITY-STATUS-IMPLEMENTATION-REPORT.md) | Employee availability status toggle API implementation | ✅ Completed |
 | [MSG91-Revision-Improvements-Report.md](./reports/MSG91-Revision-Improvements-Report.md) | MSG91 integration improvements report | ✅ Completed |
 | [PHOTO-GALLERY-FIXES-REPORT.md](./reports/PHOTO-GALLERY-FIXES-REPORT.md) | Photo gallery backend fixes | ✅ Completed |
 | [REQUEST-VALIDATION-QUERY-FIX-REPORT.md](./reports/REQUEST-VALIDATION-QUERY-FIX-REPORT.md) | Express 5 query-validation runtime fix report | ✅ Completed |

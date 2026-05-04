@@ -11,6 +11,7 @@ import {
     addEmployeeSchema,
     availableSlotsQuerySchema,
     employeeIdParamSchema,
+    toggleEmployeeStatusSchema,
     updateEmployeeSchema,
 } from '../validators/employee.validator.js';
 import { employeeCalendarQuerySchema } from '../validators/booking.validator.js';
@@ -40,6 +41,7 @@ router.get('/availability', employeeController.getStaffAvailability);
 router.get('/:id', validate(employeeIdParamSchema, 'params'), employeeController.getEmployeeById);
 router.post('/', uploadEmployeePhoto, validate(addEmployeeSchema, 'body'), employeeController.addEmployee);
 router.put('/:id', validate(employeeIdParamSchema, 'params'), uploadEmployeePhoto, validate(updateEmployeeSchema, 'body'), employeeController.updateEmployee);
+router.put('/:id/status', validate(employeeIdParamSchema, 'params'), validate(toggleEmployeeStatusSchema, 'body'), employeeController.toggleEmployeeStatus);
 router.delete('/:id', validate(employeeIdParamSchema, 'params'), employeeController.deleteEmployee);
 
 export default router;

@@ -87,3 +87,17 @@ export const getStaffAvailability = async (req, res, next) => {
         next(err);
     }
 };
+
+/**
+ * Toggle employee availability status
+ */
+export const toggleEmployeeStatus = async (req, res, next) => {
+    try {
+        const params = getValidatedRequestData(req, 'params');
+        const body = getValidatedRequestData(req, 'body');
+        const result = await employeeService.toggleEmployeeStatus(req.user._id, params.id, body.status);
+        return res.status(200).json(ApiResponse.success(result, 'Employee status updated'));
+    } catch (err) {
+        next(err);
+    }
+};

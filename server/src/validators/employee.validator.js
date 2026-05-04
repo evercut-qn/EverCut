@@ -168,3 +168,15 @@ export const availableSlotsQuerySchema = Joi.object({
         Joi.array().items(objectId).min(1),
     ).required(),
 });
+
+export const toggleEmployeeStatusSchema = Joi.object({
+    status: Joi.alternatives()
+        .try(
+            Joi.boolean(),
+            Joi.string().valid('true', 'false', 'yes', 'no', 'on', 'off'),
+        )
+        .optional()
+        .messages({
+            'any.only': 'status must be a boolean or one of: true, false, yes, no, on, off',
+        }),
+});
