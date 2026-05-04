@@ -17,10 +17,8 @@ export const serializeCustomerSummary = (customer) => {
 
     return compact({
         id: plain.id,
-        customerId: plain.id,
         firstName: plain.firstName ?? null,
         lastName: plain.lastName ?? null,
-        fullName: `${plain.firstName || ''} ${plain.lastName || ''}`.trim() || null,
         photoUrl: plain.photoUrl ?? null,
     });
 };
@@ -31,12 +29,10 @@ export const serializeCustomerProfile = (customer) => {
 
     return compact({
         id: plain.id,
-        customerId: plain.id,
         userId: plain.userId?.id || toIdString(plain.userId),
         user: plain.userId && typeof plain.userId === 'object' ? serializeUser(plain.userId) : undefined,
         firstName: plain.firstName ?? null,
         lastName: plain.lastName ?? null,
-        fullName: `${plain.firstName || ''} ${plain.lastName || ''}`.trim() || null,
         gender: plain.gender ?? null,
         dateOfBirth: plain.dateOfBirth ?? null,
         address: plain.address ?? null,

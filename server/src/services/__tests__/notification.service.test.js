@@ -67,7 +67,8 @@ test('registerFcmToken upserts a token for the authenticated user and device', a
         },
     });
     assert.equal(result.id, 'token-doc-1');
-    assert.equal(result.tokenId, 'token-doc-1');
+    assert.equal(result.id, 'token-doc-1');
+    assert.equal('tokenId' in result, false);
     assert.equal('token' in result, false);
     assert.equal('_id' in result, false);
     assert.equal(result.revokedAt, null);
@@ -130,7 +131,7 @@ test('notifyUser persists once, sends a hybrid payload to every active device, a
     assert.equal(createdPayload.dedupeKey, 'booking.confirmed:booking-1');
     assert.deepEqual(sentArgs.tokens, ['fcm-token-a', 'fcm-token-b']);
     assert.equal(sentArgs.payload.type, 'hybrid');
-    assert.equal(sentArgs.payload.notificationId, 'notification-1');
+    assert.equal(sentArgs.payload.id, 'notification-1');
     assert.equal(sentArgs.payload.data.bookingId, 'booking-1');
     assert.equal(sentArgs.payload.data.requiresFetch, 'true');
     assert.deepEqual(deliveryUpdate, {

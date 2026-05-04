@@ -36,7 +36,7 @@ export const bookingPatchSchema = Joi.alternatives()
     .match('one');
 
 export const bookingListQuerySchema = paginationSchema.keys({
-    period: Joi.string().valid('past', 'upcoming'),
+    timeframe: Joi.string().valid('past', 'upcoming'),
     favorite: Joi.boolean(),
     status: Joi.string().valid('pending', 'awaiting_confirmation', 'confirmed', 'completed', 'cancelled', 'no-show'),
     paymentStatus: Joi.string().valid('pending', 'initiated', 'success', 'failed', 'refund_pending', 'refunded', 'refund_failed'),
@@ -52,5 +52,5 @@ export const bookingMilestoneProgressQuerySchema = Joi.object({
 }).and('month', 'year');
 
 export const queueFilterQuerySchema = Joi.object({
-    filter: Joi.string().valid('active', 'upcoming').default('active'),
+    timeframe: Joi.string().valid('active', 'upcoming').default('active'),
 });

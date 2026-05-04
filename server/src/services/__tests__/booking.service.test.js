@@ -75,7 +75,7 @@ test('getBookingsByShop loads bookings by shopId so deleted employees do not dis
         options: { skip: 5, limit: 5 },
     });
     assert.equal(result.items[0].id, 'booking-1');
-    assert.equal(result.items[0].bookingId, 'booking-1');
+    assert.equal('bookingId' in result.items[0], false);
     assert.equal('_id' in result.items[0], false);
     assert.deepEqual(result.pagination, {
         currentPage: 2,
@@ -711,7 +711,7 @@ test('getFavoriteBookings returns a paginated customer booking favorites list', 
     const result = await bookingService.getFavoriteBookings('user-1', { page: 2, limit: 2 });
 
     assert.equal(result.items[0].id, 'booking-3');
-    assert.equal(result.items[0].bookingId, 'booking-3');
+    assert.equal('bookingId' in result.items[0], false);
     assert.equal('_id' in result.items[0], false);
     assert.deepEqual(result.pagination, {
         currentPage: 2,

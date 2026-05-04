@@ -158,7 +158,7 @@
               "if (Array.isArray(data.staff) && data.staff.length > 0) {",
               "  const firstStaff = data.staff[0];",
               "  pm.test('staff item has required fields', function () {",
-              "    pm.expect(firstStaff).to.have.property('employeeId');",
+              "    pm.expect(firstStaff).to.have.property('id');",
               "    pm.expect(firstStaff).to.have.property('name');",
               "    pm.expect(firstStaff).to.have.property('progress');",
               "  });",
@@ -173,7 +173,7 @@
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/bookings/analytics/queue?filter=active",
+        "url": "{{base_url}}/{{api_prefix}}/bookings/analytics/queue?timeframe=active",
         "description": "Returns today's active appointments near the current time. Shows customer name, employee name, time, and services."
       },
       "event": [
@@ -199,10 +199,10 @@
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
               "const response = pm.response.json();",
               "const data = response.data || {};",
-              "pm.test('response includes filter', function () { pm.expect(data).to.have.property('filter'); });",
+              "pm.test('response includes timeframe', function () { pm.expect(data).to.have.property('timeframe'); });",
               "pm.test('response includes active', function () { pm.expect(data).to.have.property('active'); });",
               "pm.test('response includes upcoming', function () { pm.expect(data).to.have.property('upcoming'); });",
-              "pm.test('filter is active', function () { pm.expect(data.filter).to.equal('active'); });"
+              "pm.test('timeframe is active', function () { pm.expect(data.timeframe).to.equal('active'); });"
             ]
           }
         }
@@ -213,7 +213,7 @@
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/bookings/analytics/queue?filter=upcoming",
+        "url": "{{base_url}}/{{api_prefix}}/bookings/analytics/queue?timeframe=upcoming",
         "description": "Returns today's upcoming appointments. Shows customer name, employee name, time, and services."
       },
       "event": [
@@ -239,10 +239,10 @@
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
               "const response = pm.response.json();",
               "const data = response.data || {};",
-              "pm.test('response includes filter', function () { pm.expect(data).to.have.property('filter'); });",
+              "pm.test('response includes timeframe', function () { pm.expect(data).to.have.property('timeframe'); });",
               "pm.test('response includes active', function () { pm.expect(data).to.have.property('active'); });",
               "pm.test('response includes upcoming', function () { pm.expect(data).to.have.property('upcoming'); });",
-              "pm.test('filter is upcoming', function () { pm.expect(data.filter).to.equal('upcoming'); });"
+              "pm.test('timeframe is upcoming', function () { pm.expect(data.timeframe).to.equal('upcoming'); });"
             ]
           }
         }

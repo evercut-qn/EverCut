@@ -96,7 +96,6 @@ Retrieve paginated transaction history with monthly revenue summary.
   "data": [
     {
       "id": "6756d8e9f1234567890abcde",
-      "paymentId": "6756d8e9f1234567890abcde",
       "transactionId": "TXN99201458",
       "customer": {
         "name": "Elena Vance",
@@ -170,7 +169,6 @@ Retrieve detailed information about a specific transaction.
   "message": "Transaction detail fetched",
   "data": {
     "id": "6756d8e9f1234567890abcde",
-    "paymentId": "6756d8e9f1234567890abcde",
     "transactionId": "TXN99201458",
     "customer": {
       "name": "Alex Johnson"
@@ -185,13 +183,11 @@ Retrieve detailed information about a specific transaction.
     "services": [
       {
         "id": "6756d8e9f1234567890abcd2",
-        "serviceId": "6756d8e9f1234567890abcd2",
         "name": "Haircut",
         "price": 45.00
       },
       {
         "id": "6756d8e9f1234567890abcd3",
-        "serviceId": "6756d8e9f1234567890abcd3",
         "name": "Beard",
         "price": 20.00
       }
@@ -296,8 +292,7 @@ All endpoints follow the standard error format:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `id` | string | Public transaction database ID |
-| `paymentId` | string | Payment transaction ID alias |
+| `id` | string | Public payment transaction identifier |
 | `transactionId` | string | Display transaction ID (e.g., "TXN99201458") |
 | `customer.name` | string | Customer full name |
 | `customer.upiId` | string | Customer UPI ID (derived from phone) |

@@ -69,14 +69,15 @@ Rules:
 - `data` is required and contains the resource object or list array.
 - `meta` is optional and contains pagination, counts, summaries, and other non-resource metadata.
 - Paginated endpoints return `data: [...]` and `meta.pagination`.
-- Public identifiers use `id` and domain aliases such as `bookingId`, `shopId`, `customerId`, `employeeId`, `serviceId`, `paymentId`, `payoutId`, `photoId`, `ratingId`, and `notificationId`.
+- Public resource identifiers use exactly one field: `id`.
+- Relation identifiers use explicit names such as `shopId`, `bookingId`, or `serviceIds` only when the relation is not returned as a nested DTO. If a nested relation is present, the parallel flat relation ID is omitted.
 - API responses never expose `_id`, `__v`, `$__`, `_doc`, `$isNew`, `parent`, `populated`, `$locals`, `$op`, or keys beginning with `$`.
 
 ### Resource Schemas
 
 Customer:
 
-- Required: `id`, `customerId`, `firstName`, `lastName`, `fullName`, `gender`, `dateOfBirth`, `address`, `photoUrl`, `location`, `favoriteBookingIds`, `favoriteShopIds`.
+- Required: `id`, `firstName`, `lastName`, `gender`, `dateOfBirth`, `address`, `photoUrl`, `location`, `favoriteBookingIds`, `favoriteShopIds`.
 - Optional: `userId`, `user`, `createdAt`, `updatedAt`.
 
 User:
@@ -87,59 +88,62 @@ User:
 
 Shop:
 
-- Required public: `id`, `shopId`, `shopName`, `address`, `location`, `category`, `targetCustomers`, `coverUrl`, `facilities`, `isOpen`.
-- Owner/private additions: `ownerId`, `ownerName`, `ownerFirstName`, `ownerLastName`, `ownerGender`, `ownerDateOfBirth`, `upiId`, `accountHolderName`, `bankName`, `payoutConfig`, `missedConfirmations`.
+- Required public: `id`, `shopName`, `address`, `location`, `category`, `targetCustomers`, `coverUrl`, `amenities`, `workingDays`, `workingHours`, `isOpen`.
+- Owner/private additions: `owner`, `payout`, `numberOfEmployees`, `yearsOfExperience`, `bio`, `missedConfirmations`.
 - Never returned: `pinHash`, raw `bankAccount`, Cloudinary internal IDs.
 
 Employee:
 
-- Required: `id`, `employeeId`, `shopId`, `firstName`, `lastName`, `fullName`, `photoUrl`, `gender`, `workingHours`, `isActive`.
+- Required: `id`, `shopId`, `firstName`, `lastName`, `photoUrl`, `gender`, `workingHours`, `isActive`.
 - Private owner additions: `phoneNumber`, `dateOfBirth`, `blockedDates`.
 - Never returned: `cloudinaryId`, `deletedAt`.
 
 Service:
 
-- Required: `id`, `serviceId`, `shopId`, `serviceName`, `serviceType`, `serviceFor`, `imageUrl`, `offerPrice`, `finalPrice`.
+- Required: `id`, `serviceName`, `serviceType`, `serviceFor`, `imageUrl`, `offerPrice`, `finalPrice`.
+- Relation: `shopId` when no nested `shop` is returned.
 - Optional: `duration`, `actualPrice`, `bundledServices`, `totalDuration`, `totalPrice`, `isActive`, `shop`, `createdAt`, `updatedAt`.
 
 Booking:
 
-- Required: `id`, `bookingId`, `customerId`, `shopId`, `employeeId`, `serviceIds`, `date`, `time`, `endTime`, `totalAmount`, `durationMinutes`, `status`, `paymentStatus`, `payoutStatus`.
+- Required: `id`, `date`, `time`, `endTime`, `totalAmount`, `durationMinutes`, `status`, `paymentStatus`, `payoutStatus`.
+- Relation IDs when not populated: `customerId`, `shopId`, `employeeId`, `serviceIds`.
 - Optional nested DTOs: `customer`, `shop`, `employee`, `services`.
 - Optional lifecycle fields: `paymentTransactionId`, `merchantOrderId`, `paymentGateway`, `paidAt`, `paymentMode`, `payoutTransactionId`, `payoutCompletedAt`, `barberUtr`, `completedAt`, `cancelledAt`, `barberCancelledAt`, `barberConfirmedAt`, `autoCancelledAt`, `noShowAt`, `cancellationNote`, `rescheduleCount`.
 
 Photo:
 
-- Required: `id`, `photoId`, `shopId`, `photoUrl`, `photoName`, `photoType`, `isActive`.
+- Required: `id`, `shopId`, `photoUrl`, `photoName`, `photoType`, `isActive`.
 - Optional: `description`, `fileSize`, `mimeType`, `createdAt`, `updatedAt`.
 - Never returned: `cloudinaryId`.
 
 Rating:
 
-- Required: `id`, `ratingId`, `rating`, `review`, `user`, `reply`.
+- Required: `id`, `rating`, `review`, `user`, `reply`.
 - Optional: `shopId`, `createdAt`, `updatedAt`.
 - User summary contains public customer fields only.
 
 Payment:
 
-- Required: `id`, `paymentId`, `bookingId`, `customerId`, `shopId`, `merchantOrderId`, `status`, `amountInPaisa`, `amountInRupees`, `currency`.
+- Required: `id`, `merchantOrderId`, `status`, `amountInPaisa`, `amountInRupees`, `currency`.
+- Relation IDs when not populated: `bookingId`, `customerId`, `shopId`.
 - Optional: `booking`, `customer`, `shop`, `orderId`, `gatewayState`, `paymentMode`, `transactionId`, `refund`, `settlement`, `expiresAt`, `createdAt`, `updatedAt`.
 - Payment initiation additionally returns `token` because the native PhonePe SDK requires it.
 - Never returned in normal payment DTOs: stored `sdkOrderToken`, gateway raw response, webhook IDs.
 
 Payout:
 
-- Required: `id`, `payoutId`, `bookingIds`, `barberId`, `shopId`, `paymentTransactionIds`, `transferId`, `beneficiaryId`, `amount`, `amountInRupees`, `transferMode`, `status`.
+- Required: `id`, `bookingIds`, `barberId`, `shopId`, `paymentTransactionIds`, `transferId`, `beneficiaryId`, `amount`, `amountInRupees`, `transferMode`, `status`.
 - Optional: `gatewayTransferId`, `utr`, `processedAt`, `failureReason`, `errorCode`, `retryCount`, `maxRetries`, `lastRetryAt`, `remarks`, `createdAt`, `updatedAt`.
 
 Notification:
 
-- Required: `id`, `notificationId`, `recipientUserId`, `type`, `eventType`, `title`, `body`, `data`, `status`, `delivery`.
+- Required: `id`, `recipientUserId`, `type`, `eventType`, `title`, `body`, `data`, `status`, `delivery`.
 - Optional: `actorUserId`, `entityType`, `entityId`, `readAt`, `deliveredAt`, `createdAt`, `updatedAt`.
 
 FCM Token Registration:
 
-- Required: `id`, `tokenId`, `userId`, `platform`.
+- Required: `id`, `userId`, `platform`.
 - Optional: `deviceId`, `appVersion`, `locale`, `lastSeenAt`, `revokedAt`, `createdAt`, `updatedAt`.
 - Never returned: raw FCM token value.
 
@@ -214,13 +218,11 @@ After:
   "success": true,
   "message": "Booking details fetched",
   "data": {
-    "bookingId": "booking_123",
+    "id": "booking_123",
     "customer": {
       "id": "customer_123",
-      "customerId": "customer_123",
       "firstName": "Jane",
       "lastName": "Smith",
-      "fullName": "Jane Smith",
       "photoUrl": null
     }
   }

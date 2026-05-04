@@ -746,9 +746,9 @@ export const getCustomerBookings = async (userId, query = {}) => {
         return getFavoriteBookings(userId, query);
     }
 
-    const period = query.period || 'upcoming';
+    const timeframe = query.timeframe || 'upcoming';
 
-    if (period === 'past') {
+    if (timeframe === 'past') {
         const total = await bookingRepository.countPastByCustomer(customerId, today);
         const { skip, limit, pagination } = buildPagination(query, total);
         const items = (await bookingRepository.findPastByCustomer(customerId, today, { skip, limit }))
@@ -756,7 +756,7 @@ export const getCustomerBookings = async (userId, query = {}) => {
             .filter(Boolean);
         return { items, pagination };
     }
-    if (period === 'upcoming') {
+    if (timeframe === 'upcoming') {
         const total = await bookingRepository.countUpcomingByCustomer(customerId, today);
         const { skip, limit, pagination } = buildPagination(query, total);
         const items = (await bookingRepository.findUpcomingByCustomer(customerId, today, { skip, limit }))
@@ -765,7 +765,7 @@ export const getCustomerBookings = async (userId, query = {}) => {
         return { items, pagination };
     }
 
-    throw new BadRequestError('Invalid period. Use: past or upcoming');
+    throw new BadRequestError('Invalid timeframe. Use: past or upcoming');
 };
 
 const loadCustomer = async (userId) => {
@@ -1683,7 +1683,7 @@ export const getTodaysPulse = async (ownerId) => {
  * Get today's queue - active and upcoming appointments
  * Shows appointments organized by status (active/upcoming)
  */
-export const getTodaysQueue = async (ownerId, filter = 'active') => {
+export const getTodaysQueue = async (ownerId, timeframe = 'active') => {
     const shop = await shopRepository.findByOwnerId(ownerId);
     if (!shop) throw new NotFoundError('Shop');
 
@@ -1748,7 +1748,7 @@ export const getTodaysQueue = async (ownerId, filter = 'active') => {
 
     // Format queue items
     const formatQueueItem = (booking) => ({
-        bookingId: toObjectIdString(booking._id),
+        id: toObjectIdString(booking._id),
         customer: {
             name: `${booking.customerId?.firstName || ''} ${booking.customerId?.lastName || ''}`.trim(),
         },
@@ -1760,17 +1760,17 @@ export const getTodaysQueue = async (ownerId, filter = 'active') => {
         services: booking.serviceIds?.map((s) => s.serviceName) || [],
     });
 
-    const selectedQueue = filter === 'active' ? activeBookings : upcomingBookings;
+    const selectedQueue = timeframe === 'active' ? activeBookings : upcomingBookings;
 
     return {
-        filter,
+        timeframe,
         active: {
             count: activeBookings.length,
-            items: filter === 'active' ? selectedQueue.map(formatQueueItem) : [],
+            items: timeframe === 'active' ? selectedQueue.map(formatQueueItem) : [],
         },
         upcoming: {
             count: upcomingBookings.length,
-            items: filter === 'upcoming' ? selectedQueue.map(formatQueueItem) : [],
+            items: timeframe === 'upcoming' ? selectedQueue.map(formatQueueItem) : [],
         },
     };
 };

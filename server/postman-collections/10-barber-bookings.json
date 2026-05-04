@@ -92,8 +92,8 @@
               "const bookings = Array.isArray(response.data) ? response.data : [];",
               "const statusBooking = bookings.find((booking) => ['pending', 'confirmed'].includes(booking.status)) || bookings[0];",
               "const deleteBooking = bookings.find((booking) => booking.paymentStatus === 'success') || statusBooking;",
-              "const statusBookingId = statusBooking && (statusBooking.bookingId || statusBooking.id);",
-              "const deleteBookingId = deleteBooking && (deleteBooking.bookingId || deleteBooking.id);",
+              "const statusBookingId = statusBooking && statusBooking.id;",
+              "const deleteBookingId = deleteBooking && deleteBooking.id;",
               "if (statusBookingId) { pm.collectionVariables.set('booking_id_status', statusBookingId); pm.globals.set('shared_booking_id', statusBookingId); }",
               "if (deleteBookingId) { pm.collectionVariables.set('booking_id_delete', deleteBookingId); }"
             ]

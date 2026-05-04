@@ -152,7 +152,7 @@ export const notifyUser = async ({
         const delivery = await fcmService.sendMulticast({
             tokens: tokens.map((tokenDoc) => tokenDoc.token),
             payload: {
-                notificationId: toObjectIdString(notification._id),
+                id: toObjectIdString(notification._id),
                 type,
                 eventType,
                 title,

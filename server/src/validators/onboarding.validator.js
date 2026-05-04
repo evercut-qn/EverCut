@@ -25,8 +25,8 @@ const breakTimesSchema = Joi.alternatives().try(
         Joi.object({
             start: Joi.string().trim(),
             end: Joi.string().trim(),
-            startsAt: Joi.string().trim(),
-            endsAt: Joi.string().trim(),
+            startsAt: Joi.forbidden(),
+            endsAt: Joi.forbidden(),
         }),
     ),
     Joi.string().trim(),
@@ -48,67 +48,58 @@ export const barberOnboardingSchema = Joi.object({
     email: Joi.string().email(),
     firstName: Joi.string().trim().min(1).max(50),
     lastName: Joi.string().trim().min(1).max(50),
-    ownerFirstName: Joi.string().trim().min(1).max(50),
-    ownerLastName: Joi.string().trim().min(1).max(50),
     gender: Joi.string().valid(...ALL_GENDERS),
-    ownerGender: Joi.string().valid(...ALL_GENDERS),
     dateOfBirth: Joi.date(),
-    ownerDateOfBirth: Joi.date(),
+    ownerFirstName: Joi.forbidden(),
+    ownerLastName: Joi.forbidden(),
+    ownerGender: Joi.forbidden(),
+    ownerDateOfBirth: Joi.forbidden(),
     shopName: Joi.string().trim().min(1).max(100).required(),
-    shopOwner: Joi.string().trim().min(1).max(100),
-    ownerName: Joi.string().trim().min(1).max(100),
-    shopCategory: Joi.string().valid(...ALL_SHOP_CATEGORIES),
-    businessCategory: Joi.string().valid(...ALL_SHOP_CATEGORIES),
+    shopOwner: Joi.forbidden(),
+    ownerName: Joi.forbidden(),
+    shopCategory: Joi.forbidden(),
+    businessCategory: Joi.forbidden(),
     category: Joi.string().valid(...ALL_SHOP_CATEGORIES),
     targetCustomers: targetCustomersSchema.required(),
     upiId: Joi.string(),
-    upiAddress: Joi.string(),
+    upiAddress: Joi.forbidden(),
     accountHolderName: Joi.string().trim().min(1).max(100).required(),
     bankName: Joi.string().trim().min(1).max(120).required(),
     bankAccount: Joi.string().trim().pattern(/^\d{6,34}$/).optional(),
     ifsc: Joi.string().trim().pattern(/^[A-Z]{4}0[A-Z0-9]{6}$/i).optional(),
     bio: Joi.string().max(500).allow('').default(''),
     address: Joi.string().trim(),
-    shopLocation: Joi.string().trim(),
+    shopLocation: Joi.forbidden(),
     location: Joi.alternatives().try(locationSchema, Joi.string()).required(),
     numberOfEmployees: Joi.number().integer().min(1).default(1),
     yearsOfExperience: Joi.number().integer().min(0).default(0),
-    facilities: amenitiesSchema,
     amenities: amenitiesSchema,
-    availableDays: daysSchema,
+    facilities: Joi.forbidden(),
     workingDays: daysSchema,
+    availableDays: Joi.forbidden(),
     openTime: Joi.string().trim(),
     closeTime: Joi.string().trim(),
-    opensAt: Joi.string().trim(),
-    closesAt: Joi.string().trim(),
+    opensAt: Joi.forbidden(),
+    closesAt: Joi.forbidden(),
     workingHours: Joi.alternatives().try(
         Joi.object({
             openTime: Joi.string().trim(),
             closeTime: Joi.string().trim(),
-            opensAt: Joi.string().trim(),
-            closesAt: Joi.string().trim(),
+            opensAt: Joi.forbidden(),
+            closesAt: Joi.forbidden(),
         }),
         Joi.string().trim(),
     ),
     breakTimes: breakTimesSchema,
-    breakTimings: breakTimesSchema,
+    breakTimings: Joi.forbidden(),
     pin: Joi.string().pattern(new RegExp(`^\\d{${SECURITY_PIN_LENGTH}}$`)).required(),
     confirmPin: Joi.string().required().valid(Joi.ref('pin')).messages({
         'any.only': 'confirmPin must match pin',
     }),
 })
     .custom((value, helpers) => {
-        value.firstName = value.firstName || value.ownerFirstName;
-        value.lastName = value.lastName || value.ownerLastName;
-        value.gender = value.gender || value.ownerGender;
-        value.dateOfBirth = value.dateOfBirth || value.ownerDateOfBirth;
-        value.shopOwner = value.shopOwner || value.ownerName;
-        value.shopCategory = value.shopCategory || value.businessCategory || value.category;
-        value.upiId = value.upiId || value.upiAddress;
-        value.address = value.address || value.shopLocation;
-        value.facilities = value.facilities ?? value.amenities ?? [];
-        value.availableDays = value.availableDays ?? value.workingDays;
-        value.breakTimes = value.breakTimes ?? value.breakTimings ?? [];
+        value.amenities = value.amenities ?? [];
+        value.breakTimes = value.breakTimes ?? [];
 
         if (value.workingHours) {
             if (typeof value.workingHours === 'string') {
@@ -121,21 +112,14 @@ export const barberOnboardingSchema = Joi.object({
                 }
             }
             value.openTime = value.openTime
-                || value.opensAt
-                || value.workingHours.openTime
-                || value.workingHours.opensAt;
+                || value.workingHours.openTime;
             value.closeTime = value.closeTime
-                || value.closesAt
-                || value.workingHours.closeTime
-                || value.workingHours.closesAt;
-        } else {
-            value.openTime = value.openTime || value.opensAt;
-            value.closeTime = value.closeTime || value.closesAt;
+                || value.workingHours.closeTime;
         }
 
-        if (!value.shopCategory) {
+        if (!value.category) {
             return helpers.error('any.custom', {
-                message: 'shopCategory/businessCategory is required',
+                message: 'category is required',
             });
         }
         if (!value.firstName || !value.lastName) {
@@ -155,17 +139,17 @@ export const barberOnboardingSchema = Joi.object({
         }
         if (!value.upiId) {
             return helpers.error('any.custom', {
-                message: 'upiId or upiAddress is required',
+                message: 'upiId is required',
             });
         }
         if (!value.address) {
             return helpers.error('any.custom', {
-                message: 'address or shopLocation is required',
+                message: 'address is required',
             });
         }
-        if (!value.availableDays) {
+        if (!value.workingDays) {
             return helpers.error('any.custom', {
-                message: 'availableDays or workingDays is required',
+                message: 'workingDays is required',
             });
         }
         if (!value.openTime || !value.closeTime) {

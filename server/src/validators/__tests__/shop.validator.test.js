@@ -32,6 +32,21 @@ test('updateBusinessSchema rejects invalid shop-hour strings', () => {
     assert.match(result.error?.message || '', /openTime must use HH:MM or hh:mm AM\/PM format/);
 });
 
+test('updateBusinessSchema rejects deprecated shop update aliases', () => {
+    const result = updateBusinessSchema.validate({
+        shopOwner: 'Postman Barber',
+        businessCategory: 'Barber',
+        shopLocation: 'MG Road',
+        breakTimings: '[{"start":"13:00","end":"14:00"}]',
+    }, {
+        abortEarly: false,
+        allowUnknown: false,
+        stripUnknown: true,
+    });
+
+    assert.match(result.error?.message || '', /shopOwner|businessCategory|shopLocation|breakTimings/);
+});
+
 test('updatePayoutDetailsSchema strips provider-managed beneficiary identifiers', () => {
     const result = updatePayoutDetailsSchema.validate({
         accountHolderName: 'Postman Barber',

@@ -139,8 +139,8 @@ export const getTodaysPulse = async (req, res, next) => {
 export const getTodaysQueue = async (req, res, next) => {
     try {
         const query = getValidatedRequestData(req, 'query');
-        const filter = query.filter || 'active';
-        const queue = await bookingService.getTodaysQueue(req.user._id, filter);
+        const timeframe = query.timeframe || 'active';
+        const queue = await bookingService.getTodaysQueue(req.user._id, timeframe);
         return res.status(200).json(ApiResponse.success(queue, 'Today\'s queue fetched'));
     } catch (err) {
         next(err);

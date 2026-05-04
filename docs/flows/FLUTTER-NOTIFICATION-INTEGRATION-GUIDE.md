@@ -158,7 +158,7 @@ Every FCM data payload includes string values:
 
 ```json
 {
-  "notificationId": "<notificationId>",
+  "id": "<notification id>",
   "type": "hybrid",
   "eventType": "booking.confirmed",
   "entityType": "booking",
@@ -168,7 +168,7 @@ Every FCM data payload includes string values:
 }
 ```
 
-Use `notificationId` to correlate with `/notifications`. Use `entityType/entityId` to fetch domain state.
+Use `id` to correlate with `/notifications`. Use `entityType/entityId` to fetch domain state.
 
 ## REST APIs
 

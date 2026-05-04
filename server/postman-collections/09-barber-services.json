@@ -95,8 +95,8 @@
               "const response = pm.response.json();",
               "const services = Array.isArray(response.data) ? response.data : [];",
               "const preferredService = services.find((service) => typeof service.serviceName === 'string' && service.serviceName.includes('Postman')) || services[0];",
-              "if (preferredService && (preferredService.serviceId || preferredService.id)) {",
-              "  const serviceId = preferredService.serviceId || preferredService.id;",
+              "if (preferredService && preferredService.id) {",
+              "  const serviceId = preferredService.id;",
               "  pm.collectionVariables.set('service_id', serviceId);",
               "  pm.globals.set('shared_service_id', serviceId);",
               "}"
@@ -158,7 +158,7 @@
               "});",
               "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
               "const response = pm.response.json();",
-              "const serviceId = response.data && (response.data.serviceId || response.data.id);",
+              "const serviceId = response.data && response.data.id;",
               "if (serviceId) { pm.collectionVariables.set('service_id', serviceId); pm.globals.set('shared_service_id', serviceId); }"
             ]
           }

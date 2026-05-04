@@ -56,16 +56,21 @@ export const serializePayment = (payment) => {
 
     return compact({
         id: plain.id,
-        paymentId: plain.id,
-        bookingId: plain.bookingId?.id || toIdString(plain.bookingId),
+        bookingId: plain.bookingId && typeof plain.bookingId === 'object'
+            ? undefined
+            : (plain.bookingId?.id || toIdString(plain.bookingId)),
         booking: plain.bookingId && typeof plain.bookingId === 'object'
             ? serializeBooking(plain.bookingId)
             : undefined,
-        customerId: plain.customerId?.id || toIdString(plain.customerId),
+        customerId: plain.customerId && typeof plain.customerId === 'object'
+            ? undefined
+            : (plain.customerId?.id || toIdString(plain.customerId)),
         customer: plain.customerId && typeof plain.customerId === 'object'
             ? serializeCustomerSummary(plain.customerId)
             : undefined,
-        shopId: plain.shopId?.id || toIdString(plain.shopId),
+        shopId: plain.shopId && typeof plain.shopId === 'object'
+            ? undefined
+            : (plain.shopId?.id || toIdString(plain.shopId)),
         shop: plain.shopId && typeof plain.shopId === 'object'
             ? serializeShopSummary(plain.shopId)
             : undefined,
@@ -96,7 +101,7 @@ export const serializePaymentInitiation = ({
     const sdkOrderToken = raw?.sdkOrderToken || payment?.sdkOrderToken || null;
     const plain = sanitizeForResponse(toPlainObject(payment));
     return compact({
-        paymentId: plain.id,
+        id: plain.id,
         bookingId: toIdString(bookingId),
         merchantOrderId: plain.merchantOrderId,
         orderId: gatewayResponse?.orderId || plain.gatewayOrderId || null,
@@ -120,7 +125,6 @@ export const serializePaymentStatus = ({ payment, booking = null, gatewayStatus 
 
     return compact({
         id: plain.id,
-        paymentId: plain.id,
         bookingId: toIdString(plain.bookingId),
         merchantOrderId: plain.merchantOrderId,
         orderId: gatewayStatus?.orderId || plain.gatewayOrderId || null,

@@ -61,7 +61,7 @@ This document describes the comprehensive dashboard implementation for the EverC
 
 ### 2. Staff Availability
 
-**Endpoint:** `GET /api/dashboard/staff`
+**Endpoint:** `GET /api/v1/employees/analytics/availability`
 
 **Description:** Shows each employee's daily appointment progress and availability.
 
@@ -72,7 +72,7 @@ This document describes the comprehensive dashboard implementation for the EverC
   "data": {
     "staff": [
       {
-        "employeeId": "507f1f77bcf86cd799439011",
+        "id": "507f1f77bcf86cd799439011",
         "name": "Ram Kumar",
         "photoUrl": "https://...",
         "progress": {
@@ -99,10 +99,10 @@ This document describes the comprehensive dashboard implementation for the EverC
 
 ### 3. Today's Queue
 
-**Endpoint:** `GET /api/dashboard/queue?filter=active`
+**Endpoint:** `GET /api/v1/bookings/analytics/queue?timeframe=active`
 
 **Query Parameters:**
-- `filter`: `active` or `upcoming` (default: `active`)
+- `timeframe`: `active` or `upcoming` (default: `active`)
 
 **Description:** Shows today's appointments organized by status (active/upcoming).
 
@@ -111,12 +111,12 @@ This document describes the comprehensive dashboard implementation for the EverC
 {
   "success": true,
   "data": {
-    "filter": "active",
+    "timeframe": "active",
     "active": {
       "count": 3,
       "items": [
         {
-          "bookingId": "507f1f77bcf86cd799439011",
+          "id": "507f1f77bcf86cd799439011",
           "customer": {
             "name": "Julian Thorne"
           },
@@ -186,22 +186,19 @@ The booking details endpoint now includes:
 
 ### Customer & Employee Information
 
-Both customer and employee objects now include:
-- `fullName`: Concatenated first and last name for convenience
+Customer and employee objects expose public `id` plus the whitelisted display fields required by the screen. They do not include `_id`, `fullName`, or duplicated identifier aliases.
 
 **Example Response:**
 ```json
 {
-  "bookingId": "507f1f77bcf86cd799439011",
+  "id": "507f1f77bcf86cd799439011",
   "customer": {
-    "_id": "507f1f77bcf86cd799439012",
-    "fullName": "Alex Johnson",
+    "id": "507f1f77bcf86cd799439012",
     "firstName": "Alex",
     "lastName": "Johnson"
   },
   "employee": {
-    "_id": "507f1f77bcf86cd799439013",
-    "fullName": "Ram Kumar",
+    "id": "507f1f77bcf86cd799439013",
     "firstName": "Ram",
     "lastName": "Kumar"
   },
@@ -239,10 +236,10 @@ No database schema changes required. The dashboard uses existing booking, employ
 All dashboard routes require authentication and BARBER role:
 
 ```
-GET /api/dashboard/overview    - Complete dashboard data
-GET /api/dashboard/pulse       - Today's pulse metrics
-GET /api/dashboard/staff       - Staff availability
-GET /api/dashboard/queue       - Today's queue (active/upcoming)
+GET /api/v1/earnings/overview                         - Complete dashboard data
+GET /api/v1/bookings/analytics/today                  - Today's pulse metrics
+GET /api/v1/employees/analytics/availability          - Staff availability
+GET /api/v1/bookings/analytics/queue?timeframe=active - Today's queue
 ```
 
 ---
@@ -290,19 +287,19 @@ GET /api/dashboard/queue       - Today's queue (active/upcoming)
 
 4. **Get Staff Availability:**
    ```
-   GET /api/dashboard/staff
+   GET /api/v1/employees/analytics/availability
    Headers: { "Authorization": "Bearer <token>" }
    ```
 
 5. **Get Active Queue:**
    ```
-   GET /api/dashboard/queue?filter=active
+   GET /api/v1/bookings/analytics/queue?timeframe=active
    Headers: { "Authorization": "Bearer <token>" }
    ```
 
 6. **Get Upcoming Queue:**
    ```
-   GET /api/dashboard/queue?filter=upcoming
+   GET /api/v1/bookings/analytics/queue?timeframe=upcoming
    Headers: { "Authorization": "Bearer <token>" }
    ```
 

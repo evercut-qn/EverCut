@@ -86,7 +86,7 @@
               "const ratings = Array.isArray(response.data) ? response.data : [];",
               "const capture = (variableName, marker) => {",
               "  const match = ratings.find((item) => typeof item.review === 'string' && item.review.includes(marker));",
-              "  const ratingId = match && (match.ratingId || match.id);",
+              "  const ratingId = match && match.id;",
               "  if (ratingId) { pm.collectionVariables.set(variableName, ratingId); }",
               "};",
               "capture('rating_id_add_reply', '[ADD_REPLY_TARGET]');",

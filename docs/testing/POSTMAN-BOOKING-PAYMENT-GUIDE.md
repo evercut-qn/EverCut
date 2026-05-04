@@ -183,7 +183,7 @@ Authorization: Bearer {{customer_access_token}}
 
 Body:
 {
-  "serviceId": ["{{service_id}}"],
+  "serviceIds": ["{{service_id}}"],
   "employeeId": "{{employee_id}}",
   "shopId": "{{shop_id}}",
   "date": "{{booking_date}}",
@@ -195,12 +195,12 @@ Expected Response:
 {
   "success": true,
   "data": {
-    "paymentRequired": true,
-    "booking": {
-      "status": "pending",
-      "paymentStatus": "pending",
-      "totalAmount": 300
-    }
+    "id": "...",
+    "status": "pending",
+    "paymentStatus": "pending",
+    "totalAmount": 300,
+    "time": "{{booking_time}}",
+    "endTime": "..."
   }
 }
 
@@ -229,7 +229,7 @@ Expected Response:
 {
   "success": true,
   "data": {
-    "paymentId": "...",
+    "id": "...",
     "merchantOrderId": "EC-...",
     "orderId": "OMO123456789",
     "token": "eyJhbGci...",

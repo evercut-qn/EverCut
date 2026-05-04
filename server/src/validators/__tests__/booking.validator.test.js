@@ -2,9 +2,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+    bookingListQuerySchema,
     bookingMilestoneProgressQuerySchema,
     bookingPatchSchema,
     createBookingSchema,
+    queueFilterQuerySchema,
 } from '../booking.validator.js';
 
 test('booking schemas accept availability HH:MM times and normalize AM/PM input', () => {
@@ -74,4 +76,25 @@ test('bookingMilestoneProgressQuerySchema rejects incomplete periods', () => {
     });
 
     assert.match(error?.message || '', /contains \[month\] without its required peers \[year\]/);
+});
+
+test('booking list and queue queries use timeframe instead of overlapping period/filter names', () => {
+    const bookingQuery = bookingListQuerySchema.validate({
+        timeframe: 'past',
+        page: '1',
+        limit: '10',
+    });
+    assert.equal(bookingQuery.error, undefined);
+    assert.equal(bookingQuery.value.timeframe, 'past');
+    assert.equal('period' in bookingQuery.value, false);
+
+    const legacyBookingQuery = bookingListQuerySchema.validate({ period: 'past' });
+    assert.match(legacyBookingQuery.error?.message || '', /period/);
+
+    const queueQuery = queueFilterQuerySchema.validate({ timeframe: 'upcoming' });
+    assert.equal(queueQuery.error, undefined);
+    assert.equal(queueQuery.value.timeframe, 'upcoming');
+
+    const legacyQueueQuery = queueFilterQuerySchema.validate({ filter: 'active' });
+    assert.match(legacyQueueQuery.error?.message || '', /filter/);
 });

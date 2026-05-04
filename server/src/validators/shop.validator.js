@@ -63,8 +63,8 @@ const breakTimesSchema = Joi.alternatives().try(
         Joi.object({
             start: Joi.string().trim(),
             end: Joi.string().trim(),
-            startsAt: Joi.string().trim(),
-            endsAt: Joi.string().trim(),
+            startsAt: Joi.forbidden(),
+            endsAt: Joi.forbidden(),
         }),
     ),
     Joi.string().trim(),
@@ -76,44 +76,44 @@ const bankAccountSchema = Joi.string().trim().min(6).max(34);
 
 export const updateBusinessSchema = Joi.object({
     shopName: Joi.string().trim().min(1).max(100),
-    ownerName: Joi.string().trim().min(1).max(100),
-    shopOwner: Joi.string().trim().min(1).max(100),
-    ownerFirstName: Joi.string().trim().min(1).max(50),
-    ownerLastName: Joi.string().trim().min(1).max(50),
-    ownerGender: Joi.string().valid(...ALL_GENDERS),
-    ownerDateOfBirth: Joi.date(),
     firstName: Joi.string().trim().min(1).max(50),
     lastName: Joi.string().trim().min(1).max(50),
     gender: Joi.string().valid(...ALL_GENDERS),
     dateOfBirth: Joi.date(),
+    ownerName: Joi.forbidden(),
+    shopOwner: Joi.forbidden(),
+    ownerFirstName: Joi.forbidden(),
+    ownerLastName: Joi.forbidden(),
+    ownerGender: Joi.forbidden(),
+    ownerDateOfBirth: Joi.forbidden(),
     numberOfEmployees: Joi.number().integer().min(1),
     yearsOfExperience: Joi.number().integer().min(0),
     bio: Joi.string().max(500).allow(''),
     address: Joi.string().trim(),
-    shopLocation: Joi.string().trim(),
+    shopLocation: Joi.forbidden(),
     targetCustomers: targetCustomersSchema,
     category: Joi.string().valid(...ALL_SHOP_CATEGORIES),
-    shopCategory: Joi.string().valid(...ALL_SHOP_CATEGORIES),
-    businessCategory: Joi.string().valid(...ALL_SHOP_CATEGORIES),
-    facilities: amenitiesSchema,
+    shopCategory: Joi.forbidden(),
+    businessCategory: Joi.forbidden(),
     amenities: amenitiesSchema,
-    availableDays: daysSchema,
+    facilities: Joi.forbidden(),
     workingDays: daysSchema,
+    availableDays: Joi.forbidden(),
     openTime: Joi.string().trim(),
     closeTime: Joi.string().trim(),
-    opensAt: Joi.string().trim(),
-    closesAt: Joi.string().trim(),
+    opensAt: Joi.forbidden(),
+    closesAt: Joi.forbidden(),
     workingHours: Joi.alternatives().try(
         Joi.object({
             openTime: Joi.string().trim(),
             closeTime: Joi.string().trim(),
-            opensAt: Joi.string().trim(),
-            closesAt: Joi.string().trim(),
+            opensAt: Joi.forbidden(),
+            closesAt: Joi.forbidden(),
         }),
         Joi.string().trim(),
     ),
     breakTimes: breakTimesSchema,
-    breakTimings: breakTimesSchema,
+    breakTimings: Joi.forbidden(),
     location: Joi.alternatives().try(
         Joi.object({
             type: Joi.string().valid('Point').required(),
@@ -123,16 +123,12 @@ export const updateBusinessSchema = Joi.object({
     ),
 })
     .custom((value, helpers) => {
-        value.ownerName = value.ownerName || value.shopOwner;
-        value.ownerFirstName = value.ownerFirstName || value.firstName;
-        value.ownerLastName = value.ownerLastName || value.lastName;
-        value.ownerGender = value.ownerGender || value.gender;
-        value.ownerDateOfBirth = value.ownerDateOfBirth || value.dateOfBirth;
-        value.address = value.address || value.shopLocation;
-        value.category = value.category || value.shopCategory || value.businessCategory;
-        value.facilities = value.facilities ?? value.amenities;
-        value.availableDays = value.availableDays ?? value.workingDays;
-        value.breakTimes = value.breakTimes ?? value.breakTimings;
+        value.ownerFirstName = value.firstName;
+        value.ownerLastName = value.lastName;
+        value.ownerGender = value.gender;
+        value.ownerDateOfBirth = value.dateOfBirth;
+        value.facilities = value.amenities;
+        value.availableDays = value.workingDays;
 
         if (value.workingHours) {
             if (typeof value.workingHours === 'string') {
@@ -143,16 +139,9 @@ export const updateBusinessSchema = Joi.object({
                 }
             }
             value.openTime = value.openTime
-                || value.opensAt
-                || value.workingHours.openTime
-                || value.workingHours.opensAt;
+                || value.workingHours.openTime;
             value.closeTime = value.closeTime
-                || value.closesAt
-                || value.workingHours.closeTime
-                || value.workingHours.closesAt;
-        } else {
-            value.openTime = value.openTime || value.opensAt;
-            value.closeTime = value.closeTime || value.closesAt;
+                || value.workingHours.closeTime;
         }
 
         if (value.openTime !== undefined) {

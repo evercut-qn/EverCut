@@ -106,7 +106,7 @@
               "pm.test('token document returned', function () {",
               "  const response = pm.response.json();",
               "  pm.expect(response.success).to.equal(true);",
-              "  pm.expect(response.data).to.have.property('tokenId');",
+              "  pm.expect(response.data).to.have.property('id');",
               "  pm.expect(response.data).to.have.property('platform');",
               "  pm.expect(response.data).to.not.have.property('token');",
               "});"
@@ -190,8 +190,8 @@
               "});",
               "const notifications = Array.isArray(response.data) ? response.data : [];",
               "const first = notifications[0];",
-              "if (first && (first.notificationId || first.id)) {",
-              "  const notificationId = first.notificationId || first.id;",
+              "if (first && first.id) {",
+              "  const notificationId = first.id;",
               "  pm.collectionVariables.set('notification_id', notificationId);",
               "  pm.globals.set('shared_notification_id', notificationId);",
               "}"

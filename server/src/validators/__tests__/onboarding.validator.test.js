@@ -10,16 +10,15 @@ const buildValidPayload = () => ({
     gender: 'Male',
     dateOfBirth: '1991-01-12',
     shopName: 'Postman Test Barber Studio',
-    shopOwner: 'Test Barber',
-    shopCategory: 'Barber',
+    category: 'Barber',
     targetCustomers: 'male',
     upiId: 'test.barber@upi',
     accountHolderName: 'Test Barber',
     bankName: 'HDFC Bank',
     address: 'MG Road, Bengaluru',
     location: { type: 'Point', coordinates: [77.5946, 12.9716] },
-    availableDays: ['Monday', 'Tuesday', 'Wednesday'],
-    workingHours: '{"opensAt":"09:00 AM","closesAt":"08:00 PM"}',
+    workingDays: ['Monday', 'Tuesday', 'Wednesday'],
+    workingHours: '{"openTime":"09:00 AM","closeTime":"08:00 PM"}',
     breakTimes: '[{"start":"01:00 PM","end":"02:00 PM"}]',
     pin: '1234',
     confirmPin: '1234',
@@ -49,4 +48,19 @@ test('barberOnboardingSchema rejects break times outside shop hours', () => {
     });
 
     assert.match(result.error?.message || '', /breakTimes\[0\] must stay within shop hours/);
+});
+
+test('barberOnboardingSchema rejects deprecated barber onboarding aliases', () => {
+    const result = barberOnboardingSchema.validate({
+        ...buildValidPayload(),
+        category: undefined,
+        businessCategory: 'Barber',
+        upiAddress: 'test.barber@upi',
+    }, {
+        abortEarly: false,
+        allowUnknown: false,
+        stripUnknown: true,
+    });
+
+    assert.match(result.error?.message || '', /businessCategory|upiAddress|category/);
 });

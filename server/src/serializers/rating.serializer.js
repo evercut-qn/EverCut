@@ -7,7 +7,6 @@ export const serializeRating = (rating) => {
 
     return {
         id: plain.id,
-        ratingId: plain.id,
         shopId: plain.shopId?.id || plain.shopId || null,
         rating: plain.rating,
         review: plain.review || '',

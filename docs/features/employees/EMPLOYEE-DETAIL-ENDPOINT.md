@@ -40,10 +40,8 @@ Authorization: Bearer <jwt_token>
   "data": {
     "employee": {
       "id": "507f1f77bcf86cd799439011",
-      "employeeId": "507f1f77bcf86cd799439011",
       "firstName": "Ram",
       "lastName": "Kumar",
-      "fullName": "Ram Kumar",
       "phoneNumber": "+919876543210",
       "gender": "Male",
       "dateOfBirth": "1990-05-15T00:00:00.000Z",
@@ -74,7 +72,7 @@ Authorization: Bearer <jwt_token>
         "count": 12,
         "bookings": [
           {
-            "bookingId": "507f1f77bcf86cd799439012",
+            "id": "507f1f77bcf86cd799439012",
             "date": "2026-04-30T00:00:00.000Z",
             "time": "14:30",
             "customer": {
@@ -126,10 +124,8 @@ Authorization: Bearer <jwt_token>
 | Field | Type | Description |
 |-------|------|-------------|
 | `id` | String | Public employee unique identifier |
-| `employeeId` | String | Employee ID alias used by clients |
 | `firstName` | String | Employee first name |
 | `lastName` | String | Employee last name |
-| `fullName` | String | Full name (firstName + lastName) |
 | `phoneNumber` | String | Contact phone number |
 | `gender` | String | Gender (Male/Female/Other) |
 | `dateOfBirth` | Date | Date of birth |
@@ -307,7 +303,7 @@ The endpoint makes multiple queries:
 **Optimization Recommendations:**
 - Add caching for employee details (5-minute TTL)
 - Use aggregation pipeline for statistics calculation
-- Index on `employeeId + date + status` for faster queries
+- Index on booking employee relation + date + status for faster queries
 
 ### Response Time
 
@@ -328,9 +324,9 @@ When displaying staff in the dashboard:
 <StaffList>
   {staff.map(employee => (
     <StaffCard 
-      key={employee.employeeId}
+      key={employee.id}
       employee={employee}
-      onClick={() => fetchEmployeeDetails(employee.employeeId)}
+      onClick={() => fetchEmployeeDetails(employee.id)}
     />
   ))}
 </StaffList>

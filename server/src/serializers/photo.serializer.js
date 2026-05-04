@@ -10,7 +10,6 @@ export const serializePhoto = (photo) => {
 
     return compact({
         id: plain.id,
-        photoId: plain.id,
         shopId: plain.shopId?.id || toIdString(plain.shopId),
         photoUrl: plain.photoUrl ?? null,
         photoName: plain.photoName ?? null,

@@ -24,7 +24,7 @@ const buildMulticastMessage = ({ tokens, payload }) => {
     const includeNotification = payload.type !== NOTIFICATION_TYPE.SILENT
         && Boolean(payload.title || payload.body);
     const data = normalizeFcmData({
-        notificationId: payload.notificationId,
+        id: payload.id,
         type: payload.type,
         eventType: payload.eventType,
         entityType: payload.entityType,

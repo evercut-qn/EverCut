@@ -101,8 +101,8 @@ const parseBreakTimes = (value) => {
             throw new Error(`breakTimes[${index}] must be an object`);
         }
 
-        const start = parsed.start || parsed.startsAt;
-        const end = parsed.end || parsed.endsAt;
+        const start = parsed.start;
+        const end = parsed.end;
         if (!start || !end) {
             throw new Error(`breakTimes[${index}] must include start and end`);
         }
@@ -114,18 +114,12 @@ const parseBreakTimes = (value) => {
 const normalizeUpdateBody = (body = {}) => {
     const normalized = { ...body };
 
-    normalized.ownerName = normalized.ownerName || normalized.shopOwner;
-    normalized.ownerFirstName = normalized.ownerFirstName || normalized.firstName;
-    normalized.ownerLastName = normalized.ownerLastName || normalized.lastName;
-    normalized.ownerGender = normalized.ownerGender || normalized.gender;
-    normalized.ownerDateOfBirth = normalized.ownerDateOfBirth || normalized.dateOfBirth;
-    normalized.address = normalized.address || normalized.shopLocation;
-    normalized.category = normalized.category || normalized.shopCategory || normalized.businessCategory;
-    normalized.facilities = normalized.facilities ?? normalized.amenities;
-    normalized.availableDays = normalized.availableDays ?? normalized.workingDays;
-    normalized.breakTimes = normalized.breakTimes ?? normalized.breakTimings;
-    normalized.openTime = normalized.openTime || normalized.opensAt;
-    normalized.closeTime = normalized.closeTime || normalized.closesAt;
+    normalized.ownerFirstName = normalized.firstName;
+    normalized.ownerLastName = normalized.lastName;
+    normalized.ownerGender = normalized.gender;
+    normalized.ownerDateOfBirth = normalized.dateOfBirth;
+    normalized.facilities = normalized.amenities;
+    normalized.availableDays = normalized.workingDays;
 
     if (normalized.workingHours) {
         let parsedHours = normalized.workingHours;
@@ -137,11 +131,9 @@ const normalizeUpdateBody = (body = {}) => {
             }
         }
         normalized.openTime = normalized.openTime
-            || parsedHours?.openTime
-            || parsedHours?.opensAt;
+            || parsedHours?.openTime;
         normalized.closeTime = normalized.closeTime
-            || parsedHours?.closeTime
-            || parsedHours?.closesAt;
+            || parsedHours?.closeTime;
     }
 
     return normalized;

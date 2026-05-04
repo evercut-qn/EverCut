@@ -10,11 +10,9 @@ export const serializeEmployee = (employee, options = {}) => {
 
     const base = {
         id: plain.id,
-        employeeId: plain.id,
         shopId: plain.shopId?.id || toIdString(plain.shopId),
         firstName: plain.firstName ?? null,
         lastName: plain.lastName ?? null,
-        fullName: `${plain.firstName || ''} ${plain.lastName || ''}`.trim() || null,
         photoUrl: plain.photoUrl ?? null,
         gender: plain.gender ?? null,
         workingHours: plain.workingHours ?? null,

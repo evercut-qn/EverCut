@@ -48,7 +48,7 @@
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/bookings?period=past&limit=100",
+        "url": "{{base_url}}/{{api_prefix}}/bookings?timeframe=past&limit=100",
         "description": "Captures a shop ID from the authenticated customer's completed past bookings. This request fails the collection clearly when no eligible booking exists for rating."
       },
       "event": [
@@ -74,8 +74,8 @@
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
               "const response = pm.response.json();",
               "const bookings = Array.isArray(response.data) ? response.data : [];",
-              "const completedBooking = bookings.find((booking) => booking && booking.status === 'completed' && booking.shopId);",
-              "const shopId = completedBooking && completedBooking.shopId && (completedBooking.shopId.shopId || completedBooking.shopId.id || completedBooking.shopId);",
+              "const completedBooking = bookings.find((booking) => booking && booking.status === 'completed' && booking.shop && booking.shop.id);",
+              "const shopId = completedBooking && completedBooking.shop && completedBooking.shop.id;",
               "pm.test('completed booking exists for rating eligibility', function () { pm.expect(shopId, 'A completed past booking is required before submitting a rating.').to.be.ok; });",
               "if (shopId) { pm.collectionVariables.set('shop_id', shopId); pm.globals.set('shared_shop_id', shopId); }"
             ]

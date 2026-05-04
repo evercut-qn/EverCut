@@ -14,7 +14,6 @@ export const serializePayout = (payout) => {
 
     return compact({
         id: plain.id,
-        payoutId: plain.id,
         bookingIds: serializeIds(plain.bookingIds),
         barberId: toIdString(plain.barberId),
         shopId: toIdString(plain.shopId),

@@ -94,7 +94,7 @@
               "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
               "const response = pm.response.json();",
-              "const shopId = response.data && (response.data.shopId || response.data.id);",
+              "const shopId = response.data && response.data.id;",
               "if (shopId) { pm.collectionVariables.set('shop_id', shopId); pm.globals.set('shared_shop_id', shopId); }"
             ]
           }
@@ -115,7 +115,7 @@
         "description": "Updates only barber profile and business fields. Payout details are managed through /shops/me/payout-details. NOTE: Email updates must use PUT /account/email endpoint.",
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"firstName\": \"Test\",\n  \"lastName\": \"Barber\",\n  \"shopOwner\": \"Test Barber\",\n  \"dateOfBirth\": \"1991-01-12\",\n  \"gender\": \"Male\",\n  \"shopName\": \"Postman Test Barber Studio\",\n  \"businessCategory\": \"Barber\",\n  \"targetCustomers\": \"male\",\n  \"shopLocation\": \"MG Road, Bengaluru\",\n  \"location\": {\"type\":\"Point\",\"coordinates\":[77.5946,12.9716]},\n  \"amenities\": [\"Air Conditioning\", \"Waiting Area\", \"Parking Area\", \"Wi-Fi\"],\n  \"workingDays\": [\"Monday\", \"Tuesday\", \"Wednesday\", \"Thursday\", \"Friday\", \"Saturday\"],\n  \"workingHours\": {\n    \"opensAt\": \"09:00\",\n    \"closesAt\": \"20:00\"\n  },\n  \"breakTimings\": [\n    {\n      \"startsAt\": \"13:00\",\n      \"endsAt\": \"14:00\"\n    }\n  ],\n  \"bio\": \"Updated from the automated Postman profile collection.\"\n}",
+          "raw": "{\n  \"firstName\": \"Test\",\n  \"lastName\": \"Barber\",\n  \"dateOfBirth\": \"1991-01-12\",\n  \"gender\": \"Male\",\n  \"shopName\": \"Postman Test Barber Studio\",\n  \"category\": \"Barber\",\n  \"targetCustomers\": \"male\",\n  \"address\": \"MG Road, Bengaluru\",\n  \"location\": {\"type\":\"Point\",\"coordinates\":[77.5946,12.9716]},\n  \"amenities\": [\"Air Conditioning\", \"Waiting Area\", \"Parking Area\", \"Wi-Fi\"],\n  \"workingDays\": [\"Monday\", \"Tuesday\", \"Wednesday\", \"Thursday\", \"Friday\", \"Saturday\"],\n  \"workingHours\": {\n    \"openTime\": \"09:00\",\n    \"closeTime\": \"20:00\"\n  },\n  \"breakTimes\": [\n    {\n      \"start\": \"13:00\",\n      \"end\": \"14:00\"\n    }\n  ],\n  \"bio\": \"Updated from the automated Postman profile collection.\"\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -181,7 +181,7 @@
               "const response = pm.response.json();",
               "const data = response.data || {};",
               "pm.test('response includes accountHolderName', function () { pm.expect(data).to.have.property('accountHolderName'); });",
-              "pm.test('response includes bankAccount (masked)', function () { pm.expect(data).to.have.property('bankAccount'); });",
+              "pm.test('response includes bankAccountLast4', function () { pm.expect(data).to.have.property('bankAccountLast4'); });",
               "pm.test('response includes ifsc', function () { pm.expect(data).to.have.property('ifsc'); });",
               "pm.test('response includes verificationStatus', function () { pm.expect(data).to.have.property('verificationStatus'); });",
               "pm.test('response includes canReceivePayouts', function () { pm.expect(data).to.have.property('canReceivePayouts'); });"
@@ -235,7 +235,7 @@
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
               "const response = pm.response.json();",
               "const data = response.data || {};",
-              "pm.test('bankAccount is masked', function () { pm.expect(data.bankAccount).to.match(/\\*{4,}\\d{4}/); });",
+              "pm.test('bankAccountLast4 is present', function () { pm.expect(data.bankAccountLast4).to.match(/^\\d{4}$/); });",
               "pm.test('verificationStatus is pending after update', function () { pm.expect(data.verificationStatus).to.equal('pending'); });"
             ]
           }

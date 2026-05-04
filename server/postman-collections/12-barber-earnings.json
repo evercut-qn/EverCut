@@ -172,7 +172,7 @@
               "    pm.expect(transaction).to.have.property('timestamp');",
               "    ",
               "    // Save first transaction ID for detail endpoint",
-              "    pm.collectionVariables.set('transaction_id', transaction.paymentId || transaction.id);",
+              "    pm.collectionVariables.set('transaction_id', transaction.id);",
               "  }",
               "});"
             ]

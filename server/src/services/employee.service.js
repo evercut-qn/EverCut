@@ -307,22 +307,7 @@ export const getEmployeeById = async (ownerId, employeeId) => {
     );
 
     return {
-        employee: {
-            ...serializeEmployee(employee),
-            id: toIdString(employee._id),
-            employeeId: toIdString(employee._id),
-            firstName: employee.firstName,
-            lastName: employee.lastName,
-            fullName: `${employee.firstName} ${employee.lastName}`,
-            phoneNumber: employee.phoneNumber,
-            gender: employee.gender,
-            dateOfBirth: employee.dateOfBirth,
-            photoUrl: employee.photoUrl,
-            workingHours: employee.workingHours,
-            blockedDates: employee.blockedDates,
-            isActive: employee.isActive,
-            createdAt: employee.createdAt,
-        },
+        employee: serializeEmployee(employee),
         statistics: {
             today: {
                 total: todaysBookings.length,
@@ -340,7 +325,7 @@ export const getEmployeeById = async (ownerId, employeeId) => {
             upcoming: {
                 count: upcomingBookings.length,
                 bookings: upcomingBookings.slice(0, 5).map((b) => ({
-                    bookingId: toIdString(b._id),
+                    id: toIdString(b._id),
                     date: b.date,
                     time: b.time,
                     customer: {
@@ -480,7 +465,7 @@ export const getStaffAvailability = async (ownerId) => {
                 totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
             return {
-                employeeId: toIdString(employee._id),
+                id: toIdString(employee._id),
                 name: `${employee.firstName} ${employee.lastName}`,
                 photoUrl: employee.photoUrl,
                 progress: {
@@ -543,7 +528,7 @@ export const toggleEmployeeStatus = async (ownerId, employeeId, status) => {
     });
 
     return {
-        employeeId: toIdString(updated._id),
+        id: toIdString(updated._id),
         name: `${updated.firstName} ${updated.lastName}`,
         isActive: updated.isActive,
     };

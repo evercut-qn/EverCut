@@ -25,7 +25,7 @@ test('getDashboardOverview returns pulse, staff, and queue structure', async (t)
         assert.ok(result.queue, 'Result should have queue property');
         
         // Verify queue structure
-        assert.ok(result.queue.filter, 'Queue should have filter property');
+        assert.ok(result.queue.timeframe, 'Queue should have timeframe property');
         assert.ok(result.queue.active, 'Queue should have active property');
         assert.ok(result.queue.upcoming, 'Queue should have upcoming property');
         assert.ok(typeof result.queue.active.count === 'number', 'Active count should be a number');
@@ -43,7 +43,7 @@ test('getDashboardOverview returns pulse, staff, and queue structure', async (t)
     }
 });
 
-test('getTodaysQueue returns correct structure with active filter', async (t) => {
+test('getTodaysQueue returns correct structure with active timeframe', async (t) => {
     const bookingService = await import('../booking.service.js');
     
     const mockOwnerId = 'test-owner-id';
@@ -52,7 +52,7 @@ test('getTodaysQueue returns correct structure with active filter', async (t) =>
         const result = await bookingService.getTodaysQueue(mockOwnerId, 'active');
         
         // Verify structure
-        assert.strictEqual(result.filter, 'active', 'Filter should be active');
+        assert.strictEqual(result.timeframe, 'active', 'Timeframe should be active');
         assert.ok(result.active, 'Should have active property');
         assert.ok(result.upcoming, 'Should have upcoming property');
         assert.ok(typeof result.active.count === 'number', 'Active count should be a number');
@@ -60,8 +60,8 @@ test('getTodaysQueue returns correct structure with active filter', async (t) =>
         assert.ok(typeof result.upcoming.count === 'number', 'Upcoming count should be a number');
         assert.ok(Array.isArray(result.upcoming.items), 'Upcoming items should be an array');
         
-        // When filter is 'active', upcoming items should be empty
-        assert.strictEqual(result.upcoming.items.length, 0, 'Upcoming items should be empty when filter is active');
+        // When timeframe is 'active', upcoming items should be empty
+        assert.strictEqual(result.upcoming.items.length, 0, 'Upcoming items should be empty when timeframe is active');
         
     } catch (error) {
         // Expected to fail with NotFoundError if shop doesn't exist
@@ -72,7 +72,7 @@ test('getTodaysQueue returns correct structure with active filter', async (t) =>
     }
 });
 
-test('getTodaysQueue returns correct structure with upcoming filter', async (t) => {
+test('getTodaysQueue returns correct structure with upcoming timeframe', async (t) => {
     const bookingService = await import('../booking.service.js');
     
     const mockOwnerId = 'test-owner-id';
@@ -81,12 +81,12 @@ test('getTodaysQueue returns correct structure with upcoming filter', async (t) 
         const result = await bookingService.getTodaysQueue(mockOwnerId, 'upcoming');
         
         // Verify structure
-        assert.strictEqual(result.filter, 'upcoming', 'Filter should be upcoming');
+        assert.strictEqual(result.timeframe, 'upcoming', 'Timeframe should be upcoming');
         assert.ok(result.active, 'Should have active property');
         assert.ok(result.upcoming, 'Should have upcoming property');
         
-        // When filter is 'upcoming', active items should be empty
-        assert.strictEqual(result.active.items.length, 0, 'Active items should be empty when filter is upcoming');
+        // When timeframe is 'upcoming', active items should be empty
+        assert.strictEqual(result.active.items.length, 0, 'Active items should be empty when timeframe is upcoming');
         
     } catch (error) {
         // Expected to fail with NotFoundError if shop doesn't exist

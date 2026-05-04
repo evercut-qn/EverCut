@@ -117,7 +117,6 @@ const buildTransactionListItem = (payment, booking) => {
 
     return {
         id: toObjectIdString(payment._id),
-        paymentId: toObjectIdString(payment._id),
         transactionId: payment.gatewayTransactionId || `TXN${payment._id.toString().slice(-8).toUpperCase()}`,
         customer: {
             name: formatCustomerName(customer),
@@ -166,7 +165,6 @@ const buildTransactionDetail = async (payment, booking) => {
 
     return {
         id: toObjectIdString(payment._id),
-        paymentId: toObjectIdString(payment._id),
         transactionId: payment.gatewayTransactionId || `TXN${payment._id.toString().slice(-8).toUpperCase()}`,
         customer: {
             name: formatCustomerName(customer),
@@ -180,7 +178,6 @@ const buildTransactionDetail = async (payment, booking) => {
         },
         services: services.map((service) => ({
             id: toObjectIdString(service._id),
-            serviceId: toObjectIdString(service._id),
             name: service.serviceName || 'Service',
             price: getServicePrice(service),
         })),

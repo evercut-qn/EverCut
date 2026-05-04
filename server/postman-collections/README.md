@@ -17,7 +17,7 @@ All collections now assume the backend returns the same JSON envelope for both s
 }
 ```
 
-`meta` is optional and is used for pagination, counts, and summaries. Paginated endpoints return the array directly in `data` and pagination details in `meta.pagination`. Collections capture public DTO identifiers (`id`, `bookingId`, `shopId`, `employeeId`, `serviceId`, etc.); `_id`, `__v`, `$__`, `_doc`, and other Mongoose internals are not part of the API contract. Validation and field-level failures are returned inside `data.errors`.
+`meta` is optional and is used for pagination, counts, and summaries. Paginated endpoints return the array directly in `data` and pagination details in `meta.pagination`. Collections capture each resource's public identifier from `id` and store it in Postman variables such as `shop_id` and `booking_id`; `_id`, domain ID aliases, `__v`, `$__`, `_doc`, and other Mongoose internals are not part of the response contract. Validation and field-level failures are returned inside `data.errors`.
 
 ---
 
@@ -27,7 +27,7 @@ All collections now assume the backend returns the same JSON envelope for both s
 |---|---|---|
 | `01-authentication.json` | EverCut - Authentication | OTP authentication for customer and barber test users, token capture, and health check |
 | `02-onboarding.json` | EverCut - Onboarding | First-run customer and barber onboarding using onboarding JWTs, with shop schedule normalization to 24-hour storage |
-| `03-customer-profile.json` | EverCut - Customer | Profile read/update and homepage endpoints |
+| `03-customer-profile.json` | EverCut - Customer | Profile read/update and service discovery ID capture |
 | `04-customer-bookings.json` | EverCut - Customer Bookings | Full booking lifecycle: create, schedule update, favorite add/remove, reorder, cancel |
 | `05-customer-shop-discovery.json` | EverCut - Customer Shop Discovery | Shop discovery, availability, favorites, and keyword search |
 | `06-customer-ratings.json` | EverCut - Customer Ratings | Submit a rating and read shop rating data |
@@ -77,14 +77,13 @@ Shop opening, closing, and break times may be sent as either `HH:MM` or `hh:mm A
 |---|---|---|---|
 | 1 | GET | `/api/v1/customers/me` | Get profile |
 | 2 | PUT | `/api/v1/customers/me` | Update profile |
-| 3 | GET | `/api/v1/customers/me/home` | Get homepage |
-| 4 | GET | `/api/v1/shops/services` | Get services by gender - also captures shared shop/service IDs |
+| 3 | GET | `/api/v1/shops/services` | Get services by gender - also captures shared shop/service IDs |
 
 ### `04-customer-bookings.json`
 
 | # | Method | Endpoint | Description |
 |---|---|---|---|
-| 1 | GET | `/api/v1/bookings?period=upcoming` | List upcoming bookings - captures booking ID |
+| 1 | GET | `/api/v1/bookings?timeframe=upcoming` | List upcoming bookings - captures booking ID |
 | 2 | GET | `/api/v1/employees/{{employee_id}}/availability` | Get employee availability |
 | 3 | POST | `/api/v1/bookings` | Create a booking |
 | 4 | GET | `/api/v1/bookings/{{booking_id}}` | Get booking details |
@@ -115,7 +114,7 @@ Shop opening, closing, and break times may be sent as either `HH:MM` or `hh:mm A
 
 | # | Method | Endpoint | Description |
 |---|---|---|---|
-| 1 | GET | `/api/v1/bookings?period=past&limit=100` | Bootstrap: capture a shop ID from a completed past booking |
+| 1 | GET | `/api/v1/bookings?timeframe=past&limit=100` | Bootstrap: capture a shop ID from a completed past booking |
 | 2 | POST | `/api/v1/ratings` | Submit a rating *(once per customer/shop - returns 409 on rerun)* |
 | 3 | GET | `/api/v1/ratings/shop/{{shop_id}}` | List shop ratings |
 | 4 | GET | `/api/v1/ratings/shop/{{shop_id}}/summary` | Get rating summary |
@@ -205,8 +204,8 @@ Employee `workingHours.start` and `workingHours.end` remain `HH:MM` 24-hour valu
 | 1 | GET | `/api/v1/earnings/overview` | Get complete dashboard overview (pulse + staff + queue) |
 | 2 | GET | `/api/v1/bookings/analytics/today` | Get today's pulse metrics (occupancy + status breakdown) |
 | 3 | GET | `/api/v1/employees/analytics/availability` | Get staff availability and progress tracking |
-| 4 | GET | `/api/v1/bookings/analytics/queue?filter=active` | Get today's active queue |
-| 5 | GET | `/api/v1/bookings/analytics/queue?filter=upcoming` | Get today's upcoming queue |
+| 4 | GET | `/api/v1/bookings/analytics/queue?timeframe=active` | Get today's active queue |
+| 5 | GET | `/api/v1/bookings/analytics/queue?timeframe=upcoming` | Get today's upcoming queue |
 
 ### `15-payments-payouts.json`
 
@@ -345,11 +344,11 @@ cd server
 node scripts/seed-barber-rating-mock-data.js
 ```
 
-Request 1 captures seeded IDs from the serialized `ratingId` field returned by the API.
+Request 1 captures seeded IDs from the serialized `id` field returned by the API.
 
 ### `06-customer-ratings.json` — Add Rating (Request 2)
 
-This collection captures `shop_id` from `GET /bookings?period=past`, not from nearby shop discovery. The authenticated customer must already have at least one completed past booking, otherwise request 1 fails intentionally because the backend allows ratings only for shops the customer has actually completed a booking with.
+This collection captures `shop_id` from `GET /bookings?timeframe=past`, not from nearby shop discovery. The authenticated customer must already have at least one completed past booking, otherwise request 1 fails intentionally because the backend allows ratings only for shops the customer has actually completed a booking with.
 
 Request 2 succeeds once per customer/shop pair. It returns `409 Conflict` on subsequent runs because the API allows only one rating per customer per shop.
 

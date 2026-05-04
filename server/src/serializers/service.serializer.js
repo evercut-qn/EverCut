@@ -3,6 +3,7 @@ import {
     normalizeServicePricing,
 } from '../utils/service-pricing.utils.js';
 import { sanitizeForResponse, toIdString, toPlainObject } from './core.serializer.js';
+import { serializeShopSummary } from './shop.serializer.js';
 
 const compact = (value) => Object.fromEntries(
     Object.entries(value).filter(([, nestedValue]) => nestedValue !== undefined),
@@ -17,21 +18,12 @@ export const serializeService = (service, options = {}) => {
 
     const effectivePrice = getEffectiveServicePrice(plain);
     const shop = plain.shopId && typeof plain.shopId === 'object'
-        ? {
-            id: plain.shopId.id,
-            shopId: plain.shopId.id,
-            shopName: plain.shopId.shopName ?? null,
-            address: plain.shopId.address ?? null,
-            location: plain.shopId.location ?? null,
-            category: plain.shopId.category ?? null,
-            coverUrl: plain.shopId.coverUrl ?? null,
-        }
+        ? serializeShopSummary(plain.shopId)
         : undefined;
 
     return compact({
         id: plain.id,
-        serviceId: plain.id,
-        shopId: plain.shopId?.id || toIdString(plain.shopId),
+        shopId: options.includeShop && shop ? undefined : (plain.shopId?.id || toIdString(plain.shopId)),
         shop: options.includeShop && shop ? shop : undefined,
         serviceName: plain.serviceName ?? null,
         serviceType: plain.serviceType ?? null,

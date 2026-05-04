@@ -46,7 +46,8 @@ test('getFavoriteShops returns a paginated customer favorite shop list', async (
     const result = await shopService.getFavoriteShops('user-1', { page: 1, limit: 1 });
 
     assert.equal(result.items[0].id, 'shop-1');
-    assert.equal(result.items[0].shopId, 'shop-1');
+    assert.equal(result.items[0].id, 'shop-1');
+    assert.equal('shopId' in result.items[0], false);
     assert.equal(result.items[0].shopName, 'One');
     assert.equal('_id' in result.items[0], false);
     assert.deepEqual(result.pagination, {

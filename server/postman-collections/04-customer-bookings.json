@@ -158,7 +158,7 @@
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/bookings?period=upcoming",
+        "url": "{{base_url}}/{{api_prefix}}/bookings?timeframe=upcoming",
         "description": "Lists upcoming bookings and captures the first booking ID and first service ID when they already exist."
       },
       "event": [
@@ -185,8 +185,8 @@
               "const response = pm.response.json();",
               "const bookings = Array.isArray(response.data) ? response.data : [];",
               "const firstBooking = bookings[0];",
-              "if (firstBooking && (firstBooking.bookingId || firstBooking.id)) {",
-              "  const bookingId = firstBooking.bookingId || firstBooking.id;",
+              "if (firstBooking && firstBooking.id) {",
+              "  const bookingId = firstBooking.id;",
               "  pm.collectionVariables.set('booking_id', bookingId);",
               "  pm.globals.set('shared_booking_id', bookingId);",
               "}"
@@ -282,7 +282,7 @@
               "});",
               "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
               "const response = pm.response.json();",
-              "const bookingId = response.data && response.data.bookingId;",
+              "const bookingId = response.data && response.data.id;",
               "if (bookingId) { pm.collectionVariables.set('booking_id', bookingId); pm.globals.set('shared_booking_id', bookingId); }",
               "pm.test('booking response includes exact range metadata', function () {",
               "  const data = response.data || {};",
@@ -490,7 +490,7 @@
               "});",
               "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
               "const response = pm.response.json();",
-              "const bookingId = response.data && response.data.bookingId;",
+              "const bookingId = response.data && response.data.id;",
               "if (bookingId) { pm.collectionVariables.set('reordered_booking_id', bookingId); }"
             ]
           }

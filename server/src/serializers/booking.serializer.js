@@ -38,16 +38,15 @@ export const serializeBooking = (booking, options = {}) => {
 
     return compact({
         id: plain.id,
-        bookingId: plain.id || toIdString(plain.bookingId),
-        customerId: resolveId(plain.customerId || plain.customer),
+        customerId: customer ? undefined : resolveId(plain.customerId || plain.customer),
         customer,
-        shopId: resolveId(plain.shopId || plain.shop),
+        shopId: shop ? undefined : resolveId(plain.shopId || plain.shop),
         shop,
-        employeeId: resolveId(plain.employeeId || plain.employee),
+        employeeId: employee ? undefined : resolveId(plain.employeeId || plain.employee),
         employee,
-        serviceIds: Array.isArray(plain.serviceIds)
+        serviceIds: services.length > 0 ? undefined : (Array.isArray(plain.serviceIds)
             ? plain.serviceIds.map(resolveId).filter(Boolean)
-            : undefined,
+            : undefined),
         services,
         date: plain.date ?? null,
         time: plain.time ?? null,
@@ -101,12 +100,13 @@ export const serializeBookingCreation = (booking) => {
 
     return compact({
         id: plain.id || toIdString(plain.bookingId),
-        bookingId: plain.bookingId || plain.id,
         shopId: plain.shopId?.id || toIdString(plain.shopId),
         customerId: plain.customerId?.id || toIdString(plain.customerId),
-        employeeId: plain.employeeId?.id || toIdString(plain.employeeId),
+        employeeId: plain.employee ? undefined : (plain.employeeId?.id || toIdString(plain.employeeId)),
         employee: plain.employee ? serializeEmployee(plain.employee, { publicView: true }) : undefined,
-        serviceIds: Array.isArray(plain.serviceIds) ? plain.serviceIds.map(toIdString).filter(Boolean) : undefined,
+        serviceIds: services.length > 0
+            ? undefined
+            : (Array.isArray(plain.serviceIds) ? plain.serviceIds.map(toIdString).filter(Boolean) : undefined),
         services,
         date: plain.date,
         time: plain.time,
@@ -130,7 +130,6 @@ export const serializeBookingDetails = (details) => {
 
     return compact({
         id: plain.id || toIdString(plain.bookingId),
-        bookingId: plain.bookingId || plain.id,
         customer: plain.customer ? serializeCustomerSummary(plain.customer) : null,
         employee: plain.employee ? serializeEmployee(plain.employee, { publicView: true }) : null,
         shop: plain.shop ? serializeShopSummary(plain.shop) : null,

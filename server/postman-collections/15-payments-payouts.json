@@ -143,7 +143,7 @@
           }
         ],
         "url": "{{base_url}}/{{api_prefix}}/payments",
-        "description": "Creates a PhonePe native SDK checkout order for the authenticated customer's pending booking. The response returns orderId, token, merchantId, merchantOrderId, and paymentId for the Flutter PhonePe SDK. No redirect URL is returned.",
+        "description": "Creates a PhonePe native SDK checkout order for the authenticated customer's pending booking. The response returns id, orderId, token, merchantId, and merchantOrderId for the Flutter PhonePe SDK. No redirect URL is returned.",
         "body": {
           "mode": "raw",
           "raw": "{\n  \"bookingId\": \"{{payment_booking_id}}\"\n}",
@@ -188,15 +188,15 @@
               "pm.test('captures native payment references', function () {",
               "  const response = pm.response.json();",
               "  pm.expect(response.success).to.equal(true);",
-              "  pm.expect(response.data).to.have.property('paymentId');",
+              "  pm.expect(response.data).to.have.property('id');",
               "  pm.expect(response.data).to.have.property('merchantOrderId');",
               "  pm.expect(response.data).to.have.property('orderId');",
               "  pm.expect(response.data).to.have.property('token');",
               "  pm.expect(response.data).to.have.property('merchantId');",
               "  pm.expect(response.data).to.not.have.property('redirectUrl');",
-              "  pm.collectionVariables.set('payment_id', response.data.paymentId);",
+              "  pm.collectionVariables.set('payment_id', response.data.id);",
               "  pm.collectionVariables.set('merchant_order_id', response.data.merchantOrderId);",
-              "  pm.globals.set('payment_id', response.data.paymentId);",
+              "  pm.globals.set('payment_id', response.data.id);",
               "  pm.globals.set('merchant_order_id', response.data.merchantOrderId);",
               "});"
             ]
@@ -468,7 +468,7 @@
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
               "pm.test('captures retry payout references when present', function () {",
               "  const response = pm.response.json();",
-              "  const payoutId = response.data && (response.data.payoutId || response.data.id);",
+              "  const payoutId = response.data && response.data.id;",
               "  if (payoutId) {",
               "    pm.collectionVariables.set('payout_id', payoutId);",
               "    pm.globals.set('payout_id', payoutId);",

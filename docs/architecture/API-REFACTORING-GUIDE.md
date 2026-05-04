@@ -106,7 +106,7 @@ Authorization: Bearer {barber_access_token}
   "data": {
     "staff": [
       {
-        "employeeId": "507f1f77bcf86cd799439011",
+        "id": "507f1f77bcf86cd799439011",
         "name": "John Doe",
         "photoUrl": "https://...",
         "progress": {
@@ -130,18 +130,18 @@ Authorization: Bearer {barber_access_token}
 
 **Old Endpoint:**
 ```
-GET /api/v1/dashboard/queue?filter=active
+GET /api/v1/dashboard/queue?timeframe=active
 Authorization: Bearer {barber_access_token}
 ```
 
 **New Endpoint:**
 ```
-GET /api/v1/bookings/analytics/queue?filter=active
+GET /api/v1/bookings/analytics/queue?timeframe=active
 Authorization: Bearer {barber_access_token}
 ```
 
 **Query Parameters:**
-- `filter` (optional): `active` or `upcoming` (default: `active`)
+- `timeframe` (optional): `active` or `upcoming` (default: `active`)
 
 **Response Structure:** (unchanged)
 ```json
@@ -149,12 +149,12 @@ Authorization: Bearer {barber_access_token}
   "success": true,
   "message": "Today's queue fetched",
   "data": {
-    "filter": "active",
+    "timeframe": "active",
     "active": {
       "count": 3,
       "items": [
         {
-          "bookingId": "507f1f77bcf86cd799439011",
+          "id": "507f1f77bcf86cd799439011",
           "customer": { "name": "Jane Smith" },
           "employee": { "name": "John Doe" },
           "time": "14:30",
@@ -211,10 +211,8 @@ Authorization: Bearer {customer_access_token}
   "message": "Profile fetched",
   "data": {
     "id": "507f1f77bcf86cd799439011",
-    "customerId": "507f1f77bcf86cd799439011",
     "firstName": "Jane",
     "lastName": "Smith",
-    "fullName": "Jane Smith",
     "photoUrl": "https://...",
     "address": "123 Main St, City",
     "location": {
@@ -230,7 +228,7 @@ Authorization: Bearer {customer_access_token}
 }
 ```
 
-All JSON APIs now use the same response envelope: `{ success, message, data, meta? }`. Paginated endpoints return the list directly in `data` and pagination/count metadata in `meta`, for example `{ "data": [...], "meta": { "pagination": {...} } }`. Public DTOs expose `id` plus domain aliases such as `customerId`, `shopId`, `bookingId`, and never expose MongoDB/Mongoose internals such as `_id`, `__v`, `$__`, `_doc`, or `$isNew`.
+All JSON APIs now use the same response envelope: `{ success, message, data, meta? }`. Paginated endpoints return the list directly in `data` and pagination/count metadata in `meta`, for example `{ "data": [...], "meta": { "pagination": {...} } }`. Public DTOs expose each resource's own identifier as `id`; relation identifiers keep explicit names such as `shopId` or `bookingId` only when no nested relation object is returned. APIs never expose MongoDB/Mongoose internals such as `_id`, `__v`, `$__`, `_doc`, or `$isNew`.
 
 **Rationale:** The `/home` endpoint returned a subset of customer data formatted for a specific UI screen. Frontends should fetch the full profile via `/customers/me` and extract the fields they need. If performance is critical, consider implementing field filtering via query parameters (e.g., `?fields=photoUrl,firstName,lastName,address`).
 
@@ -262,7 +260,7 @@ const { pulse, staff, queue } = response.data;
 const [pulseRes, staffRes, queueRes] = await Promise.all([
   fetch('/api/v1/bookings/analytics/today'),
   fetch('/api/v1/employees/analytics/availability'),
-  fetch('/api/v1/bookings/analytics/queue?filter=active')
+  fetch('/api/v1/bookings/analytics/queue?timeframe=active')
 ]);
 
 const pulse = pulseRes.data;

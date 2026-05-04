@@ -85,8 +85,8 @@
               "const response = pm.response.json();",
               "const photos = Array.isArray(response.data) ? response.data : [];",
               "const firstPhoto = photos[0];",
-              "if (firstPhoto && (firstPhoto.photoId || firstPhoto.id)) {",
-              "  const photoId = firstPhoto.photoId || firstPhoto.id;",
+              "if (firstPhoto && firstPhoto.id) {",
+              "  const photoId = firstPhoto.id;",
               "  pm.collectionVariables.set('photo_id', photoId);",
               "  pm.globals.set('shared_photo_id', photoId);",
               "}"
@@ -147,8 +147,8 @@
               "const response = pm.response.json();",
               "const photos = Array.isArray(response.data) ? response.data : [];",
               "const firstPhoto = photos[0];",
-              "if (firstPhoto && (firstPhoto.photoId || firstPhoto.id)) {",
-              "  const photoId = firstPhoto.photoId || firstPhoto.id;",
+              "if (firstPhoto && firstPhoto.id) {",
+              "  const photoId = firstPhoto.id;",
               "  pm.collectionVariables.set('photo_id', photoId);",
               "  pm.globals.set('shared_photo_id', photoId);",
               "}"

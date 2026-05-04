@@ -10,7 +10,6 @@ export const serializeNotification = (notification) => {
 
     return {
         id: plain.id,
-        notificationId: plain.id,
         recipientUserId: toIdString(plain.recipientUserId),
         actorUserId: plain.actorUserId ? toIdString(plain.actorUserId) : null,
         type: plain.type,
@@ -35,7 +34,6 @@ export const serializeFcmTokenRegistration = (token) => {
 
     return compact({
         id: plain.id,
-        tokenId: plain.id,
         userId: toIdString(plain.userId),
         platform: plain.platform ?? null,
         deviceId: plain.deviceId ?? null,

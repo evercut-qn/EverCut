@@ -90,8 +90,8 @@
               "const response = pm.response.json();",
               "const employees = Array.isArray(response.data) ? response.data : [];",
               "const preferredEmployee = employees.find((employee) => typeof employee.firstName === 'string' && employee.firstName.includes('Postman')) || employees[0];",
-              "if (preferredEmployee && (preferredEmployee.employeeId || preferredEmployee.id)) {",
-              "  const employeeId = preferredEmployee.employeeId || preferredEmployee.id;",
+              "if (preferredEmployee && preferredEmployee.id) {",
+              "  const employeeId = preferredEmployee.id;",
               "  pm.collectionVariables.set('employee_id', employeeId);",
               "  pm.globals.set('shared_employee_id', employeeId);",
               "}"
@@ -224,7 +224,7 @@
               "});",
               "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
               "const response = pm.response.json();",
-              "const employeeId = response.data && (response.data.employeeId || response.data.id);",
+              "const employeeId = response.data && response.data.id;",
               "if (employeeId) { pm.collectionVariables.set('employee_id', employeeId); pm.globals.set('shared_employee_id', employeeId); }"
             ]
           }

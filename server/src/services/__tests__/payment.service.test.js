@@ -92,7 +92,8 @@ test('getPayments lists only the authenticated customer payments', async (t) => 
         hasNextPage: false,
         hasPrevPage: true,
     });
-    assert.equal(result.items[0].paymentId, 'payment-6');
+    assert.equal(result.items[0].id, 'payment-6');
+    assert.equal('paymentId' in result.items[0], false);
 });
 
 test('getPayments lists only the authenticated barber shop payments', async (t) => {
@@ -193,7 +194,8 @@ test('initiatePayment creates a native PhonePe SDK order and never returns a red
     const result = await paymentService.initiatePayment('user-1', 'booking-1');
 
     assert.equal(result.redirectUrl, undefined);
-    assert.equal(result.paymentId, 'payment-1');
+    assert.equal(result.id, 'payment-1');
+    assert.equal('paymentId' in result, false);
     assert.equal(result.bookingId, 'booking-1');
     assert.equal(result.orderId, 'OMO-native-1');
     assert.equal(result.token, 'sdk-order-token');
@@ -257,7 +259,8 @@ test('initiatePayment reuses an unexpired pending native SDK order without expos
     assert.equal(result.token, null);
     assert.equal(result.reusable, true);
     assert.equal(result.orderId, 'OMO-native-1');
-    assert.equal(result.paymentId, 'payment-1');
+    assert.equal(result.id, 'payment-1');
+    assert.equal('paymentId' in result, false);
     assert.equal(result.merchantOrderId, 'EC-booking-1-reuse');
     assert.equal(gatewayMock.mock.calls.length, 0);
 });
