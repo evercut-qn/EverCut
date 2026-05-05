@@ -184,6 +184,12 @@
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
               "const response = pm.response.json();",
               "const bookings = Array.isArray(response.data) ? response.data : [];",
+              "bookings.forEach((booking) => {",
+              "  if (booking.employee) {",
+              "    pm.expect(booking.employee).to.have.property('isAvailableOnBookingDate');",
+              "    pm.expect(booking.employee.isAvailableOnBookingDate).to.be.a('boolean');",
+              "  }",
+              "});",
               "const firstBooking = bookings[0];",
               "if (firstBooking && firstBooking.id) {",
               "  const bookingId = firstBooking.id;",
@@ -324,7 +330,13 @@
               "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
               "  });",
               "});",
-              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "const response = pm.response.json();",
+              "const booking = response.data || {};",
+              "pm.test('booking detail includes employee availability flag', function () {",
+              "  pm.expect(booking.employee).to.have.property('isAvailableOnBookingDate');",
+              "  pm.expect(booking.employee.isAvailableOnBookingDate).to.be.a('boolean');",
+              "});"
             ]
           }
         }

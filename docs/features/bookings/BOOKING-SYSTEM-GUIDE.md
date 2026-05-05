@@ -106,6 +106,30 @@ COMPLETED (Service Done)
 
 ---
 
+### Employee Leave Behavior
+
+Employee leave is handled through `Employee.blockedDates`. When a barber marks an employee unavailable with `PATCH /api/v1/employees/:id/availability`, the system adds the requested date(s) to `blockedDates`, prevents new bookings and reschedules for that employee/date combination, finds active affected bookings, and sends customer notifications.
+
+Existing bookings are not reassigned, cancelled, or mutated. They keep the original employee, original time, services, status, and payment state.
+
+Booking list and booking detail responses include a single frontend-facing flag on populated employees:
+
+```json
+{
+  "employee": {
+    "id": "507f1f77bcf86cd799439014",
+    "firstName": "Dev",
+    "lastName": "Patel",
+    "photoUrl": "https://cdn.example/employee.jpg",
+    "isAvailableOnBookingDate": false
+  }
+}
+```
+
+Frontend clients should show an informational warning when `employee.isAvailableOnBookingDate === false`. The shop assigns any replacement offline when the customer arrives; the API does not record replacement assignment history.
+
+---
+
 ## API Endpoints
 
 ### Discovery & Availability
@@ -117,6 +141,7 @@ COMPLETED (Service Done)
 | GET | `/api/v1/shops/:id/employees` | No | List employees |
 | GET | `/api/v1/employees/:id/availability` | Yes | Employee availability (recommended) |
 | GET | `/api/v1/shops/:id/availability` | Yes | Shop-wide availability |
+| PATCH | `/api/v1/employees/:id/availability` | BARBER | Mark employee available/unavailable for date(s) |
 
 ### Booking Management (Customer)
 

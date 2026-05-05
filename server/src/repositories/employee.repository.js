@@ -34,6 +34,22 @@ class EmployeeRepository {
         );
     }
 
+    async updateAvailabilityDates(id, shopId, dates, available) {
+        const normalizedDates = [...new Set(dates)]
+            .filter(Boolean)
+            .map((date) => new Date(`${date}T00:00:00.000Z`));
+
+        const update = available
+            ? { $pull: { blockedDates: { $in: normalizedDates } } }
+            : { $addToSet: { blockedDates: { $each: normalizedDates } } };
+
+        return Employee.findOneAndUpdate(
+            { _id: id, shopId },
+            update,
+            { returnDocument: 'after', runValidators: true },
+        );
+    }
+
     /**
      * Atomically claim every slot marker for a booking.
      * Returns null if any marker is already taken or the date is blocked.

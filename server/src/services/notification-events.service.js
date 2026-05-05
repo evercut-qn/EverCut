@@ -197,6 +197,41 @@ export const notifyBookingAutoCancelled = async ({ bookingId }) => safeNotify(
     { eventType: NOTIFICATION_EVENT.BOOKING_AUTO_CANCELLED, bookingId },
 );
 
+export const notifyBookingEmployeeUnavailable = async ({
+    bookingId,
+    employeeId,
+    employeeName,
+    date,
+}) => safeNotify(
+    async () => {
+        const context = await loadBookingContext(bookingId);
+        if (context.skipped) return context;
+
+        const { booking, shop, customer } = context;
+        if (!customer.userId) return { skipped: true, reason: 'customer_user_missing' };
+
+        const result = await notificationService.notifyUser({
+            recipientUserId: customer.userId,
+            actorUserId: shop.ownerId || null,
+            type: NOTIFICATION_TYPE.HYBRID,
+            eventType: NOTIFICATION_EVENT.BOOKING_EMPLOYEE_UNAVAILABLE,
+            title: 'Booking update',
+            body: `Your assigned barber ${employeeName} is unavailable. Your appointment time is still reserved.`,
+            data: bookingData(booking, shop, customer, {
+                employeeId: toObjectIdString(employeeId),
+                employeeName,
+                date,
+            }),
+            entityType: 'booking',
+            entityId: booking._id,
+            dedupeKey: `${NOTIFICATION_EVENT.BOOKING_EMPLOYEE_UNAVAILABLE}:${bookingId}:${employeeId}:${date}`,
+        });
+
+        return { ...result, skipped: false };
+    },
+    { eventType: NOTIFICATION_EVENT.BOOKING_EMPLOYEE_UNAVAILABLE, bookingId, employeeId, date },
+);
+
 export const notifyBookingStatusChanged = async ({ bookingId, status, actorUserId = null }) => {
     if (status === BOOKING_STATUS.CONFIRMED) {
         return notifyBookingConfirmed({ bookingId, actorUserId });
@@ -478,6 +513,7 @@ const notificationEventsService = {
     notifyBookingConfirmed,
     notifyBookingCancelled,
     notifyBookingAutoCancelled,
+    notifyBookingEmployeeUnavailable,
     notifyBookingStatusChanged,
     notifyPaymentFailed,
     notifyRefundStatus,

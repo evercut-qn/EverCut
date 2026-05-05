@@ -55,6 +55,11 @@
       "key": "employee_phone",
       "value": "",
       "type": "string"
+    },
+    {
+      "key": "employee_leave_date",
+      "value": "",
+      "type": "string"
     }
   ],
   "item": [
@@ -348,7 +353,129 @@
       ]
     },
     {
-      "name": "6. Delete Employee (Terminal)",
+      "name": "6. Mark Employee Unavailable For Date",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/{{api_prefix}}/employees/{{employee_id}}/availability",
+        "description": "Marks the captured employee unavailable for a generated future date. Existing bookings remain unchanged and affected customers receive booking.employee_unavailable notifications.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"dates\": [\"{{employee_leave_date}}\"],\n  \"available\": false\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const date = new Date();",
+              "date.setDate(date.getDate() + 3);",
+              "const leaveDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;",
+              "pm.collectionVariables.set('employee_leave_date', leaveDate);"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
+              "});",
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "const response = pm.response.json();",
+              "const data = response.data || {};",
+              "pm.test('leave response includes affected booking counts', function () {",
+              "  pm.expect(data).to.have.property('affectedBookings');",
+              "  pm.expect(data).to.have.property('customersNotified');",
+              "  pm.expect(data).to.have.property('blockedDates');",
+              "});",
+              "pm.test('blockedDates includes leave date', function () {",
+              "  pm.expect(data.blockedDates || []).to.include(pm.collectionVariables.get('employee_leave_date'));",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Mark Employee Available Again",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/{{api_prefix}}/employees/{{employee_id}}/availability",
+        "description": "Removes the generated leave date. The system does not notify customers when an employee becomes available again, avoiding multiple conflicting customer messages.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"dates\": [\"{{employee_leave_date}}\"],\n  \"available\": true\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
+              "});",
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "const response = pm.response.json();",
+              "const data = response.data || {};",
+              "pm.test('availability response includes datesUnblocked', function () { pm.expect(data).to.have.property('datesUnblocked'); });",
+              "pm.test('customers were not notified on availability restore', function () { pm.expect(data.customersNotified).to.equal(0); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Delete Employee (Terminal)",
       "request": {
         "method": "DELETE",
         "header": [],

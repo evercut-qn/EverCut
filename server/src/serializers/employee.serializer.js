@@ -17,6 +17,7 @@ export const serializeEmployee = (employee, options = {}) => {
         gender: plain.gender ?? null,
         workingHours: plain.workingHours ?? null,
         isActive: plain.isActive ?? true,
+        isAvailableOnBookingDate: plain.isAvailableOnBookingDate,
         createdAt: plain.createdAt,
         updatedAt: plain.updatedAt,
     };

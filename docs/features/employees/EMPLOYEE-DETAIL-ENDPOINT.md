@@ -12,6 +12,21 @@ This document describes the employee detail endpoint that provides comprehensive
 
 **Authorization:** Shop owners can only access employees from their own shop
 
+### Leave / Date Availability
+
+Barbers can mark an employee unavailable or available again for one or more full dates:
+
+**URL:** `PATCH /api/v1/employees/:id/availability`
+
+```json
+{
+  "dates": ["2026-06-15", "2026-06-16"],
+  "available": false
+}
+```
+
+When `available` is `false`, the dates are added to `blockedDates`, new booking attempts for that employee/date are rejected, active affected bookings are found, and customers are notified. Existing bookings remain confirmed and keep the original employee. When `available` is `true`, dates are removed from `blockedDates`; customers are not automatically notified again.
+
 ---
 
 ## Request
@@ -375,6 +390,7 @@ const fetchEmployeeDetails = async (employeeId) => {
 - `PATCH /api/employees/:id/status` - Toggle employee availability status
 - `DELETE /api/employees/:id` - Delete employee
 - `GET /api/employees/:id/availability` - Employee availability
+- `PATCH /api/v1/employees/:id/availability` - Mark employee available/unavailable for date(s)
 
 ---
 

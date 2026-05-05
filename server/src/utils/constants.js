@@ -269,6 +269,7 @@ export const NOTIFICATION_EVENT = Object.freeze({
     BOOKING_COMPLETED: 'booking.completed',
     BOOKING_NO_SHOW: 'booking.no_show',
     BOOKING_AUTO_CANCELLED: 'booking.auto_cancelled',
+    BOOKING_EMPLOYEE_UNAVAILABLE: 'booking.employee_unavailable',
     PAYMENT_FAILED: 'payment.failed',
     PAYMENT_REFUND_PENDING: 'payment.refund_pending',
     PAYMENT_REFUNDED: 'payment.refunded',

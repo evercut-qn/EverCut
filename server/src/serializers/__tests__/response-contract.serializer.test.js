@@ -114,3 +114,20 @@ test('serializers do not duplicate populated relation ids beside relation object
     assert.equal('customerId' in payment, false);
     assert.equal('shopId' in payment, false);
 });
+
+test('booking serializer adds employee availability for the booking date without exposing blockedDates', () => {
+    const booking = serializeBooking({
+        _id: '507f1f77bcf86cd799439011',
+        date: '2026-06-15',
+        time: '10:00',
+        employeeId: {
+            _id: '507f1f77bcf86cd799439014',
+            firstName: 'Dev',
+            lastName: 'Patel',
+            blockedDates: [new Date('2026-06-15T00:00:00.000Z')],
+        },
+    });
+
+    assert.equal(booking.employee.isAvailableOnBookingDate, false);
+    assert.equal('blockedDates' in booking.employee, false);
+});

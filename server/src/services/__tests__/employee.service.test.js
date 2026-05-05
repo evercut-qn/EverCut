@@ -5,6 +5,7 @@ import cloudinary from '../../config/cloudinary.config.js';
 import bookingRepository from '../../repositories/booking.repository.js';
 import employeeRepository from '../../repositories/employee.repository.js';
 import shopRepository from '../../repositories/shop.repository.js';
+import notificationEvents from '../notification-events.service.js';
 import * as employeeService from '../employee.service.js';
 
 test('deleteEmployee blocks unresolved bookings for that employee', async (t) => {
@@ -135,4 +136,124 @@ test('addEmployee defaults working hours to normalized 24-hour shop hours', asyn
     );
 
     assert.deepEqual(createdPayload.workingHours, { start: '09:00', end: '20:00' });
+});
+
+test('updateEmployeeAvailability blocks only new leave dates and notifies affected bookings', async (t) => {
+    t.mock.method(shopRepository, 'findByOwnerId', async () => ({ _id: 'shop-1' }));
+    t.mock.method(employeeRepository, 'findById', async () => ({
+        _id: 'employee-1',
+        shopId: 'shop-1',
+        firstName: 'Alex',
+        lastName: 'Stylist',
+        blockedDates: [new Date('2026-06-15T00:00:00.000Z')],
+    }));
+
+    let availabilityUpdate = null;
+    t.mock.method(employeeRepository, 'updateAvailabilityDates', async (employeeId, shopId, dates, available) => {
+        availabilityUpdate = { employeeId, shopId, dates, available };
+        return {
+            _id: employeeId,
+            shopId,
+            firstName: 'Alex',
+            lastName: 'Stylist',
+            blockedDates: [
+                new Date('2026-06-15T00:00:00.000Z'),
+                new Date('2026-06-16T00:00:00.000Z'),
+            ],
+        };
+    });
+
+    let affectedLookup = null;
+    t.mock.method(bookingRepository, 'findActiveByEmployeeAndDates', async (employeeId, dates) => {
+        affectedLookup = { employeeId, dates };
+        return [
+            {
+                _id: 'booking-1',
+                customerId: { firstName: 'Mina', lastName: 'Shah' },
+                date: new Date('2026-06-16T00:00:00.000Z'),
+                time: '10:00',
+            },
+        ];
+    });
+
+    const notifiedBookings = [];
+    t.mock.method(notificationEvents, 'notifyBookingEmployeeUnavailable', async (payload) => {
+        notifiedBookings.push(payload);
+        return { skipped: false };
+    });
+
+    const result = await employeeService.updateEmployeeAvailability(
+        'owner-1',
+        'employee-1',
+        { dates: ['2026-06-15', '2026-06-16', '2026-06-16'], available: false },
+    );
+
+    assert.deepEqual(availabilityUpdate, {
+        employeeId: 'employee-1',
+        shopId: 'shop-1',
+        dates: ['2026-06-16'],
+        available: false,
+    });
+    assert.deepEqual(affectedLookup, {
+        employeeId: 'employee-1',
+        dates: ['2026-06-16'],
+    });
+    assert.deepEqual(notifiedBookings, [
+        {
+            bookingId: 'booking-1',
+            employeeId: 'employee-1',
+            employeeName: 'Alex Stylist',
+            date: '2026-06-16',
+        },
+    ]);
+    assert.equal(result.employeeId, 'employee-1');
+    assert.equal(result.datesBlocked, 1);
+    assert.equal(result.affectedBookings, 1);
+    assert.equal(result.customersNotified, 1);
+    assert.deepEqual(result.blockedDates, ['2026-06-15', '2026-06-16']);
+    assert.deepEqual(result.notificationsSent, [
+        {
+            bookingId: 'booking-1',
+            customerName: 'Mina Shah',
+            date: '2026-06-16',
+            time: '10:00',
+            notificationStatus: 'sent',
+        },
+    ]);
+});
+
+test('updateEmployeeAvailability removes blocked dates without notifying customers', async (t) => {
+    t.mock.method(shopRepository, 'findByOwnerId', async () => ({ _id: 'shop-1' }));
+    t.mock.method(employeeRepository, 'findById', async () => ({
+        _id: 'employee-1',
+        shopId: 'shop-1',
+        firstName: 'Alex',
+        lastName: 'Stylist',
+        blockedDates: [new Date('2026-06-15T00:00:00.000Z')],
+    }));
+    t.mock.method(employeeRepository, 'updateAvailabilityDates', async () => ({
+        _id: 'employee-1',
+        shopId: 'shop-1',
+        firstName: 'Alex',
+        lastName: 'Stylist',
+        blockedDates: [],
+    }));
+
+    const affectedLookup = t.mock.method(bookingRepository, 'findActiveByEmployeeAndDates', async () => []);
+    const notifyMock = t.mock.method(notificationEvents, 'notifyBookingEmployeeUnavailable', async () => {
+        throw new Error('marking available again should not notify customers');
+    });
+
+    const result = await employeeService.updateEmployeeAvailability(
+        'owner-1',
+        'employee-1',
+        { dates: ['2026-06-15'], available: true },
+    );
+
+    assert.equal(affectedLookup.mock.calls.length, 0);
+    assert.equal(notifyMock.mock.calls.length, 0);
+    assert.equal(result.datesUnblocked, 1);
+    assert.equal(result.affectedBookings, 0);
+    assert.equal(result.customersNotified, 0);
+    assert.deepEqual(result.blockedDates, []);
 });

@@ -16,6 +16,29 @@ const serializeBookingRef = (value, serializer) => (
     value && typeof value === 'object' ? serializer(value) : undefined
 );
 
+const toDateOnlyString = (value) => {
+    if (!value) return null;
+    if (value instanceof Date && !Number.isNaN(value.getTime())) {
+        return value.toISOString().slice(0, 10);
+    }
+    return String(value).slice(0, 10);
+};
+
+const withEmployeeBookingAvailability = (employee, bookingDate) => {
+    if (!employee || typeof employee !== 'object' || !bookingDate) return employee;
+    const plainEmployee = toPlainObject(employee);
+    if (plainEmployee.isAvailableOnBookingDate !== undefined) return plainEmployee;
+
+    const bookingDateText = toDateOnlyString(bookingDate);
+    const blockedDates = Array.isArray(plainEmployee.blockedDates) ? plainEmployee.blockedDates : [];
+    const isBlocked = blockedDates.some((blockedDate) => toDateOnlyString(blockedDate) === bookingDateText);
+
+    return {
+        ...plainEmployee,
+        isAvailableOnBookingDate: !isBlocked,
+    };
+};
+
 export const serializeBooking = (booking, options = {}) => {
     const plain = sanitizeForResponse(toPlainObject(booking));
     if (!plain) return null;
@@ -31,7 +54,7 @@ export const serializeBooking = (booking, options = {}) => {
 
     const customer = serializeBookingRef(plain.customerId || plain.customer, serializeCustomerSummary);
     const employee = serializeBookingRef(
-        plain.employeeId || plain.employee,
+        withEmployeeBookingAvailability(plain.employeeId || plain.employee, plain.date),
         (value) => serializeEmployee(value, { publicView: true }),
     );
     const shop = serializeBookingRef(plain.shopId || plain.shop, serializeShopSummary);
@@ -131,7 +154,9 @@ export const serializeBookingDetails = (details) => {
     return compact({
         id: plain.id || toIdString(plain.bookingId),
         customer: plain.customer ? serializeCustomerSummary(plain.customer) : null,
-        employee: plain.employee ? serializeEmployee(plain.employee, { publicView: true }) : null,
+        employee: plain.employee
+            ? serializeEmployee(withEmployeeBookingAvailability(plain.employee, plain.date), { publicView: true })
+            : null,
         shop: plain.shop ? serializeShopSummary(plain.shop) : null,
         date: plain.date,
         time: plain.time,

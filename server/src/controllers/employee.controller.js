@@ -44,6 +44,20 @@ export const updateEmployee = async (req, res, next) => {
     }
 };
 
+export const updateEmployeeAvailability = async (req, res, next) => {
+    try {
+        const params = getValidatedRequestData(req, 'params');
+        const body = getValidatedRequestData(req, 'body');
+        const result = await employeeService.updateEmployeeAvailability(req.user._id, params.id, body);
+        const message = body.available
+            ? 'Employee marked available'
+            : 'Employee marked unavailable. Customers have been notified.';
+        return res.status(200).json(ApiResponse.success(result, message));
+    } catch (err) {
+        next(err);
+    }
+};
+
 export const deleteEmployee = async (req, res, next) => {
     try {
         const params = getValidatedRequestData(req, 'params');

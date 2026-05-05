@@ -1225,7 +1225,7 @@ export const getBookingsByShop = async (ownerId, query = {}) => {
         }
     }
 
-    const total = await bookingRepository.countAll(filters);
+    const total = await bookingRepository.countAll({ shopId: shop._id, ...filters });
     const { skip, limit, pagination } = buildPagination(query, total);
 
     const [bookings, numCustomers, numberOfEmployees] = await Promise.all([

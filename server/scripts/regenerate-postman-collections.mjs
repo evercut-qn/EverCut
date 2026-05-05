@@ -583,6 +583,12 @@ const customerBookingsCollection = {
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           "const response = pm.response.json();",
           "const bookings = Array.isArray(response.data) ? response.data : [];",
+          "bookings.forEach((booking) => {",
+          "  if (booking.employee) {",
+          "    pm.expect(booking.employee).to.have.property('isAvailableOnBookingDate');",
+          "    pm.expect(booking.employee.isAvailableOnBookingDate).to.be.a('boolean');",
+          "  }",
+          "});",
           "const firstBooking = bookings[0];",
           "if (firstBooking && firstBooking.id) {",
           "  const bookingId = firstBooking.id;",
@@ -635,7 +641,15 @@ const customerBookingsCollection = {
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id}}',
         description: 'Reads the full booking detail payload for the captured booking.',
-        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          "const response = pm.response.json();",
+          "const booking = response.data || {};",
+          "pm.test('booking detail includes employee availability flag', function () {",
+          "  pm.expect(booking.employee).to.have.property('isAvailableOnBookingDate');",
+          "  pm.expect(booking.employee.isAvailableOnBookingDate).to.be.a('boolean');",
+          "});"
+        ),
       }),
     },
     {
@@ -1123,6 +1137,7 @@ const barberEmployeesCollection = {
     ...baseVariables(
       textVariable('employee_id', ''),
       textVariable('employee_phone', ''),
+      textVariable('employee_leave_date', ''),
     ),
   ],
   item: [
@@ -1229,7 +1244,55 @@ const barberEmployeesCollection = {
       }),
     },
     {
-      name: '6. Delete Employee (Terminal)',
+      name: '6. Mark Employee Unavailable For Date',
+      ...request({
+        method: 'PATCH',
+        url: '{{base_url}}/{{api_prefix}}/employees/{{employee_id}}/availability',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "dates": ["{{employee_leave_date}}"],\n  "available": false\n}`),
+        description: 'Marks the captured employee unavailable for a generated future date. Existing bookings remain unchanged and affected customers receive booking.employee_unavailable notifications.',
+        event: mergedEvents(
+          [
+            "const date = new Date();",
+            "date.setDate(date.getDate() + 3);",
+            "const leaveDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;",
+            "pm.collectionVariables.set('employee_leave_date', leaveDate);"
+          ],
+          [
+            "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+            "const response = pm.response.json();",
+            "const data = response.data || {};",
+            "pm.test('leave response includes affected booking counts', function () {",
+            "  pm.expect(data).to.have.property('affectedBookings');",
+            "  pm.expect(data).to.have.property('customersNotified');",
+            "  pm.expect(data).to.have.property('blockedDates');",
+            "});",
+            "pm.test('blockedDates includes leave date', function () {",
+            "  pm.expect(data.blockedDates || []).to.include(pm.collectionVariables.get('employee_leave_date'));",
+            "});"
+          ]
+        ),
+      }),
+    },
+    {
+      name: '7. Mark Employee Available Again',
+      ...request({
+        method: 'PATCH',
+        url: '{{base_url}}/{{api_prefix}}/employees/{{employee_id}}/availability',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "dates": ["{{employee_leave_date}}"],\n  "available": true\n}`),
+        description: 'Removes the generated leave date. The system does not notify customers when an employee becomes available again, avoiding multiple conflicting customer messages.',
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          "const response = pm.response.json();",
+          "const data = response.data || {};",
+          "pm.test('availability response includes datesUnblocked', function () { pm.expect(data).to.have.property('datesUnblocked'); });",
+          "pm.test('customers were not notified on availability restore', function () { pm.expect(data.customersNotified).to.equal(0); });"
+        ),
+      }),
+    },
+    {
+      name: '8. Delete Employee (Terminal)',
       ...request({
         method: 'DELETE',
         url: '{{base_url}}/{{api_prefix}}/employees/{{employee_id}}',
@@ -1375,6 +1438,12 @@ const barberBookingsCollection = {
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           "const response = pm.response.json();",
           "const bookings = Array.isArray(response.data) ? response.data : [];",
+          "bookings.forEach((booking) => {",
+          "  if (booking.employee) {",
+          "    pm.expect(booking.employee).to.have.property('isAvailableOnBookingDate');",
+          "    pm.expect(booking.employee.isAvailableOnBookingDate).to.be.a('boolean');",
+          "  }",
+          "});",
           "const statusBooking = bookings.find((booking) => ['pending', 'confirmed'].includes(booking.status)) || bookings[0];",
           "const deleteBooking = bookings.find((booking) => booking.paymentStatus === 'success') || statusBooking;",
           "const statusBookingId = statusBooking && statusBooking.id;",

@@ -10,13 +10,13 @@ const ACTIVE_BOOKING_STATUSES = [
 
 const EMPLOYEE_POPULATE = {
     path: 'employeeId',
-    select: 'firstName lastName photoUrl',
+    select: 'firstName lastName photoUrl blockedDates',
     options: { includeDeleted: true },
 };
 
 const EMPLOYEE_NAME_POPULATE = {
     path: 'employeeId',
-    select: 'firstName lastName',
+    select: 'firstName lastName blockedDates',
     options: { includeDeleted: true },
 };
 
@@ -227,6 +227,21 @@ class BookingRepository {
             date,
             status: { $nin: [BOOKING_STATUS.CANCELLED] },
         })).lean();
+    }
+
+    async findActiveByEmployeeAndDates(employeeId, dates) {
+        return Booking.find(trustQueryOperators({
+            employeeId,
+            date: { $in: dates.map((date) => new Date(`${date}T00:00:00.000Z`)) },
+            status: { $in: ACTIVE_BOOKING_STATUSES },
+        }))
+            .populate({
+                path: 'customerId',
+                select: 'firstName lastName userId',
+                populate: { path: 'userId', select: 'phoneNumber email' },
+            })
+            .populate('shopId', 'shopName ownerId')
+            .lean();
     }
 
     async findBlockingByEmployeeAndDate(employeeId, date) {

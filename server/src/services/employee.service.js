@@ -9,6 +9,8 @@ import { parseTimeToMinutes } from '../utils/time.utils.js';
 import { normalizeShopSchedule } from '../utils/shop-schedule.utils.js';
 import { serializeEmployee, serializeEmployees } from '../serializers/employee.serializer.js';
 import { toIdString } from '../serializers/core.serializer.js';
+import { toDateOnlyString } from '../utils/slot-lock.utils.js';
+import notificationEvents from './notification-events.service.js';
 
 /**
  * Employee service â€” CRUD operations for shop employees.
@@ -101,6 +103,31 @@ const normalizeBlockedDates = (value) => {
         return dates;
     }, []);
 };
+
+const normalizeAvailabilityDates = (dates) => {
+    const normalized = normalizeBlockedDates(dates);
+    if (!Array.isArray(normalized) || normalized.length === 0) {
+        throw new BadRequestError('dates must include at least one date');
+    }
+
+    return normalized.map(toDateOnlyString);
+};
+
+const employeeDisplayName = (employee) => [employee?.firstName, employee?.lastName]
+    .filter(Boolean)
+    .join(' ')
+    || 'Employee';
+
+const customerDisplayName = (customer) => [customer?.firstName, customer?.lastName]
+    .filter(Boolean)
+    .join(' ')
+    || 'Customer';
+
+const blockedDateStrings = (employee) => (
+    Array.isArray(employee?.blockedDates)
+        ? employee.blockedDates.map(toDateOnlyString).filter(Boolean).sort()
+        : []
+);
 
 const getNormalizedShopWorkingHours = (shop) => {
     const scheduleResult = normalizeShopSchedule({
@@ -390,6 +417,79 @@ export const updateEmployee = async (ownerId, employeeId, data, file) => {
     }
 
     return serializeEmployee(updated);
+};
+
+export const updateEmployeeAvailability = async (ownerId, employeeId, data) => {
+    const shop = await shopRepository.findByOwnerId(ownerId);
+    if (!shop) throw new NotFoundError('Shop profile');
+
+    const employee = await employeeRepository.findById(employeeId);
+    if (!employee || String(employee.shopId) !== String(shop._id)) {
+        throw new NotFoundError('Employee');
+    }
+
+    const requestedDates = normalizeAvailabilityDates(data?.dates);
+    const available = data?.available === true;
+    const existingBlockedDates = new Set(blockedDateStrings(employee));
+    const datesToChange = requestedDates.filter((date) => (
+        available ? existingBlockedDates.has(date) : !existingBlockedDates.has(date)
+    ));
+
+    const updated = datesToChange.length > 0
+        ? await employeeRepository.updateAvailabilityDates(employeeId, shop._id, datesToChange, available)
+        : employee;
+    if (!updated) throw new NotFoundError('Employee');
+
+    let affectedBookings = [];
+    let notificationsSent = [];
+
+    if (!available && datesToChange.length > 0) {
+        affectedBookings = await bookingRepository.findActiveByEmployeeAndDates(employeeId, datesToChange);
+        const employeeName = employeeDisplayName(updated);
+
+        notificationsSent = await Promise.all(affectedBookings.map(async (booking) => {
+            const bookingDate = toDateOnlyString(booking.date);
+            const notificationResult = await notificationEvents.notifyBookingEmployeeUnavailable({
+                bookingId: toIdString(booking._id),
+                employeeId: toIdString(updated._id),
+                employeeName,
+                date: bookingDate,
+            });
+
+            return {
+                bookingId: toIdString(booking._id),
+                customerName: customerDisplayName(booking.customerId),
+                date: bookingDate,
+                time: booking.time,
+                notificationStatus: notificationResult?.skipped ? 'skipped' : 'sent',
+            };
+        }));
+    }
+
+    const customersNotified = notificationsSent.filter(
+        (notification) => notification.notificationStatus === 'sent',
+    ).length;
+
+    logger.info('Employee availability dates updated', {
+        employeeId,
+        shopId: shop._id,
+        ownerId,
+        available,
+        dates: datesToChange,
+        affectedBookings: affectedBookings.length,
+        customersNotified,
+    });
+
+    return {
+        employeeId: toIdString(updated._id),
+        name: employeeDisplayName(updated),
+        datesBlocked: available ? 0 : datesToChange.length,
+        datesUnblocked: available ? datesToChange.length : 0,
+        blockedDates: blockedDateStrings(updated),
+        affectedBookings: affectedBookings.length,
+        customersNotified,
+        notificationsSent,
+    };
 };
 
 export const deleteEmployee = async (ownerId, employeeId) => {

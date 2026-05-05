@@ -180,3 +180,18 @@ export const toggleEmployeeStatusSchema = Joi.object({
             'any.only': 'status must be a boolean or one of: true, false, yes, no, on, off',
         }),
 });
+
+export const updateEmployeeAvailabilitySchema = Joi.object({
+    dates: Joi.array()
+        .items(Joi.string().pattern(DATE_ONLY_PATTERN).messages({
+            'string.pattern.base': 'dates must contain YYYY-MM-DD values',
+        }))
+        .min(1)
+        .unique()
+        .required()
+        .messages({
+            'array.min': 'dates must include at least one date',
+            'array.unique': 'dates must not contain duplicates',
+        }),
+    available: Joi.boolean().required(),
+});
