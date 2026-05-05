@@ -51,12 +51,6 @@
       "value": "",
       "type": "string",
       "description": "Notification ID captured from the list endpoint."
-    },
-    {
-      "key": "fcm_token",
-      "value": "postman-fcm-token-{{$timestamp}}",
-      "type": "string",
-      "description": "Synthetic FCM token for backend token-management testing. Use a real device token when testing actual Firebase delivery."
     }
   ],
   "item": [

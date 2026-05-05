@@ -2045,7 +2045,6 @@ const notificationsCollection = {
   variable: [
     ...baseVariables(
       textVariable('notification_id', '', 'Notification ID captured from the list endpoint.'),
-      textVariable('fcm_token', 'postman-fcm-token-{{$timestamp}}', 'Synthetic FCM token for backend token-management testing. Use a real device token when testing actual Firebase delivery.'),
     ),
   ],
   item: [
@@ -2172,7 +2171,7 @@ const environmentTemplate = {
     { key: 'barber_refresh_token', value: '', enabled: true },
     { key: 'barber_onboarding_token', value: '', enabled: true },
     { key: 'admin_access_token', value: '', enabled: true },
-    { key: 'fcm_token', value: '', enabled: true },
+    { key: 'fcm_token', value: 'postman-fcm-token-{{$timestamp}}', enabled: true },
   ],
   _postman_variable_scope: 'environment',
   _postman_exported_at: new Date().toISOString(),
