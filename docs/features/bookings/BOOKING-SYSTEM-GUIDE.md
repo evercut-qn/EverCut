@@ -1,8 +1,8 @@
 # Booking System - Complete Guide
 
-**Version:** 3.0  
-**Last Updated:** May 4, 2026  
-**Status:** ✅ Production Ready
+**Version:** 3.1  
+**Last Updated:** May 5, 2026  
+**Status:** ✅ Production Ready (Enhanced Booking List API)
 
 ---
 
@@ -123,7 +123,7 @@ COMPLETED (Service Done)
 | Method | Endpoint | Auth | Purpose |
 |--------|----------|------|---------|
 | POST | `/api/v1/bookings` | CUSTOMER | Create booking |
-| GET | `/api/v1/bookings` | CUSTOMER | List bookings |
+| GET | `/api/v1/bookings` | CUSTOMER | List bookings (supports: timeframe, favorite, status, paymentStatus) |
 | GET | `/api/v1/bookings/:id` | CUSTOMER | Get booking details |
 | PATCH | `/api/v1/bookings/:id` | CUSTOMER | Update schedule or cancel with `status=cancelled` |
 | POST | `/api/v1/bookings` | CUSTOMER | Reorder from `sourceBookingId` |
@@ -134,9 +134,9 @@ COMPLETED (Service Done)
 
 | Method | Endpoint | Auth | Purpose |
 |--------|----------|------|---------|
-| GET | `/api/v1/bookings` | BARBER | List all bookings |
+| GET | `/api/v1/bookings` | BARBER | List all bookings (supports: employeeId, dateFrom, dateTo, status, paymentStatus) |
 | GET | `/api/v1/bookings?status=awaiting_confirmation&paymentStatus=success` | BARBER | List pending confirmations |
-| GET | `/api/v1/bookings?status=confirmed` | BARBER | Get bookings by status |
+| GET | `/api/v1/bookings?employeeId=X&dateFrom=Y&dateTo=Z` | BARBER | Filter by employee and date range |
 | GET | `/api/v1/bookings/analytics/summary` | BARBER | Get statistics |
 | GET | `/api/v1/bookings/analytics/milestones` | BARBER | Get milestone progress |
 | GET | `/api/v1/bookings/analytics/today` | BARBER | Get today's dashboard summary |
@@ -528,6 +528,326 @@ Content-Type: application/json
 - ✅ Slot released
 - ✅ Ready for payout
 - ✅ Customer can rate barber
+
+---
+
+## Booking List API - Detailed Documentation
+
+### Overview
+
+The `GET /api/v1/bookings` endpoint provides role-specific filtering capabilities for both customers and barbers. The API intelligently adapts based on the authenticated user's role.
+
+### For Customers
+
+**Endpoint:** `GET /api/v1/bookings`
+
+**Available Filters:**
+
+| Parameter | Type | Values | Description |
+|-----------|------|--------|-------------|
+| `timeframe` | string | `past`, `upcoming` | Filter by time relative to today |
+| `favorite` | boolean | `true`, `false` | Show only favorite bookings |
+| `status` | string | See status values below | Filter by booking status |
+| `paymentStatus` | string | See payment status values below | Filter by payment status |
+| `page` | number | 1, 2, 3... | Page number (default: 1) |
+| `limit` | number | 1-100 | Items per page (default: 10) |
+
+**Example Requests:**
+
+```http
+# Get upcoming bookings
+GET /api/v1/bookings?timeframe=upcoming
+Authorization: Bearer <customer_token>
+
+# Get past confirmed bookings
+GET /api/v1/bookings?timeframe=past&status=confirmed
+Authorization: Bearer <customer_token>
+
+# Get favorite bookings
+GET /api/v1/bookings?favorite=true
+Authorization: Bearer <customer_token>
+
+# Get bookings with successful payment
+GET /api/v1/bookings?paymentStatus=success&page=1&limit=20
+Authorization: Bearer <customer_token>
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "items": [
+      {
+        "bookingId": "507f1f77bcf86cd799439011",
+        "shop": {
+          "shopId": "507f1f77bcf86cd799439012",
+          "name": "Elite Salon",
+          "address": "123 Main St, City",
+          "coverUrl": "https://..."
+        },
+        "employee": {
+          "employeeId": "507f1f77bcf86cd799439013",
+          "name": "Jane Smith",
+          "photoUrl": "https://..."
+        },
+        "services": [
+          {
+            "serviceId": "507f1f77bcf86cd799439014",
+            "name": "Haircut",
+            "price": 250
+          },
+          {
+            "serviceId": "507f1f77bcf86cd799439015",
+            "name": "Beard Trim",
+            "price": 53
+          }
+        ],
+        "date": "2026-05-10",
+        "time": "10:00",
+        "endTime": "11:00",
+        "durationMinutes": 60,
+        "totalAmount": 303,
+        "status": "confirmed",
+        "paymentStatus": "success",
+        "createdAt": "2026-05-01T08:30:00Z"
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "limit": 10,
+      "total": 45,
+      "totalPages": 5
+    }
+  },
+  "message": "Bookings fetched"
+}
+```
+
+---
+
+### For Barbers
+
+**Endpoint:** `GET /api/v1/bookings`
+
+**Available Filters:**
+
+| Parameter | Type | Values | Description |
+|-----------|------|--------|-------------|
+| `employeeId` | ObjectId | Valid employee ID | Filter by specific employee |
+| `dateFrom` | string | YYYY-MM-DD | Start date (inclusive) |
+| `dateTo` | string | YYYY-MM-DD | End date (inclusive) |
+| `status` | string | See status values below | Filter by booking status |
+| `paymentStatus` | string | See payment status values below | Filter by payment status |
+| `page` | number | 1, 2, 3... | Page number (default: 1) |
+| `limit` | number | 1-100 | Items per page (default: 10) |
+
+**Example Requests:**
+
+```http
+# Get all bookings for a specific employee
+GET /api/v1/bookings?employeeId=507f1f77bcf86cd799439013
+Authorization: Bearer <barber_token>
+
+# Get bookings for an employee in a date range
+GET /api/v1/bookings?employeeId=507f1f77bcf86cd799439013&dateFrom=2026-05-01&dateTo=2026-05-31
+Authorization: Bearer <barber_token>
+
+# Get pending confirmations
+GET /api/v1/bookings?status=awaiting_confirmation&paymentStatus=success
+Authorization: Bearer <barber_token>
+
+# Get today's confirmed bookings
+GET /api/v1/bookings?dateFrom=2026-05-05&dateTo=2026-05-05&status=confirmed
+Authorization: Bearer <barber_token>
+
+# Get all bookings in May 2026
+GET /api/v1/bookings?dateFrom=2026-05-01&dateTo=2026-05-31
+Authorization: Bearer <barber_token>
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "items": [
+      {
+        "bookingId": "507f1f77bcf86cd799439011",
+        "customer": {
+          "customerId": "507f1f77bcf86cd799439016",
+          "name": "John Doe",
+          "phone": "+919876543210"
+        },
+        "employee": {
+          "employeeId": "507f1f77bcf86cd799439013",
+          "name": "Jane Smith"
+        },
+        "services": [
+          {
+            "serviceId": "507f1f77bcf86cd799439014",
+            "name": "Haircut",
+            "price": 250
+          }
+        ],
+        "date": "2026-05-10",
+        "time": "10:00",
+        "endTime": "10:30",
+        "durationMinutes": 30,
+        "totalAmount": 250,
+        "status": "confirmed",
+        "paymentStatus": "success",
+        "payoutStatus": "not_initiated",
+        "createdAt": "2026-05-01T08:30:00Z",
+        "barberConfirmedAt": "2026-05-01T09:00:00Z"
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "limit": 10,
+      "total": 120,
+      "totalPages": 12
+    },
+    "numberOfEmployees": 5,
+    "numberOfCustomers": 85
+  },
+  "message": "Bookings fetched"
+}
+```
+
+---
+
+### Status Values
+
+**Booking Status:**
+- `pending` - Created, not paid
+- `awaiting_confirmation` - Paid, waiting for barber
+- `confirmed` - Barber confirmed
+- `completed` - Service delivered
+- `cancelled` - Booking cancelled
+- `no-show` - Customer didn't show up
+
+**Payment Status:**
+- `pending` - No payment initiated
+- `initiated` - Payment process started
+- `success` - Payment successful
+- `failed` - Payment failed
+- `refund_pending` - Refund initiated
+- `refund_failed` - Refund failed
+- `refunded` - Refund completed
+
+---
+
+### Validation & Error Handling
+
+**Customer Restrictions:**
+```json
+// ❌ Customers cannot use barber-only filters
+GET /api/v1/bookings?employeeId=X
+GET /api/v1/bookings?dateFrom=2026-05-01
+
+// Response: 403 Forbidden
+{
+  "success": false,
+  "message": "Employee and date range filters are only available for barbers"
+}
+```
+
+**Barber Restrictions:**
+```json
+// ❌ Barbers cannot use customer-only filters
+GET /api/v1/bookings?timeframe=upcoming
+GET /api/v1/bookings?favorite=true
+
+// Response: 403 Forbidden
+{
+  "success": false,
+  "message": "Timeframe and favorite filters are only available for customers"
+}
+```
+
+**Invalid Employee:**
+```json
+// ❌ Employee must belong to barber's shop
+GET /api/v1/bookings?employeeId=invalid_or_other_shop_employee
+
+// Response: 400 Bad Request
+{
+  "success": false,
+  "message": "Employee does not belong to this shop"
+}
+```
+
+**Invalid Date Format:**
+```json
+// ❌ Dates must be in YYYY-MM-DD format
+GET /api/v1/bookings?dateFrom=05-01-2026
+
+// Response: 400 Bad Request
+{
+  "success": false,
+  "message": "Validation error",
+  "errors": [
+    {
+      "field": "dateFrom",
+      "message": "must be in YYYY-MM-DD format"
+    }
+  ]
+}
+```
+
+---
+
+### Use Cases
+
+**Customer Use Cases:**
+
+1. **View Upcoming Appointments**
+   ```http
+   GET /api/v1/bookings?timeframe=upcoming&status=confirmed
+   ```
+
+2. **Check Booking History**
+   ```http
+   GET /api/v1/bookings?timeframe=past&page=1&limit=20
+   ```
+
+3. **Find Favorite Bookings to Reorder**
+   ```http
+   GET /api/v1/bookings?favorite=true
+   ```
+
+4. **Track Payment Status**
+   ```http
+   GET /api/v1/bookings?paymentStatus=pending
+   ```
+
+**Barber Use Cases:**
+
+1. **Find Employee's Bookings for Leave Management**
+   ```http
+   GET /api/v1/bookings?employeeId=X&dateFrom=2026-06-15&dateTo=2026-06-17&status=confirmed,awaiting_confirmation
+   ```
+
+2. **View Today's Schedule**
+   ```http
+   GET /api/v1/bookings?dateFrom=2026-05-05&dateTo=2026-05-05
+   ```
+
+3. **Check Pending Confirmations**
+   ```http
+   GET /api/v1/bookings?status=awaiting_confirmation&paymentStatus=success
+   ```
+
+4. **Monthly Revenue Report**
+   ```http
+   GET /api/v1/bookings?dateFrom=2026-05-01&dateTo=2026-05-31&status=completed&paymentStatus=success
+   ```
+
+5. **Employee Performance Tracking**
+   ```http
+   GET /api/v1/bookings?employeeId=X&dateFrom=2026-05-01&dateTo=2026-05-31&status=completed
+   ```
 
 ---
 

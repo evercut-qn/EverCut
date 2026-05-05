@@ -30,10 +30,20 @@ export const getBookings = async (req, res, next) => {
         assertSupportedBookingRole(req.user.roleType);
 
         if (req.user.roleType === ROLES.CUSTOMER) {
+            // Customers cannot use barber-only filters
+            if (query.employeeId || query.dateFrom || query.dateTo) {
+                throw new ForbiddenError('Employee and date range filters are only available for barbers');
+            }
+            
             const result = await bookingService.getCustomerBookings(req.user._id, query);
             return res.status(200).json(ApiResponse.paginated(result.items, result.pagination, 'Bookings fetched'));
         }
 
+        // Barbers cannot use customer-only filters
+        if (query.timeframe || query.favorite) {
+            throw new ForbiddenError('Timeframe and favorite filters are only available for customers');
+        }
+        
         const result = await bookingService.getBookingsByShop(req.user._id, query);
         return res.status(200).json(
             ApiResponse.paginated(

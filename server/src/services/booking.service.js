@@ -1185,11 +1185,47 @@ export const getBookingsByShop = async (ownerId, query = {}) => {
     const shop = await shopRepository.findByOwnerId(ownerId);
     if (!shop) throw new NotFoundError('Shop');
 
+    // Build filters
     const filters = {};
-    if (query.status) filters.status = query.status;
-    if (query.paymentStatus) filters.paymentStatus = query.paymentStatus;
+    
+    // Status filter
+    if (query.status) {
+        filters.status = query.status;
+    }
+    
+    // Payment status filter
+    if (query.paymentStatus) {
+        filters.paymentStatus = query.paymentStatus;
+    }
+    
+    // Employee filter
+    if (query.employeeId) {
+        // Validate employee belongs to this shop
+        const employee = await employeeRepository.findById(query.employeeId);
+        if (!employee || employee.shopId.toString() !== shop._id.toString()) {
+            throw new BadRequestError('Employee does not belong to this shop');
+        }
+        filters.employeeId = query.employeeId;
+    }
+    
+    // Date range filter
+    if (query.dateFrom || query.dateTo) {
+        filters.date = {};
+        
+        if (query.dateFrom) {
+            const fromDate = new Date(query.dateFrom);
+            fromDate.setHours(0, 0, 0, 0);
+            filters.date.$gte = fromDate;
+        }
+        
+        if (query.dateTo) {
+            const toDate = new Date(query.dateTo);
+            toDate.setHours(23, 59, 59, 999);
+            filters.date.$lte = toDate;
+        }
+    }
 
-    const total = await bookingRepository.countAll({ shopId: shop._id, ...filters });
+    const total = await bookingRepository.countAll(filters);
     const { skip, limit, pagination } = buildPagination(query, total);
 
     const [bookings, numCustomers, numberOfEmployees] = await Promise.all([

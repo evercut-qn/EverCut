@@ -36,10 +36,18 @@ export const bookingPatchSchema = Joi.alternatives()
     .match('one');
 
 export const bookingListQuerySchema = paginationSchema.keys({
+    // Customer-only filters
     timeframe: Joi.string().valid('past', 'upcoming'),
     favorite: Joi.boolean(),
+    
+    // Shared filters (both customer and barber)
     status: Joi.string().valid('pending', 'awaiting_confirmation', 'confirmed', 'completed', 'cancelled', 'no-show'),
     paymentStatus: Joi.string().valid('pending', 'initiated', 'success', 'failed', 'refund_pending', 'refunded', 'refund_failed'),
+    
+    // Barber-only filters
+    employeeId: objectId,
+    dateFrom: dateString,
+    dateTo: dateString,
 });
 
 export const bookingIdParamSchema = Joi.object({

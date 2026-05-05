@@ -1344,7 +1344,7 @@ const barberServicesCollection = {
 const barberBookingsCollection = {
   info: {
     name: 'EverCut - Barber Bookings',
-    description: 'Barber booking administration collection covering list, status stats, monthly milestone progress, status updates, and explicit booking cancellation.',
+    description: 'Barber booking administration collection covering list with role-specific filters (employeeId, dateFrom, dateTo), status stats, monthly milestone progress, status updates, and explicit booking cancellation. Enhanced with employee and date range filtering for leave management and scheduling.',
     schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
   },
   auth: bearerAuth('barber_access_token'),
@@ -1352,12 +1352,16 @@ const barberBookingsCollection = {
     syncPairs: [
       ['shared_booking_id', 'booking_id_status'],
       ['shared_booking_id', 'booking_id_delete'],
+      ['shared_employee_id', 'employee_id'],
     ],
+    includeDateHelpers: true,
   }),
   variable: [
     ...baseVariables(
       textVariable('booking_id_status', ''),
       textVariable('booking_id_delete', ''),
+      textVariable('employee_id', ''),
+      textVariable('booking_date', ''),
     ),
   ],
   item: [
@@ -1417,7 +1421,53 @@ const barberBookingsCollection = {
       }),
     },
     {
-      name: '6. Confirm Booking',
+      name: '6. Get Bookings By Employee',
+      ...request({
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/bookings?employeeId={{employee_id}}',
+        description: 'Lists all bookings for a specific employee. Useful for tracking employee performance and managing employee schedules.',
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          "const response = pm.response.json();",
+          "const bookings = Array.isArray(response.data) ? response.data : [];",
+          "pm.test('all bookings belong to the specified employee', function () {",
+          "  const employeeId = pm.collectionVariables.get('employee_id');",
+          "  bookings.forEach((booking) => {",
+          "    pm.expect(booking.employee && booking.employee.id).to.equal(employeeId);",
+          "  });",
+          "});"
+        ),
+      }),
+    },
+    {
+      name: '7. Get Bookings By Date Range',
+      ...request({
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/bookings?dateFrom={{booking_date}}&dateTo={{booking_date}}',
+        description: 'Lists all bookings within a date range. Use same date for both parameters to get bookings for a single day (e.g., today\'s schedule).',
+        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
+      }),
+    },
+    {
+      name: '8. Get Employee Bookings In Date Range',
+      ...request({
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/bookings?employeeId={{employee_id}}&dateFrom={{booking_date}}&dateTo={{booking_date}}',
+        description: 'Lists bookings for a specific employee within a date range. Essential for employee leave management - find affected bookings when employee requests time off.',
+        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
+      }),
+    },
+    {
+      name: '9. Get Employee Bookings With Status Filter',
+      ...request({
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/bookings?employeeId={{employee_id}}&status=confirmed,awaiting_confirmation',
+        description: 'Lists active bookings for an employee (confirmed or awaiting confirmation). Useful for finding bookings that need reassignment when employee is unavailable.',
+        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
+      }),
+    },
+    {
+      name: '10. Confirm Booking',
       ...request({
         method: 'PATCH',
         url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id_status}}',
@@ -1428,7 +1478,7 @@ const barberBookingsCollection = {
       }),
     },
     {
-      name: '7. Update Booking Status',
+      name: '11. Update Booking Status',
       ...request({
         method: 'PATCH',
         url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id_status}}',
@@ -1439,7 +1489,7 @@ const barberBookingsCollection = {
       }),
     },
     {
-      name: '8. Cancel Paid Booking (Terminal)',
+      name: '12. Cancel Paid Booking (Terminal)',
       ...request({
         method: 'PATCH',
         url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id_delete}}',
