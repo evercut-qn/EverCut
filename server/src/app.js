@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import config from './config/index.js';
+import { createCorsOptions } from './config/cors.config.js';
 import routes from './routes/index.js';
 import requestLogger from './middleware/request-logger.middleware.js';
 import errorHandler from './middleware/error-handler.middleware.js';
@@ -24,15 +25,7 @@ const createApp = () => {
     app.use(requestLogger);
 
     // ── 2. CORS ────────────────────────────────────────────────────────────
-    app.use(
-        cors({
-            origin: config.env === 'production'
-                ? process.env.ALLOWED_ORIGINS?.split(',') || []
-                : '*',
-            methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-            allowedHeaders: ['Content-Type', 'Authorization'],
-        }),
-    );
+    app.use(cors(createCorsOptions()));
 
     // ── 3. Body parsing ────────────────────────────────────────────────────
     app.use(
