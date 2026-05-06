@@ -48,9 +48,9 @@
           "  const day = String(date.getDate()).padStart(2, '0');",
           "  return `${year}-${month}-${day}`;",
           "};",
-          "const getWorkingHourTime = (hour) => {",
+          "const getWorkingHourTime = (hour, minute = 0) => {",
           "  const clampedHour = Math.max(9, Math.min(20, hour));",
-          "  return `${String(clampedHour).padStart(2, '0')}:00`;",
+          "  return `${String(clampedHour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;",
           "};",
           "",
           "// Check if user has manually set dates/times in Collection Variables",
@@ -60,16 +60,14 @@
           "if (!hasManualDate) {",
           "  pm.collectionVariables.set('booking_date', toIsoDate(getNextAvailableDate(1)));",
           "  pm.collectionVariables.set('booking_update_date', toIsoDate(getNextAvailableDate(2)));",
-          "  pm.collectionVariables.set('booking_reschedule_date', toIsoDate(getNextAvailableDate(3)));",
-          "  pm.collectionVariables.set('booking_reorder_date', toIsoDate(getNextAvailableDate(4)));",
-          "  pm.collectionVariables.set('calendar_date', toIsoDate(getNextAvailableDate(2)));",
+          "  pm.collectionVariables.set('booking_reorder_date', toIsoDate(getNextAvailableDate(3)));",
+          "  pm.collectionVariables.set('availability_date', toIsoDate(getNextAvailableDate(2)));",
           "}",
           "",
           "if (!hasManualTime) {",
-          "  pm.collectionVariables.set('booking_time', getWorkingHourTime(11));",
-          "  pm.collectionVariables.set('booking_update_time', getWorkingHourTime(12));",
-          "  pm.collectionVariables.set('booking_reschedule_time', getWorkingHourTime(13));",
-          "  pm.collectionVariables.set('booking_reorder_time', getWorkingHourTime(14));",
+          "  pm.collectionVariables.set('booking_time', getWorkingHourTime(11, 5));",
+          "  pm.collectionVariables.set('booking_update_time', getWorkingHourTime(12, 10));",
+          "  pm.collectionVariables.set('booking_reorder_time', getWorkingHourTime(14, 15));",
           "}"
         ]
       }
@@ -119,17 +117,12 @@
       "type": "string"
     },
     {
-      "key": "booking_reschedule_date",
-      "value": "",
-      "type": "string"
-    },
-    {
       "key": "booking_reorder_date",
       "value": "",
       "type": "string"
     },
     {
-      "key": "calendar_date",
+      "key": "availability_date",
       "value": "",
       "type": "string"
     },
@@ -144,12 +137,12 @@
       "type": "string"
     },
     {
-      "key": "booking_reschedule_time",
+      "key": "booking_reorder_time",
       "value": "",
       "type": "string"
     },
     {
-      "key": "booking_reorder_time",
+      "key": "booking_idempotency_key",
       "value": "",
       "type": "string"
     },
@@ -165,7 +158,7 @@
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/bookings?type=upcoming",
+        "url": "{{base_url}}/{{api_prefix}}/bookings?timeframe=upcoming",
         "description": "Lists upcoming bookings and captures the first booking ID and first service ID when they already exist."
       },
       "event": [
@@ -182,24 +175,39 @@
               "  pm.expect(response).to.have.property('message');",
               "  pm.expect(response.message).to.be.a('string');",
               "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
               "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
               "const response = pm.response.json();",
-              "const bookings = Array.isArray(response.data && response.data.items) ? response.data.items : [];",
+              "const bookings = Array.isArray(response.data) ? response.data : [];",
+              "bookings.forEach((booking) => {",
+              "  if (booking.employee) {",
+              "    pm.expect(booking.employee).to.have.property('isAvailableOnBookingDate');",
+              "    pm.expect(booking.employee.isAvailableOnBookingDate).to.be.a('boolean');",
+              "  }",
+              "});",
               "const firstBooking = bookings[0];",
-              "if (firstBooking && firstBooking._id) { pm.collectionVariables.set('booking_id', firstBooking._id); pm.globals.set('shared_booking_id', firstBooking._id); }"
+              "if (firstBooking && firstBooking.id) {",
+              "  const bookingId = firstBooking.id;",
+              "  pm.collectionVariables.set('booking_id', bookingId);",
+              "  pm.globals.set('shared_booking_id', bookingId);",
+              "}"
             ]
           }
         }
       ]
     },
     {
-      "name": "2. Get Employee Calendar",
+      "name": "2. Get Employee Availability",
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/employees/{{employee_id}}/calendar?date={{calendar_date}}",
-        "description": "Checks the captured employee calendar for the generated booking date."
+        "url": "{{base_url}}/{{api_prefix}}/employees/{{employee_id}}/availability?date={{availability_date}}&serviceId={{service_id}}",
+        "description": "Checks exact-range availability for the captured employee on the generated booking date."
       },
       "event": [
         {
@@ -215,6 +223,11 @@
               "  pm.expect(response).to.have.property('message');",
               "  pm.expect(response.message).to.be.a('string');",
               "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
               "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
             ]
@@ -233,10 +246,10 @@
           }
         ],
         "url": "{{base_url}}/{{api_prefix}}/bookings",
-        "description": "Creates a new future booking using the shared shop, employee, and service IDs. The body matches the real validator shape.",
+        "description": "Creates a new future booking using exact time-range locking. The optional idempotency key makes client retries safe without creating duplicate bookings.",
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"serviceId\": [\"{{service_id}}\"],\n  \"employeeId\": \"{{employee_id}}\",\n  \"shopId\": \"{{shop_id}}\",\n  \"date\": \"{{booking_date}}\",\n  \"time\": \"{{booking_time}}\"\n}",
+          "raw": "{\n  \"serviceIds\": [\"{{service_id}}\"],\n  \"employeeId\": \"{{employee_id}}\",\n  \"shopId\": \"{{shop_id}}\",\n  \"date\": \"{{booking_date}}\",\n  \"time\": \"{{booking_time}}\",\n  \"idempotencyKey\": \"{{booking_idempotency_key}}\"\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -245,6 +258,15 @@
         }
       },
       "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.collectionVariables.set('booking_idempotency_key', `postman-booking-${Date.now()}`);"
+            ]
+          }
+        },
         {
           "listen": "test",
           "script": {
@@ -258,11 +280,23 @@
               "  pm.expect(response).to.have.property('message');",
               "  pm.expect(response.message).to.be.a('string');",
               "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
               "});",
               "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
               "const response = pm.response.json();",
-              "const bookingId = response.data && response.data.bookingId;",
-              "if (bookingId) { pm.collectionVariables.set('booking_id', bookingId); pm.globals.set('shared_booking_id', bookingId); }"
+              "const bookingId = response.data && response.data.id;",
+              "if (bookingId) { pm.collectionVariables.set('booking_id', bookingId); pm.globals.set('shared_booking_id', bookingId); }",
+              "pm.test('booking response includes exact range metadata', function () {",
+              "  const data = response.data || {};",
+              "  pm.expect(data).to.have.property('time');",
+              "  pm.expect(data).to.have.property('endTime');",
+              "  pm.expect(data).to.have.property('startMinute');",
+              "  pm.expect(data).to.have.property('endMinute');",
+              "});"
             ]
           }
         }
@@ -290,49 +324,31 @@
               "  pm.expect(response).to.have.property('message');",
               "  pm.expect(response.message).to.be.a('string');",
               "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
               "});",
-              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "const response = pm.response.json();",
+              "const booking = response.data || {};",
+              "pm.test('booking detail includes employee availability flag', function () {",
+              "  pm.expect(booking.employee).to.have.property('isAvailableOnBookingDate');",
+              "  pm.expect(booking.employee.isAvailableOnBookingDate).to.be.a('boolean');",
+              "});"
             ]
           }
         }
       ]
     },
     {
-      "name": "5. Get Booking Confirmation",
+      "name": "5. Add Booking Favorite",
       "request": {
-        "method": "GET",
-        "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/bookings/{{booking_id}}/confirmation",
-        "description": "Returns the confirmation screen payload for the captured booking."
-      },
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "pm.test('response uses the standard envelope', function () {",
-              "  const response = pm.response.json();",
-              "  pm.expect(response).to.be.an('object');",
-              "  pm.expect(response).to.have.property('success');",
-              "  pm.expect(response.success).to.be.a('boolean');",
-              "  pm.expect(response).to.have.property('message');",
-              "  pm.expect(response.message).to.be.a('string');",
-              "  pm.expect(response).to.have.property('data');",
-              "});",
-              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "6. Toggle Booking Favorite",
-      "request": {
-        "method": "PATCH",
+        "method": "PUT",
         "header": [],
         "url": "{{base_url}}/{{api_prefix}}/bookings/{{booking_id}}/favorite",
-        "description": "Adds or removes the current booking from the customer favorites list through the booking resource."
+        "description": "Adds the current booking to the customer favorites list through the booking resource."
       },
       "event": [
         {
@@ -348,6 +364,11 @@
               "  pm.expect(response).to.have.property('message');",
               "  pm.expect(response.message).to.be.a('string');",
               "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
               "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
             ]
@@ -356,11 +377,11 @@
       ]
     },
     {
-      "name": "7. Get Favorite Bookings",
+      "name": "6. Get Favorite Bookings",
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/bookings?type=favorites",
+        "url": "{{base_url}}/{{api_prefix}}/bookings?favorite=true",
         "description": "Lists the authenticated customer favorite bookings through the booking list flow."
       },
       "event": [
@@ -377,6 +398,11 @@
               "  pm.expect(response).to.have.property('message');",
               "  pm.expect(response.message).to.be.a('string');",
               "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
               "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
             ]
@@ -385,9 +411,9 @@
       ]
     },
     {
-      "name": "8. Update Booking",
+      "name": "7. Update Booking Schedule",
       "request": {
-        "method": "PUT",
+        "method": "PATCH",
         "header": [
           {
             "key": "Content-Type",
@@ -395,7 +421,7 @@
           }
         ],
         "url": "{{base_url}}/{{api_prefix}}/bookings/{{booking_id}}",
-        "description": "Updates the booking using the real validator shape: all three fields are required. Note: 7-day advance booking window applies.",
+        "description": "Updates the booking schedule using the real validator shape: all three fields are required. Note: 7-day advance booking window applies.",
         "body": {
           "mode": "raw",
           "raw": "{\n  \"employeeId\": \"{{employee_id}}\",\n  \"date\": \"{{booking_update_date}}\",\n  \"time\": \"{{booking_update_time}}\"\n}",
@@ -420,6 +446,11 @@
               "  pm.expect(response).to.have.property('message');",
               "  pm.expect(response.message).to.be.a('string');",
               "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
               "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
             ]
@@ -428,50 +459,7 @@
       ]
     },
     {
-      "name": "9. Reschedule Booking",
-      "request": {
-        "method": "PUT",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          }
-        ],
-        "url": "{{base_url}}/{{api_prefix}}/bookings/{{booking_id}}/reschedule",
-        "description": "Reschedules the current booking to a later generated date and time. Limited to once per booking. 7-day advance booking window applies.",
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"newDate\": \"{{booking_reschedule_date}}\",\n  \"newTime\": \"{{booking_reschedule_time}}\"\n}",
-          "options": {
-            "raw": {
-              "language": "json"
-            }
-          }
-        }
-      },
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "pm.test('response uses the standard envelope', function () {",
-              "  const response = pm.response.json();",
-              "  pm.expect(response).to.be.an('object');",
-              "  pm.expect(response).to.have.property('success');",
-              "  pm.expect(response.success).to.be.a('boolean');",
-              "  pm.expect(response).to.have.property('message');",
-              "  pm.expect(response.message).to.be.a('string');",
-              "  pm.expect(response).to.have.property('data');",
-              "});",
-              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "10. Reorder Booking",
+      "name": "8. Reorder Booking",
       "request": {
         "method": "POST",
         "header": [
@@ -480,11 +468,11 @@
             "value": "application/json"
           }
         ],
-        "url": "{{base_url}}/{{api_prefix}}/bookings/{{booking_id}}/reorder",
-        "description": "Creates a fresh booking from the current one. The API expects `date` and `time`, not `newDate` and `newTime`. 7-day advance booking window applies.",
+        "url": "{{base_url}}/{{api_prefix}}/bookings",
+        "description": "Creates a fresh booking from the current one through the booking collection create endpoint. 7-day advance booking window applies.",
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"date\": \"{{booking_reorder_date}}\",\n  \"time\": \"{{booking_reorder_time}}\"\n}",
+          "raw": "{\n  \"sourceBookingId\": \"{{booking_id}}\",\n  \"date\": \"{{booking_reorder_date}}\",\n  \"time\": \"{{booking_reorder_time}}\"\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -506,10 +494,15 @@
               "  pm.expect(response).to.have.property('message');",
               "  pm.expect(response.message).to.be.a('string');",
               "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
               "});",
               "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
               "const response = pm.response.json();",
-              "const bookingId = response.data && response.data.bookingId;",
+              "const bookingId = response.data && response.data.id;",
               "if (bookingId) { pm.collectionVariables.set('reordered_booking_id', bookingId); }"
             ]
           }
@@ -517,12 +510,12 @@
       ]
     },
     {
-      "name": "11. Cancel Booking",
+      "name": "9. Remove Booking Favorite",
       "request": {
-        "method": "POST",
+        "method": "DELETE",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/bookings/{{booking_id}}/cancel",
-        "description": "Cancels the currently captured booking and releases its locked slot markers. This stays last because it is destructive."
+        "url": "{{base_url}}/{{api_prefix}}/bookings/{{booking_id}}/favorite",
+        "description": "Removes the current booking from the customer favorites list."
       },
       "event": [
         {
@@ -538,6 +531,59 @@
               "  pm.expect(response).to.have.property('message');",
               "  pm.expect(response.message).to.be.a('string');",
               "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
+              "});",
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "10. Cancel Booking",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/{{api_prefix}}/bookings/{{booking_id}}",
+        "description": "Cancels the currently captured booking and releases its exact locked time range. This stays last because it is destructive.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"status\": \"cancelled\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
               "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
             ]

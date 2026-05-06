@@ -11,9 +11,8 @@
 1. [Quick Setup](#quick-setup)
 2. [Environment Configuration](#environment-configuration)
 3. [Booking & Payment Flow](#booking--payment-flow)
-4. [Webhook Testing](#webhook-testing)
-5. [Failure Scenarios](#failure-scenarios)
-6. [Verification & Troubleshooting](#verification--troubleshooting)
+4. [Failure Scenarios](#failure-scenarios)
+5. [Verification & Troubleshooting](#verification--troubleshooting)
 
 ---
 
@@ -30,7 +29,6 @@ Auth → Create Booking → Initiate Payment → Verify Payment → Webhook → 
 - ✅ Booking creation with payment
 - ✅ Native PhonePe SDK payment flow
 - ✅ Payment verification
-- ✅ Webhook simulation (backup verification)
 - ✅ Barber booking approval
 
 ---
@@ -83,16 +81,6 @@ Select **"EverCut Local"** environment in Postman and verify:
 | `test_barber_mobile` | `9876543211` | Test barber phone |
 | `test_otp` | `123456` | Test OTP (dev mode) |
 
-### Webhook Credentials (Must Match `.env`)
-
-| Postman Variable | `.env` Variable | Default Value |
-|------------------|-----------------|---------------|
-| `phonepe_webhook_username` | `PHONEPE_WEBHOOK_USERNAME` | `test-phonepe-webhook-user` |
-| `phonepe_webhook_password` | `PHONEPE_WEBHOOK_PASSWORD` | `test-phonepe-webhook-password` |
-| `cashfree_webhook_secret` | `CASHFREE_PAYOUT_CLIENT_SECRET` | `test-cashfree-client-secret` |
-
-**⚠️ Important:** These must match exactly or webhook tests will fail!
-
 ### Date & Time (Automatic)
 
 **No configuration needed!** The system auto-generates:
@@ -104,7 +92,7 @@ Select **"EverCut Local"** environment in Postman and verify:
 **Manual Override:** Set in environment:
 ```
 booking_date = 2026-05-15  (YYYY-MM-DD)
-booking_time = 14:30       (HH:MM, 24-hour)
+booking_time = 14:15       (HH:MM, 24-hour; avoid shop break windows)
 ```
 
 **Reset:** Clear variables to resume auto-generation.
@@ -183,23 +171,24 @@ Authorization: Bearer {{customer_access_token}}
 
 Body:
 {
-  "serviceId": ["{{service_id}}"],
+  "serviceIds": ["{{service_id}}"],
   "employeeId": "{{employee_id}}",
   "shopId": "{{shop_id}}",
   "date": "{{booking_date}}",
-  "time": "{{booking_time}}"
+  "time": "{{booking_time}}",
+  "idempotencyKey": "{{booking_idempotency_key}}"
 }
 
 Expected Response:
 {
   "success": true,
   "data": {
-    "paymentRequired": true,
-    "booking": {
-      "status": "pending",
-      "paymentStatus": "pending",
-      "totalAmount": 300
-    }
+    "id": "...",
+    "status": "pending",
+    "paymentStatus": "pending",
+    "totalAmount": 300,
+    "time": "{{booking_time}}",
+    "endTime": "..."
   }
 }
 
@@ -228,7 +217,7 @@ Expected Response:
 {
   "success": true,
   "data": {
-    "paymentId": "...",
+    "id": "...",
     "merchantOrderId": "EC-...",
     "orderId": "OMO123456789",
     "token": "eyJhbGci...",
@@ -278,43 +267,6 @@ Expected Response:
 
 **🔒 Security:** SDK status is ignored. Backend verifies with PhonePe directly.
 
-#### 5.3 Webhook (Backup Verification)
-
-```
-Request #7: PhonePe Payment Success Webhook
-POST /payments/webhook
-Authorization: {{phonepe_webhook_authorization}}  ← Auto-computed!
-
-Body:
-{
-  "event": "checkout.order.completed",
-  "payload": {
-    "merchantOrderId": "{{merchant_order_id}}",
-    "orderId": "PO123456789",
-    "state": "COMPLETED",
-    "amount": 30300,
-    "paymentDetails": [{
-      "paymentMode": "UPI",
-      "transactionId": "TXN123456789",
-      "amount": 30300,
-      "state": "COMPLETED"
-    }]
-  }
-}
-
-Expected Response:
-{
-  "received": true
-}
-
-What Happens:
-1. Pre-request script computes SHA256(username:password)
-2. Sets Authorization header automatically
-3. Backend verifies signature
-4. Backend calls PhonePe Order Status API (double verification)
-5. Updates payment and booking
-```
-
 ---
 
 ### Step 6: Barber Approves Booking
@@ -349,41 +301,6 @@ What Happens:
 
 ---
 
-## Webhook Testing
-
-### PhonePe Webhooks (SHA256 Authentication)
-
-**Requests:** #7 (Success), #8 (Failure), #9 (Refund)
-
-**How It Works:**
-```javascript
-// Pre-request script (automatic)
-const username = pm.environment.get('phonepe_webhook_username');
-const password = pm.environment.get('phonepe_webhook_password');
-const authSignature = CryptoJS.SHA256(username + ':' + password).toString(CryptoJS.enc.Hex);
-pm.collectionVariables.set('phonepe_webhook_authorization', authSignature);
-```
-
-**Backend Verification:**
-```javascript
-const expectedAuth = crypto
-  .createHash('sha256')
-  .update(`${PHONEPE_WEBHOOK_USERNAME}:${PHONEPE_WEBHOOK_PASSWORD}`)
-  .digest('hex');
-
-if (receivedAuth !== expectedAuth) {
-  throw new Error('Invalid webhook authentication');
-}
-```
-
-**Security:** Attacker cannot spoof without knowing username + password.
-
----
-
-**Security:** Attacker cannot spoof without knowing username + password.
-
----
-
 ## Failure Scenarios
 
 ### Payment Failure
@@ -397,57 +314,10 @@ if (receivedAuth !== expectedAuth) {
 }
 ```
 
-**Request #8:** Payment Failure Webhook
-```json
-{
-  "event": "checkout.order.failed",
-  "payload": {
-    "merchantOrderId": "{{merchant_order_id}}",
-    "state": "FAILED",
-    "paymentDetails": [{
-      "state": "FAILED",
-      "errorCode": "PAYMENT_DECLINED"
-    }]
-  }
-}
-```
-
 **Expected:**
 - Payment → failed
 - Booking → payment_failed
-- Slot lock released
-
----
-
-### Refund Testing
-
-**Request #5:** Initiate Refund
-```
-POST /payments/{{payment_id}}/refund
-Authorization: Bearer {{barber_access_token}}
-
-Body:
-{
-  "reason": "Customer cancelled"
-}
-```
-
-**Request #9:** Refund Completed Webhook
-```json
-{
-  "event": "pg.refund.completed",
-  "payload": {
-    "merchantRefundId": "{{merchant_refund_id}}",
-    "state": "COMPLETED",
-    "amount": 29000
-  }
-}
-```
-
-**Expected:**
-- Payment → refunded
-- Booking → cancelled
-- Customer receives refund
+- Exact time-range lock released
 
 ---
 
@@ -500,41 +370,12 @@ db.bookings.findOne({ _id: ObjectId("booking_id") })
 
 ### Common Issues
 
-#### "Invalid webhook authentication"
-
-**Cause:** Webhook credentials don't match `.env`
-
-**Fix:**
-1. Check Postman environment:
-   - `phonepe_webhook_username`
-   - `phonepe_webhook_password`
-2. Check `.env` file:
-   - `PHONEPE_WEBHOOK_USERNAME`
-   - `PHONEPE_WEBHOOK_PASSWORD`
-3. Ensure they match exactly
-4. Restart server after changing `.env`
-
----
-
-#### "Invalid webhook signature"
-
-**Cause:** Cashfree secret doesn't match `.env`
-
-**Fix:**
-1. Check Postman: `cashfree_webhook_secret`
-2. Check `.env`: `CASHFREE_PAYOUT_CLIENT_SECRET`
-3. Ensure they match exactly
-4. Don't manually edit webhook body after pre-request script runs
-
----
-
 #### Payment stays "pending"
 
 **Fix:**
 1. Run Request #2 (Verify Payment) to poll PhonePe
 2. Check PhonePe credentials in `.env`
 3. Check server logs for PhonePe API errors
-4. Use Request #7 (Webhook) to force completion
 
 ---
 
@@ -555,7 +396,6 @@ After running complete flow, verify:
 - [ ] Booking status = `confirmed`
 - [ ] Booking `paymentStatus` = `success`
 - [ ] Payment verified by PhonePe
-- [ ] Webhook processed successfully
 - [ ] Barber approved the booking
 - [ ] No errors in server logs
 
@@ -572,8 +412,7 @@ After running complete flow, verify:
 4. Create Booking → Captures booking_id
 5. Initiate Payment → Captures payment_id
 6. Verify Payment → Simulates SDK callback
-7. Payment Webhook → Backup verification
-8. Barber Approves Booking → Booking confirmed
+7. Barber Approves Booking → Booking confirmed
 ```
 
 ### Environment Variables
@@ -588,23 +427,12 @@ After running complete flow, verify:
 | `booking_id` | Booking reference | ✅ |
 | `payment_id` | Payment reference | ✅ |
 | `merchant_order_id` | PhonePe order ID | ✅ |
-| `phonepe_webhook_username` | Webhook auth | ❌ Manual |
-| `phonepe_webhook_password` | Webhook auth | ❌ Manual |
-
-### Webhook Requests
-
-| Request | Collection | Purpose |
-|---------|------------|---------|
-| #7 | 14-payments-payouts | PhonePe payment success |
-| #8 | 14-payments-payouts | PhonePe payment failure |
-| #9 | 14-payments-payouts | PhonePe refund completed |
 
 ---
 
 ## Related Documentation
 
 - **Flutter Implementation:** `docs/flows/FLUTTER-BOOKING-PAYMENT-FLOW.md`
-- **Webhook Testing with Hookdeck:** `docs/features/payments/HOOKDECK-DAILY-WORKFLOW.md`
 
 ---
 

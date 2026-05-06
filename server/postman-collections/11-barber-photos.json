@@ -75,12 +75,21 @@
               "  pm.expect(response).to.have.property('message');",
               "  pm.expect(response.message).to.be.a('string');",
               "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
               "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
               "const response = pm.response.json();",
-              "const photos = Array.isArray(response.data && response.data.items) ? response.data.items : [];",
+              "const photos = Array.isArray(response.data) ? response.data : [];",
               "const firstPhoto = photos[0];",
-              "if (firstPhoto && firstPhoto._id) { pm.collectionVariables.set('photo_id', firstPhoto._id); pm.globals.set('shared_photo_id', firstPhoto._id); }"
+              "if (firstPhoto && firstPhoto.id) {",
+              "  const photoId = firstPhoto.id;",
+              "  pm.collectionVariables.set('photo_id', photoId);",
+              "  pm.globals.set('shared_photo_id', photoId);",
+              "}"
             ]
           }
         }
@@ -128,12 +137,21 @@
               "  pm.expect(response).to.have.property('message');",
               "  pm.expect(response.message).to.be.a('string');",
               "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
               "});",
               "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
               "const response = pm.response.json();",
               "const photos = Array.isArray(response.data) ? response.data : [];",
               "const firstPhoto = photos[0];",
-              "if (firstPhoto && firstPhoto._id) { pm.collectionVariables.set('photo_id', firstPhoto._id); pm.globals.set('shared_photo_id', firstPhoto._id); }"
+              "if (firstPhoto && firstPhoto.id) {",
+              "  const photoId = firstPhoto.id;",
+              "  pm.collectionVariables.set('photo_id', photoId);",
+              "  pm.globals.set('shared_photo_id', photoId);",
+              "}"
             ]
           }
         }
@@ -161,6 +179,11 @@
               "  pm.expect(response).to.have.property('message');",
               "  pm.expect(response.message).to.be.a('string');",
               "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
               "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
             ]
@@ -190,6 +213,11 @@
               "  pm.expect(response).to.have.property('message');",
               "  pm.expect(response.message).to.be.a('string');",
               "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
               "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
             ]
@@ -219,6 +247,11 @@
               "  pm.expect(response).to.have.property('message');",
               "  pm.expect(response.message).to.be.a('string');",
               "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
               "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
               "pm.collectionVariables.unset('photo_id');",

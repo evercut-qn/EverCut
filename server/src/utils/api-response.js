@@ -6,6 +6,8 @@
  *   res.status(400).json(ApiResponse.error('Validation failed', { errors }));
  */
 
+import { sanitizeForResponse } from '../serializers/core.serializer.js';
+
 const isPlainObject = (value) => Object.prototype.toString.call(value) === '[object Object]';
 
 const isMessageOnlyPayload = (value) => (
@@ -14,7 +16,12 @@ const isMessageOnlyPayload = (value) => (
     && typeof value.message === 'string'
 );
 
-const normalizeData = (value) => (value === null || value === undefined ? {} : value);
+const normalizeData = (value) => (value === null || value === undefined ? {} : sanitizeForResponse(value));
+
+const normalizeMeta = (value) => {
+    const sanitized = sanitizeForResponse(value || {});
+    return sanitized && Object.keys(sanitized).length > 0 ? sanitized : undefined;
+};
 
 export class ApiResponse {
     /**
@@ -27,11 +34,13 @@ export class ApiResponse {
             ? data.message
             : message;
 
-        return {
+        const response = {
             success: true,
             message: normalizedMessage,
             data: isMessageOnlyPayload(data) ? {} : normalizeData(data),
         };
+
+        return response;
     }
 
     /**
@@ -54,14 +63,16 @@ export class ApiResponse {
      * @param {string} message
      */
     static paginated(items, pagination, message = 'Success', extraData = {}) {
+        const meta = normalizeMeta({
+            pagination,
+            ...extraData,
+        });
+
         return {
             success: true,
             message,
-            data: {
-                items,
-                pagination,
-                ...normalizeData(extraData),
-            },
+            data: normalizeData(Array.isArray(items) ? items : []),
+            ...(meta ? { meta } : {}),
         };
     }
 }

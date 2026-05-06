@@ -3,7 +3,6 @@ import * as accountService from '../services/account.service.js';
 import * as bookingService from '../services/booking.service.js';
 import * as photoService from '../services/photo.service.js';
 import * as pinService from '../services/pin.service.js';
-import * as serviceCatalogService from '../services/service-catalog.service.js';
 import * as shopService from '../services/shop.service.js';
 import { BadRequestError, NotFoundError } from '../utils/api-error.js';
 import { ApiResponse } from '../utils/api-response.js';
@@ -28,20 +27,20 @@ export const updateMyShop = async (req, res, next) => {
     }
 };
 
-export const getMyUpiDetails = async (req, res, next) => {
+export const getPayoutDetails = async (req, res, next) => {
     try {
-        const details = await shopService.getUpiDetails(req.user._id);
-        return res.status(200).json(ApiResponse.success(details, 'UPI details fetched'));
+        const details = await shopService.getPayoutDetails(req.user._id);
+        return res.status(200).json(ApiResponse.success(details, 'Payout details fetched'));
     } catch (err) {
         next(err);
     }
 };
 
-export const updateMyUpiDetails = async (req, res, next) => {
+export const updatePayoutDetails = async (req, res, next) => {
     try {
         const body = getValidatedRequestData(req, 'body');
-        const details = await shopService.updateUpiDetails(req.user._id, body, req.user);
-        return res.status(200).json(ApiResponse.success(details, 'UPI details updated'));
+        const details = await shopService.updatePayoutDetails(req.user._id, body);
+        return res.status(200).json(ApiResponse.success(details, 'Payout details updated successfully'));
     } catch (err) {
         next(err);
     }
@@ -97,25 +96,6 @@ export const toggleMyStatus = async (req, res, next) => {
     }
 };
 
-export const signOutEverywhere = async (req, res, next) => {
-    try {
-        const result = await accountService.signOutEverywhere(req.user._id);
-        return res.status(200).json(ApiResponse.success(result, 'Signed out from all devices'));
-    } catch (err) {
-        next(err);
-    }
-};
-
-export const deleteMyShop = async (req, res, next) => {
-    try {
-        const { currentPin } = getValidatedRequestData(req, 'body');
-        const result = await accountService.deleteBarberAccount(req.user, currentPin);
-        return res.status(200).json(ApiResponse.success(result, 'Account deleted successfully'));
-    } catch (err) {
-        next(err);
-    }
-};
-
 export const getShopById = async (req, res, next) => {
     try {
         const params = getValidatedRequestData(req, 'params');
@@ -166,21 +146,11 @@ export const removeFavoriteShop = async (req, res, next) => {
     }
 };
 
-export const toggleFavoriteShop = async (req, res, next) => {
+export const getShops = async (req, res, next) => {
     try {
-        const { id } = getValidatedRequestData(req, 'params');
-        const result = await shopService.toggleFavoriteShop(req.user._id, id);
-        return res.status(200).json(ApiResponse.success(result, 'Favorite shop updated'));
-    } catch (err) {
-        next(err);
-    }
-};
-
-export const getNearbyShops = async (req, res, next) => {
-    try {
-        const { longitude, latitude } = getValidatedRequestData(req, 'query');
-        const shops = await shopService.getNearbyShops([Number(longitude), Number(latitude)]);
-        return res.status(200).json(ApiResponse.success(shops, 'Nearby shops fetched'));
+        const query = getValidatedRequestData(req, 'query');
+        const shops = await shopService.getShops(query);
+        return res.status(200).json(ApiResponse.success(shops, 'Shops fetched'));
     } catch (err) {
         next(err);
     }
@@ -195,25 +165,6 @@ export const getNearbyServices = async (req, res, next) => {
             search,
         );
         return res.status(200).json(ApiResponse.success(result, 'Services fetched'));
-    } catch (err) {
-        next(err);
-    }
-};
-
-export const getDoorstepShops = async (_req, res, next) => {
-    try {
-        const shops = await shopService.getDoorstepShops();
-        return res.status(200).json(ApiResponse.success(shops, 'Doorstep service shops'));
-    } catch (err) {
-        next(err);
-    }
-};
-
-export const searchShops = async (req, res, next) => {
-    try {
-        const { query: q } = getValidatedRequestData(req, 'query');
-        const results = await serviceCatalogService.searchShops(q);
-        return res.status(200).json(ApiResponse.success(results, 'Shop search results'));
     } catch (err) {
         next(err);
     }

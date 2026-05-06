@@ -54,6 +54,21 @@ const employeeSchema = new mongoose.Schema(
                 time: { type: String },
             },
         ],
+        bookedRanges: [
+            {
+                bookingId: {
+                    type: mongoose.Schema.Types.ObjectId,
+                    ref: 'Booking',
+                    index: true,
+                },
+                date: { type: String, required: true },
+                startTime: { type: String, required: true },
+                endTime: { type: String, required: true },
+                startMinute: { type: Number, required: true, min: 0, max: 1439 },
+                endMinute: { type: Number, required: true, min: 1, max: 1440 },
+                _id: false,
+            },
+        ],
         blockedDates: [{ type: Date }],
         isActive: {
             type: Boolean,
@@ -71,6 +86,8 @@ const employeeSchema = new mongoose.Schema(
 // Indexes
 // ---------------------------------------------------------------------------
 employeeSchema.index({ shopId: 1, isActive: 1 });
+employeeSchema.index({ 'bookedRanges.date': 1, 'bookedRanges.startMinute': 1, 'bookedRanges.endMinute': 1 });
+employeeSchema.index({ 'bookedRanges.bookingId': 1 });
 employeeSchema.index(
     { shopId: 1, phoneNumber: 1 },
     {

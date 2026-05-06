@@ -1,3 +1,5 @@
+import mongoose from 'mongoose';
+
 import bookingRepository from '../repositories/booking.repository.js';
 import employeeRepository from '../repositories/employee.repository.js';
 import serviceRepository from '../repositories/service.repository.js';
@@ -6,12 +8,16 @@ import customerRepository from '../repositories/customer.repository.js';
 import { NotFoundError, BadRequestError, ForbiddenError } from '../utils/api-error.js';
 import {
     isBookingInFuture,
-    isWithinShopHours,
     getDayOfWeek,
     isWithinCancellationWindow,
     toTwentyFourHourTime,
     isValidBookingDateTime,
     isWithinBookingWindow,
+    buildTimeRange,
+    getOverlappingBreakRange,
+    isTimeRangeWithinWindow,
+    minutesToTimeString,
+    parseTimeToMinutes,
 } from '../utils/time.utils.js';
 import { buildPagination } from '../utils/pagination.utils.js';
 import {
@@ -23,21 +29,28 @@ import {
     CANCELLATION_WINDOW_HOURS,
     PAYMENT_STATUS,
     PAYOUT_STATUS,
+    ROLES,
     SERVICE_TYPE,
 } from '../utils/constants.js';
 import { getEffectiveServicePrice, normalizeServicePricing } from '../utils/service-pricing.utils.js';
 import { buildSlotLockTimes, toDateOnlyString } from '../utils/slot-lock.utils.js';
+import { calculateAvailableSlots, getAvailableSlotTimes, normalizeBookedRanges } from '../utils/slot-calculator.utils.js';
 import logger from '../utils/logger.js';
+import notificationEvents from './notification-events.service.js';
+import {
+    serializeBooking,
+    serializeBookingCreation,
+    serializeBookingDetails,
+} from '../serializers/booking.serializer.js';
 
 /**
  * Booking service — all booking business logic.
  */
 
-// ── Customer: book a salon ───────────────────────────────────────────────
+// ── Customer: create booking ─────────────────────────────────────────────
 
 const normalizeBookedServices = (services = []) => services.map(normalizeServicePricing);
 const toObjectIdString = (value) => String(value?._id || value || '');
-const isIdInList = (ids = [], id) => ids.some((item) => toObjectIdString(item) === toObjectIdString(id));
 const paginateArray = (items, query = {}) => {
     const { skip, limit, pagination } = buildPagination(query, items.length);
     return {
@@ -76,12 +89,51 @@ const getBookingSlotLockTimes = (booking) => {
     const normalizedTime = toTwentyFourHourTime(booking.time);
     return normalizedTime ? [normalizedTime] : [booking.time].filter(Boolean);
 };
+const getBookingTimeRangeLock = (booking) => {
+    const date = toDateOnlyString(booking.date);
+    const startMinute = Number(booking.startMinute);
+    const endMinute = Number(booking.endMinute);
+
+    if (Number.isFinite(startMinute) && Number.isFinite(endMinute) && startMinute < endMinute) {
+        return {
+            bookingId: booking._id,
+            date,
+            startMinute,
+            endMinute,
+            slotLockTimes: getBookingSlotLockTimes(booking),
+        };
+    }
+
+    const fallbackDuration = Number(booking.durationMinutes) > 0 ? Number(booking.durationMinutes) : 30;
+    const fallbackRange = buildTimeRange(booking.time, fallbackDuration);
+    if (!fallbackRange) {
+        return {
+            bookingId: booking._id,
+            date,
+            slotLockTimes: getBookingSlotLockTimes(booking),
+        };
+    }
+
+    return {
+        bookingId: booking._id,
+        date,
+        startMinute: fallbackRange.startMinute,
+        endMinute: fallbackRange.endMinute,
+        slotLockTimes: getBookingSlotLockTimes(booking),
+    };
+};
 const releaseBookingSlotLock = async (booking) => {
-    await employeeRepository.releaseSlots(
-        booking.employeeId,
-        toDateOnlyString(booking.date),
-        getBookingSlotLockTimes(booking),
-    );
+    const rangeLock = getBookingTimeRangeLock(booking);
+    const hasPersistedExactRange = Number.isFinite(Number(booking.startMinute))
+        && Number.isFinite(Number(booking.endMinute))
+        && Number(booking.startMinute) < Number(booking.endMinute);
+
+    if (hasPersistedExactRange) {
+        await employeeRepository.releaseTimeRange(booking.employeeId, rangeLock);
+        return;
+    }
+
+    await employeeRepository.releaseSlots(booking.employeeId, rangeLock.date, rangeLock.slotLockTimes);
 };
 const assertBookingCanChangeBeforePayment = (booking) => {
     if (booking.status !== BOOKING_STATUS.PENDING || booking.paymentStatus !== PAYMENT_STATUS.PENDING) {
@@ -98,6 +150,143 @@ const assertBundleMinimum = (services = [], totalAmount = 0) => {
 
     throw new BadRequestError(`Bundle service amount must be at least ₹${BUNDLE_RULES.MIN_SERVICE_AMOUNT}`);
 };
+const assertShopAcceptsDate = (shop, date) => {
+    if (!shop.isOpen) throw new BadRequestError('Shop is currently closed');
+
+    const dayOfWeek = getDayOfWeek(date);
+    if (!Array.isArray(shop.availableDays) || !shop.availableDays.includes(dayOfWeek)) {
+        throw new BadRequestError(`Shop is closed on ${dayOfWeek}`);
+    }
+};
+
+const loadEmployeeForScheduling = async (employeeId, shopId) => {
+    const employee = await employeeRepository.findByIdLean(
+        employeeId,
+        'firstName lastName photoUrl shopId workingHours blockedDates isActive deletedAt',
+    );
+    if (!employee) throw new NotFoundError('Employee');
+    if (!employee.isActive || employee.deletedAt) throw new BadRequestError('Employee is not active');
+    if (toObjectIdString(employee.shopId) !== toObjectIdString(shopId)) {
+        throw new BadRequestError('Employee must belong to the target shop');
+    }
+    return employee;
+};
+
+const assertDateIsNotBlockedForEmployee = (employee, date) => {
+    const blocked = (employee.blockedDates || []).some((blockedDate) => (
+        toDateOnlyString(blockedDate) === date
+    ));
+    if (blocked) throw new BadRequestError('Employee is blocked for this date');
+};
+
+const getEffectiveScheduleWindow = (shop, employee) => {
+    const shopStart = parseTimeToMinutes(shop.openTime);
+    const shopEnd = parseTimeToMinutes(shop.closeTime);
+    const employeeStart = parseTimeToMinutes(employee.workingHours?.start);
+    const employeeEnd = parseTimeToMinutes(employee.workingHours?.end);
+
+    if (
+        shopStart === null
+        || shopEnd === null
+        || employeeStart === null
+        || employeeEnd === null
+        || shopStart >= shopEnd
+        || employeeStart >= employeeEnd
+    ) {
+        throw new BadRequestError('Shop or employee working hours are invalid');
+    }
+
+    return {
+        startMinute: Math.max(shopStart, employeeStart),
+        endMinute: Math.min(shopEnd, employeeEnd),
+    };
+};
+
+const buildSchedulingPlan = ({ shop, employee, date, time, durationMinutes }) => {
+    assertDateIsNotBlockedForEmployee(employee, date);
+
+    const timeRange = buildTimeRange(time, durationMinutes);
+    if (!timeRange) throw new BadRequestError('Booking time or duration is invalid');
+
+    const effectiveWindow = getEffectiveScheduleWindow(shop, employee);
+    if (effectiveWindow.startMinute >= effectiveWindow.endMinute) {
+        throw new BadRequestError('Employee has no working overlap with shop hours');
+    }
+
+    if (!isTimeRangeWithinWindow(
+        timeRange.startMinute,
+        timeRange.endMinute,
+        effectiveWindow.startMinute,
+        effectiveWindow.endMinute,
+    )) {
+        const effectiveEnd = minutesToTimeString(effectiveWindow.endMinute);
+        if (timeRange.startMinute >= effectiveWindow.startMinute && timeRange.startMinute < effectiveWindow.endMinute) {
+            throw new BadRequestError(`Booking would extend past closing time (${effectiveEnd})`);
+        }
+        throw new BadRequestError('Booking time is outside employee working hours');
+    }
+
+    const overlappingBreak = getOverlappingBreakRange(
+        timeRange.startMinute,
+        timeRange.endMinute,
+        shop.breakTimes || [],
+    );
+    if (overlappingBreak) {
+        throw new BadRequestError(
+            `Booking time overlaps with shop break ${overlappingBreak.startTime}-${overlappingBreak.endTime}`,
+        );
+    }
+
+    return {
+        ...timeRange,
+        date,
+        effectiveWindow,
+        slotLockTimes: buildSlotLockTimes(timeRange.startTime, durationMinutes),
+    };
+};
+
+const toBookingRangeForAvailability = (booking) => ({
+    _id: booking._id,
+    bookingId: booking._id,
+    date: booking.date,
+    time: booking.time,
+    startTime: booking.time,
+    endTime: booking.endTime,
+    startMinute: booking.startMinute,
+    endMinute: booking.endMinute,
+    durationMinutes: booking.durationMinutes,
+});
+
+const buildBookingPersistencePayload = ({
+    bookingId,
+    customerId,
+    serviceIds,
+    employeeId,
+    shopId,
+    date,
+    totalAmount,
+    durationMinutes,
+    schedulePlan,
+    idempotencyKey,
+}) => ({
+    ...(bookingId && { _id: bookingId }),
+    customerId,
+    serviceIds,
+    employeeId,
+    shopId,
+    date,
+    time: schedulePlan.startTime,
+    endTime: schedulePlan.endTime,
+    startMinute: schedulePlan.startMinute,
+    endMinute: schedulePlan.endMinute,
+    totalAmount,
+    durationMinutes,
+    slotLockTimes: schedulePlan.slotLockTimes,
+    status: BOOKING_STATUS.PENDING,
+    paymentStatus: PAYMENT_STATUS.PENDING,
+    payoutStatus: PAYOUT_STATUS.NOT_INITIATED,
+    ...(idempotencyKey && { idempotencyKey }),
+});
 const MONTH_LABEL_FORMATTER = new Intl.DateTimeFormat('en-US', {
     month: 'long',
     year: 'numeric',
@@ -137,23 +326,14 @@ const buildBookingDetailsPayload = async (booking) => {
     const isBundled = isBundleSelection(services);
     const platformFee = isBundled ? 10 : 3;
 
-    return {
+    return serializeBookingDetails({
         bookingId: booking._id,
-        customer: {
-            ...booking.customerId,
-            fullName: booking.customerId
-                ? `${booking.customerId.firstName || ''} ${booking.customerId.lastName || ''}`.trim()
-                : null,
-        },
-        employee: {
-            ...booking.employeeId,
-            fullName: booking.employeeId
-                ? `${booking.employeeId.firstName || ''} ${booking.employeeId.lastName || ''}`.trim()
-                : null,
-        },
+        customer: booking.customerId,
+        employee: booking.employeeId,
         shop: booking.shopId,
         date: booking.date,
         time: booking.time,
+        endTime: booking.endTime,
         services,
         subTotal: totalAmount,
         platformFee,
@@ -163,18 +343,49 @@ const buildBookingDetailsPayload = async (booking) => {
         paymentStatus: booking.paymentStatus,
         payoutStatus: booking.payoutStatus,
         durationMinutes: booking.durationMinutes || sumServiceDurations(services),
+        startMinute: booking.startMinute,
+        endMinute: booking.endMinute,
+        slotLockTimes: booking.slotLockTimes,
         paymentTransactionId: booking.paymentTransactionId,
         merchantOrderId: booking.merchantOrderId,
-    };
+    });
 };
 
-export const bookSalon = async (userId, data) => {
-    const { serviceId, employeeId, shopId, date, time } = data;
+export const createBooking = async (userId, data) => {
+    if (data.sourceBookingId) {
+        return reorderBooking(userId, data.sourceBookingId, data.date, data.time);
+    }
+
+    const { serviceIds, employeeId, shopId, date, time, idempotencyKey } = data;
     const normalizedTime = normalizeBookingTime(time);
 
     const customer = await customerRepository.findByUserId(userId);
     if (!customer) throw new NotFoundError('Customer profile');
     const customerId = customer._id;
+
+    if (idempotencyKey) {
+        const existing = await bookingRepository.findByIdempotencyKey(customerId, idempotencyKey);
+        if (existing) {
+            return serializeBookingCreation({
+                bookingId: existing._id,
+                shopId: existing.shopId,
+                customerId: existing.customerId,
+                employeeId: existing.employeeId,
+                serviceIds: existing.serviceIds,
+                date: toDateOnlyString(existing.date),
+                time: existing.time,
+                endTime: existing.endTime,
+                totalAmount: existing.totalAmount,
+                durationMinutes: existing.durationMinutes,
+                slotLockTimes: existing.slotLockTimes,
+                status: existing.status,
+                paymentStatus: existing.paymentStatus,
+                payoutStatus: existing.payoutStatus,
+                paymentRequired: existing.paymentStatus === PAYMENT_STATUS.PENDING,
+                idempotentReplay: true,
+            });
+        }
+    }
 
     // Validate date/time is in future and within booking window
     if (!isValidBookingDateTime(date, normalizedTime, BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS)) {
@@ -185,23 +396,12 @@ export const bookSalon = async (userId, data) => {
     }
 
     // Validate shop
-    const shop = await shopRepository.findByIdWithFields(shopId, 'shopName address isOpen openTime closeTime availableDays');
+    const shop = await shopRepository.findByIdWithFields(
+        shopId,
+        'shopName address isOpen openTime closeTime availableDays breakTimes',
+    );
     if (!shop) throw new NotFoundError('Shop');
-    if (!shop.isOpen) throw new BadRequestError('Shop is currently closed');
-
-    // Check available day
-    const dayOfWeek = getDayOfWeek(date);
-    if (!shop.availableDays.includes(dayOfWeek)) {
-        throw new BadRequestError(`Shop is closed on ${dayOfWeek}`);
-    }
-
-    // Check shop hours
-    if (!isWithinShopHours(normalizedTime, shop.openTime, shop.closeTime)) {
-        throw new BadRequestError('Booking time is outside shop hours');
-    }
-
-    // Normalize serviceIds
-    const serviceIds = Array.isArray(serviceId) ? serviceId : [serviceId];
+    assertShopAcceptsDate(shop, date);
 
     // Validate: No duplicates
     const uniqueServiceIds = new Set(serviceIds);
@@ -243,54 +443,78 @@ export const bookSalon = async (userId, data) => {
         );
     }
 
-    const slotLockTimes = buildSlotLockTimes(normalizedTime, durationMinutes);
+    const employeeForScheduling = await loadEmployeeForScheduling(employeeId, shopId);
+    const schedulePlan = buildSchedulingPlan({
+        shop,
+        employee: employeeForScheduling,
+        date,
+        time: normalizedTime,
+        durationMinutes,
+    });
 
-    // Claim employee slot markers atomically.
-    const employee = await employeeRepository.claimSlots(employeeId, date, slotLockTimes, { shopId });
-    if (!employee) throw new BadRequestError('Employee not available at this date/time');
+    const bookingId = new mongoose.Types.ObjectId();
 
-    let booking;
+    // Create booking first, with the same id that will be used in the range lock.
+    const booking = await bookingRepository.create(buildBookingPersistencePayload({
+        bookingId,
+        customerId,
+        serviceIds,
+        employeeId,
+        shopId,
+        date,
+        totalAmount,
+        durationMinutes,
+        schedulePlan,
+        idempotencyKey,
+    }));
+
+    // Claim the exact employee time range atomically using the generated booking ID
+    let employee;
     try {
-        booking = await bookingRepository.create({
-            customerId,
-            serviceIds,
+        employee = await employeeRepository.claimTimeRange(
             employeeId,
-            shopId,
-            date,
-            time: normalizedTime,
-            totalAmount,
-            durationMinutes,
-            slotLockTimes,
-            status: BOOKING_STATUS.PENDING,
-            paymentStatus: PAYMENT_STATUS.PENDING,
-            payoutStatus: PAYOUT_STATUS.NOT_INITIATED,
-        });
+            {
+                bookingId: booking._id,
+                date,
+                startTime: schedulePlan.startTime,
+                endTime: schedulePlan.endTime,
+                startMinute: schedulePlan.startMinute,
+                endMinute: schedulePlan.endMinute,
+                slotLockTimes: schedulePlan.slotLockTimes,
+            },
+            { shopId },
+        );
+        if (!employee) throw new BadRequestError('Employee not available at this date/time');
     } catch (error) {
-        await employeeRepository.releaseSlots(employeeId, date, slotLockTimes);
+        // If claiming fails, delete the booking we just created
+        await bookingRepository.deleteById(booking._id);
         throw error;
     }
 
-    return {
+    return serializeBookingCreation({
         bookingId: booking._id,
         shopId,
         customerId,
         employee,
         services,
         date,
-        time: normalizedTime,
+        time: schedulePlan.startTime,
+        endTime: schedulePlan.endTime,
         totalAmount,
         durationMinutes,
-        slotLockTimes,
+        slotLockTimes: schedulePlan.slotLockTimes,
+        startMinute: schedulePlan.startMinute,
+        endMinute: schedulePlan.endMinute,
         status: booking.status,
         paymentStatus: booking.paymentStatus,
         payoutStatus: booking.payoutStatus,
         paymentRequired: true,
-    };
+    });
 };
 
 // ── Customer: get booking details ────────────────────────────────────────
 
-export const getBookingDetails = async (bookingId, userId) => {
+const getBookingDetailsForCustomer = async (bookingId, userId) => {
     const booking = await bookingRepository.findByIdPopulated(bookingId);
     if (!booking) throw new NotFoundError('Booking');
 
@@ -302,7 +526,7 @@ export const getBookingDetails = async (bookingId, userId) => {
     return buildBookingDetailsPayload(booking);
 };
 
-export const getBookingDetailsForShopOwner = async (bookingId, ownerId) => {
+const getBookingDetailsForShopOwner = async (bookingId, ownerId) => {
     const booking = await bookingRepository.findByIdPopulated(bookingId);
     if (!booking) throw new NotFoundError('Booking');
 
@@ -317,9 +541,21 @@ export const getBookingDetailsForShopOwner = async (bookingId, ownerId) => {
     return buildBookingDetailsPayload(booking);
 };
 
+export const getBookingDetailsForUser = async (bookingId, user) => {
+    if (user.roleType === ROLES.CUSTOMER) {
+        return getBookingDetailsForCustomer(bookingId, user._id);
+    }
+
+    if (user.roleType === ROLES.BARBER) {
+        return getBookingDetailsForShopOwner(bookingId, user._id);
+    }
+
+    throw new ForbiddenError('This endpoint is available only to customers and barbers');
+};
+
 // ── Customer: cancel booking ─────────────────────────────────────────────
 
-export const cancelBooking = async (bookingId, userId) => {
+const cancelBookingByCustomer = async (bookingId, userId) => {
     const booking = await bookingRepository.findById(bookingId);
     if (!booking) throw new NotFoundError('Booking');
 
@@ -341,7 +577,6 @@ export const cancelBooking = async (bookingId, userId) => {
         throw new BadRequestError(`Cancellation not allowed within ${CANCELLATION_WINDOW_HOURS} hours of appointment`);
     }
 
-    await releaseBookingSlotLock(booking);
     let cancellationNote = null;
 
     if (booking.paymentStatus === PAYMENT_STATUS.SUCCESS) {
@@ -368,80 +603,28 @@ export const cancelBooking = async (bookingId, userId) => {
         }
     }
 
-    return bookingRepository.updateById(bookingId, {
+    const updated = await bookingRepository.updateById(bookingId, {
         status: BOOKING_STATUS.CANCELLED,
         cancelledAt: new Date(),
         cancellationNote,
     });
+    await releaseBookingSlotLock(booking);
+    await notificationEvents.notifyBookingCancelled({
+        bookingId,
+        actorUserId: userId,
+        cancelledBy: 'customer',
+        reason: cancellationNote,
+    });
+    return serializeBooking(updated);
 };
 
-// ── Customer: reschedule booking ─────────────────────────────────────────
+// ── Customer: schedule changes ───────────────────────────────────────────
 
-export const rescheduleBooking = async (bookingId, userId, newDate, newTime) => {
-    const normalizedNewTime = normalizeBookingTime(newTime);
-    const booking = await bookingRepository.findById(bookingId);
-    if (!booking) throw new NotFoundError('Booking');
+// Schedule changes are handled by updateBookingSchedule.
 
-    const customer = await customerRepository.findByUserId(userId);
-    if (!customer || (booking.customerId._id || booking.customerId).toString() !== customer._id.toString()) {
-        throw new ForbiddenError('You can only reschedule your own bookings');
-    }
+// ── Customer: create booking from source ─────────────────────────────────
 
-    assertBookingCanChangeBeforePayment(booking);
-
-    if (!isBookingInFuture(booking.date.toISOString().split('T')[0], booking.time)) {
-        throw new BadRequestError('Appointment has already passed');
-    }
-
-    if (!isValidBookingDateTime(newDate, normalizedNewTime, BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS)) {
-        if (!isBookingInFuture(newDate, normalizedNewTime)) {
-            throw new BadRequestError('Cannot reschedule to a past date/time');
-        }
-        throw new BadRequestError(`Bookings can only be made up to ${BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS} days in advance.`);
-    }
-
-    if (isWithinCancellationWindow(booking.date, booking.time, CANCELLATION_WINDOW_HOURS)) {
-        throw new BadRequestError(`Reschedule not allowed within ${CANCELLATION_WINDOW_HOURS} hours of appointment`);
-    }
-
-    if (booking.rescheduleCount >= MAX_RESCHEDULE_COUNT) {
-        throw new BadRequestError('You can only reschedule once');
-    }
-
-    const oldDate = booking.date.toISOString().split('T')[0];
-    const durationMinutes = booking.durationMinutes || sumServiceDurations(
-        normalizeBookedServices(
-            await serviceRepository.findByIds(
-                booking.serviceIds,
-                'serviceType duration totalDuration',
-            ),
-        ),
-    );
-    assertValidServiceDuration(durationMinutes);
-    const oldSlotLockTimes = getBookingSlotLockTimes(booking);
-    const newSlotLockTimes = buildSlotLockTimes(normalizedNewTime, durationMinutes);
-
-    await employeeRepository.releaseSlots(booking.employeeId, oldDate, oldSlotLockTimes);
-
-    const claimed = await employeeRepository.claimSlots(booking.employeeId, newDate, newSlotLockTimes, { shopId: booking.shopId });
-    if (!claimed) {
-        await employeeRepository.claimSlots(booking.employeeId, oldDate, oldSlotLockTimes, { shopId: booking.shopId });
-        throw new BadRequestError('Employee not available at the new date/time');
-    }
-
-    booking.date = newDate;
-    booking.time = normalizedNewTime;
-    booking.durationMinutes = durationMinutes;
-    booking.slotLockTimes = newSlotLockTimes;
-    booking.rescheduleCount += 1;
-    await booking.save();
-
-    return booking;
-};
-
-// ── Customer: reorder (re-book) ──────────────────────────────────────────
-
-export const reorderBooking = async (userId, bookingId, newDate, newTime) => {
+const reorderBooking = async (userId, bookingId, newDate, newTime) => {
     const normalizedNewTime = normalizeBookingTime(newTime);
     const customer = await customerRepository.findByUserId(userId);
     if (!customer) throw new NotFoundError('Customer profile');
@@ -475,50 +658,83 @@ export const reorderBooking = async (userId, bookingId, newDate, newTime) => {
     const durationMinutes = sumServiceDurations(services);
     assertValidServiceDuration(durationMinutes);
     assertBundleMinimum(services, totalAmount);
-    const slotLockTimes = buildSlotLockTimes(normalizedNewTime, durationMinutes);
+    if (durationMinutes > BOOKING_LIMITS.MAX_BOOKING_DURATION_MINUTES) {
+        throw new BadRequestError(
+            `Total booking duration cannot exceed ${BOOKING_LIMITS.MAX_BOOKING_DURATION_MINUTES / 60} hours`,
+        );
+    }
 
-    const employee = await employeeRepository.claimSlots(existing.employeeId, newDate, slotLockTimes, {
-        shopId: existing.shopId,
+    const shop = await shopRepository.findByIdWithFields(
+        existing.shopId,
+        'shopName address isOpen openTime closeTime availableDays breakTimes',
+    );
+    if (!shop) throw new NotFoundError('Shop');
+    assertShopAcceptsDate(shop, newDate);
+    const employeeForScheduling = await loadEmployeeForScheduling(existing.employeeId, existing.shopId);
+    const schedulePlan = buildSchedulingPlan({
+        shop,
+        employee: employeeForScheduling,
+        date: newDate,
+        time: normalizedNewTime,
+        durationMinutes,
     });
-    if (!employee) throw new BadRequestError('Employee not available');
 
+    // Create booking first - MongoDB auto-generates the _id
+    const newBooking = await bookingRepository.create(buildBookingPersistencePayload({
+        customerId,
+        serviceIds: existing.serviceIds,
+        employeeId: existing.employeeId,
+        shopId: existing.shopId,
+        date: newDate,
+        totalAmount,
+        durationMinutes,
+        schedulePlan,
+    }));
+
+    // Claim the exact employee time range atomically using the generated booking ID
+    let employee;
     try {
-        const newBooking = await bookingRepository.create({
-            customerId,
-            serviceIds: existing.serviceIds,
-            employeeId: existing.employeeId,
-            shopId: existing.shopId,
-            date: newDate,
-            time: normalizedNewTime,
-            totalAmount,
-            durationMinutes,
-            slotLockTimes,
-            status: BOOKING_STATUS.PENDING,
-            paymentStatus: PAYMENT_STATUS.PENDING,
-            payoutStatus: PAYOUT_STATUS.NOT_INITIATED,
-        });
-
-        return {
-            bookingId: newBooking._id,
-            employee,
-            services,
-            totalAmount,
-            durationMinutes,
-            slotLockTimes,
-            status: newBooking.status,
-            paymentStatus: newBooking.paymentStatus,
-            payoutStatus: newBooking.payoutStatus,
-            paymentRequired: true,
-        };
+        employee = await employeeRepository.claimTimeRange(
+            existing.employeeId,
+            {
+                bookingId: newBooking._id,
+                date: newDate,
+                startTime: schedulePlan.startTime,
+                endTime: schedulePlan.endTime,
+                startMinute: schedulePlan.startMinute,
+                endMinute: schedulePlan.endMinute,
+                slotLockTimes: schedulePlan.slotLockTimes,
+            },
+            { shopId: existing.shopId },
+        );
+        if (!employee) throw new BadRequestError('Employee not available');
     } catch (err) {
-        await employeeRepository.releaseSlots(existing.employeeId, newDate, slotLockTimes);
+        // If claiming fails, delete the booking we just created
+        await bookingRepository.deleteById(newBooking._id);
         throw err;
     }
+
+    return serializeBookingCreation({
+        bookingId: newBooking._id,
+        employee,
+        services,
+        totalAmount,
+        durationMinutes,
+        time: schedulePlan.startTime,
+        endTime: schedulePlan.endTime,
+        startMinute: schedulePlan.startMinute,
+        endMinute: schedulePlan.endMinute,
+        slotLockTimes: schedulePlan.slotLockTimes,
+        status: newBooking.status,
+        paymentStatus: newBooking.paymentStatus,
+        payoutStatus: newBooking.payoutStatus,
+        paymentRequired: true,
+    });
 };
 
-// ── Customer: list bookings (past/upcoming/favorites) ────────────────────
+// ── Customer: list bookings ──────────────────────────────────────────────
 
-export const getCustomerBookings = async (userId, type, query = {}) => {
+export const getCustomerBookings = async (userId, query = {}) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -526,23 +742,30 @@ export const getCustomerBookings = async (userId, type, query = {}) => {
     if (!customer) throw new NotFoundError('Customer profile');
     const customerId = customer._id;
 
-    if (type === 'past') {
-        const total = await bookingRepository.countPastByCustomer(customerId, today);
-        const { skip, limit, pagination } = buildPagination(query, total);
-        const items = await bookingRepository.findPastByCustomer(customerId, today, { skip, limit });
-        return { items, pagination };
-    }
-    if (type === 'upcoming') {
-        const total = await bookingRepository.countUpcomingByCustomer(customerId, today);
-        const { skip, limit, pagination } = buildPagination(query, total);
-        const items = await bookingRepository.findUpcomingByCustomer(customerId, today, { skip, limit });
-        return { items, pagination };
-    }
-    if (type === 'favorites') {
+    if (query.favorite) {
         return getFavoriteBookings(userId, query);
     }
 
-    throw new BadRequestError('Invalid filter type. Use: past, upcoming, or favorites');
+    const timeframe = query.timeframe || 'upcoming';
+
+    if (timeframe === 'past') {
+        const total = await bookingRepository.countPastByCustomer(customerId, today);
+        const { skip, limit, pagination } = buildPagination(query, total);
+        const items = (await bookingRepository.findPastByCustomer(customerId, today, { skip, limit }))
+            .map(serializeBooking)
+            .filter(Boolean);
+        return { items, pagination };
+    }
+    if (timeframe === 'upcoming') {
+        const total = await bookingRepository.countUpcomingByCustomer(customerId, today);
+        const { skip, limit, pagination } = buildPagination(query, total);
+        const items = (await bookingRepository.findUpcomingByCustomer(customerId, today, { skip, limit }))
+            .map(serializeBooking)
+            .filter(Boolean);
+        return { items, pagination };
+    }
+
+    throw new BadRequestError('Invalid timeframe. Use: past or upcoming');
 };
 
 const loadCustomer = async (userId) => {
@@ -559,13 +782,13 @@ const assertBookingBelongsToCustomer = async (customer, bookingId) => {
         throw new ForbiddenError('You can only favorite your own bookings');
     }
 
-    return booking;
+    return undefined;
 };
 
 export const getFavoriteBookings = async (userId, query = {}) => {
     const customer = await customerRepository.findFavoriteBookingsByUserId(userId);
     if (!customer) throw new NotFoundError('Customer profile');
-    return paginateArray(customer.favoriteBookings || [], query);
+    return paginateArray((customer.favoriteBookings || []).map(serializeBooking).filter(Boolean), query);
 };
 
 export const addFavoriteBooking = async (userId, bookingId) => {
@@ -589,58 +812,9 @@ export const removeFavoriteBooking = async (userId, bookingId) => {
     };
 };
 
-export const toggleFavoriteBooking = async (userId, bookingId) => {
-    const customer = await loadCustomer(userId);
-    await assertBookingBelongsToCustomer(customer, bookingId);
+// ── Customer: update booking schedule ────────────────────────────────────
 
-    if (isIdInList(customer.favoriteBookings, bookingId)) {
-        await customerRepository.removeFavoriteBooking(userId, bookingId);
-        return {
-            favorite: false,
-            bookingId,
-        };
-    }
-
-    await customerRepository.addFavoriteBooking(userId, bookingId);
-    return {
-        favorite: true,
-        bookingId,
-    };
-};
-
-
-// ── Customer: booking confirmation ───────────────────────────────────────
-
-export const getBookingConfirmation = async (bookingId, userId) => {
-    const booking = await bookingRepository.findByIdPopulated(bookingId);
-    if (!booking) throw new NotFoundError('Booking');
-
-    const customer = await customerRepository.findByUserId(userId);
-    if (!customer || (booking.customerId._id || booking.customerId).toString() !== customer._id.toString()) {
-        throw new ForbiddenError('You can only access your own bookings');
-    }
-
-    const services = normalizeBookedServices(
-        await serviceRepository.findByIds(
-            booking.serviceIds,
-            'serviceName finalPrice totalPrice actualPrice offerPrice serviceType duration totalDuration',
-        ),
-    );
-    const totalAmount = sumServicePrices(services);
-
-    return {
-        shopCoverUrl: booking.shopId?.coverUrl,
-        date: booking.date,
-        time: booking.time,
-        services: services.map((s) => s.serviceName),
-        totalAmount,
-        totalServices: services.length,
-    };
-};
-
-// ── Customer: update booking ─────────────────────────────────────────────
-
-export const updateBooking = async (bookingId, userId, { employeeId, date, time }) => {
+export const updateBookingSchedule = async (bookingId, userId, { employeeId, date, time }) => {
     const normalizedTime = normalizeBookingTime(time);
     const booking = await bookingRepository.findById(bookingId);
     if (!booking) throw new NotFoundError('Booking');
@@ -665,7 +839,19 @@ export const updateBooking = async (bookingId, userId, { employeeId, date, time 
         && booking.time === normalizedTime;
 
     // Nothing to update if the slot hasn't changed
-    if (isSameSlot) return booking;
+    if (isSameSlot) return serializeBooking(booking);
+
+    if (!isBookingInFuture(booking.date.toISOString().split('T')[0], booking.time)) {
+        throw new BadRequestError('Appointment has already passed');
+    }
+
+    if (isWithinCancellationWindow(booking.date, booking.time, CANCELLATION_WINDOW_HOURS)) {
+        throw new BadRequestError(`Booking updates are not allowed within ${CANCELLATION_WINDOW_HOURS} hours of appointment`);
+    }
+
+    if ((booking.rescheduleCount || 0) >= MAX_RESCHEDULE_COUNT) {
+        throw new BadRequestError('You can only reschedule once');
+    }
 
     const durationMinutes = booking.durationMinutes || sumServiceDurations(
         normalizeBookedServices(
@@ -677,67 +863,80 @@ export const updateBooking = async (bookingId, userId, { employeeId, date, time 
     );
     assertValidServiceDuration(durationMinutes);
     const oldSlotLockTimes = getBookingSlotLockTimes(booking);
-    const newSlotLockTimes = buildSlotLockTimes(normalizedTime, durationMinutes);
+    const shop = await shopRepository.findByIdWithFields(
+        booking.shopId,
+        'shopName address isOpen openTime closeTime availableDays breakTimes',
+    );
+    if (!shop) throw new NotFoundError('Shop');
+    assertShopAcceptsDate(shop, date);
+    const employeeForScheduling = await loadEmployeeForScheduling(employeeId, booking.shopId);
+    const schedulePlan = buildSchedulingPlan({
+        shop,
+        employee: employeeForScheduling,
+        date,
+        time: normalizedTime,
+        durationMinutes,
+    });
 
-    await employeeRepository.releaseSlots(booking.employeeId, oldDate, oldSlotLockTimes);
+    const oldRangeLock = getBookingTimeRangeLock(booking);
+    let employee = null;
 
-    // Claim the new slot
-    const employee = await employeeRepository.claimSlots(employeeId, date, newSlotLockTimes, { shopId: booking.shopId });
+    if (
+        toObjectIdString(booking.employeeId) === toObjectIdString(employeeId)
+        && Number.isFinite(oldRangeLock.startMinute)
+        && Number.isFinite(oldRangeLock.endMinute)
+    ) {
+        employee = await employeeRepository.moveTimeRange(
+            booking.employeeId,
+            {
+                bookingId: booking._id,
+                date,
+                startTime: schedulePlan.startTime,
+                endTime: schedulePlan.endTime,
+                startMinute: schedulePlan.startMinute,
+                endMinute: schedulePlan.endMinute,
+                slotLockTimes: schedulePlan.slotLockTimes,
+            },
+            { shopId: booking.shopId },
+        );
+    } else {
+        employee = await employeeRepository.claimTimeRange(
+            employeeId,
+            {
+                bookingId: booking._id,
+                date,
+                startTime: schedulePlan.startTime,
+                endTime: schedulePlan.endTime,
+                startMinute: schedulePlan.startMinute,
+                endMinute: schedulePlan.endMinute,
+                slotLockTimes: schedulePlan.slotLockTimes,
+            },
+            { shopId: booking.shopId },
+        );
+        if (employee) {
+            await releaseBookingSlotLock(booking);
+        }
+    }
+
     if (!employee) {
-        await employeeRepository.claimSlots(booking.employeeId, oldDate, oldSlotLockTimes, { shopId: booking.shopId });
         throw new BadRequestError('Employee not available at this date/time');
     }
 
     booking.employeeId = employeeId;
     booking.date = date;
-    booking.time = normalizedTime;
+    booking.time = schedulePlan.startTime;
+    booking.endTime = schedulePlan.endTime;
+    booking.startMinute = schedulePlan.startMinute;
+    booking.endMinute = schedulePlan.endMinute;
     booking.durationMinutes = durationMinutes;
-    booking.slotLockTimes = newSlotLockTimes;
+    booking.slotLockTimes = schedulePlan.slotLockTimes;
+    booking.rescheduleCount = (booking.rescheduleCount || 0) + 1;
     await booking.save();
 
-    return booking;
+    return serializeBooking(booking);
 };
 
-// ── Customer: employee calendar ──────────────────────────────────────────
-
-export const getEmployeeCalendar = async (employeeId, date) => {
-    if (!date) throw new BadRequestError('Date query parameter is required');
-
-    const employee = await employeeRepository.findByIdLean(employeeId, 'firstName lastName blockedDates workingHours');
-    if (!employee) throw new NotFoundError('Employee');
-
-    const now = new Date();
-    const todayStr = now.toISOString().slice(0, 10);
-
-    if (date < todayStr) throw new BadRequestError('Cannot fetch past bookings');
-
-    // Check if date is within booking window
-    if (!isWithinBookingWindow(date, BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS, now)) {
-        throw new BadRequestError(`Calendar can only be viewed up to ${BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS} days in advance.`);
-    }
-
-    let bookings = await bookingRepository.findByEmployeeAndDate(employeeId, date);
-
-    // For today, filter to future-only slots
-    if (date === todayStr) {
-        const { parseTimeToMinutes } = await import('../utils/time.utils.js');
-        const currentMinutes = now.getHours() * 60 + now.getMinutes();
-        bookings = bookings.filter((b) => {
-            const m = parseTimeToMinutes(b.time);
-            return m !== null && m > currentMinutes;
-        });
-    }
-
-    return {
-        employeeId,
-        name: `${employee.firstName} ${employee.lastName}`,
-        workingHours: employee.workingHours,
-        blockedDates: employee.blockedDates,
-        bookedSlots: bookings.map((b) => ({ date: b.date, time: b.time, bookingId: b._id })),
-    };
-};
-
-// ── Customer: available slots ────────────────────────────────────────────
+// ── Availability ─────────────────────────────────────────────────────────
 
 export const getAvailableSlots = async (employeeId, date, serviceId) => {
     if (!date) throw new BadRequestError('Date query parameter is required');
@@ -775,7 +974,7 @@ export const getAvailableSlots = async (employeeId, date, serviceId) => {
     // Get shop details
     const shop = await shopRepository.findByIdWithFields(
         employee.shopId,
-        'shopName openTime closeTime isOpen',
+        'shopName openTime closeTime isOpen breakTimes',
     );
     if (!shop) throw new NotFoundError('Shop');
     if (!shop.isOpen) throw new BadRequestError('Shop is currently closed');
@@ -800,15 +999,13 @@ export const getAvailableSlots = async (employeeId, date, serviceId) => {
     }
 
     // Get booked slots for this date
-    const bookings = await bookingRepository.findByEmployeeAndDate(employeeId, date);
-    const bookedSlots = bookings.map((b) => ({
-        date: b.date,
-        time: b.time,
-        durationMinutes: b.durationMinutes,
-    }));
+    const bookings = await bookingRepository.findBlockingByEmployeeAndDate(employeeId, date);
+    const bookedRanges = normalizeBookedRanges({
+        date,
+        bookedSlots: bookings.map(toBookingRangeForAvailability),
+    });
 
     // Calculate available slots
-    const { calculateAvailableSlots } = await import('../utils/slot-calculator.utils.js');
     const availability = calculateAvailableSlots({
         date,
         shopHours: {
@@ -817,7 +1014,8 @@ export const getAvailableSlots = async (employeeId, date, serviceId) => {
         },
         employeeHours: employee.workingHours,
         serviceDuration,
-        bookedSlots,
+        bookedRanges,
+        breakTimes: shop.breakTimes || [],
         blockedDates: employee.blockedDates || [],
         now,
     });
@@ -910,19 +1108,26 @@ export const getShopAvailability = async (shopId, date, serviceId) => {
         };
     }
 
-    // Calculate availability for each employee
-    const { getAvailableSlotTimes } = await import('../utils/slot-calculator.utils.js');
+    // Calculate availability for each employee from the same exact-range engine used at booking time.
     const employeeAvailability = [];
     let firstAvailable = null;
+    const employeeIds = activeEmployees.map((employee) => employee._id);
+    const bookingsForDate = await bookingRepository.findBlockingByEmployeeIdsAndDate(employeeIds, date);
+    const bookingsByEmployee = new Map();
+
+    for (const booking of bookingsForDate) {
+        const employeeKey = toObjectIdString(booking.employeeId);
+        const existing = bookingsByEmployee.get(employeeKey) || [];
+        existing.push(booking);
+        bookingsByEmployee.set(employeeKey, existing);
+    }
 
     for (const employee of activeEmployees) {
-        // Get booked slots for this employee on this date
-        const bookings = await bookingRepository.findByEmployeeAndDate(employee._id, date);
-        const bookedSlots = bookings.map((b) => ({
-            date: b.date,
-            time: b.time,
-            durationMinutes: b.durationMinutes,
-        }));
+        const bookings = bookingsByEmployee.get(toObjectIdString(employee._id)) || [];
+        const bookedRanges = normalizeBookedRanges({
+            date,
+            bookedSlots: bookings.map(toBookingRangeForAvailability),
+        });
 
         // Calculate available slots
         const availableSlots = getAvailableSlotTimes({
@@ -933,7 +1138,8 @@ export const getShopAvailability = async (shopId, date, serviceId) => {
             },
             employeeHours: employee.workingHours,
             serviceDuration,
-            bookedSlots,
+            bookedRanges,
+            breakTimes: shop.breakTimes || [],
             blockedDates: employee.blockedDates || [],
             now,
         });
@@ -979,23 +1185,66 @@ export const getBookingsByShop = async (ownerId, query = {}) => {
     const shop = await shopRepository.findByOwnerId(ownerId);
     if (!shop) throw new NotFoundError('Shop');
 
-    const total = await bookingRepository.countAll({ shopId: shop._id });
+    // Build filters
+    const filters = {};
+    
+    // Status filter
+    if (query.status) {
+        filters.status = query.status;
+    }
+    
+    // Payment status filter
+    if (query.paymentStatus) {
+        filters.paymentStatus = query.paymentStatus;
+    }
+    
+    // Employee filter
+    if (query.employeeId) {
+        // Validate employee belongs to this shop
+        const employee = await employeeRepository.findById(query.employeeId);
+        if (!employee || employee.shopId.toString() !== shop._id.toString()) {
+            throw new BadRequestError('Employee does not belong to this shop');
+        }
+        filters.employeeId = query.employeeId;
+    }
+    
+    // Date range filter
+    if (query.dateFrom || query.dateTo) {
+        filters.date = {};
+        
+        if (query.dateFrom) {
+            const fromDate = new Date(query.dateFrom);
+            fromDate.setHours(0, 0, 0, 0);
+            filters.date.$gte = fromDate;
+        }
+        
+        if (query.dateTo) {
+            const toDate = new Date(query.dateTo);
+            toDate.setHours(23, 59, 59, 999);
+            filters.date.$lte = toDate;
+        }
+    }
+
+    const total = await bookingRepository.countAll({ shopId: shop._id, ...filters });
     const { skip, limit, pagination } = buildPagination(query, total);
 
     const [bookings, numCustomers, numberOfEmployees] = await Promise.all([
-        bookingRepository.findByShopId(shop._id, {}, { skip, limit }),
+        bookingRepository.findByShopId(shop._id, filters, { skip, limit }),
         bookingRepository.getUniqueCustomerCountForShop(shop._id),
         employeeRepository.countByShopId(shop._id),
     ]);
 
-    return { items: bookings, pagination, numberOfEmployees, numberOfCustomers: numCustomers };
+    return {
+        items: bookings.map(serializeBooking).filter(Boolean),
+        pagination,
+        numberOfEmployees,
+        numberOfCustomers: numCustomers,
+    };
 };
 
-export const updateBookingStatus = async (bookingId, status, ownerId) => {
+const updateBookingStatusForShopOwner = async (bookingId, status, ownerId) => {
     const allowed = [
-        BOOKING_STATUS.CANCELLED,
         BOOKING_STATUS.COMPLETED,
-        BOOKING_STATUS.CONFIRMED,
         BOOKING_STATUS.NO_SHOW,
     ];
     if (!allowed.includes(status)) throw new BadRequestError(`Invalid status. Allowed: ${allowed.join(', ')}`);
@@ -1010,24 +1259,15 @@ export const updateBookingStatus = async (bookingId, status, ownerId) => {
 
     // Prevent manual status changes for bookings awaiting confirmation
     if (booking.status === BOOKING_STATUS.AWAITING_CONFIRMATION) {
-        throw new BadRequestError('Use the confirm or cancel endpoints for bookings awaiting confirmation');
-    }
-
-    if (status === BOOKING_STATUS.CONFIRMED && booking.paymentStatus !== PAYMENT_STATUS.SUCCESS) {
-        throw new BadRequestError('Cannot confirm a booking before payment succeeds');
+        throw new BadRequestError('Confirm or cancel bookings awaiting confirmation before closing them');
     }
 
     if ([BOOKING_STATUS.COMPLETED, BOOKING_STATUS.NO_SHOW].includes(status) && booking.paymentStatus !== PAYMENT_STATUS.SUCCESS) {
         throw new BadRequestError('Cannot close a booking before payment succeeds');
     }
 
-    if (status === BOOKING_STATUS.CANCELLED && booking.paymentStatus === PAYMENT_STATUS.SUCCESS) {
-        throw new BadRequestError('Paid bookings must be refunded through the payment refund flow');
-    }
-
     const updated = await bookingRepository.updateById(bookingId, {
         status,
-        cancelledAt: status === BOOKING_STATUS.CANCELLED ? new Date() : booking.cancelledAt,
         completedAt: status === BOOKING_STATUS.COMPLETED ? new Date() : booking.completedAt,
         noShowAt: status === BOOKING_STATUS.NO_SHOW ? new Date() : booking.noShowAt,
         payoutStatus: [BOOKING_STATUS.COMPLETED, BOOKING_STATUS.NO_SHOW].includes(status)
@@ -1035,10 +1275,40 @@ export const updateBookingStatus = async (bookingId, status, ownerId) => {
             : booking.payoutStatus,
     });
     if (!updated) throw new NotFoundError('Booking');
-    return updated;
+
+    if ([BOOKING_STATUS.COMPLETED, BOOKING_STATUS.NO_SHOW].includes(status)) {
+        await releaseBookingSlotLock(booking);
+    }
+
+    await notificationEvents.notifyBookingStatusChanged({
+        bookingId,
+        status,
+        actorUserId: ownerId,
+    });
+
+    return serializeBooking(updated);
 };
 
-// Removed: deleteBookingAfterPayment - merged into cancelBookingByBarber
+export const updateBookingStatus = async (bookingId, user, status) => {
+    if (user.roleType === ROLES.CUSTOMER) {
+        if (status !== BOOKING_STATUS.CANCELLED) {
+            throw new ForbiddenError('Customers can only cancel bookings through this field');
+        }
+        return cancelBookingByCustomer(bookingId, user._id);
+    }
+
+    if (user.roleType === ROLES.BARBER) {
+        if (status === BOOKING_STATUS.CANCELLED) {
+            return cancelBookingByBarber(bookingId, user._id);
+        }
+        if (status === BOOKING_STATUS.CONFIRMED) {
+            return confirmBookingByBarber(bookingId, user._id);
+        }
+        return updateBookingStatusForShopOwner(bookingId, status, user._id);
+    }
+
+    throw new ForbiddenError('This endpoint is available only to customers and barbers');
+};
 
 export const getBookingStats = async (ownerId) => {
     const shop = await shopRepository.findByOwnerId(ownerId);
@@ -1111,47 +1381,15 @@ export const getBookingMilestoneProgress = async (ownerId, query = {}) => {
     };
 };
 
-export const getBookingsByStatusDetailed = async (ownerId, status, query = {}) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
-    if (!shop) throw new NotFoundError('Shop');
-
-    const total = await bookingRepository.countByStatusForShop(shop._id, status);
-    const { skip, limit, pagination } = buildPagination(query, total);
-
-    const items = await bookingRepository.findByStatusForShop(shop._id, status, { skip, limit });
-    return { items, pagination };
-};
+// Status-filtered booking lists are served by getBookingsByShop(query).
 
 // ── Barber: Get Pending Confirmations ────────────────────────────────────
 
-export const getPendingConfirmations = async (ownerId, query = {}) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
-    if (!shop) throw new NotFoundError('Shop');
-
-    const filter = {
-        shopId: shop._id,
-        status: BOOKING_STATUS.AWAITING_CONFIRMATION,
-        paymentStatus: PAYMENT_STATUS.SUCCESS,
-    };
-
-    const total = await bookingRepository.countAll(filter);
-    const { skip, limit, pagination } = buildPagination(query, total);
-
-    const items = await bookingRepository.findByShopId(
-        shop._id,
-        {
-            status: BOOKING_STATUS.AWAITING_CONFIRMATION,
-            paymentStatus: PAYMENT_STATUS.SUCCESS,
-        },
-        { skip, limit, sort: { paidAt: -1 } },
-    );
-
-    return { items, pagination };
-};
+// Pending confirmations are served by getBookingsByShop({ status, paymentStatus }).
 
 // ── Barber: Confirm Booking ──────────────────────────────────────────────
 
-export const confirmBookingByBarber = async (bookingId, ownerId) => {
+const confirmBookingByBarber = async (bookingId, ownerId) => {
     const booking = await bookingRepository.findById(bookingId);
     if (!booking) throw new NotFoundError('Booking');
 
@@ -1181,12 +1419,17 @@ export const confirmBookingByBarber = async (bookingId, ownerId) => {
         ownerId,
     });
 
-    return updated;
+    await notificationEvents.notifyBookingConfirmed({
+        bookingId,
+        actorUserId: ownerId,
+    });
+
+    return serializeBooking(updated);
 };
 
 // ── Barber: Cancel Booking (Paid or Unpaid) ──────────────────────────────
 
-export const cancelBookingByBarber = async (bookingId, ownerId) => {
+const cancelBookingByBarber = async (bookingId, ownerId) => {
     const booking = await bookingRepository.findById(bookingId);
     if (!booking) throw new NotFoundError('Booking');
 
@@ -1196,8 +1439,6 @@ export const cancelBookingByBarber = async (bookingId, ownerId) => {
     if (booking.shopId.toString() !== shop._id.toString()) {
         throw new ForbiddenError('You can only cancel bookings for your own shop');
     }
-
-    await releaseBookingSlotLock(booking);
 
     // Handle PAID bookings
     if (booking.paymentStatus === PAYMENT_STATUS.SUCCESS) {
@@ -1229,6 +1470,7 @@ export const cancelBookingByBarber = async (bookingId, ownerId) => {
             barberCancelledAt: new Date(),
             cancelledAt: new Date(),
         });
+        await releaseBookingSlotLock(booking);
 
         logger.info('[BookingService] Paid booking cancelled by barber', {
             bookingId,
@@ -1236,11 +1478,18 @@ export const cancelBookingByBarber = async (bookingId, ownerId) => {
             ownerId,
         });
 
-        return updated;
+        await notificationEvents.notifyBookingCancelled({
+            bookingId,
+            actorUserId: ownerId,
+            cancelledBy: 'barber',
+        });
+
+        return serializeBooking(updated);
     }
 
     // Handle UNPAID bookings - just delete
     await bookingRepository.deleteById(bookingId);
+    await releaseBookingSlotLock(booking);
 
     logger.info('[BookingService] Unpaid booking deleted by barber', {
         bookingId,
@@ -1289,8 +1538,6 @@ export const autoCancelAwaitingBookings = async () => {
                 continue;
             }
 
-            await releaseBookingSlotLock(booking);
-
             // Initiate FULL refund (no deductions for auto-cancel)
             try {
                 const { initiateRefund } = await import('./payment.service.js');
@@ -1318,6 +1565,10 @@ export const autoCancelAwaitingBookings = async () => {
                 status: BOOKING_STATUS.CANCELLED,
                 autoCancelledAt: new Date(),
                 cancelledAt: new Date(),
+            });
+            await releaseBookingSlotLock(booking);
+            await notificationEvents.notifyBookingAutoCancelled({
+                bookingId: booking._id,
             });
 
             // Update shop stats (increment missed confirmation count)
@@ -1405,19 +1656,39 @@ export const getTodaysPulse = async (ownerId) => {
     const employees = await employeeRepository.findByShopId(shop._id, {});
     const activeEmployees = employees.filter((emp) => emp.isActive && !emp.deletedAt);
 
-    // Calculate total available slots for today
-    // Assuming 30-minute slots and 8-hour workday per employee
-    const slotsPerEmployee = 16; // 8 hours * 2 slots per hour
-    const totalCapacity = activeEmployees.length * slotsPerEmployee;
+    // Calculate exact minute capacity from shop hours, employee hours, and breaks.
+    const todayStr = toDateOnlyString(today);
+    const totalCapacity = activeEmployees.reduce((sum, employee) => {
+        const capacity = calculateAvailableSlots({
+            date: todayStr,
+            shopHours: { openTime: shop.openTime, closeTime: shop.closeTime },
+            employeeHours: employee.workingHours,
+            serviceDuration: 1,
+            breakTimes: shop.breakTimes || [],
+            blockedDates: employee.blockedDates || [],
+            now: new Date('1970-01-01T00:00:00.000Z'),
+        });
+        return sum + capacity.availableWindows.reduce(
+            (windowSum, window) => windowSum + (window.endMinute - window.startMinute),
+            0,
+        );
+    }, 0);
     const bookedSlots = todaysBookings.filter(
         (b) => b.status !== BOOKING_STATUS.CANCELLED,
-    ).length;
+    ).reduce((sum, booking) => {
+        const exactDuration = Number(booking.endMinute) - Number(booking.startMinute);
+        const duration = Number.isFinite(exactDuration) && exactDuration > 0
+            ? exactDuration
+            : Number(booking.durationMinutes) || 0;
+        return sum + duration;
+    }, 0);
 
     return {
         occupancy: {
             booked: bookedSlots,
             total: totalCapacity,
             percentage: totalCapacity > 0 ? Math.round((bookedSlots / totalCapacity) * 100) : 0,
+            unit: 'minutes',
         },
         statusBreakdown: [
             {
@@ -1448,7 +1719,7 @@ export const getTodaysPulse = async (ownerId) => {
  * Get today's queue - active and upcoming appointments
  * Shows appointments organized by status (active/upcoming)
  */
-export const getTodaysQueue = async (ownerId, filter = 'active') => {
+export const getTodaysQueue = async (ownerId, timeframe = 'active') => {
     const shop = await shopRepository.findByOwnerId(ownerId);
     if (!shop) throw new NotFoundError('Shop');
 
@@ -1487,13 +1758,16 @@ export const getTodaysQueue = async (ownerId, filter = 'active') => {
         const bookingMinutes = parseTimeToMinutes(booking.time);
         if (bookingMinutes === null) return;
 
-        // Active: within 30 minutes before or currently happening
-        // Upcoming: more than 30 minutes in the future
+        // Calculate time difference (negative = past, positive = future)
         const timeDiff = bookingMinutes - currentMinutes;
 
-        if (timeDiff >= -30 && timeDiff <= 30) {
+        // Active: bookings happening now or in the past (not yet completed)
+        // Upcoming: bookings more than 30 minutes in the future
+        if (timeDiff <= 30) {
+            // Booking is now or in the past, or within 30 minutes in the future
             activeBookings.push(booking);
-        } else if (timeDiff > 30) {
+        } else {
+            // Booking is more than 30 minutes in the future
             upcomingBookings.push(booking);
         }
     });
@@ -1510,7 +1784,7 @@ export const getTodaysQueue = async (ownerId, filter = 'active') => {
 
     // Format queue items
     const formatQueueItem = (booking) => ({
-        bookingId: booking._id,
+        id: toObjectIdString(booking._id),
         customer: {
             name: `${booking.customerId?.firstName || ''} ${booking.customerId?.lastName || ''}`.trim(),
         },
@@ -1522,17 +1796,17 @@ export const getTodaysQueue = async (ownerId, filter = 'active') => {
         services: booking.serviceIds?.map((s) => s.serviceName) || [],
     });
 
-    const selectedQueue = filter === 'active' ? activeBookings : upcomingBookings;
+    const selectedQueue = timeframe === 'active' ? activeBookings : upcomingBookings;
 
     return {
-        filter,
+        timeframe,
         active: {
             count: activeBookings.length,
-            items: filter === 'active' ? selectedQueue.map(formatQueueItem) : [],
+            items: timeframe === 'active' ? selectedQueue.map(formatQueueItem) : [],
         },
         upcoming: {
             count: upcomingBookings.length,
-            items: filter === 'upcoming' ? selectedQueue.map(formatQueueItem) : [],
+            items: timeframe === 'upcoming' ? selectedQueue.map(formatQueueItem) : [],
         },
     };
 };

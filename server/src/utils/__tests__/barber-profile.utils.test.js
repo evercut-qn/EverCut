@@ -38,6 +38,7 @@ test('serializeBarberProfile exposes a generic payout beneficiary identifier', (
         pinHash: 'secret',
     });
 
-    assert.equal(serialized.payoutConfig.beneficiaryId, 'beneficiary-1');
-    assert.equal(Object.hasOwn(serialized.payoutConfig, 'cashfreeBeneficiaryId'), false);
+    assert.equal(serialized.payout.beneficiaryId, 'beneficiary-1');
+    assert.equal(Object.hasOwn(serialized.payout, 'cashfreeBeneficiaryId'), false);
+    assert.equal(Object.hasOwn(serialized, 'payoutConfig'), false);
 });

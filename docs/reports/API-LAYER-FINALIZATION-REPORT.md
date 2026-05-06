@@ -112,7 +112,6 @@ All endpoints are mounted under `/api/v1`.
 - `GET /bookings/stats` - barber
 - `GET /bookings/progress` - barber
 - `GET /bookings/:id` - customer/barber
-- `GET /bookings/:id/payment` - customer
 - `GET /bookings/:id/confirmation` - customer
 - `PUT /bookings/:id` - customer
 - `PUT /bookings/:id/reschedule` - customer

@@ -4,8 +4,7 @@ import Joi from 'joi';
 
 import { validate } from '../validate.middleware.js';
 import {
-    bookingsByStatusQuerySchema,
-    customerBookingsQuerySchema,
+    bookingListQuerySchema,
 } from '../../validators/booking.validator.js';
 import { addEmployeeSchema } from '../../validators/employee.validator.js';
 import { serviceListQuerySchema } from '../../validators/service.validator.js';
@@ -84,20 +83,21 @@ test('params validation stores sanitized data without mutating req.params', asyn
 });
 
 test('booking query schemas preserve pagination fields', () => {
-    const customerBookings = customerBookingsQuerySchema.validate({
-        type: 'past',
+    const favoriteBookings = bookingListQuerySchema.validate({
+        favorite: 'true',
         page: '2',
         limit: '5',
     });
-    const bookingsByStatus = bookingsByStatusQuerySchema.validate({
+    const bookingsByStatus = bookingListQuerySchema.validate({
         status: 'confirmed',
+        paymentStatus: 'success',
         page: '3',
         limit: '10',
     });
 
-    assert.equal(customerBookings.error, undefined);
-    assert.deepEqual(customerBookings.value, {
-        type: 'past',
+    assert.equal(favoriteBookings.error, undefined);
+    assert.deepEqual(favoriteBookings.value, {
+        favorite: true,
         page: 2,
         limit: 5,
     });
@@ -105,6 +105,7 @@ test('booking query schemas preserve pagination fields', () => {
     assert.equal(bookingsByStatus.error, undefined);
     assert.deepEqual(bookingsByStatus.value, {
         status: 'confirmed',
+        paymentStatus: 'success',
         page: 3,
         limit: 10,
     });

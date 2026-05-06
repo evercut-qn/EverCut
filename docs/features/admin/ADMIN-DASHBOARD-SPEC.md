@@ -171,7 +171,7 @@ This document defines a **minimal, high-impact** admin dashboard for the EverCut
 
 **Why:** Handle customer disputes and cancellation edge cases.
 
-**Existing Route:** `POST /api/payments/:bookingId/refund` (ADMIN authorized)
+**Existing Route:** `POST /api/v1/bookings/:id/refunds` (ADMIN authorized)
 
 ---
 

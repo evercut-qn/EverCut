@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "EverCut - Barber Bookings",
-    "description": "Barber booking administration collection covering list, status stats, monthly milestone progress, status updates, and explicit booking cancellation.",
+    "description": "Barber booking administration collection covering list with role-specific filters (employeeId, dateFrom, dateTo), status stats, monthly milestone progress, status updates, and explicit booking cancellation. Enhanced with employee and date range filtering for leave management and scheduling.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -29,7 +29,45 @@
           "  }",
           "};",
           "syncGlobalToCollection('shared_booking_id', 'booking_id_status');",
-          "syncGlobalToCollection('shared_booking_id', 'booking_id_delete');"
+          "syncGlobalToCollection('shared_booking_id', 'booking_id_delete');",
+          "syncGlobalToCollection('shared_employee_id', 'employee_id');",
+          "// Smart date/time generation for bookings",
+          "const getNextAvailableDate = (daysAhead, skipSundays = true) => {",
+          "  const date = new Date();",
+          "  date.setHours(0, 0, 0, 0);",
+          "  date.setDate(date.getDate() + daysAhead);",
+          "  if (skipSundays) {",
+          "    while (date.getDay() === 0) { date.setDate(date.getDate() + 1); }",
+          "  }",
+          "  return date;",
+          "};",
+          "const toIsoDate = (date) => {",
+          "  const year = date.getFullYear();",
+          "  const month = String(date.getMonth() + 1).padStart(2, '0');",
+          "  const day = String(date.getDate()).padStart(2, '0');",
+          "  return `${year}-${month}-${day}`;",
+          "};",
+          "const getWorkingHourTime = (hour, minute = 0) => {",
+          "  const clampedHour = Math.max(9, Math.min(20, hour));",
+          "  return `${String(clampedHour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;",
+          "};",
+          "",
+          "// Check if user has manually set dates/times in Collection Variables",
+          "const hasManualDate = pm.collectionVariables.get('booking_date');",
+          "const hasManualTime = pm.collectionVariables.get('booking_time');",
+          "",
+          "if (!hasManualDate) {",
+          "  pm.collectionVariables.set('booking_date', toIsoDate(getNextAvailableDate(1)));",
+          "  pm.collectionVariables.set('booking_update_date', toIsoDate(getNextAvailableDate(2)));",
+          "  pm.collectionVariables.set('booking_reorder_date', toIsoDate(getNextAvailableDate(3)));",
+          "  pm.collectionVariables.set('availability_date', toIsoDate(getNextAvailableDate(2)));",
+          "}",
+          "",
+          "if (!hasManualTime) {",
+          "  pm.collectionVariables.set('booking_time', getWorkingHourTime(11, 5));",
+          "  pm.collectionVariables.set('booking_update_time', getWorkingHourTime(12, 10));",
+          "  pm.collectionVariables.set('booking_reorder_time', getWorkingHourTime(14, 15));",
+          "}"
         ]
       }
     }
@@ -54,6 +92,16 @@
     },
     {
       "key": "booking_id_delete",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "employee_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "booking_date",
       "value": "",
       "type": "string"
     }
@@ -81,15 +129,25 @@
               "  pm.expect(response).to.have.property('message');",
               "  pm.expect(response.message).to.be.a('string');",
               "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
               "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
               "const response = pm.response.json();",
-              "const data = response.data || {};",
-              "const bookings = Array.isArray(data.items) ? data.items : [];",
+              "const bookings = Array.isArray(response.data) ? response.data : [];",
+              "bookings.forEach((booking) => {",
+              "  if (booking.employee) {",
+              "    pm.expect(booking.employee).to.have.property('isAvailableOnBookingDate');",
+              "    pm.expect(booking.employee.isAvailableOnBookingDate).to.be.a('boolean');",
+              "  }",
+              "});",
               "const statusBooking = bookings.find((booking) => ['pending', 'confirmed'].includes(booking.status)) || bookings[0];",
               "const deleteBooking = bookings.find((booking) => booking.paymentStatus === 'success') || statusBooking;",
-              "const statusBookingId = statusBooking && (statusBooking._id || statusBooking.bookingId);",
-              "const deleteBookingId = deleteBooking && (deleteBooking._id || deleteBooking.bookingId);",
+              "const statusBookingId = statusBooking && statusBooking.id;",
+              "const deleteBookingId = deleteBooking && deleteBooking.id;",
               "if (statusBookingId) { pm.collectionVariables.set('booking_id_status', statusBookingId); pm.globals.set('shared_booking_id', statusBookingId); }",
               "if (deleteBookingId) { pm.collectionVariables.set('booking_id_delete', deleteBookingId); }"
             ]
@@ -102,7 +160,7 @@
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/bookings/stats",
+        "url": "{{base_url}}/{{api_prefix}}/bookings/analytics/summary",
         "description": "Returns booking counts grouped by status."
       },
       "event": [
@@ -119,6 +177,11 @@
               "  pm.expect(response).to.have.property('message');",
               "  pm.expect(response.message).to.be.a('string');",
               "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
               "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
             ]
@@ -131,7 +194,7 @@
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/bookings/progress",
+        "url": "{{base_url}}/{{api_prefix}}/bookings/analytics/milestones",
         "description": "Returns the current month completed-booking milestone progress card data, including the active status, completed count, visible targets, and next reward gap."
       },
       "event": [
@@ -148,6 +211,11 @@
               "  pm.expect(response).to.have.property('message');",
               "  pm.expect(response.message).to.be.a('string');",
               "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
               "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
             ]
@@ -160,7 +228,7 @@
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/bookings/pending-confirmations",
+        "url": "{{base_url}}/{{api_prefix}}/bookings?status=awaiting_confirmation&paymentStatus=success",
         "description": "Lists all bookings awaiting barber confirmation. These are paid bookings that need explicit barber approval."
       },
       "event": [
@@ -177,6 +245,11 @@
               "  pm.expect(response).to.have.property('message');",
               "  pm.expect(response.message).to.be.a('string');",
               "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
               "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
             ]
@@ -189,7 +262,7 @@
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/bookings/status?status=confirmed",
+        "url": "{{base_url}}/{{api_prefix}}/bookings?status=confirmed",
         "description": "Lists confirmed bookings. Paid bookings move through awaiting_confirmation before barber confirmation."
       },
       "event": [
@@ -206,6 +279,11 @@
               "  pm.expect(response).to.have.property('message');",
               "  pm.expect(response.message).to.be.a('string');",
               "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
               "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
             ]
@@ -214,12 +292,12 @@
       ]
     },
     {
-      "name": "6. Confirm Booking",
+      "name": "6. Get Bookings By Employee",
       "request": {
-        "method": "PATCH",
+        "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/bookings/{{booking_id_status}}/confirm",
-        "description": "Barber explicitly confirms a booking, moving it from awaiting_confirmation to confirmed status."
+        "url": "{{base_url}}/{{api_prefix}}/bookings?employeeId={{employee_id}}",
+        "description": "Lists all bookings for a specific employee. Useful for tracking employee performance and managing employee schedules."
       },
       "event": [
         {
@@ -235,6 +313,53 @@
               "  pm.expect(response).to.have.property('message');",
               "  pm.expect(response.message).to.be.a('string');",
               "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
+              "});",
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "const response = pm.response.json();",
+              "const bookings = Array.isArray(response.data) ? response.data : [];",
+              "pm.test('all bookings belong to the specified employee', function () {",
+              "  const employeeId = pm.collectionVariables.get('employee_id');",
+              "  bookings.forEach((booking) => {",
+              "    pm.expect(booking.employee && booking.employee.id).to.equal(employeeId);",
+              "  });",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Get Bookings By Date Range",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/{{api_prefix}}/bookings?dateFrom={{booking_date}}&dateTo={{booking_date}}",
+        "description": "Lists all bookings within a date range. Use same date for both parameters to get bookings for a single day (e.g., today's schedule)."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
               "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
             ]
@@ -243,16 +368,132 @@
       ]
     },
     {
-      "name": "7. Update Booking Status",
+      "name": "8. Get Employee Bookings In Date Range",
       "request": {
-        "method": "PUT",
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/{{api_prefix}}/bookings?employeeId={{employee_id}}&dateFrom={{booking_date}}&dateTo={{booking_date}}",
+        "description": "Lists bookings for a specific employee within a date range. Essential for employee leave management - find affected bookings when employee requests time off."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
+              "});",
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "9. Get Employee Bookings With Status Filter",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/{{api_prefix}}/bookings?employeeId={{employee_id}}&status=confirmed,awaiting_confirmation",
+        "description": "Lists active bookings for an employee (confirmed or awaiting confirmation). Useful for finding bookings that need reassignment when employee is unavailable."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
+              "});",
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "10. Confirm Booking",
+      "request": {
+        "method": "PATCH",
         "header": [
           {
             "key": "Content-Type",
             "value": "application/json"
           }
         ],
-        "url": "{{base_url}}/{{api_prefix}}/bookings/{{booking_id_status}}/status",
+        "url": "{{base_url}}/{{api_prefix}}/bookings/{{booking_id_status}}",
+        "description": "Barber explicitly confirms a booking, moving it from awaiting_confirmation to confirmed status.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"status\": \"confirmed\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
+              "});",
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "11. Update Booking Status",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/{{api_prefix}}/bookings/{{booking_id_status}}",
         "description": "Updates the captured booking status. Use `booking_id_status`, not the delete-only booking ID.",
         "body": {
           "mode": "raw",
@@ -278,6 +519,11 @@
               "  pm.expect(response).to.have.property('message');",
               "  pm.expect(response.message).to.be.a('string');",
               "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
               "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
             ]
@@ -286,12 +532,26 @@
       ]
     },
     {
-      "name": "8. Cancel Paid Booking (Terminal)",
+      "name": "12. Cancel Paid Booking (Terminal)",
       "request": {
-        "method": "POST",
-        "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/bookings/{{booking_id_delete}}/cancel",
-        "description": "Cancels a paid booking only when the booking is still awaiting confirmation."
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/{{api_prefix}}/bookings/{{booking_id_delete}}",
+        "description": "Cancels a paid booking only when the booking is still awaiting confirmation.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"status\": \"cancelled\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
       },
       "event": [
         {
@@ -307,6 +567,11 @@
               "  pm.expect(response).to.have.property('message');",
               "  pm.expect(response.message).to.be.a('string');",
               "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
               "});",
               "pm.test('status is 200 or 400', function () { pm.expect(pm.response.code).to.be.oneOf([200, 400]); });",
               "if (pm.response.code === 200) { pm.collectionVariables.unset('booking_id_delete'); }"

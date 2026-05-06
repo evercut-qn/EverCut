@@ -90,6 +90,62 @@ test('employeeRepository.claimSlots atomically rejects any occupied slot marker'
     assert.equal(capturedSelect, 'firstName lastName photoUrl');
 });
 
+test('employeeRepository.claimTimeRange atomically rejects overlapping exact ranges', async (t) => {
+    let capturedFilter = null;
+    let capturedUpdate = null;
+    let capturedOptions = null;
+    let capturedSelect = null;
+    const query = {
+        select(fields) {
+            capturedSelect = fields;
+            return this;
+        },
+    };
+
+    t.mock.method(Employee, 'findOneAndUpdate', (filter, update, options) => {
+        capturedFilter = filter;
+        capturedUpdate = update;
+        capturedOptions = options;
+        return query;
+    });
+
+    await employeeRepository.claimTimeRange(
+        'employee-1',
+        {
+            bookingId: 'booking-1',
+            date: '2099-01-01',
+            startTime: '10:15',
+            endTime: '11:20',
+            startMinute: 615,
+            endMinute: 680,
+            slotLockTimes: ['10:15', '10:45', '11:15'],
+        },
+        { shopId: 'shop-1' },
+    );
+    sanitize(capturedFilter);
+
+    const noOverlapFilter = capturedFilter.$and[0].bookedRanges.$not.$elemMatch;
+    assert.equal(noOverlapFilter.date, '2099-01-01');
+    assert.equal(noOverlapFilter.startMinute.$lt, 680);
+    assert.equal(noOverlapFilter.endMinute.$gt, 615);
+    assert.deepEqual(capturedUpdate.$push.bookedRanges, {
+        bookingId: 'booking-1',
+        date: '2099-01-01',
+        startTime: '10:15',
+        endTime: '11:20',
+        startMinute: 615,
+        endMinute: 680,
+    });
+    assert.deepEqual(capturedUpdate.$push.bookedSlots.$each, [
+        { date: '2099-01-01', time: '10:15' },
+        { date: '2099-01-01', time: '10:45' },
+        { date: '2099-01-01', time: '11:15' },
+    ]);
+    assert.equal(capturedFilter.shopId, 'shop-1');
+    assert.deepEqual(capturedOptions, { returnDocument: 'after', runValidators: true });
+    assert.equal(capturedSelect, 'firstName lastName photoUrl workingHours');
+});
+
 test('paymentRepository.findPendingByBookingId preserves its internal $in operator under sanitizeFilter', async (t) => {
     let capturedFilter = null;
     let capturedSort = null;

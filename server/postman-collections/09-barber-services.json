@@ -85,12 +85,21 @@
               "  pm.expect(response).to.have.property('message');",
               "  pm.expect(response.message).to.be.a('string');",
               "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
               "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
               "const response = pm.response.json();",
-              "const services = Array.isArray(response.data && response.data.items) ? response.data.items : [];",
+              "const services = Array.isArray(response.data) ? response.data : [];",
               "const preferredService = services.find((service) => typeof service.serviceName === 'string' && service.serviceName.includes('Postman')) || services[0];",
-              "if (preferredService && preferredService._id) { pm.collectionVariables.set('service_id', preferredService._id); pm.globals.set('shared_service_id', preferredService._id); }"
+              "if (preferredService && preferredService.id) {",
+              "  const serviceId = preferredService.id;",
+              "  pm.collectionVariables.set('service_id', serviceId);",
+              "  pm.globals.set('shared_service_id', serviceId);",
+              "}"
             ]
           }
         }
@@ -141,10 +150,15 @@
               "  pm.expect(response).to.have.property('message');",
               "  pm.expect(response.message).to.be.a('string');",
               "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
               "});",
               "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
               "const response = pm.response.json();",
-              "const serviceId = response.data && response.data._id;",
+              "const serviceId = response.data && response.data.id;",
               "if (serviceId) { pm.collectionVariables.set('service_id', serviceId); pm.globals.set('shared_service_id', serviceId); }"
             ]
           }
@@ -196,6 +210,11 @@
               "  pm.expect(response).to.have.property('message');",
               "  pm.expect(response.message).to.be.a('string');",
               "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
               "});",
               "pm.test('status is 201', function () { pm.response.to.have.status(201); });"
             ]
@@ -239,6 +258,11 @@
               "  pm.expect(response).to.have.property('message');",
               "  pm.expect(response.message).to.be.a('string');",
               "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
               "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
             ]
@@ -268,6 +292,11 @@
               "  pm.expect(response).to.have.property('message');",
               "  pm.expect(response.message).to.be.a('string');",
               "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
               "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
               "pm.collectionVariables.unset('service_id');",

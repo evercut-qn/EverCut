@@ -12,6 +12,21 @@ This document describes the employee detail endpoint that provides comprehensive
 
 **Authorization:** Shop owners can only access employees from their own shop
 
+### Leave / Date Availability
+
+Barbers can mark an employee unavailable or available again for one or more full dates:
+
+**URL:** `PATCH /api/v1/employees/:id/availability`
+
+```json
+{
+  "dates": ["2026-06-15", "2026-06-16"],
+  "available": false
+}
+```
+
+When `available` is `false`, the dates are added to `blockedDates`, new booking attempts for that employee/date are rejected, active affected bookings are found, and customers are notified. Existing bookings remain confirmed and keep the original employee. When `available` is `true`, dates are removed from `blockedDates`; customers are not automatically notified again.
+
 ---
 
 ## Request
@@ -39,10 +54,9 @@ Authorization: Bearer <jwt_token>
   "success": true,
   "data": {
     "employee": {
-      "_id": "507f1f77bcf86cd799439011",
+      "id": "507f1f77bcf86cd799439011",
       "firstName": "Ram",
       "lastName": "Kumar",
-      "fullName": "Ram Kumar",
       "phoneNumber": "+919876543210",
       "gender": "Male",
       "dateOfBirth": "1990-05-15T00:00:00.000Z",
@@ -73,7 +87,7 @@ Authorization: Bearer <jwt_token>
         "count": 12,
         "bookings": [
           {
-            "bookingId": "507f1f77bcf86cd799439012",
+            "id": "507f1f77bcf86cd799439012",
             "date": "2026-04-30T00:00:00.000Z",
             "time": "14:30",
             "customer": {
@@ -124,17 +138,16 @@ Authorization: Bearer <jwt_token>
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `_id` | String | Employee unique identifier |
+| `id` | String | Public employee unique identifier |
 | `firstName` | String | Employee first name |
 | `lastName` | String | Employee last name |
-| `fullName` | String | Full name (firstName + lastName) |
 | `phoneNumber` | String | Contact phone number |
 | `gender` | String | Gender (Male/Female/Other) |
 | `dateOfBirth` | Date | Date of birth |
 | `photoUrl` | String | Profile photo URL (Cloudinary) |
 | `workingHours` | Object | Working hours (start/end times) |
 | `blockedDates` | Array | List of blocked dates |
-| `isActive` | Boolean | Whether employee is active |
+| `isActive` | Boolean | Whether employee is active/available |
 | `createdAt` | Date | Account creation date |
 
 ### Statistics Object
@@ -305,7 +318,7 @@ The endpoint makes multiple queries:
 **Optimization Recommendations:**
 - Add caching for employee details (5-minute TTL)
 - Use aggregation pipeline for statistics calculation
-- Index on `employeeId + date + status` for faster queries
+- Index on booking employee relation + date + status for faster queries
 
 ### Response Time
 
@@ -326,9 +339,9 @@ When displaying staff in the dashboard:
 <StaffList>
   {staff.map(employee => (
     <StaffCard 
-      key={employee.employeeId}
+      key={employee.id}
       employee={employee}
-      onClick={() => fetchEmployeeDetails(employee.employeeId)}
+      onClick={() => fetchEmployeeDetails(employee.id)}
     />
   ))}
 </StaffList>
@@ -373,10 +386,11 @@ const fetchEmployeeDetails = async (employeeId) => {
 
 - `GET /api/employees` - List all employees
 - `POST /api/employees` - Add new employee
-- `PUT /api/employees/:id` - Update employee
+- `PATCH /api/employees/:id` - Update employee
+- `PATCH /api/employees/:id/status` - Toggle employee availability status
 - `DELETE /api/employees/:id` - Delete employee
-- `GET /api/employees/:id/calendar` - Employee calendar
-- `GET /api/employees/:id/available-slots` - Available time slots
+- `GET /api/employees/:id/availability` - Employee availability
+- `PATCH /api/v1/employees/:id/availability` - Mark employee available/unavailable for date(s)
 
 ---
 
@@ -388,5 +402,5 @@ const fetchEmployeeDetails = async (employeeId) => {
 
 ---
 
-**Last Updated:** April 30, 2026
+**Last Updated:** May 4, 2026
 **Status:** ✅ Implemented and Production-Ready

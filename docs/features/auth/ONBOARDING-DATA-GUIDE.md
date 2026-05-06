@@ -143,7 +143,7 @@ Future<Map<String, dynamic>> completeCustomerOnboarding({
   "message": "Customer created",
   "data": {
     "user": {
-      "_id": "507f1f77bcf86cd799439011",
+      "id": "507f1f77bcf86cd799439011",
       "phoneNumber": "+919876543210",
       "email": "john.doe@example.com",
       "emailVerified": false,
@@ -152,7 +152,7 @@ Future<Map<String, dynamic>> completeCustomerOnboarding({
       "createdAt": "2026-05-02T10:30:00.000Z"
     },
     "profile": {
-      "_id": "507f1f77bcf86cd799439012",
+      "id": "507f1f77bcf86cd799439012",
       "userId": "507f1f77bcf86cd799439011",
       "firstName": "John",
       "lastName": "Doe",
@@ -207,8 +207,7 @@ Content-Type: multipart/form-data
 | Field | Type | Format | Example | Notes |
 |-------|------|--------|---------|-------|
 | `shopName` | String | 1-100 chars | "John's Barber Studio" | Required |
-| `shopOwner` | String | 1-100 chars | "John Barber" | Required |
-| `businessCategory` | String | Enum | "Barber" | See categories below |
+| `category` | String | Enum | "Barber" | See categories below |
 | `targetCustomers` | String | Enum | "male" | male/female/unisex |
 
 #### **Location**
@@ -227,14 +226,14 @@ Content-Type: multipart/form-data
 |-------|------|--------|---------|-------|
 | `workingDays` | String | JSON array | See below | Required |
 | `workingHours` | String | JSON object | See below | Required |
-| `breakTimings` | String | JSON array | See below | Required |
+| `breakTimes` | String | JSON array | See below | Required |
 
 #### **Payment Information**
 | Field | Type | Format | Example | Notes |
 |-------|------|--------|---------|-------|
 | `accountHolderName` | String | 1-100 chars | "John Barber" | Required |
 | `bankName` | String | 1-120 chars | "HDFC Bank" | Required |
-| `upiAddress` | String | UPI ID | "john.barber@upi" | Required |
+| `upiId` | String | UPI ID | "john.barber@upi" | Required |
 
 #### **Security**
 | Field | Type | Format | Example | Notes |
@@ -245,7 +244,7 @@ Content-Type: multipart/form-data
 #### **Images**
 | Field | Type | Format | Example | Notes |
 |-------|------|--------|---------|-------|
-| `shopImages` | File[] | Images | [img1.jpg, img2.jpg] | 1-3 images required |
+| `photos` | File[] | Images | [img1.jpg, img2.jpg] | 1-3 images required |
 
 ### **Optional Fields**
 | Field | Type | Default | Example |
@@ -316,14 +315,14 @@ request.fields['workingDays'] = jsonEncode(workingDays);
 ```dart
 // Option 1: 24-hour format (recommended)
 final workingHours = {
-  'opensAt': '09:00',
-  'closesAt': '20:00',
+  'openTime': '09:00',
+  'closeTime': '20:00',
 };
 
 // Option 2: 12-hour format (backend normalizes)
 final workingHours = {
-  'opensAt': '09:00 AM',
-  'closesAt': '08:00 PM',
+  'openTime': '09:00 AM',
+  'closeTime': '08:00 PM',
 };
 
 // Send as JSON string
@@ -332,7 +331,7 @@ request.fields['workingHours'] = jsonEncode(workingHours);
 
 #### **Break Timings**
 ```dart
-final breakTimings = [
+final breakTimes = [
   {
     'startsAt': '13:00',
     'endsAt': '14:00',
@@ -344,7 +343,7 @@ final breakTimings = [
 ];
 
 // Send as JSON string
-request.fields['breakTimings'] = jsonEncode(breakTimings);
+request.fields['breakTimes'] = jsonEncode(breakTimes);
 ```
 
 ### **Flutter Example**
@@ -361,21 +360,21 @@ Future<Map<String, dynamic>> completeBarberOnboarding({
   required String gender,
   required String dateOfBirth,
   required String shopName,
-  required String businessCategory,
+  required String category,
   required String targetCustomers,
   required String address,
   required double longitude,
   required double latitude,
   required List<String> amenities,
   required List<String> workingDays,
-  required String opensAt,
-  required String closesAt,
-  required List<Map<String, String>> breakTimings,
+  required String openTime,
+  required String closeTime,
+  required List<Map<String, String>> breakTimes,
   required String accountHolderName,
   required String bankName,
-  required String upiAddress,
+  required String upiId,
   required String pin,
-  required List<File> shopImages,
+  required List<File> photos,
   String? bio,
   int? numberOfEmployees,
   int? yearsOfExperience,
@@ -397,8 +396,7 @@ Future<Map<String, dynamic>> completeBarberOnboarding({
 
   // Shop Information
   request.fields['shopName'] = shopName;
-  request.fields['shopOwner'] = '$firstName $lastName';
-  request.fields['businessCategory'] = businessCategory;
+  request.fields['category'] = category;
   request.fields['targetCustomers'] = targetCustomers;
 
   // Location
@@ -414,15 +412,15 @@ Future<Map<String, dynamic>> completeBarberOnboarding({
   // Working Schedule
   request.fields['workingDays'] = jsonEncode(workingDays);
   request.fields['workingHours'] = jsonEncode({
-    'opensAt': opensAt,
-    'closesAt': closesAt,
+    'openTime': openTime,
+    'closeTime': closeTime,
   });
-  request.fields['breakTimings'] = jsonEncode(breakTimings);
+  request.fields['breakTimes'] = jsonEncode(breakTimes);
 
   // Payment Information
   request.fields['accountHolderName'] = accountHolderName;
   request.fields['bankName'] = bankName;
-  request.fields['upiAddress'] = upiAddress;
+  request.fields['upiId'] = upiId;
 
   // Security PIN
   request.fields['pin'] = pin;
@@ -438,10 +436,10 @@ Future<Map<String, dynamic>> completeBarberOnboarding({
   }
 
   // Shop Images (1-3 images)
-  for (var i = 0; i < shopImages.length && i < 3; i++) {
+  for (var i = 0; i < photos.length && i < 3; i++) {
     request.files.add(await http.MultipartFile.fromPath(
-      'shopImages',
-      shopImages[i].path,
+      'photos',
+      photos[i].path,
     ));
   }
 
@@ -478,7 +476,7 @@ Future<Map<String, dynamic>> completeBarberOnboarding({
   "message": "Barber profile created",
   "data": {
     "user": {
-      "_id": "507f1f77bcf86cd799439011",
+      "id": "507f1f77bcf86cd799439011",
       "phoneNumber": "+919876543211",
       "email": "john.barber@example.com",
       "emailVerified": false,
@@ -487,14 +485,18 @@ Future<Map<String, dynamic>> completeBarberOnboarding({
       "createdAt": "2026-05-02T10:30:00.000Z"
     },
     "shop": {
-      "_id": "507f1f77bcf86cd799439013",
-      "ownerId": "507f1f77bcf86cd799439011",
+      "id": "507f1f77bcf86cd799439013",
+      "owner": {
+        "id": "507f1f77bcf86cd799439011",
+        "firstName": "John",
+        "lastName": "Barber",
+        "gender": "Male",
+        "dateOfBirth": "1991-01-12T00:00:00.000Z",
+        "email": "john.barber@example.com",
+        "phoneNumber": "+919876543211",
+        "photoUrl": null
+      },
       "shopName": "John's Barber Studio",
-      "ownerName": "John Barber",
-      "ownerFirstName": "John",
-      "ownerLastName": "Barber",
-      "ownerGender": "Male",
-      "ownerDateOfBirth": "1991-01-12T00:00:00.000Z",
       "category": "Barber",
       "targetCustomers": "male",
       "address": "MG Road, Bengaluru",
@@ -502,23 +504,32 @@ Future<Map<String, dynamic>> completeBarberOnboarding({
         "type": "Point",
         "coordinates": [77.5946, 12.9716]
       },
-      "facilities": ["Air Conditioning", "Waiting Area", "Wi-Fi"],
-      "availableDays": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
-      "openTime": "09:00",
-      "closeTime": "20:00",
+      "amenities": ["Air Conditioning", "Waiting Area", "Wi-Fi"],
+      "workingDays": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+      "workingHours": {
+        "openTime": "09:00",
+        "closeTime": "20:00"
+      },
       "breakTimes": [{"start": "13:00", "end": "14:00"}],
-      "upiId": "john.barber@upi",
-      "accountHolderName": "John Barber",
-      "bankName": "HDFC Bank",
+      "payout": {
+        "accountHolderName": "John Barber",
+        "bankName": "HDFC Bank",
+        "upiId": "john.barber@upi",
+        "bankAccountLast4": null,
+        "ifsc": null,
+        "verificationStatus": "pending",
+        "isVerified": false,
+        "canReceivePayouts": false
+      },
       "isOpen": true,
       "numberOfEmployees": 1,
       "yearsOfExperience": 0
     },
     "photos": [
       {
-        "_id": "507f1f77bcf86cd799439014",
+        "id": "507f1f77bcf86cd799439014",
         "shopId": "507f1f77bcf86cd799439013",
-        "imageUrl": "https://res.cloudinary.com/...",
+        "photoUrl": "https://res.cloudinary.com/...",
         "photoType": "shop_interior"
       }
     ],
@@ -544,19 +555,18 @@ Future<Map<String, dynamic>> completeBarberOnboarding({
 | **location** | ✅ Required | ✅ Required | GeoJSON Point |
 | **photo** | ✅ Required | ❌ No | Customer profile photo |
 | **shopName** | ❌ No | ✅ Required | |
-| **shopOwner** | ❌ No | ✅ Required | |
-| **businessCategory** | ❌ No | ✅ Required | Salon/Barber/etc |
+| **category** | ❌ No | ✅ Required | Salon/Barber/etc |
 | **targetCustomers** | ❌ No | ✅ Required | male/female/unisex |
 | **amenities** | ❌ No | ✅ Required | JSON array |
 | **workingDays** | ❌ No | ✅ Required | JSON array |
 | **workingHours** | ❌ No | ✅ Required | JSON object |
-| **breakTimings** | ❌ No | ✅ Required | JSON array |
+| **breakTimes** | ❌ No | ✅ Required | JSON array |
 | **accountHolderName** | ❌ No | ✅ Required | For payouts |
 | **bankName** | ❌ No | ✅ Required | For payouts |
-| **upiAddress** | ❌ No | ✅ Required | For payouts |
+| **upiId** | ❌ No | ✅ Required | For payouts |
 | **pin** | ❌ No | ✅ Required | 4-digit security PIN |
 | **confirmPin** | ❌ No | ✅ Required | Must match pin |
-| **shopImages** | ❌ No | ✅ Required | 1-3 images |
+| **photos** | ❌ No | ✅ Required | 1-3 images |
 | **bio** | ❌ No | ⭕ Optional | Shop description |
 | **numberOfEmployees** | ❌ No | ⭕ Optional | Default: 1 |
 | **yearsOfExperience** | ❌ No | ⭕ Optional | Default: 0 |
@@ -580,7 +590,7 @@ Future<Map<String, dynamic>> completeBarberOnboarding({
 - Business category must be: "Salon", "Beauty Parlour", "Barber", or "Door-Step"
 - Target customers must be: "male", "female", or "unisex"
 - Working days must be valid day names (Monday-Sunday)
-- Working hours: `opensAt` must be before `closesAt`
+- Working hours: `openTime` must be before `closeTime`
 - Break timings: `startsAt` must be before `endsAt`
 - PIN must be exactly 4 digits
 - `confirmPin` must match `pin`
@@ -629,14 +639,14 @@ request.fields['amenities'] = jsonEncode(amenities);
 ```dart
 // ❌ WRONG: Invalid time format
 request.fields['workingHours'] = jsonEncode({
-  'opensAt': '9:00',      // Missing leading zero
-  'closesAt': '8:00 pm',  // Inconsistent format
+  'openTime': '9:00',      // Missing leading zero
+  'closeTime': '8:00 pm',  // Inconsistent format
 });
 
 // ✅ CORRECT: Consistent 24-hour format
 request.fields['workingHours'] = jsonEncode({
-  'opensAt': '09:00',
-  'closesAt': '20:00',
+  'openTime': '09:00',
+  'closeTime': '20:00',
 });
 ```
 

@@ -5,6 +5,8 @@ import { BadRequestError, NotFoundError, ConflictError } from '../utils/api-erro
 import { escapeRegex } from '../utils/regex.utils.js';
 import { buildPagination } from '../utils/pagination.utils.js';
 import { calculateDiscountedPrice, normalizeServicePricing } from '../utils/service-pricing.utils.js';
+import { serializeService, serializeServices } from '../serializers/service.serializer.js';
+import { serializeShopSummary } from '../serializers/shop.serializer.js';
 
 /**
  * Service-catalog service - manages the salon services (haircut, etc.)
@@ -130,7 +132,7 @@ export const addService = async (ownerId, data) => {
         rethrowDuplicateServiceWrite(error);
     }
 
-    return normalizeServicePricing(createdService);
+    return serializeService(createdService);
 };
 
 export const getServices = async (ownerId, queryFilters = {}) => {
@@ -141,8 +143,8 @@ export const getServices = async (ownerId, queryFilters = {}) => {
     const total = await serviceRepository.countByShopId(shop._id, filters);
     const { skip, limit, pagination } = buildPagination(queryFilters, total);
 
-    const items = await serviceRepository.findByShopId(shop._id, filters, { skip, limit });
-    return { items: items.map(normalizeServicePricing), pagination };
+    const items = serializeServices(await serviceRepository.findByShopId(shop._id, filters, { skip, limit }));
+    return { items, pagination };
 };
 
 export const updateService = async (ownerId, serviceId, data) => {
@@ -168,7 +170,7 @@ export const updateService = async (ownerId, serviceId, data) => {
         rethrowDuplicateServiceWrite(error);
     }
     if (!updated) throw new NotFoundError('Service');
-    return normalizeServicePricing(updated);
+    return serializeService(updated);
 };
 
 export const deleteService = async (ownerId, serviceId) => {
@@ -183,13 +185,21 @@ export const deleteService = async (ownerId, serviceId) => {
 export const searchServices = async (query, gender) => {
     const filters = {};
     if (gender) filters.serviceFor = { $regex: new RegExp(`^${escapeRegex(gender)}$`, 'i') };
-    return serviceRepository.searchByName(query, filters, 'serviceName serviceFor shopId');
+    return serializeServices(
+        await serviceRepository.searchByName(query, filters, 'serviceName serviceFor shopId'),
+        { includeShop: true },
+    );
 };
 
 export const searchShops = async (query) => {
-    return shopRepository.searchByName(query, 'shopName address location category coverUrl');
+    return (await shopRepository.searchByName(query, 'shopName address location category coverUrl'))
+        .map(serializeShopSummary)
+        .filter(Boolean);
 };
 
 export const getServicesByGender = async (gender) => {
-    return serviceRepository.findByGender(gender, 'serviceName shopId serviceFor serviceType');
+    return serializeServices(
+        await serviceRepository.findByGender(gender, 'serviceName shopId serviceFor serviceType'),
+        { includeShop: true },
+    );
 };

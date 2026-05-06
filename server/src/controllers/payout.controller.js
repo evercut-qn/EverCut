@@ -13,16 +13,19 @@ export const handlePayoutWebhook = async (req, res) => {
             processed: result.processed,
         });
 
-        return res.status(200).json({ received: true });
+        return res.status(200).json(ApiResponse.success(
+            { received: true, ...result },
+            'Payout webhook processed',
+        ));
     } catch (error) {
         logger.error('[PayoutController] Webhook processing error', {
             error: error.message,
         });
 
-        return res.status(error.statusCode || 500).json({
-            received: false,
-            error: error.message || 'processing_error',
-        });
+        return res.status(error.statusCode || 500).json(ApiResponse.error(
+            error.message || 'processing_error',
+            { received: false },
+        ));
     }
 };
 

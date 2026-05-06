@@ -1,14 +1,14 @@
 # Queue Endpoint Validation Fix
 
 **Date:** April 30, 2026  
-**Issue:** 500 Internal Server Error on `/bookings/queue` endpoint  
+**Issue:** 500 Internal Server Error on the queue endpoint  
 **Status:** ✅ Fixed
 
 ---
 
 ## Problem
 
-The newly migrated `/bookings/queue` endpoint was returning a 500 Internal Server Error with the message:
+The migrated queue endpoint was returning a 500 Internal Server Error with the message:
 
 ```
 "Validated request query is unavailable. Ensure validate(..., 'query') runs before the controller."
@@ -18,7 +18,7 @@ The newly migrated `/bookings/queue` endpoint was returning a 500 Internal Serve
 
 When we migrated the dashboard routes to resource-based routes, we added the `/queue` endpoint to `bookings.routes.js` but **forgot to add the validation middleware** for the query parameters.
 
-The endpoint accepts an optional `filter` query parameter (`active` or `upcoming`), but the route was defined without the `validate()` middleware:
+The endpoint now accepts an optional `timeframe` query parameter (`active` or `upcoming`) and rejects the deprecated `filter` parameter:
 
 ```javascript
 // ❌ BEFORE (Missing validation)
@@ -37,12 +37,12 @@ Added `queueFilterQuerySchema` to `server/src/validators/booking.validator.js`:
 
 ```javascript
 export const queueFilterQuerySchema = Joi.object({
-    filter: Joi.string().valid('active', 'upcoming').default('active'),
+    timeframe: Joi.string().valid('active', 'upcoming').default('active'),
 });
 ```
 
 **Features:**
-- Validates `filter` query parameter
+- Validates `timeframe` query parameter
 - Only allows `'active'` or `'upcoming'` values
 - Defaults to `'active'` if not provided
 - Follows Joi validation best practices
@@ -78,9 +78,9 @@ router.get('/queue', authorize(ROLES.BARBER), validate(queueFilterQuerySchema, '
 
 ### Valid Requests
 
-**Request 1: With filter parameter**
+**Request 1: With timeframe parameter**
 ```
-GET /api/v1/bookings/queue?filter=active
+GET /api/v1/bookings/analytics/queue?timeframe=active
 Authorization: Bearer {barber_token}
 ```
 
@@ -90,7 +90,7 @@ Authorization: Bearer {barber_token}
   "success": true,
   "message": "Today's queue fetched",
   "data": {
-    "filter": "active",
+    "timeframe": "active",
     "active": {
       "count": 3,
       "items": [...]
@@ -103,17 +103,17 @@ Authorization: Bearer {barber_token}
 }
 ```
 
-**Request 2: Without filter parameter (uses default)**
+**Request 2: Without timeframe parameter (uses default)**
 ```
-GET /api/v1/bookings/queue
+GET /api/v1/bookings/analytics/queue
 Authorization: Bearer {barber_token}
 ```
 
-**Expected Response:** Same as above (defaults to `filter=active`)
+**Expected Response:** Same as above (defaults to `timeframe=active`)
 
-**Request 3: With upcoming filter**
+**Request 3: With upcoming timeframe**
 ```
-GET /api/v1/bookings/queue?filter=upcoming
+GET /api/v1/bookings/analytics/queue?timeframe=upcoming
 Authorization: Bearer {barber_token}
 ```
 
@@ -123,7 +123,7 @@ Authorization: Bearer {barber_token}
   "success": true,
   "message": "Today's queue fetched",
   "data": {
-    "filter": "upcoming",
+    "timeframe": "upcoming",
     "active": {
       "count": 3,
       "items": []
@@ -138,9 +138,9 @@ Authorization: Bearer {barber_token}
 
 ### Invalid Requests
 
-**Request: Invalid filter value**
+**Request: Invalid timeframe value**
 ```
-GET /api/v1/bookings/queue?filter=invalid
+GET /api/v1/bookings/analytics/queue?timeframe=invalid
 Authorization: Bearer {barber_token}
 ```
 
@@ -151,8 +151,8 @@ Authorization: Bearer {barber_token}
   "message": "Validation error",
   "errors": [
     {
-      "field": "filter",
-      "message": "filter must be one of [active, upcoming]"
+      "field": "timeframe",
+      "message": "timeframe must be one of [active, upcoming]"
     }
   ]
 }

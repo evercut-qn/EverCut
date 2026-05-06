@@ -92,6 +92,5 @@ export const uploadBarberOnboardingImages = multer({
     },
     fileFilter: imageFilter,
 }).fields([
-    { name: 'shopImages', maxCount: 3 },
     { name: 'photos', maxCount: 3 },
 ]);

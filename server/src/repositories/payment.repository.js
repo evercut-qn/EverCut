@@ -48,7 +48,7 @@ class PaymentRepository {
 
         if (options.skip !== undefined) query.skip(options.skip);
         if (options.limit !== undefined) query.limit(options.limit);
-        return query;
+        return query.lean();
     }
 
     async findAllForEarnings(filter = {}, options = {}) {
@@ -79,7 +79,7 @@ class PaymentRepository {
 
         if (options.skip !== undefined) query.skip(options.skip);
         if (options.limit !== undefined) query.limit(options.limit);
-        return query;
+        return query.lean();
     }
 
     async countAll(filter = {}) {

@@ -1,6 +1,6 @@
 # EverCut Backend Documentation
 
-> **Last Updated:** March 20, 2026  
+> **Last Updated:** May 3, 2026  
 > **Project:** EverCut — Salon & Barber Booking Platform API
 
 ---
@@ -28,7 +28,9 @@ Detailed, implementation-ready guides for Flutter developers and backend testing
 | Document | Description | Status |
 |----------|-------------|--------|
 | [FLUTTER-BOOKING-PAYMENT-FLOW.md](./flows/FLUTTER-BOOKING-PAYMENT-FLOW.md) | Complete Flutter implementation guide for booking + native PhonePe SDK payment flow | ✅ Production Ready |
+| [flutter-notification-integration-guide.md](./flows/flutter-notification-integration-guide.md) | Flutter integration guide for FCM token handling and foreground/background/terminated notification handling | ✅ Production Ready |
 | [POSTMAN-BOOKING-PAYMENT-GUIDE.md](./testing/POSTMAN-BOOKING-PAYMENT-GUIDE.md) | Postman testing guide for booking & payment flow (auth → payment → barber approval) | ✅ Production Ready |
+| [notification-system-postman-guide.md](./testing/notification-system-postman-guide.md) | Postman-only notification backend testing guide | ✅ Production Ready |
 
 > **Note:** The `docs/flows/` directory contains detailed, step-by-step implementation guides for developers. The `docs/testing/` directory contains Postman API testing documentation.
 
@@ -74,6 +76,12 @@ Detailed guides for implementing specific features.
 | [BOOKING-DATE-RESTRICTION-UPDATE.md](./features/bookings/BOOKING-DATE-RESTRICTION-UPDATE.md) | Booking date window restrictions | 📋 Implementation Guide |
 | [README.md](./features/bookings/README.md) | Booking system quick reference | ✅ Reference |
 
+### Employee Management
+
+| Document | Description | Status |
+|----------|-------------|--------|
+| [EMPLOYEE-DETAIL-ENDPOINT.md](./features/employees/EMPLOYEE-DETAIL-ENDPOINT.md) | Employee detail endpoint implementation | ✅ Production Ready |
+
 ### Payment Integration
 
 | Document | Description | Status |
@@ -84,10 +92,18 @@ Detailed guides for implementing specific features.
 | [POSTMAN-BOOKING-PAYMENT-GUIDE.md](./testing/POSTMAN-BOOKING-PAYMENT-GUIDE.md) | Postman testing guide for booking & payment flow | ✅ Production Ready |
 | [PAYMENT-GATEWAY-IMPLEMENTATION-GUIDE.md](./features/payments/PAYMENT-GATEWAY-IMPLEMENTATION-GUIDE.md) | PhonePe payment gateway implementation details | 📋 Implementation Guide |
 | [PAYMENT-GATEWAY-RESEARCH-GUIDE.md](./features/payments/PAYMENT-GATEWAY-RESEARCH-GUIDE.md) | Payment gateway research and comparison | 📊 Research |
-| [HOOKDECK-DAILY-WORKFLOW.md](./features/payments/HOOKDECK-DAILY-WORKFLOW.md) | Webhook testing workflow using Hookdeck | 📋 Testing Guide |
+| [HOOKDECK-DAILY-WORKFLOW.md](./features/payments/HOOKDECK-DAILY-WORKFLOW.md) | Webhook development workflow using Hookdeck | 📋 Development Guide |
 | [old-method/](./features/payments/old-method/) | Archived web redirect/payment-link documentation | 📦 Archived |
 
 > **Note:** EverCut migrated from web redirect payment flow to native PhonePe Flutter SDK in April 2026. Old redirect-based documentation is archived in `features/payments/old-method/` for historical reference only.
+
+### Notifications
+
+| Document | Description | Status |
+|----------|-------------|--------|
+| [notification-system-overview.md](./features/notifications/notification-system-overview.md) | Functional overview of hybrid FCM + REST notification behavior | ✅ Production Ready |
+| [flutter-notification-integration-guide.md](./flows/flutter-notification-integration-guide.md) | Flutter client integration guide for FCM and REST notification APIs | ✅ Production Ready |
+| [notification-system-postman-guide.md](./testing/notification-system-postman-guide.md) | Postman-only backend notification testing guide | ✅ Production Ready |
 
 ---
 
@@ -99,10 +115,12 @@ Reports documenting issues found and fixes applied.
 |----------|-------------|--------|
 | [BACKEND-INTEGRITY-FIXES-REPORT.md](./reports/BACKEND-INTEGRITY-FIXES-REPORT.md) | Backend integrity issues and fixes applied | ✅ Completed |
 | [E2E-BACKEND-VERIFICATION-REPORT.md](./reports/E2E-BACKEND-VERIFICATION-REPORT.md) | Full authenticated backend verification and follow-up fixes | ✅ Completed |
+| [EMPLOYEE-AVAILABILITY-STATUS-IMPLEMENTATION-REPORT.md](./reports/EMPLOYEE-AVAILABILITY-STATUS-IMPLEMENTATION-REPORT.md) | Employee availability status toggle API implementation | ✅ Completed |
 | [MSG91-Revision-Improvements-Report.md](./reports/MSG91-Revision-Improvements-Report.md) | MSG91 integration improvements report | ✅ Completed |
 | [PHOTO-GALLERY-FIXES-REPORT.md](./reports/PHOTO-GALLERY-FIXES-REPORT.md) | Photo gallery backend fixes | ✅ Completed |
 | [REQUEST-VALIDATION-QUERY-FIX-REPORT.md](./reports/REQUEST-VALIDATION-QUERY-FIX-REPORT.md) | Express 5 query-validation runtime fix report | ✅ Completed |
 | [SERVICE-CATALOG-FIXES-REPORT.md](./reports/SERVICE-CATALOG-FIXES-REPORT.md) | Service catalog backend fixes | ✅ Completed |
+| [notification-system-report.md](./reports/notification-system-report.md) | Hybrid FCM + REST notification system implementation report | ✅ Completed |
 
 ---
 
@@ -124,9 +142,11 @@ docs/
 ├── README.md                          # This file
 ├── PAYMENT-MIGRATION-SUMMARY.md       # Native SDK migration summary
 ├── flows/                             # Developer implementation guides
-│   └── FLUTTER-BOOKING-PAYMENT-FLOW.md
+│   ├── FLUTTER-BOOKING-PAYMENT-FLOW.md
+│   └── flutter-notification-integration-guide.md
 ├── testing/                           # Postman API testing guides
-│   └── POSTMAN-BOOKING-PAYMENT-GUIDE.md
+│   ├── POSTMAN-BOOKING-PAYMENT-GUIDE.md
+│   └── notification-system-postman-guide.md
 ├── architecture/                      # Architecture & planning docs
 │   └── IMPLEMENTATION-PLAN.md
 ├── security/                          # Security audits & reports
@@ -142,6 +162,8 @@ docs/
 │   │   └── README.md
 │   ├── payments/
 │   │   └── old-method/                # Archived redirect flow docs
+│   ├── notifications/
+│   │   └── notification-system-overview.md
 │   └── msg91/
 │       ├── MSG91-COMPLETE-GUIDE.md
 │       ├── MSG91-INTEGRATION-GUIDE.md
@@ -153,6 +175,7 @@ docs/
 │   ├── MSG91-Revision-Improvements-Report.md
 │   ├── PHOTO-GALLERY-FIXES-REPORT.md
 │   ├── REQUEST-VALIDATION-QUERY-FIX-REPORT.md
+│   ├── notification-system-report.md
 │   └── SERVICE-CATALOG-FIXES-REPORT.md
 ├── research/                          # Research & analysis docs
 │   ├── OBJECT-STORAGE-RESEARCH.MD
@@ -178,13 +201,15 @@ docs/
 ### For Flutter Developers
 
 1. **Booking + Payment Flow:** [FLUTTER-BOOKING-PAYMENT-FLOW.md](./flows/FLUTTER-BOOKING-PAYMENT-FLOW.md) — Complete implementation guide with native PhonePe SDK
-2. **Backend Contract:** [BOOKING-SYSTEM-GUIDE.md](./features/bookings/BOOKING-SYSTEM-GUIDE.md) — API contracts and flow details
-3. **Native SDK Source:** [PHONEPE-PG-FLUTTER-NODEJS.md](./research/PHONEPE-PG-FLUTTER-NODEJS.md) — PhonePe integration reference
+2. **Notifications:** [flutter-notification-integration-guide.md](./flows/flutter-notification-integration-guide.md) — FCM setup, token handling, and foreground/background/terminated handling
+3. **Backend Contract:** [BOOKING-SYSTEM-GUIDE.md](./features/bookings/BOOKING-SYSTEM-GUIDE.md) — API contracts and flow details
+4. **Native SDK Source:** [PHONEPE-PG-FLUTTER-NODEJS.md](./research/PHONEPE-PG-FLUTTER-NODEJS.md) — PhonePe integration reference
 
 ### For Backend Testing
 
 1. **Booking & Payment Testing:** [POSTMAN-BOOKING-PAYMENT-GUIDE.md](./testing/POSTMAN-BOOKING-PAYMENT-GUIDE.md) — Test booking & payment flow from auth to barber approval
-2. **Postman Collections:** `server/postman-collections/` — Ready-to-use API test collections with auto-generated signatures
+2. **Notification Testing:** [notification-system-postman-guide.md](./testing/notification-system-postman-guide.md) — Test FCM token management, notification history, unread count, and read tracking
+3. **Postman Collections:** `server/postman-collections/` — Ready-to-use API test collections with auto-generated signatures
 
 ### For Security Review
 

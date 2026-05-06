@@ -31,9 +31,9 @@ Authorization: Bearer {barber_access_token}
 
 **New Approach:**
 Frontend should call individual resource endpoints:
-- `GET /api/v1/bookings/stats/today` - For pulse metrics
-- `GET /api/v1/employees/availability` - For staff data
-- `GET /api/v1/bookings/queue` - For queue data
+- `GET /api/v1/bookings/analytics/today` - For pulse metrics
+- `GET /api/v1/employees/analytics/availability` - For staff data
+- `GET /api/v1/bookings/analytics/queue` - For queue data
 
 **Alternative (if aggregation is needed):**
 ```
@@ -45,7 +45,7 @@ Authorization: Bearer {barber_access_token}
 
 ---
 
-#### ✅ **MIGRATED: `/dashboard/pulse` → `/bookings/stats/today`**
+#### ✅ **MIGRATED: `/dashboard/pulse` → `/bookings/analytics/today`**
 
 **Old Endpoint:**
 ```
@@ -55,7 +55,7 @@ Authorization: Bearer {barber_access_token}
 
 **New Endpoint:**
 ```
-GET /api/v1/bookings/stats/today
+GET /api/v1/bookings/analytics/today
 Authorization: Bearer {barber_access_token}
 ```
 
@@ -84,7 +84,7 @@ Authorization: Bearer {barber_access_token}
 
 ---
 
-#### ✅ **MIGRATED: `/dashboard/staff` → `/employees/availability`**
+#### ✅ **MIGRATED: `/dashboard/staff` → `/employees/analytics/availability`**
 
 **Old Endpoint:**
 ```
@@ -94,7 +94,7 @@ Authorization: Bearer {barber_access_token}
 
 **New Endpoint:**
 ```
-GET /api/v1/employees/availability
+GET /api/v1/employees/analytics/availability
 Authorization: Bearer {barber_access_token}
 ```
 
@@ -106,7 +106,7 @@ Authorization: Bearer {barber_access_token}
   "data": {
     "staff": [
       {
-        "employeeId": "507f1f77bcf86cd799439011",
+        "id": "507f1f77bcf86cd799439011",
         "name": "John Doe",
         "photoUrl": "https://...",
         "progress": {
@@ -126,22 +126,22 @@ Authorization: Bearer {barber_access_token}
 
 ---
 
-#### ✅ **MIGRATED: `/dashboard/queue` → `/bookings/queue`**
+#### ✅ **MIGRATED: `/dashboard/queue` → `/bookings/analytics/queue`**
 
 **Old Endpoint:**
 ```
-GET /api/v1/dashboard/queue?filter=active
+GET /api/v1/dashboard/queue?timeframe=active
 Authorization: Bearer {barber_access_token}
 ```
 
 **New Endpoint:**
 ```
-GET /api/v1/bookings/queue?filter=active
+GET /api/v1/bookings/analytics/queue?timeframe=active
 Authorization: Bearer {barber_access_token}
 ```
 
 **Query Parameters:**
-- `filter` (optional): `active` or `upcoming` (default: `active`)
+- `timeframe` (optional): `active` or `upcoming` (default: `active`)
 
 **Response Structure:** (unchanged)
 ```json
@@ -149,12 +149,12 @@ Authorization: Bearer {barber_access_token}
   "success": true,
   "message": "Today's queue fetched",
   "data": {
-    "filter": "active",
+    "timeframe": "active",
     "active": {
       "count": 3,
       "items": [
         {
-          "bookingId": "507f1f77bcf86cd799439011",
+          "id": "507f1f77bcf86cd799439011",
           "customer": { "name": "Jane Smith" },
           "employee": { "name": "John Doe" },
           "time": "14:30",
@@ -210,11 +210,9 @@ Authorization: Bearer {customer_access_token}
   "success": true,
   "message": "Profile fetched",
   "data": {
-    "_id": "507f1f77bcf86cd799439011",
+    "id": "507f1f77bcf86cd799439011",
     "firstName": "Jane",
     "lastName": "Smith",
-    "phoneNumber": "9876543210",
-    "email": "jane@example.com",
     "photoUrl": "https://...",
     "address": "123 Main St, City",
     "location": {
@@ -223,12 +221,14 @@ Authorization: Bearer {customer_access_token}
     },
     "gender": "Female",
     "dateOfBirth": "1995-03-15T00:00:00.000Z",
-    "favoriteShops": [...],
-    "favoriteBookings": [...],
+    "favoriteShopIds": [...],
+    "favoriteBookingIds": [...],
     "createdAt": "2024-01-15T10:30:00.000Z"
   }
 }
 ```
+
+All JSON APIs now use the same response envelope: `{ success, message, data, meta? }`. Paginated endpoints return the list directly in `data` and pagination/count metadata in `meta`, for example `{ "data": [...], "meta": { "pagination": {...} } }`. Public DTOs expose each resource's own identifier as `id`; relation identifiers keep explicit names such as `shopId` or `bookingId` only when no nested relation object is returned. APIs never expose MongoDB/Mongoose internals such as `_id`, `__v`, `$__`, `_doc`, or `$isNew`.
 
 **Rationale:** The `/home` endpoint returned a subset of customer data formatted for a specific UI screen. Frontends should fetch the full profile via `/customers/me` and extract the fields they need. If performance is critical, consider implementing field filtering via query parameters (e.g., `?fields=photoUrl,firstName,lastName,address`).
 
@@ -258,9 +258,9 @@ const { pulse, staff, queue } = response.data;
 ```javascript
 // Parallel resource calls
 const [pulseRes, staffRes, queueRes] = await Promise.all([
-  fetch('/api/v1/bookings/stats/today'),
-  fetch('/api/v1/employees/availability'),
-  fetch('/api/v1/bookings/queue?filter=active')
+  fetch('/api/v1/bookings/analytics/today'),
+  fetch('/api/v1/employees/analytics/availability'),
+  fetch('/api/v1/bookings/analytics/queue?timeframe=active')
 ]);
 
 const pulse = pulseRes.data;
@@ -347,9 +347,9 @@ If critical issues arise, the old dashboard routes can be temporarily restored b
 - ✅ Test new earnings controller method (`getDashboardOverview`)
 
 ### Integration Tests
-- Test that `/bookings/stats/today` returns correct pulse metrics
-- Test that `/employees/availability` returns correct staff data
-- Test that `/bookings/queue` filters correctly by `active`/`upcoming`
+- Test that `/bookings/analytics/today` returns correct pulse metrics
+- Test that `/employees/analytics/availability` returns correct staff data
+- Test that `/bookings/analytics/queue` filters correctly by `active`/`upcoming`
 - Test that `/customers/me` returns complete profile data
 
 ### End-to-End Tests
@@ -374,9 +374,9 @@ For questions about this refactoring, contact:
 | Old Endpoint | New Endpoint | Method | Auth | Status |
 |-------------|--------------|--------|------|--------|
 | `/dashboard/overview` | `/earnings/overview` | GET | Barber | Migrated |
-| `/dashboard/pulse` | `/bookings/stats/today` | GET | Barber | Migrated |
-| `/dashboard/staff` | `/employees/availability` | GET | Barber | Migrated |
-| `/dashboard/queue` | `/bookings/queue` | GET | Barber | Migrated |
+| `/dashboard/pulse` | `/bookings/analytics/today` | GET | Barber | Migrated |
+| `/dashboard/staff` | `/employees/analytics/availability` | GET | Barber | Migrated |
+| `/dashboard/queue` | `/bookings/analytics/queue` | GET | Barber | Migrated |
 | `/customers/me/home` | `/customers/me` | GET | Customer | Removed |
 
 ---

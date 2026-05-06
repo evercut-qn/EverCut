@@ -36,6 +36,7 @@ test('route index mounts feature-oriented resources instead of legacy role prefi
         '/earnings',
         '/payments',
         '/payouts',
+        '/notifications',
     ]) {
         assert.match(source, new RegExp(`router\\.use\\('${routePrefix.replace('/', '\\/')}`));
     }
@@ -94,6 +95,7 @@ test('feature routes and controllers use simple direct files instead of module i
         'routes/payout.routes.js',
         'routes/photos.routes.js',
         'routes/ratings.routes.js',
+        'routes/notifications.routes.js',
         'routes/services.routes.js',
         'routes/shops.routes.js',
         'controllers/auth.controller.js',
@@ -106,6 +108,7 @@ test('feature routes and controllers use simple direct files instead of module i
         'controllers/payout.controller.js',
         'controllers/photo.controller.js',
         'controllers/rating.controller.js',
+        'controllers/notification.controller.js',
         'controllers/service.controller.js',
         'controllers/shop.controller.js',
     ];
@@ -204,14 +207,24 @@ test('booking discovery and payment routes use final resource-oriented URLs', as
     assert.doesNotMatch(paymentRoutes, /\/booking\/:bookingId/);
     assert.doesNotMatch(paymentRoutes, /\/redirect/);
 
-    assert.match(bookingRoutes, /\/:id\/payment/);
-    assert.match(bookingRoutes, /\/:id\/refund/);
-    assert.match(bookingRoutes, /\/:id\/cancel/);
+    assert.doesNotMatch(bookingRoutes, /\/:id\/payment/);
+    assert.match(bookingRoutes, /\/:id\/refunds/);
+    assert.match(bookingRoutes, /router\.patch\('\/:id'/);
+    assert.doesNotMatch(bookingRoutes, /\/:id\/confirm/);
+    assert.doesNotMatch(bookingRoutes, /\/:id\/cancel/);
+    assert.doesNotMatch(bookingRoutes, /\/:id\/reschedule/);
+    assert.doesNotMatch(bookingRoutes, /\/:id\/reorder/);
+    assert.doesNotMatch(bookingRoutes, /\/status/);
+    assert.doesNotMatch(bookingRoutes, /\/pending-confirmations/);
     assert.doesNotMatch(bookingRoutes, /router\.delete\('\/:id'/);
 
     assert.doesNotMatch(postmanSource, /\/bookings\/shops/);
     assert.doesNotMatch(postmanSource, /\/payments\/initiate/);
     assert.doesNotMatch(postmanSource, /\/payments\/booking/);
+    assert.doesNotMatch(postmanSource, /\/bookings\/\{\{booking_id\}\}\/confirmation/);
+    assert.doesNotMatch(postmanSource, /\/bookings\/\{\{booking_id\}\}\/reschedule/);
+    assert.doesNotMatch(postmanSource, /\/bookings\/\{\{booking_id\}\}\/reorder/);
+    assert.doesNotMatch(postmanSource, /\/bookings\/\{\{booking_id_delete\}\}\/cancel/);
 });
 
 test('favorite behavior is grouped by booking and shop flow, not a favorites module', async () => {
@@ -231,13 +244,12 @@ test('favorite behavior is grouped by booking and shop flow, not a favorites mod
 
     assert.match(bookingRoutes, /router\.put\('\/:id\/favorite'/);
     assert.match(bookingRoutes, /router\.delete\('\/:id\/favorite'/);
-    assert.match(bookingRoutes, /router\.patch\('\/:id\/favorite'/);
-    assert.doesNotMatch(bookingRoutes, /\/favorites/);
+    assert.doesNotMatch(bookingRoutes, /router\.patch\('\/:id\/favorite'/);
 
     assert.match(shopRoutes, /router\.get\('\/favorites'/);
     assert.match(shopRoutes, /router\.put\('\/:id\/favorite'/);
     assert.match(shopRoutes, /router\.delete\('\/:id\/favorite'/);
-    assert.match(shopRoutes, /router\.patch\('\/:id\/favorite'/);
+    assert.doesNotMatch(shopRoutes, /router\.patch\('\/:id\/favorite'/);
     assert.ok(
         shopRoutes.indexOf("router.get('/favorites'") < shopRoutes.indexOf("router.get('/:id'"),
         'GET /shops/favorites must be registered before GET /shops/:id',
@@ -245,9 +257,45 @@ test('favorite behavior is grouped by booking and shop flow, not a favorites mod
 
     assert.doesNotMatch(postmanSource, /\/favorites\//);
     assert.match(postmanSource, /\/bookings\{\{booking_id\}\}\/favorite|\/bookings\/\{\{booking_id\}\}\/favorite/);
-    assert.match(postmanSource, /\/bookings\?type=favorites/);
+    assert.match(postmanSource, /\/bookings\?favorite=true/);
     assert.match(postmanSource, /\/shops\/favorites/);
     assert.match(postmanSource, /\/shops\/\{\{shop_id\}\}\/favorite/);
+});
+
+test('shops and employees expose the normalized me, payout, availability, and analytics resources', async () => {
+    const accountRoutes = await readSource('routes/account.routes.js');
+    const shopRoutes = await readSource('routes/shops.routes.js');
+    const employeeRoutes = await readSource('routes/employees.routes.js');
+    const postmanSource = await readFile(
+        path.join(serverDir, 'scripts', 'regenerate-postman-collections.mjs'),
+        'utf8',
+    );
+
+    assert.match(shopRoutes, /router\.get\('\/me'/);
+    assert.match(shopRoutes, /router\.patch\('\/me'/);
+    assert.match(shopRoutes, /\/me\/payout-details/);
+    assert.doesNotMatch(shopRoutes, /\/upi/);
+    assert.doesNotMatch(shopRoutes, /\/bank-details/);
+    assert.doesNotMatch(shopRoutes, /sign-out-everywhere/);
+
+    assert.match(accountRoutes, /router\.delete\(\s*'\/sessions'/);
+    assert.match(accountRoutes, /router\.delete\(\s*'\/'/);
+
+    assert.match(employeeRoutes, /\/:id\/availability/);
+    assert.match(employeeRoutes, /\/analytics\/availability/);
+    assert.ok(
+        employeeRoutes.indexOf("router.get('/analytics/availability'") < employeeRoutes.indexOf("router.get(\n    '/:id/availability'"),
+        'GET /employees/analytics/availability must be registered before GET /employees/:id/availability',
+    );
+    assert.doesNotMatch(employeeRoutes, /available-slots/);
+    assert.doesNotMatch(employeeRoutes, /\/:id\/calendar/);
+    assert.doesNotMatch(employeeRoutes, /router\.put/);
+
+    assert.match(postmanSource, /\/shops\/me/);
+    assert.doesNotMatch(postmanSource, /\/employees\/\{\{employee_id\}\}\/available-slots/);
+    assert.doesNotMatch(postmanSource, /\/employees\/\{\{employee_id\}\}\/calendar/);
+    assert.match(postmanSource, /\/shops\/me\/payout-details/);
+    assert.match(postmanSource, /\/employees\/\{\{employee_id\}\}\/availability/);
 });
 
 test('payments expose a collection list before the payment-id route', async () => {

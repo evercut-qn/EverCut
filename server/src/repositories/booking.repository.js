@@ -2,15 +2,21 @@ import Booking from '../models/booking.model.js';
 import { BOOKING_STATUS, PAYMENT_STATUS, PAYOUT_STATUS } from '../utils/constants.js';
 import { trustQueryOperators } from '../utils/mongoose-query.utils.js';
 
+const ACTIVE_BOOKING_STATUSES = [
+    BOOKING_STATUS.PENDING,
+    BOOKING_STATUS.AWAITING_CONFIRMATION,
+    BOOKING_STATUS.CONFIRMED,
+];
+
 const EMPLOYEE_POPULATE = {
     path: 'employeeId',
-    select: 'firstName lastName photoUrl',
+    select: 'firstName lastName photoUrl blockedDates',
     options: { includeDeleted: true },
 };
 
 const EMPLOYEE_NAME_POPULATE = {
     path: 'employeeId',
-    select: 'firstName lastName',
+    select: 'firstName lastName blockedDates',
     options: { includeDeleted: true },
 };
 
@@ -27,6 +33,15 @@ class BookingRepository {
         return Booking.findById(id).session(options.session || null);
     }
 
+    async findByIdempotencyKey(customerId, idempotencyKey) {
+        if (!idempotencyKey) return null;
+        return Booking.findOne(trustQueryOperators({
+            customerId,
+            idempotencyKey,
+            status: { $ne: BOOKING_STATUS.CANCELLED },
+        }));
+    }
+
     async findByIds(ids, options = {}) {
         return Booking.find(trustQueryOperators({ _id: { $in: ids } }))
             .session(options.session || null)
@@ -41,7 +56,8 @@ class BookingRepository {
                 path: 'customerId',
                 select: 'firstName lastName userId',
                 populate: { path: 'userId', select: 'email phoneNumber' },
-            });
+            })
+            .lean();
     }
 
     async updateById(id, data) {
@@ -71,7 +87,8 @@ class BookingRepository {
             .populate('serviceIds')
             .populate(EMPLOYEE_POPULATE)
             .populate('shopId', 'shopName address coverUrl')
-            .sort({ date: -1 });
+            .sort({ date: -1 })
+            .lean();
     }
 
     async findUpcomingByCustomer(customerId, today, options = {}) {
@@ -86,7 +103,7 @@ class BookingRepository {
 
         if (options.skip !== undefined) query.skip(options.skip);
         if (options.limit !== undefined) query.limit(options.limit);
-        return query;
+        return query.lean();
     }
 
     async countUpcomingByCustomer(customerId, today) {
@@ -105,7 +122,7 @@ class BookingRepository {
 
         if (options.skip !== undefined) query.skip(options.skip);
         if (options.limit !== undefined) query.limit(options.limit);
-        return query;
+        return query.lean();
     }
 
     async countPastByCustomer(customerId, today) {
@@ -124,7 +141,7 @@ class BookingRepository {
 
         if (options.skip !== undefined) query.skip(options.skip);
         if (options.limit !== undefined) query.limit(options.limit);
-        return query;
+        return query.lean();
     }
 
     async findByShopId(shopId, filters = {}, options = {}) {
@@ -140,7 +157,7 @@ class BookingRepository {
 
         if (options.skip !== undefined) query.skip(options.skip);
         if (options.limit !== undefined) query.limit(options.limit);
-        return query;
+        return query.lean();
     }
 
     async countAll(filter = {}) {
@@ -212,6 +229,37 @@ class BookingRepository {
         })).lean();
     }
 
+    async findActiveByEmployeeAndDates(employeeId, dates) {
+        return Booking.find(trustQueryOperators({
+            employeeId,
+            date: { $in: dates.map((date) => new Date(`${date}T00:00:00.000Z`)) },
+            status: { $in: ACTIVE_BOOKING_STATUSES },
+        }))
+            .populate({
+                path: 'customerId',
+                select: 'firstName lastName userId',
+                populate: { path: 'userId', select: 'phoneNumber email' },
+            })
+            .populate('shopId', 'shopName ownerId')
+            .lean();
+    }
+
+    async findBlockingByEmployeeAndDate(employeeId, date) {
+        return Booking.find(trustQueryOperators({
+            employeeId,
+            date,
+            status: { $in: ACTIVE_BOOKING_STATUSES },
+        })).lean();
+    }
+
+    async findBlockingByEmployeeIdsAndDate(employeeIds, date) {
+        return Booking.find(trustQueryOperators({
+            employeeId: { $in: employeeIds },
+            date,
+            status: { $in: ACTIVE_BOOKING_STATUSES },
+        })).lean();
+    }
+
     async findConflict(shopId, employeeId, date, time, excludeBookingId) {
         const filter = {
             shopId,
@@ -240,7 +288,8 @@ class BookingRepository {
         }))
             .populate('serviceIds', 'serviceName offerPrice duration')
             .populate(EMPLOYEE_NAME_POPULATE)
-            .populate('shopId', 'shopName address');
+            .populate('shopId', 'shopName address')
+            .lean();
     }
 
     async hasCompletedBookingForCustomer(customerId, shopId) {
