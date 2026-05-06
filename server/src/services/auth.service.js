@@ -56,7 +56,7 @@ export const generateOnboardingToken = (phoneNumber) => jwt.sign(
         type: TOKEN_TYPE.ONBOARDING,
     },
     config.jwt.accessSecret,
-    { expiresIn: '30m' },
+    { expiresIn: '24h' },
 );
 
 /** Generate a pair of access + refresh tokens. */
