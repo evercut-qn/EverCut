@@ -4,6 +4,7 @@ import cloudinary from '../config/cloudinary.config.js';
 import { NotFoundError, BadRequestError } from '../utils/api-error.js';
 import { buildPagination } from '../utils/pagination.utils.js';
 import { MAX_PHOTOS_PER_SHOP } from '../utils/constants.js';
+import { serializePhoto, serializePhotos } from '../serializers/photo.serializer.js';
 
 /**
  * Photo upload/management service for barbers.
@@ -35,7 +36,7 @@ export const uploadPhotos = async (ownerId, files, photoType = 'other', descript
         uploaded.push(photo);
     }
 
-    return uploaded;
+    return serializePhotos(uploaded);
 };
 
 export const getPhotos = async (ownerId, queryFilters = {}) => {
@@ -50,7 +51,7 @@ export const getPhotos = async (ownerId, queryFilters = {}) => {
     const total = await photoRepository.getActiveCountByShop(shop._id, filter);
     const { skip, limit, pagination } = buildPagination(queryFilters, total);
 
-    const items = await photoRepository.findByShopId(shop._id, filter, { skip, limit });
+    const items = serializePhotos(await photoRepository.findByShopId(shop._id, filter, { skip, limit }));
     return { items, pagination };
 };
 
@@ -60,7 +61,7 @@ export const getPhotoById = async (ownerId, photoId) => {
 
     const photo = await photoRepository.findByIdAndShop(photoId, shop._id);
     if (!photo) throw new NotFoundError('Photo');
-    return photo;
+    return serializePhoto(photo);
 };
 
 export const deletePhoto = async (ownerId, photoId) => {
@@ -104,5 +105,5 @@ export const updateShopCover = async (ownerId, file) => {
         try { await cloudinary.uploader.destroy(shop.coverCloudinaryId); } catch { /* non-fatal */ }
     }
 
-    return { coverUrl: updated.coverUrl, cloudinaryId: updated.coverCloudinaryId };
+    return { coverUrl: updated.coverUrl };
 };

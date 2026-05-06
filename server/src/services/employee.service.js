@@ -7,6 +7,10 @@ import cloudinary from '../config/cloudinary.config.js';
 import { buildPagination } from '../utils/pagination.utils.js';
 import { parseTimeToMinutes } from '../utils/time.utils.js';
 import { normalizeShopSchedule } from '../utils/shop-schedule.utils.js';
+import { serializeEmployee, serializeEmployees } from '../serializers/employee.serializer.js';
+import { toIdString } from '../serializers/core.serializer.js';
+import { toDateOnlyString } from '../utils/slot-lock.utils.js';
+import notificationEvents from './notification-events.service.js';
 
 /**
  * Employee service â€” CRUD operations for shop employees.
@@ -99,6 +103,31 @@ const normalizeBlockedDates = (value) => {
         return dates;
     }, []);
 };
+
+const normalizeAvailabilityDates = (dates) => {
+    const normalized = normalizeBlockedDates(dates);
+    if (!Array.isArray(normalized) || normalized.length === 0) {
+        throw new BadRequestError('dates must include at least one date');
+    }
+
+    return normalized.map(toDateOnlyString);
+};
+
+const employeeDisplayName = (employee) => [employee?.firstName, employee?.lastName]
+    .filter(Boolean)
+    .join(' ')
+    || 'Employee';
+
+const customerDisplayName = (customer) => [customer?.firstName, customer?.lastName]
+    .filter(Boolean)
+    .join(' ')
+    || 'Customer';
+
+const blockedDateStrings = (employee) => (
+    Array.isArray(employee?.blockedDates)
+        ? employee.blockedDates.map(toDateOnlyString).filter(Boolean).sort()
+        : []
+);
 
 const getNormalizedShopWorkingHours = (shop) => {
     const scheduleResult = normalizeShopSchedule({
@@ -216,7 +245,8 @@ export const addEmployee = async (ownerId, data, file) => {
     }
 
     try {
-        return await employeeRepository.create(employeeData);
+        const created = await employeeRepository.create(employeeData);
+        return serializeEmployee(created);
     } catch (error) {
         await rethrowDuplicateEmployeeWrite(error, employeeData.cloudinaryId);
     }
@@ -229,7 +259,7 @@ export const getEmployees = async (ownerId, query = {}) => {
     const total = await employeeRepository.countByShopId(shop._id);
     const { skip, limit, pagination } = buildPagination(query, total);
 
-    const items = await employeeRepository.findByShopId(shop._id, { skip, limit });
+    const items = serializeEmployees(await employeeRepository.findByShopId(shop._id, { skip, limit }));
     return { items, pagination };
 };
 
@@ -304,20 +334,7 @@ export const getEmployeeById = async (ownerId, employeeId) => {
     );
 
     return {
-        employee: {
-            _id: employee._id,
-            firstName: employee.firstName,
-            lastName: employee.lastName,
-            fullName: `${employee.firstName} ${employee.lastName}`,
-            phoneNumber: employee.phoneNumber,
-            gender: employee.gender,
-            dateOfBirth: employee.dateOfBirth,
-            photoUrl: employee.photoUrl,
-            workingHours: employee.workingHours,
-            blockedDates: employee.blockedDates,
-            isActive: employee.isActive,
-            createdAt: employee.createdAt,
-        },
+        employee: serializeEmployee(employee),
         statistics: {
             today: {
                 total: todaysBookings.length,
@@ -335,7 +352,7 @@ export const getEmployeeById = async (ownerId, employeeId) => {
             upcoming: {
                 count: upcomingBookings.length,
                 bookings: upcomingBookings.slice(0, 5).map((b) => ({
-                    bookingId: b._id,
+                    id: toIdString(b._id),
                     date: b.date,
                     time: b.time,
                     customer: {
@@ -399,7 +416,80 @@ export const updateEmployee = async (ownerId, employeeId, data, file) => {
         await destroyCloudinaryAsset(employee.cloudinaryId, 'replace-photo');
     }
 
-    return updated;
+    return serializeEmployee(updated);
+};
+
+export const updateEmployeeAvailability = async (ownerId, employeeId, data) => {
+    const shop = await shopRepository.findByOwnerId(ownerId);
+    if (!shop) throw new NotFoundError('Shop profile');
+
+    const employee = await employeeRepository.findById(employeeId);
+    if (!employee || String(employee.shopId) !== String(shop._id)) {
+        throw new NotFoundError('Employee');
+    }
+
+    const requestedDates = normalizeAvailabilityDates(data?.dates);
+    const available = data?.available === true;
+    const existingBlockedDates = new Set(blockedDateStrings(employee));
+    const datesToChange = requestedDates.filter((date) => (
+        available ? existingBlockedDates.has(date) : !existingBlockedDates.has(date)
+    ));
+
+    const updated = datesToChange.length > 0
+        ? await employeeRepository.updateAvailabilityDates(employeeId, shop._id, datesToChange, available)
+        : employee;
+    if (!updated) throw new NotFoundError('Employee');
+
+    let affectedBookings = [];
+    let notificationsSent = [];
+
+    if (!available && datesToChange.length > 0) {
+        affectedBookings = await bookingRepository.findActiveByEmployeeAndDates(employeeId, datesToChange);
+        const employeeName = employeeDisplayName(updated);
+
+        notificationsSent = await Promise.all(affectedBookings.map(async (booking) => {
+            const bookingDate = toDateOnlyString(booking.date);
+            const notificationResult = await notificationEvents.notifyBookingEmployeeUnavailable({
+                bookingId: toIdString(booking._id),
+                employeeId: toIdString(updated._id),
+                employeeName,
+                date: bookingDate,
+            });
+
+            return {
+                bookingId: toIdString(booking._id),
+                customerName: customerDisplayName(booking.customerId),
+                date: bookingDate,
+                time: booking.time,
+                notificationStatus: notificationResult?.skipped ? 'skipped' : 'sent',
+            };
+        }));
+    }
+
+    const customersNotified = notificationsSent.filter(
+        (notification) => notification.notificationStatus === 'sent',
+    ).length;
+
+    logger.info('Employee availability dates updated', {
+        employeeId,
+        shopId: shop._id,
+        ownerId,
+        available,
+        dates: datesToChange,
+        affectedBookings: affectedBookings.length,
+        customersNotified,
+    });
+
+    return {
+        employeeId: toIdString(updated._id),
+        name: employeeDisplayName(updated),
+        datesBlocked: available ? 0 : datesToChange.length,
+        datesUnblocked: available ? datesToChange.length : 0,
+        blockedDates: blockedDateStrings(updated),
+        affectedBookings: affectedBookings.length,
+        customersNotified,
+        notificationsSent,
+    };
 };
 
 export const deleteEmployee = async (ownerId, employeeId) => {
@@ -475,7 +565,7 @@ export const getStaffAvailability = async (ownerId) => {
                 totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
             return {
-                employeeId: employee._id,
+                id: toIdString(employee._id),
                 name: `${employee.firstName} ${employee.lastName}`,
                 photoUrl: employee.photoUrl,
                 progress: {
@@ -491,5 +581,55 @@ export const getStaffAvailability = async (ownerId) => {
     return {
         staff: staffAvailability,
         totalStaff: activeEmployees.length,
+    };
+};
+
+/**
+ * Toggle employee availability status
+ * Similar to shop status toggle - allows marking employee as available/unavailable
+ */
+export const toggleEmployeeStatus = async (ownerId, employeeId, status) => {
+    const shop = await shopRepository.findByOwnerId(ownerId);
+    if (!shop) throw new NotFoundError('Shop profile');
+
+    const employee = await employeeRepository.findById(employeeId);
+    if (!employee || String(employee.shopId) !== String(shop._id)) {
+        throw new NotFoundError('Employee');
+    }
+
+    // Normalize status value (similar to shop toggle)
+    let newStatus;
+    if (status === undefined) {
+        // Toggle current status
+        newStatus = !employee.isActive;
+    } else if (typeof status === 'boolean') {
+        newStatus = status;
+    } else if (typeof status === 'string') {
+        const normalized = status.toLowerCase().trim();
+        if (['true', 'yes', 'on'].includes(normalized)) {
+            newStatus = true;
+        } else if (['false', 'no', 'off'].includes(normalized)) {
+            newStatus = false;
+        } else {
+            throw new BadRequestError('status must be a boolean or one of: true, false, yes, no, on, off');
+        }
+    } else {
+        throw new BadRequestError('status must be a boolean or string');
+    }
+
+    const updated = await employeeRepository.updateById(employeeId, shop._id, { isActive: newStatus });
+    if (!updated) throw new NotFoundError('Employee');
+
+    logger.info('Employee status updated', {
+        employeeId,
+        shopId: shop._id,
+        ownerId,
+        isActive: newStatus,
+    });
+
+    return {
+        id: toIdString(updated._id),
+        name: `${updated.firstName} ${updated.lastName}`,
+        isActive: updated.isActive,
     };
 };

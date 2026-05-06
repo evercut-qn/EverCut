@@ -1,4 +1,5 @@
 import userRepository from '../repositories/user.repository.js';
+import notificationEvents from './notification-events.service.js';
 import { BadRequestError, ConflictError } from '../utils/api-error.js';
 import logger, { maskPhoneNumber } from '../utils/logger.js';
 
@@ -62,6 +63,10 @@ export const updateEmail = async (userId, newEmail) => {
         userId,
         newEmail: normalizedEmail,
         phoneNumber: maskPhoneNumber(currentUser.phoneNumber),
+    });
+    await notificationEvents.notifyAccountUpdated({
+        userId,
+        updateType: 'email',
     });
 
     return {

@@ -59,16 +59,14 @@
           "if (!hasManualDate) {",
           "  pm.collectionVariables.set('booking_date', toIsoDate(getNextAvailableDate(1)));",
           "  pm.collectionVariables.set('booking_update_date', toIsoDate(getNextAvailableDate(2)));",
-          "  pm.collectionVariables.set('booking_reschedule_date', toIsoDate(getNextAvailableDate(3)));",
-          "  pm.collectionVariables.set('booking_reorder_date', toIsoDate(getNextAvailableDate(4)));",
-          "  pm.collectionVariables.set('calendar_date', toIsoDate(getNextAvailableDate(2)));",
+          "  pm.collectionVariables.set('booking_reorder_date', toIsoDate(getNextAvailableDate(3)));",
+          "  pm.collectionVariables.set('availability_date', toIsoDate(getNextAvailableDate(2)));",
           "}",
           "",
           "if (!hasManualTime) {",
           "  pm.collectionVariables.set('booking_time', getWorkingHourTime(11, 5));",
           "  pm.collectionVariables.set('booking_update_time', getWorkingHourTime(12, 10));",
-          "  pm.collectionVariables.set('booking_reschedule_time', getWorkingHourTime(14, 15));",
-          "  pm.collectionVariables.set('booking_reorder_time', getWorkingHourTime(15, 20));",
+          "  pm.collectionVariables.set('booking_reorder_time', getWorkingHourTime(14, 15));",
           "}"
         ]
       }
@@ -129,7 +127,7 @@
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/shops/nearby?coordinates={{coordinates}}",
+        "url": "{{base_url}}/{{api_prefix}}/shops?coordinates={{coordinates}}",
         "description": "Finds nearby shops and captures the Postman barber shop ID when it is present."
       },
       "event": [
@@ -146,12 +144,21 @@
               "  pm.expect(response).to.have.property('message');",
               "  pm.expect(response.message).to.be.a('string');",
               "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
               "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
               "const response = pm.response.json();",
               "const shops = Array.isArray(response.data) ? response.data : [];",
               "const preferredShop = shops.find((shop) => typeof shop.shopName === 'string' && shop.shopName.includes('Postman')) || shops[0];",
-              "if (preferredShop && preferredShop._id) { pm.collectionVariables.set('shop_id', preferredShop._id); pm.globals.set('shared_shop_id', preferredShop._id); }"
+              "if (preferredShop && preferredShop.id) {",
+              "  const shopId = preferredShop.id;",
+              "  pm.collectionVariables.set('shop_id', shopId);",
+              "  pm.globals.set('shared_shop_id', shopId);",
+              "}"
             ]
           }
         }
@@ -179,6 +186,11 @@
               "  pm.expect(response).to.have.property('message');",
               "  pm.expect(response.message).to.be.a('string');",
               "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
               "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
               "const response = pm.response.json();",
@@ -187,8 +199,16 @@
               "const bundled = data.services && Array.isArray(data.services.bundled) ? data.services.bundled : [];",
               "const services = [...single, ...bundled];",
               "const preferredService = services.find((service) => typeof service.serviceName === 'string' && service.serviceName.includes('Postman')) || services[0];",
-              "if (data.shop && data.shop._id) { pm.collectionVariables.set('shop_id', data.shop._id); pm.globals.set('shared_shop_id', data.shop._id); }",
-              "if (preferredService && preferredService._id) { pm.collectionVariables.set('service_id', preferredService._id); pm.globals.set('shared_service_id', preferredService._id); }"
+              "if (data.shop && data.shop.id) {",
+              "  const shopId = data.shop.id;",
+              "  pm.collectionVariables.set('shop_id', shopId);",
+              "  pm.globals.set('shared_shop_id', shopId);",
+              "}",
+              "if (preferredService && preferredService.id) {",
+              "  const serviceId = preferredService.id;",
+              "  pm.collectionVariables.set('service_id', serviceId);",
+              "  pm.globals.set('shared_service_id', serviceId);",
+              "}"
             ]
           }
         }
@@ -216,6 +236,11 @@
               "  pm.expect(response).to.have.property('message');",
               "  pm.expect(response.message).to.be.a('string');",
               "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
               "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
               "const response = pm.response.json();",
@@ -233,7 +258,7 @@
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/employees/{{employee_id}}/available-slots?date={{booking_date}}&serviceId={{service_id}}",
+        "url": "{{base_url}}/{{api_prefix}}/employees/{{employee_id}}/availability?date={{booking_date}}&serviceId={{service_id}}",
         "description": "Returns exact-range availability for the employee, including bookable starts, free windows, break blocking, booked ranges, blocked dates, and the 7-day advance booking window."
       },
       "event": [
@@ -250,6 +275,11 @@
               "  pm.expect(response).to.have.property('message');",
               "  pm.expect(response.message).to.be.a('string');",
               "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
               "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
               "const response = pm.response.json();",
@@ -287,6 +317,11 @@
               "  pm.expect(response).to.have.property('message');",
               "  pm.expect(response.message).to.be.a('string');",
               "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
               "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
               "const response = pm.response.json();",
@@ -301,12 +336,12 @@
       ]
     },
     {
-      "name": "6. Toggle Favorite Shop",
+      "name": "6. Add Favorite Shop",
       "request": {
-        "method": "PATCH",
+        "method": "PUT",
         "header": [],
         "url": "{{base_url}}/{{api_prefix}}/shops/{{shop_id}}/favorite",
-        "description": "Adds or removes the captured shop from the authenticated customer favorite shops list through the shop discovery flow."
+        "description": "Adds the captured shop to the authenticated customer favorite shops list through the shop discovery flow."
       },
       "event": [
         {
@@ -322,6 +357,11 @@
               "  pm.expect(response).to.have.property('message');",
               "  pm.expect(response.message).to.be.a('string');",
               "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
               "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
             ]
@@ -351,6 +391,11 @@
               "  pm.expect(response).to.have.property('message');",
               "  pm.expect(response.message).to.be.a('string');",
               "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
               "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
             ]
@@ -359,11 +404,45 @@
       ]
     },
     {
-      "name": "8. Get Doorstep Shops",
+      "name": "8. Remove Favorite Shop",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": "{{base_url}}/{{api_prefix}}/shops/{{shop_id}}/favorite",
+        "description": "Removes the captured shop from the authenticated customer favorite shops list."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
+              "});",
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "9. Get Doorstep Shops",
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/shops/doorstep",
+        "url": "{{base_url}}/{{api_prefix}}/shops?category=Door-Step",
         "description": "Lists shops with the Door-Step category."
       },
       "event": [
@@ -380,6 +459,11 @@
               "  pm.expect(response).to.have.property('message');",
               "  pm.expect(response.message).to.be.a('string');",
               "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
               "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
             ]
@@ -388,7 +472,7 @@
       ]
     },
     {
-      "name": "9. Search Services",
+      "name": "10. Search Services",
       "request": {
         "method": "GET",
         "header": [],
@@ -409,6 +493,11 @@
               "  pm.expect(response).to.have.property('message');",
               "  pm.expect(response.message).to.be.a('string');",
               "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
               "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
             ]
@@ -417,11 +506,11 @@
       ]
     },
     {
-      "name": "10. Search Shops",
+      "name": "11. Search Shops",
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/shops/search?query={{shop_search_query}}",
+        "url": "{{base_url}}/{{api_prefix}}/shops?query={{shop_search_query}}",
         "description": "Searches the customer-visible shop catalogue for the Postman barber shop."
       },
       "event": [
@@ -438,6 +527,11 @@
               "  pm.expect(response).to.have.property('message');",
               "  pm.expect(response.message).to.be.a('string');",
               "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
               "});",
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
             ]

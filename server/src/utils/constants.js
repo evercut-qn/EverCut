@@ -232,6 +232,61 @@ export const GENDER = Object.freeze({
 export const ALL_GENDERS = Object.values(GENDER);
 
 // ---------------------------------------------------------------------------
+// Notifications
+// ---------------------------------------------------------------------------
+
+export const NOTIFICATION_TYPE = Object.freeze({
+    PUSH: 'push',
+    SILENT: 'silent',
+    HYBRID: 'hybrid',
+});
+
+export const ALL_NOTIFICATION_TYPES = Object.values(NOTIFICATION_TYPE);
+
+export const NOTIFICATION_STATUS = Object.freeze({
+    QUEUED: 'queued',
+    SENT: 'sent',
+    PARTIAL: 'partial',
+    FAILED: 'failed',
+    SKIPPED: 'skipped',
+});
+
+export const ALL_NOTIFICATION_STATUSES = Object.values(NOTIFICATION_STATUS);
+
+export const FCM_PLATFORM = Object.freeze({
+    ANDROID: 'android',
+    IOS: 'ios',
+    WEB: 'web',
+    UNKNOWN: 'unknown',
+});
+
+export const ALL_FCM_PLATFORMS = Object.values(FCM_PLATFORM);
+
+export const NOTIFICATION_EVENT = Object.freeze({
+    BOOKING_AWAITING_CONFIRMATION: 'booking.awaiting_confirmation',
+    BOOKING_CONFIRMED: 'booking.confirmed',
+    BOOKING_CANCELLED: 'booking.cancelled',
+    BOOKING_COMPLETED: 'booking.completed',
+    BOOKING_NO_SHOW: 'booking.no_show',
+    BOOKING_AUTO_CANCELLED: 'booking.auto_cancelled',
+    BOOKING_EMPLOYEE_UNAVAILABLE: 'booking.employee_unavailable',
+    PAYMENT_FAILED: 'payment.failed',
+    PAYMENT_REFUND_PENDING: 'payment.refund_pending',
+    PAYMENT_REFUNDED: 'payment.refunded',
+    PAYMENT_REFUND_FAILED: 'payment.refund_failed',
+    RATING_RECEIVED: 'rating.received',
+    RATING_REPLY: 'rating.reply',
+    ACCOUNT_UPDATED: 'account.updated',
+    SHOP_STATUS_UPDATED: 'shop.status_updated',
+    PAYOUT_COMPLETED: 'payout.completed',
+    PAYOUT_FAILED: 'payout.failed',
+    SYSTEM_ALERT: 'system.alert',
+    CHAT_MESSAGE: 'chat.message',
+});
+
+export const ALL_NOTIFICATION_EVENTS = Object.values(NOTIFICATION_EVENT);
+
+// ---------------------------------------------------------------------------
 // Security
 // ---------------------------------------------------------------------------
 

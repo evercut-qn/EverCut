@@ -63,8 +63,8 @@ const getMaxAdvanceDays = (shopCategory) => {
 
 #### **`rescheduleBooking()` Function:**
 ```javascript
-// API: PUT /bookings/:id/reschedule
-// Body: { "newDate": "2026-05-05", "newTime": "14:00" }
+// API: PATCH /bookings/:id
+// Body: { "employeeId": "emp123", "date": "2026-05-05", "time": "14:00" }
 
 // Purpose: Simple date/time change with restrictions
 - ✅ Only changes DATE and TIME
@@ -76,7 +76,7 @@ const getMaxAdvanceDays = (shopCategory) => {
 
 #### **`updateBooking()` Function:**
 ```javascript
-// API: PUT /bookings/:id  
+// API: PATCH /bookings/:id
 // Body: { "employeeId": "emp123", "date": "2026-05-05", "time": "14:00" }
 
 // Purpose: Flexible booking modification
@@ -98,8 +98,8 @@ const getMaxAdvanceDays = (shopCategory) => {
 | **Change Shop** | ❌ No | ❌ No |
 | **Reschedule Limit** | ✅ Max 1 time | ❌ No limit |
 | **Tracks Count** | ✅ Yes | ❌ No |
-| **API Endpoint** | `/reschedule` | `/bookings/:id` |
-| **Request Body** | `newDate`, `newTime` | `employeeId`, `date`, `time` |
+| **API Endpoint** | `/bookings/:id` | `/bookings/:id` |
+| **Request Body** | `employeeId`, `date`, `time` | `employeeId`, `date`, `time` |
 
 ### **Business Use Cases:**
 
@@ -339,10 +339,9 @@ if (!isWithinBookingWindow(date, BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS, now)) 
 | Endpoint | Method | Impact |
 |----------|--------|--------|
 | `/api/v1/bookings` | POST | ✅ Date validation added |
-| `/api/v1/bookings/:id` | PUT | ✅ Date validation added |
-| `/api/v1/bookings/:id/reschedule` | PUT | ✅ Date validation added |
-| `/api/v1/bookings/:id/reorder` | POST | ✅ Date validation added |
-| `/api/v1/employees/:id/available-slots` | GET | ✅ Date validation added |
+| `/api/v1/bookings/:id` | PATCH | ✅ Date validation added |
+| `/api/v1/bookings` with `sourceBookingId` | POST | ✅ Date validation added |
+| `/api/v1/employees/:id/availability` | GET | ✅ Date validation added |
 | `/api/v1/shops/:id/availability` | GET | ✅ Date validation added |
 | `/api/v1/employees/:id/calendar` | GET | ✅ Date validation added |
 
@@ -439,11 +438,11 @@ try {
 
 ```javascript
 // Valid availability check
-GET /api/v1/employees/emp123/available-slots?date=2026-05-05&serviceId=service1
+GET /api/v1/employees/emp123/availability?date=2026-05-05&serviceId=service1
 // Expected: ✅ Success with available slots
 
 // Invalid availability check
-GET /api/v1/employees/emp123/available-slots?date=2026-05-10&serviceId=service1
+GET /api/v1/employees/emp123/availability?date=2026-05-10&serviceId=service1
 // Expected: ❌ Error "Availability can only be checked up to 7 days in advance."
 ```
 

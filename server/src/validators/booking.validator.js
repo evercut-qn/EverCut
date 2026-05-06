@@ -1,56 +1,57 @@
 import Joi from 'joi';
 import { objectId, dateString, timeString, paginationSchema } from './common.validator.js';
 
-export const bookSalonSchema = Joi.object({
+const createDirectBookingSchema = Joi.object({
     shopId: objectId.required(),
     employeeId: objectId.required(),
-    serviceId: Joi.alternatives().try(
-        objectId,
-        Joi.array().items(objectId).min(1),
-    ).required(),
+    serviceIds: Joi.array().items(objectId).min(1).required(),
     date: dateString.required(),
     time: timeString.required(),
     idempotencyKey: Joi.string().trim().max(128),
 });
 
-export const rescheduleSchema = Joi.object({
-    newDate: dateString.required(),
-    newTime: timeString.required(),
-});
-
-export const reorderSchema = Joi.object({
+const createFromSourceBookingSchema = Joi.object({
+    sourceBookingId: objectId.required(),
     date: dateString.required(),
     time: timeString.required(),
+    idempotencyKey: Joi.string().trim().max(128),
 });
 
-export const updateBookingSchema = Joi.object({
+export const createBookingSchema = Joi.alternatives()
+    .try(createDirectBookingSchema, createFromSourceBookingSchema)
+    .match('one');
+
+const bookingSchedulePatchSchema = Joi.object({
     employeeId: objectId.required(),
     date: dateString.required(),
     time: timeString.required(),
 });
 
-export const bookingStatusSchema = Joi.object({
+const bookingStatusPatchSchema = Joi.object({
     status: Joi.string().valid('confirmed', 'completed', 'cancelled', 'no-show').required(),
 });
 
-export const customerBookingsQuerySchema = paginationSchema.keys({
-    type: Joi.string().valid('past', 'upcoming', 'favorites').required(),
-});
+export const bookingPatchSchema = Joi.alternatives()
+    .try(bookingSchedulePatchSchema, bookingStatusPatchSchema)
+    .match('one');
 
 export const bookingListQuerySchema = paginationSchema.keys({
-    type: Joi.string().valid('past', 'upcoming', 'favorites'),
+    // Customer-only filters
+    timeframe: Joi.string().valid('past', 'upcoming'),
+    favorite: Joi.boolean(),
+    
+    // Shared filters (both customer and barber)
+    status: Joi.string().valid('pending', 'awaiting_confirmation', 'confirmed', 'completed', 'cancelled', 'no-show'),
+    paymentStatus: Joi.string().valid('pending', 'initiated', 'success', 'failed', 'refund_pending', 'refunded', 'refund_failed'),
+    
+    // Barber-only filters
+    employeeId: objectId,
+    dateFrom: dateString,
+    dateTo: dateString,
 });
 
 export const bookingIdParamSchema = Joi.object({
     id: objectId.required(),
-});
-
-export const employeeCalendarQuerySchema = Joi.object({
-    date: dateString.required(),
-});
-
-export const bookingsByStatusQuerySchema = paginationSchema.keys({
-    status: Joi.string().valid('pending', 'awaiting_confirmation', 'confirmed', 'completed', 'cancelled', 'no-show').required(),
 });
 
 export const bookingMilestoneProgressQuerySchema = Joi.object({
@@ -58,11 +59,6 @@ export const bookingMilestoneProgressQuerySchema = Joi.object({
     year: Joi.number().integer().min(2000).max(9999),
 }).and('month', 'year');
 
-export const paginationQuerySchema = Joi.object({
-    page: Joi.number().integer().min(1).default(1),
-    limit: Joi.number().integer().min(1).max(100).default(10),
-});
-
 export const queueFilterQuerySchema = Joi.object({
-    filter: Joi.string().valid('active', 'upcoming').default('active'),
+    timeframe: Joi.string().valid('active', 'upcoming').default('active'),
 });

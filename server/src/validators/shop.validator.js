@@ -63,8 +63,8 @@ const breakTimesSchema = Joi.alternatives().try(
         Joi.object({
             start: Joi.string().trim(),
             end: Joi.string().trim(),
-            startsAt: Joi.string().trim(),
-            endsAt: Joi.string().trim(),
+            startsAt: Joi.forbidden(),
+            endsAt: Joi.forbidden(),
         }),
     ),
     Joi.string().trim(),
@@ -76,50 +76,44 @@ const bankAccountSchema = Joi.string().trim().min(6).max(34);
 
 export const updateBusinessSchema = Joi.object({
     shopName: Joi.string().trim().min(1).max(100),
-    ownerName: Joi.string().trim().min(1).max(100),
-    shopOwner: Joi.string().trim().min(1).max(100),
-    ownerFirstName: Joi.string().trim().min(1).max(50),
-    ownerLastName: Joi.string().trim().min(1).max(50),
-    ownerGender: Joi.string().valid(...ALL_GENDERS),
-    ownerDateOfBirth: Joi.date(),
     firstName: Joi.string().trim().min(1).max(50),
     lastName: Joi.string().trim().min(1).max(50),
     gender: Joi.string().valid(...ALL_GENDERS),
     dateOfBirth: Joi.date(),
+    ownerName: Joi.forbidden(),
+    shopOwner: Joi.forbidden(),
+    ownerFirstName: Joi.forbidden(),
+    ownerLastName: Joi.forbidden(),
+    ownerGender: Joi.forbidden(),
+    ownerDateOfBirth: Joi.forbidden(),
     numberOfEmployees: Joi.number().integer().min(1),
     yearsOfExperience: Joi.number().integer().min(0),
-    upiId: Joi.string(),
-    upiAddress: Joi.string(),
-    accountHolderName: Joi.string().trim().min(1).max(100),
-    bankName: Joi.string().trim().min(1).max(120),
-    bankAccount: bankAccountSchema,
-    ifsc: ifscSchema,
     bio: Joi.string().max(500).allow(''),
     address: Joi.string().trim(),
-    shopLocation: Joi.string().trim(),
+    shopLocation: Joi.forbidden(),
     targetCustomers: targetCustomersSchema,
     category: Joi.string().valid(...ALL_SHOP_CATEGORIES),
-    shopCategory: Joi.string().valid(...ALL_SHOP_CATEGORIES),
-    businessCategory: Joi.string().valid(...ALL_SHOP_CATEGORIES),
-    facilities: amenitiesSchema,
+    shopCategory: Joi.forbidden(),
+    businessCategory: Joi.forbidden(),
     amenities: amenitiesSchema,
-    availableDays: daysSchema,
+    facilities: Joi.forbidden(),
     workingDays: daysSchema,
+    availableDays: Joi.forbidden(),
     openTime: Joi.string().trim(),
     closeTime: Joi.string().trim(),
-    opensAt: Joi.string().trim(),
-    closesAt: Joi.string().trim(),
+    opensAt: Joi.forbidden(),
+    closesAt: Joi.forbidden(),
     workingHours: Joi.alternatives().try(
         Joi.object({
             openTime: Joi.string().trim(),
             closeTime: Joi.string().trim(),
-            opensAt: Joi.string().trim(),
-            closesAt: Joi.string().trim(),
+            opensAt: Joi.forbidden(),
+            closesAt: Joi.forbidden(),
         }),
         Joi.string().trim(),
     ),
     breakTimes: breakTimesSchema,
-    breakTimings: breakTimesSchema,
+    breakTimings: Joi.forbidden(),
     location: Joi.alternatives().try(
         Joi.object({
             type: Joi.string().valid('Point').required(),
@@ -129,17 +123,12 @@ export const updateBusinessSchema = Joi.object({
     ),
 })
     .custom((value, helpers) => {
-        value.ownerName = value.ownerName || value.shopOwner;
-        value.ownerFirstName = value.ownerFirstName || value.firstName;
-        value.ownerLastName = value.ownerLastName || value.lastName;
-        value.ownerGender = value.ownerGender || value.gender;
-        value.ownerDateOfBirth = value.ownerDateOfBirth || value.dateOfBirth;
-        value.upiId = value.upiId || value.upiAddress;
-        value.address = value.address || value.shopLocation;
-        value.category = value.category || value.shopCategory || value.businessCategory;
-        value.facilities = value.facilities ?? value.amenities;
-        value.availableDays = value.availableDays ?? value.workingDays;
-        value.breakTimes = value.breakTimes ?? value.breakTimings;
+        value.ownerFirstName = value.firstName;
+        value.ownerLastName = value.lastName;
+        value.ownerGender = value.gender;
+        value.ownerDateOfBirth = value.dateOfBirth;
+        value.facilities = value.amenities;
+        value.availableDays = value.workingDays;
 
         if (value.workingHours) {
             if (typeof value.workingHours === 'string') {
@@ -150,16 +139,9 @@ export const updateBusinessSchema = Joi.object({
                 }
             }
             value.openTime = value.openTime
-                || value.opensAt
-                || value.workingHours.openTime
-                || value.workingHours.opensAt;
+                || value.workingHours.openTime;
             value.closeTime = value.closeTime
-                || value.closesAt
-                || value.workingHours.closeTime
-                || value.workingHours.closesAt;
-        } else {
-            value.openTime = value.openTime || value.opensAt;
-            value.closeTime = value.closeTime || value.closesAt;
+                || value.workingHours.closeTime;
         }
 
         if (value.openTime !== undefined) {
@@ -218,23 +200,6 @@ export const updateBusinessSchema = Joi.object({
     })
     .min(1);
 
-export const updateUpiDetailsSchema = Joi.object({
-    upiId: Joi.string().trim(),
-    upiAddress: Joi.string().trim(),
-    accountHolderName: Joi.string().trim().min(1).max(100),
-    bankName: Joi.string().trim().min(1).max(120),
-    bankAccount: bankAccountSchema,
-    ifsc: ifscSchema,
-    isVerified: Joi.any().strip(),
-    verificationStatus: Joi.any().strip(),
-    beneficiaryId: Joi.any().strip(),
-})
-    .custom((value) => {
-        value.upiId = value.upiId || value.upiAddress;
-        return value;
-    })
-    .min(1);
-
 export const toggleStatusSchema = Joi.object({
     status: Joi.alternatives().try(Joi.boolean(), Joi.string()).optional(),
     isOpen: Joi.any().strip(),
@@ -253,12 +218,19 @@ export const shopIdParamSchema = Joi.object({
     id: objectId.required(),
 });
 
-export const nearbyShopsQuerySchema = Joi.object({
+export const shopListQuerySchema = Joi.object({
     longitude: Joi.number().min(-180).max(180),
     latitude: Joi.number().min(-90).max(90),
     coordinates: Joi.string().pattern(coordinatesPattern),
+    query: Joi.string().trim().min(1).max(100),
+    category: Joi.string().valid(...ALL_SHOP_CATEGORIES),
 })
-    .custom(normalizeCoordinates, 'coordinates normalization')
+    .custom((value, helpers) => {
+        if (value.coordinates || value.longitude !== undefined || value.latitude !== undefined) {
+            return normalizeCoordinates(value, helpers);
+        }
+        return value;
+    }, 'shop list query normalization')
     .messages({ 'any.custom': '{{#message}}' });
 
 export const servicesByGenderQuerySchema = Joi.object({
@@ -276,10 +248,6 @@ export const searchServicesQuerySchema = Joi.object({
     gender: Joi.string().valid(...ALL_SERVICE_FOR),
 });
 
-export const searchShopsQuerySchema = Joi.object({
-    query: Joi.string().trim().min(1).max(100).required(),
-});
-
 export const shopAvailabilityQuerySchema = Joi.object({
     date: Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/).required().messages({
         'string.pattern.base': 'date must be in YYYY-MM-DD format',
@@ -290,7 +258,7 @@ export const shopAvailabilityQuerySchema = Joi.object({
     ).required(),
 });
 
-export const updateBankDetailsSchema = Joi.object({
+export const updatePayoutDetailsSchema = Joi.object({
     accountHolderName: Joi.string().trim().min(1).max(100).required(),
     bankName: Joi.string().trim().min(1).max(120).required(),
     bankAccount: Joi.string().trim().pattern(/^\d{6,34}$/).required().messages({

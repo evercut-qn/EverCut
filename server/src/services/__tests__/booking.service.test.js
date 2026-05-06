@@ -74,18 +74,18 @@ test('getBookingsByShop loads bookings by shopId so deleted employees do not dis
         filters: {},
         options: { skip: 5, limit: 5 },
     });
-    assert.deepEqual(result, {
-        items: [{ _id: 'booking-1' }],
-        pagination: {
-            currentPage: 2,
-            totalPages: 1,
-            totalDocuments: 1,
-            hasNextPage: false,
-            hasPrevPage: true,
-        },
-        numberOfEmployees: 3,
-        numberOfCustomers: 2,
+    assert.equal(result.items[0].id, 'booking-1');
+    assert.equal('bookingId' in result.items[0], false);
+    assert.equal('_id' in result.items[0], false);
+    assert.deepEqual(result.pagination, {
+        currentPage: 2,
+        totalPages: 1,
+        totalDocuments: 1,
+        hasNextPage: false,
+        hasPrevPage: true,
     });
+    assert.equal(result.numberOfEmployees, 3);
+    assert.equal(result.numberOfCustomers, 2);
 });
 
 test('getBookingMilestoneProgress returns the monthly completed-booking target state for the requested period', async (t) => {
@@ -168,7 +168,7 @@ test('getBookingMilestoneProgress returns no next milestone once all visible tar
     assert.equal(result.nextMilestone, null);
 });
 
-test('bookSalon creates a pending booking that requires payment before confirmation', async (t) => {
+test('createBooking creates a pending booking that requires payment before confirmation', async (t) => {
     t.mock.method(customerRepository, 'findByUserId', async () => ({ _id: 'customer-1' }));
 
     t.mock.method(shopRepository, 'findByIdWithFields', async () => ({
@@ -206,10 +206,10 @@ test('bookSalon creates a pending booking that requires payment before confirmat
         };
     });
     t.mock.method(employeeRepository, 'claimSlot', async () => {
-        throw new Error('bookSalon should claim exact ranges, not single slots');
+        throw new Error('createBooking should claim exact ranges, not single slots');
     });
     t.mock.method(employeeRepository, 'claimSlots', async () => {
-        throw new Error('bookSalon should claim exact ranges, not marker slots');
+        throw new Error('createBooking should claim exact ranges, not marker slots');
     });
 
     const originalReleaseSlots = employeeRepository.releaseSlots;
@@ -226,7 +226,7 @@ test('bookSalon creates a pending booking that requires payment before confirmat
     });
 
     t.mock.method(employeeRepository, 'releaseSlot', async () => {
-        throw new Error('bookSalon should release normalized slot markers with releaseSlots');
+        throw new Error('createBooking should release normalized slot markers with releaseSlots');
     });
 
     let createdBookingPayload = null;
@@ -242,10 +242,10 @@ test('bookSalon creates a pending booking that requires payment before confirmat
     });
 
     const bookingDate = getInWindowBookingDate();
-    const result = await bookingService.bookSalon('user-1', {
+    const result = await bookingService.createBooking('user-1', {
         shopId: 'shop-1',
         employeeId: 'employee-1',
-        serviceId: 'service-1',
+        serviceIds: ['service-1'],
         date: bookingDate,
         time: '10:00 AM',
     });
@@ -281,7 +281,7 @@ test('bookSalon creates a pending booking that requires payment before confirmat
     assert.equal(result.payoutStatus, 'not_initiated');
 });
 
-test('bookSalon claims every slot marker covered by the selected service duration', async (t) => {
+test('createBooking claims every slot marker covered by the selected service duration', async (t) => {
     t.mock.method(customerRepository, 'findByUserId', async () => ({ _id: 'customer-1' }));
 
     t.mock.method(shopRepository, 'findByIdWithFields', async () => ({
@@ -319,10 +319,10 @@ test('bookSalon claims every slot marker covered by the selected service duratio
         };
     });
     t.mock.method(employeeRepository, 'claimSlot', async () => {
-        throw new Error('bookSalon should not use start-only claimSlot for duration-based bookings');
+        throw new Error('createBooking should not use start-only claimSlot for duration-based bookings');
     });
     t.mock.method(employeeRepository, 'claimSlots', async () => {
-        throw new Error('bookSalon should not use marker-only claimSlots for duration-based bookings');
+        throw new Error('createBooking should not use marker-only claimSlots for duration-based bookings');
     });
 
     t.mock.method(bookingRepository, 'create', async (payload) => ({
@@ -331,10 +331,10 @@ test('bookSalon claims every slot marker covered by the selected service duratio
     }));
 
     const bookingDate = getInWindowBookingDate();
-    await bookingService.bookSalon('user-1', {
+    await bookingService.createBooking('user-1', {
         shopId: 'shop-1',
         employeeId: 'employee-1',
-        serviceId: 'service-1',
+        serviceIds: ['service-1'],
         date: bookingDate,
         time: '10:00',
     });
@@ -346,7 +346,7 @@ test('bookSalon claims every slot marker covered by the selected service duratio
     assert.deepEqual(claimedRange.slotLockTimes, ['10:00', '10:30']);
 });
 
-test('bookSalon rejects bookings whose exact end time exceeds the employee or shop window before claiming', async (t) => {
+test('createBooking rejects bookings whose exact end time exceeds the employee or shop window before claiming', async (t) => {
     t.mock.method(customerRepository, 'findByUserId', async () => ({ _id: 'customer-1' }));
 
     t.mock.method(shopRepository, 'findByIdWithFields', async () => ({
@@ -391,10 +391,10 @@ test('bookSalon rejects bookings whose exact end time exceeds the employee or sh
     });
 
     await assert.rejects(
-        bookingService.bookSalon('user-1', {
+        bookingService.createBooking('user-1', {
             shopId: 'shop-1',
             employeeId: 'employee-1',
-            serviceId: 'service-1',
+            serviceIds: ['service-1'],
             date: getInWindowBookingDate(),
             time: '17:30',
         }),
@@ -403,7 +403,7 @@ test('bookSalon rejects bookings whose exact end time exceeds the employee or sh
     assert.equal(claimRangeMock.mock.calls.length, 0);
 });
 
-test('bookSalon rejects bookings that overlap a shop break before claiming', async (t) => {
+test('createBooking rejects bookings that overlap a shop break before claiming', async (t) => {
     t.mock.method(customerRepository, 'findByUserId', async () => ({ _id: 'customer-1' }));
 
     t.mock.method(shopRepository, 'findByIdWithFields', async () => ({
@@ -448,10 +448,10 @@ test('bookSalon rejects bookings that overlap a shop break before claiming', asy
     });
 
     await assert.rejects(
-        bookingService.bookSalon('user-1', {
+        bookingService.createBooking('user-1', {
             shopId: 'shop-1',
             employeeId: 'employee-1',
-            serviceId: 'service-1',
+            serviceIds: ['service-1'],
             date: getInWindowBookingDate(),
             time: '12:30',
         }),
@@ -460,7 +460,7 @@ test('bookSalon rejects bookings that overlap a shop break before claiming', asy
     assert.equal(claimRangeMock.mock.calls.length, 0);
 });
 
-test('bookSalon claims an exact minute range and persists exact end metadata', async (t) => {
+test('createBooking claims an exact minute range and persists exact end metadata', async (t) => {
     t.mock.method(customerRepository, 'findByUserId', async () => ({ _id: 'customer-1' }));
 
     t.mock.method(shopRepository, 'findByIdWithFields', async () => ({
@@ -513,10 +513,10 @@ test('bookSalon claims an exact minute range and persists exact end metadata', a
     });
 
     const bookingDate = getInWindowBookingDate();
-    await bookingService.bookSalon('user-1', {
+    await bookingService.createBooking('user-1', {
         shopId: 'shop-1',
         employeeId: 'employee-1',
-        serviceId: 'service-1',
+        serviceIds: ['service-1'],
         date: bookingDate,
         time: '12:30',
     });
@@ -536,7 +536,7 @@ test('bookSalon claims an exact minute range and persists exact end metadata', a
     assert.deepEqual(createdBookingPayload.slotLockTimes, ['12:30', '13:00', '13:30']);
 });
 
-test('updateBooking rejects paid bookings before releasing the existing slot', async (t) => {
+test('updateBookingSchedule rejects paid bookings before releasing the existing slot', async (t) => {
     t.mock.method(bookingRepository, 'findById', async () => ({
         _id: 'booking-1',
         customerId: 'customer-1',
@@ -556,7 +556,7 @@ test('updateBooking rejects paid bookings before releasing the existing slot', a
     });
 
     await assert.rejects(
-        bookingService.updateBooking('booking-1', 'user-1', {
+        bookingService.updateBookingSchedule('booking-1', 'user-1', {
             employeeId: 'employee-1',
             date: '2099-01-02',
             time: '11:00',
@@ -566,7 +566,7 @@ test('updateBooking rejects paid bookings before releasing the existing slot', a
     assert.equal(releaseMock.mock.calls.length, 0);
 });
 
-test('bookSalon rejects bundle bookings below the documented minimum service amount', async (t) => {
+test('createBooking rejects bundle bookings below the documented minimum service amount', async (t) => {
     t.mock.method(customerRepository, 'findByUserId', async () => ({ _id: 'customer-1' }));
 
     t.mock.method(shopRepository, 'findByIdWithFields', async () => ({
@@ -598,10 +598,10 @@ test('bookSalon rejects bundle bookings below the documented minimum service amo
     }));
 
     await assert.rejects(
-        bookingService.bookSalon('user-1', {
+        bookingService.createBooking('user-1', {
             shopId: 'shop-1',
             employeeId: 'employee-1',
-            serviceId: 'bundle-1',
+            serviceIds: ['bundle-1'],
             date: getInWindowBookingDate(),
             time: '10:00 AM',
         }),
@@ -609,7 +609,7 @@ test('bookSalon rejects bundle bookings below the documented minimum service amo
     );
 });
 
-test('cancelBooking returns a customer-friendly manual-refund message when payout has started', async (t) => {
+test('updateBookingStatus returns a customer-friendly manual-refund message when payout has started', async (t) => {
     t.mock.method(bookingRepository, 'findById', async () => ({
         _id: 'booking-1',
         customerId: 'customer-1',
@@ -630,7 +630,11 @@ test('cancelBooking returns a customer-friendly manual-refund message when payou
         return { _id: id, ...updates };
     });
 
-    const result = await bookingService.cancelBooking('booking-1', 'user-1');
+    const result = await bookingService.updateBookingStatus(
+        'booking-1',
+        { _id: 'user-1', roleType: 'CUSTOMER' },
+        'cancelled',
+    );
 
     assert.equal(
         bookingUpdate.cancellationNote,
@@ -677,7 +681,11 @@ test('updateBookingStatus releases the exact booking range when a booking is com
         ...update,
     }));
 
-    await bookingService.updateBookingStatus('booking-1', 'completed', 'owner-1');
+    await bookingService.updateBookingStatus(
+        'booking-1',
+        { _id: 'owner-1', roleType: 'BARBER' },
+        'completed',
+    );
 
     assert.deepEqual(releasedRange, {
         employeeId: 'employee-1',
@@ -702,15 +710,15 @@ test('getFavoriteBookings returns a paginated customer booking favorites list', 
 
     const result = await bookingService.getFavoriteBookings('user-1', { page: 2, limit: 2 });
 
-    assert.deepEqual(result, {
-        items: [{ _id: 'booking-3' }],
-        pagination: {
-            currentPage: 2,
-            totalPages: 2,
-            totalDocuments: 3,
-            hasNextPage: false,
-            hasPrevPage: true,
-        },
+    assert.equal(result.items[0].id, 'booking-3');
+    assert.equal('bookingId' in result.items[0], false);
+    assert.equal('_id' in result.items[0], false);
+    assert.deepEqual(result.pagination, {
+        currentPage: 2,
+        totalPages: 2,
+        totalDocuments: 3,
+        hasNextPage: false,
+        hasPrevPage: true,
     });
 });
 
@@ -735,7 +743,7 @@ test('addFavoriteBooking rejects bookings owned by another customer', async (t) 
     assert.equal(addMock.mock.calls.length, 0);
 });
 
-test('toggleFavoriteBooking removes an existing favorite booking', async (t) => {
+test('removeFavoriteBooking removes an existing favorite booking', async (t) => {
     t.mock.method(customerRepository, 'findByUserId', async () => ({
         _id: 'customer-1',
         favoriteBookings: ['booking-1'],
@@ -751,7 +759,7 @@ test('toggleFavoriteBooking removes an existing favorite booking', async (t) => 
         return { _id: 'customer-1' };
     });
 
-    const result = await bookingService.toggleFavoriteBooking('user-1', 'booking-1');
+    const result = await bookingService.removeFavoriteBooking('user-1', 'booking-1');
 
     assert.deepEqual(removed, { userId: 'user-1', bookingId: 'booking-1' });
     assert.deepEqual(result, {

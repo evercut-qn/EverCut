@@ -44,6 +44,20 @@ export const updateEmployee = async (req, res, next) => {
     }
 };
 
+export const updateEmployeeAvailability = async (req, res, next) => {
+    try {
+        const params = getValidatedRequestData(req, 'params');
+        const body = getValidatedRequestData(req, 'body');
+        const result = await employeeService.updateEmployeeAvailability(req.user._id, params.id, body);
+        const message = body.available
+            ? 'Employee marked available'
+            : 'Employee marked unavailable. Customers have been notified.';
+        return res.status(200).json(ApiResponse.success(result, message));
+    } catch (err) {
+        next(err);
+    }
+};
+
 export const deleteEmployee = async (req, res, next) => {
     try {
         const params = getValidatedRequestData(req, 'params');
@@ -54,23 +68,12 @@ export const deleteEmployee = async (req, res, next) => {
     }
 };
 
-export const getEmployeeCalendar = async (req, res, next) => {
-    try {
-        const params = getValidatedRequestData(req, 'params');
-        const query = getValidatedRequestData(req, 'query');
-        const result = await bookingService.getEmployeeCalendar(params.id, query.date);
-        return res.status(200).json(ApiResponse.success(result, 'Calendar fetched'));
-    } catch (err) {
-        next(err);
-    }
-};
-
-export const getAvailableSlots = async (req, res, next) => {
+export const getEmployeeAvailability = async (req, res, next) => {
     try {
         const params = getValidatedRequestData(req, 'params');
         const query = getValidatedRequestData(req, 'query');
         const result = await bookingService.getAvailableSlots(params.id, query.date, query.serviceId);
-        return res.status(200).json(ApiResponse.success(result, 'Available slots fetched'));
+        return res.status(200).json(ApiResponse.success(result, 'Employee availability fetched'));
     } catch (err) {
         next(err);
     }
@@ -83,6 +86,20 @@ export const getStaffAvailability = async (req, res, next) => {
     try {
         const staff = await employeeService.getStaffAvailability(req.user._id);
         return res.status(200).json(ApiResponse.success(staff, 'Staff availability fetched'));
+    } catch (err) {
+        next(err);
+    }
+};
+
+/**
+ * Toggle employee availability status
+ */
+export const toggleEmployeeStatus = async (req, res, next) => {
+    try {
+        const params = getValidatedRequestData(req, 'params');
+        const body = getValidatedRequestData(req, 'body');
+        const result = await employeeService.toggleEmployeeStatus(req.user._id, params.id, body.status);
+        return res.status(200).json(ApiResponse.success(result, 'Employee status updated'));
     } catch (err) {
         next(err);
     }

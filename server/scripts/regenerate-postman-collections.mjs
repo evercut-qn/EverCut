@@ -69,6 +69,11 @@ const standardEnvelopeAssertions = [
   "  pm.expect(response).to.have.property('message');",
   "  pm.expect(response.message).to.be.a('string');",
   "  pm.expect(response).to.have.property('data');",
+  "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+  "  const responseText = JSON.stringify(response);",
+  "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+  "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+  "  });",
   '});',
 ];
 
@@ -130,16 +135,14 @@ const collectionPreRequest = ({
       "if (!hasManualDate) {",
       "  pm.collectionVariables.set('booking_date', toIsoDate(getNextAvailableDate(1)));",
       "  pm.collectionVariables.set('booking_update_date', toIsoDate(getNextAvailableDate(2)));",
-      "  pm.collectionVariables.set('booking_reschedule_date', toIsoDate(getNextAvailableDate(3)));",
-      "  pm.collectionVariables.set('booking_reorder_date', toIsoDate(getNextAvailableDate(4)));",
-      "  pm.collectionVariables.set('calendar_date', toIsoDate(getNextAvailableDate(2)));",
+      "  pm.collectionVariables.set('booking_reorder_date', toIsoDate(getNextAvailableDate(3)));",
+      "  pm.collectionVariables.set('availability_date', toIsoDate(getNextAvailableDate(2)));",
       "}",
       "",
       "if (!hasManualTime) {",
       "  pm.collectionVariables.set('booking_time', getWorkingHourTime(11, 5));",
       "  pm.collectionVariables.set('booking_update_time', getWorkingHourTime(12, 10));",
-      "  pm.collectionVariables.set('booking_reschedule_time', getWorkingHourTime(14, 15));",
-      "  pm.collectionVariables.set('booking_reorder_time', getWorkingHourTime(15, 20));",
+      "  pm.collectionVariables.set('booking_reorder_time', getWorkingHourTime(14, 15));",
       "}"
     );
   }
@@ -431,30 +434,30 @@ const onboardingCollection = {
           textField('dateOfBirth', '1991-01-12'),
           textField('gender', 'Male'),
           textField('shopName', 'Postman Test Barber Studio'),
-          textField('shopOwner', 'Test Barber'),
-          textField('businessCategory', 'Barber'),
+          textField('category', 'Barber'),
           textField('targetCustomers', 'male'),
-          textField('shopLocation', barberLocationText),
+          textField('address', barberLocationText),
           textField('location', barberLocationGeoJson, 'Matches the customer discovery coordinates'),
           textField('amenities', '["Air Conditioning","Waiting Area","Drinking Water","Washrooms","Parking Area","Wi-Fi","Charging Points"]'),
           textField('workingDays', '["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"]'),
-          textField('workingHours', '{"opensAt":"09:00","closesAt":"20:00"}'),
-          textField('breakTimings', '[{"startsAt":"13:00","endsAt":"14:00"}]'),
+          textField('workingHours', '{"openTime":"09:00","closeTime":"20:00"}'),
+          textField('breakTimes', '[{"start":"13:00","end":"14:00"}]'),
           textField('accountHolderName', 'Test Barber'),
           textField('bankName', 'HDFC Bank'),
-          textField('upiAddress', 'test.barber@upi'),
+          textField('upiId', 'test.barber@upi'),
           textField('pin', '1234'),
           textField('confirmPin', '1234'),
-          fileField('shopImages', 'Attach shop image 1 of 3 manually in Postman'),
-          fileField('shopImages', 'Attach shop image 2 of 3 manually in Postman'),
-          fileField('shopImages', 'Attach shop image 3 of 3 manually in Postman'),
+          fileField('photos', 'Attach shop image 1 of 3 manually in Postman'),
+          fileField('photos', 'Attach shop image 2 of 3 manually in Postman'),
+          fileField('photos', 'Attach shop image 3 of 3 manually in Postman'),
         ]),
         description: 'Creates the barber shop for the OTP-verified barber test user. Shop schedule values can be sent in HH:MM or hh:mm AM/PM format and are normalized by the backend. The three shop image fields already point to the local sample file.',
         event: testEvent(
           "pm.test('status is 201 or 409', function () { pm.expect(pm.response.code).to.be.oneOf([201, 409]); });",
           "if (pm.response.code === 201) {",
           "  const data = pm.response.json().data || {};",
-          "  if (data.shop && data.shop._id) pm.globals.set('shared_shop_id', data.shop._id);",
+          "  const shopId = data.shop && data.shop.id;",
+          "  if (shopId) pm.globals.set('shared_shop_id', shopId);",
           "  if (data.accessToken) pm.environment.set('barber_access_token', data.accessToken);",
           "  if (data.refreshToken) pm.environment.set('barber_refresh_token', data.refreshToken);",
           "  pm.environment.unset('barber_onboarding_token');",
@@ -511,7 +514,7 @@ const customerCollection = {
       name: '3. Get Services By Gender And Capture IDs',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/shops/nearby/services?gender=male&coordinates={{coordinates}}',
+        url: '{{base_url}}/{{api_prefix}}/shops/services?gender=male&coordinates={{coordinates}}',
         description: 'Uses the shared Bengaluru coordinates so the response includes the barber shop created by onboarding. The script captures the first nearby Postman shop and service IDs.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
@@ -520,8 +523,16 @@ const customerCollection = {
           "const services = Array.isArray(data.services) ? data.services : [];",
           "const preferredShop = shops.find((shop) => typeof shop.shopName === 'string' && shop.shopName.includes('Postman')) || shops[0];",
           "const preferredService = services.find((service) => typeof service.serviceName === 'string' && service.serviceName.includes('Postman')) || services[0];",
-          "if (preferredShop && preferredShop._id) { pm.collectionVariables.set('shop_id', preferredShop._id); pm.globals.set('shared_shop_id', preferredShop._id); }",
-          "if (preferredService && preferredService._id) { pm.collectionVariables.set('service_id', preferredService._id); pm.globals.set('shared_service_id', preferredService._id); }"
+          "if (preferredShop && preferredShop.id) {",
+          "  const shopId = preferredShop.id;",
+          "  pm.collectionVariables.set('shop_id', shopId);",
+          "  pm.globals.set('shared_shop_id', shopId);",
+          "}",
+          "if (preferredService && preferredService.id) {",
+          "  const serviceId = preferredService.id;",
+          "  pm.collectionVariables.set('service_id', serviceId);",
+          "  pm.globals.set('shared_service_id', serviceId);",
+          "}"
         ),
       }),
     },
@@ -552,12 +563,10 @@ const customerBookingsCollection = {
       textVariable('booking_id', ''),
       textVariable('booking_date', ''),
       textVariable('booking_update_date', ''),
-      textVariable('booking_reschedule_date', ''),
       textVariable('booking_reorder_date', ''),
-      textVariable('calendar_date', ''),
+      textVariable('availability_date', ''),
       textVariable('booking_time', ''),
       textVariable('booking_update_time', ''),
-      textVariable('booking_reschedule_time', ''),
       textVariable('booking_reorder_time', ''),
       textVariable('booking_idempotency_key', ''),
       textVariable('reordered_booking_id', ''),
@@ -568,23 +577,33 @@ const customerBookingsCollection = {
       name: '1. Get Upcoming Bookings And Capture IDs',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/bookings?type=upcoming',
+        url: '{{base_url}}/{{api_prefix}}/bookings?timeframe=upcoming',
         description: 'Lists upcoming bookings and captures the first booking ID and first service ID when they already exist.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           "const response = pm.response.json();",
-          "const bookings = Array.isArray(response.data && response.data.items) ? response.data.items : [];",
+          "const bookings = Array.isArray(response.data) ? response.data : [];",
+          "bookings.forEach((booking) => {",
+          "  if (booking.employee) {",
+          "    pm.expect(booking.employee).to.have.property('isAvailableOnBookingDate');",
+          "    pm.expect(booking.employee.isAvailableOnBookingDate).to.be.a('boolean');",
+          "  }",
+          "});",
           "const firstBooking = bookings[0];",
-          "if (firstBooking && firstBooking._id) { pm.collectionVariables.set('booking_id', firstBooking._id); pm.globals.set('shared_booking_id', firstBooking._id); }"
+          "if (firstBooking && firstBooking.id) {",
+          "  const bookingId = firstBooking.id;",
+          "  pm.collectionVariables.set('booking_id', bookingId);",
+          "  pm.globals.set('shared_booking_id', bookingId);",
+          "}"
         ),
       }),
     },
     {
-      name: '2. Get Employee Calendar',
+      name: '2. Get Employee Availability',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/employees/{{employee_id}}/calendar?date={{calendar_date}}',
-        description: 'Checks the captured employee calendar for the generated booking date.',
+        url: '{{base_url}}/{{api_prefix}}/employees/{{employee_id}}/availability?date={{availability_date}}&serviceId={{service_id}}',
+        description: 'Checks exact-range availability for the captured employee on the generated booking date.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
     },
@@ -594,7 +613,7 @@ const customerBookingsCollection = {
         method: 'POST',
         url: '{{base_url}}/{{api_prefix}}/bookings',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody(`{\n  "serviceId": ["{{service_id}}"],\n  "employeeId": "{{employee_id}}",\n  "shopId": "{{shop_id}}",\n  "date": "{{booking_date}}",\n  "time": "{{booking_time}}",\n  "idempotencyKey": "{{booking_idempotency_key}}"\n}`),
+        body: jsonBody(`{\n  "serviceIds": ["{{service_id}}"],\n  "employeeId": "{{employee_id}}",\n  "shopId": "{{shop_id}}",\n  "date": "{{booking_date}}",\n  "time": "{{booking_time}}",\n  "idempotencyKey": "{{booking_idempotency_key}}"\n}`),
         description: 'Creates a new future booking using exact time-range locking. The optional idempotency key makes client retries safe without creating duplicate bookings.',
         event: mergedEvents(
           [
@@ -603,7 +622,7 @@ const customerBookingsCollection = {
           [
             "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
             "const response = pm.response.json();",
-            "const bookingId = response.data && response.data.bookingId;",
+            "const bookingId = response.data && response.data.id;",
             "if (bookingId) { pm.collectionVariables.set('booking_id', bookingId); pm.globals.set('shared_booking_id', bookingId); }",
             "pm.test('booking response includes exact range metadata', function () {",
             "  const data = response.data || {};",
@@ -622,79 +641,78 @@ const customerBookingsCollection = {
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id}}',
         description: 'Reads the full booking detail payload for the captured booking.',
-        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          "const response = pm.response.json();",
+          "const booking = response.data || {};",
+          "pm.test('booking detail includes employee availability flag', function () {",
+          "  pm.expect(booking.employee).to.have.property('isAvailableOnBookingDate');",
+          "  pm.expect(booking.employee.isAvailableOnBookingDate).to.be.a('boolean');",
+          "});"
+        ),
       }),
     },
     {
-      name: '5. Get Booking Confirmation',
+      name: '5. Add Booking Favorite',
       ...request({
-        method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id}}/confirmation',
-        description: 'Returns the confirmation screen payload for the captured booking.',
-        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
-      }),
-    },
-    {
-      name: '6. Toggle Booking Favorite',
-      ...request({
-        method: 'PATCH',
+        method: 'PUT',
         url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id}}/favorite',
-        description: 'Adds or removes the current booking from the customer favorites list through the booking resource.',
+        description: 'Adds the current booking to the customer favorites list through the booking resource.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
     },
     {
-      name: '7. Get Favorite Bookings',
+      name: '6. Get Favorite Bookings',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/bookings?type=favorites',
+        url: '{{base_url}}/{{api_prefix}}/bookings?favorite=true',
         description: 'Lists the authenticated customer favorite bookings through the booking list flow.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
     },
     {
-      name: '8. Update Booking',
+      name: '7. Update Booking Schedule',
       ...request({
-        method: 'PUT',
+        method: 'PATCH',
         url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id}}',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
         body: jsonBody(`{\n  "employeeId": "{{employee_id}}",\n  "date": "{{booking_update_date}}",\n  "time": "{{booking_update_time}}"\n}`),
-        description: 'Updates the booking using the real validator shape: all three fields are required. Note: 7-day advance booking window applies.',
+        description: 'Updates the booking schedule using the real validator shape: all three fields are required. Note: 7-day advance booking window applies.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
     },
     {
-      name: '9. Reschedule Booking',
-      ...request({
-        method: 'PUT',
-        url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id}}/reschedule',
-        headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody(`{\n  "newDate": "{{booking_reschedule_date}}",\n  "newTime": "{{booking_reschedule_time}}"\n}`),
-        description: 'Reschedules the current booking to a later generated date and time. Limited to once per booking. 7-day advance booking window applies.',
-        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
-      }),
-    },
-    {
-      name: '10. Reorder Booking',
+      name: '8. Reorder Booking',
       ...request({
         method: 'POST',
-        url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id}}/reorder',
+        url: '{{base_url}}/{{api_prefix}}/bookings',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody(`{\n  "date": "{{booking_reorder_date}}",\n  "time": "{{booking_reorder_time}}"\n}`),
-        description: 'Creates a fresh booking from the current one. The API expects `date` and `time`, not `newDate` and `newTime`. 7-day advance booking window applies.',
+        body: jsonBody(`{\n  "sourceBookingId": "{{booking_id}}",\n  "date": "{{booking_reorder_date}}",\n  "time": "{{booking_reorder_time}}"\n}`),
+        description: 'Creates a fresh booking from the current one through the booking collection create endpoint. 7-day advance booking window applies.',
         event: testEvent(
           "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
           "const response = pm.response.json();",
-          "const bookingId = response.data && response.data.bookingId;",
+          "const bookingId = response.data && response.data.id;",
           "if (bookingId) { pm.collectionVariables.set('reordered_booking_id', bookingId); }"
         ),
       }),
     },
     {
-      name: '11. Cancel Booking',
+      name: '9. Remove Booking Favorite',
       ...request({
-        method: 'POST',
-        url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id}}/cancel',
+        method: 'DELETE',
+        url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id}}/favorite',
+        description: 'Removes the current booking from the customer favorites list.',
+        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
+      }),
+    },
+    {
+      name: '10. Cancel Booking',
+      ...request({
+        method: 'PATCH',
+        url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id}}',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "status": "cancelled"\n}`),
         description: 'Cancels the currently captured booking and releases its exact locked time range. This stays last because it is destructive.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -733,14 +751,18 @@ const customerShopDiscoveryCollection = {
       name: '1. Get Nearby Shops And Capture Shop ID',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/shops/nearby?coordinates={{coordinates}}',
+        url: '{{base_url}}/{{api_prefix}}/shops?coordinates={{coordinates}}',
         description: 'Finds nearby shops and captures the Postman barber shop ID when it is present.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           "const response = pm.response.json();",
           "const shops = Array.isArray(response.data) ? response.data : [];",
           "const preferredShop = shops.find((shop) => typeof shop.shopName === 'string' && shop.shopName.includes('Postman')) || shops[0];",
-          "if (preferredShop && preferredShop._id) { pm.collectionVariables.set('shop_id', preferredShop._id); pm.globals.set('shared_shop_id', preferredShop._id); }"
+          "if (preferredShop && preferredShop.id) {",
+          "  const shopId = preferredShop.id;",
+          "  pm.collectionVariables.set('shop_id', shopId);",
+          "  pm.globals.set('shared_shop_id', shopId);",
+          "}"
         ),
       }),
     },
@@ -758,8 +780,16 @@ const customerShopDiscoveryCollection = {
           "const bundled = data.services && Array.isArray(data.services.bundled) ? data.services.bundled : [];",
           "const services = [...single, ...bundled];",
           "const preferredService = services.find((service) => typeof service.serviceName === 'string' && service.serviceName.includes('Postman')) || services[0];",
-          "if (data.shop && data.shop._id) { pm.collectionVariables.set('shop_id', data.shop._id); pm.globals.set('shared_shop_id', data.shop._id); }",
-          "if (preferredService && preferredService._id) { pm.collectionVariables.set('service_id', preferredService._id); pm.globals.set('shared_service_id', preferredService._id); }"
+          "if (data.shop && data.shop.id) {",
+          "  const shopId = data.shop.id;",
+          "  pm.collectionVariables.set('shop_id', shopId);",
+          "  pm.globals.set('shared_shop_id', shopId);",
+          "}",
+          "if (preferredService && preferredService.id) {",
+          "  const serviceId = preferredService.id;",
+          "  pm.collectionVariables.set('service_id', serviceId);",
+          "  pm.globals.set('shared_service_id', serviceId);",
+          "}"
         ),
       }),
     },
@@ -783,7 +813,7 @@ const customerShopDiscoveryCollection = {
       name: '4. Get Employee Available Slots',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/employees/{{employee_id}}/available-slots?date={{booking_date}}&serviceId={{service_id}}',
+        url: '{{base_url}}/{{api_prefix}}/employees/{{employee_id}}/availability?date={{booking_date}}&serviceId={{service_id}}',
         description: 'Returns exact-range availability for the employee, including bookable starts, free windows, break blocking, booked ranges, blocked dates, and the 7-day advance booking window.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
@@ -816,11 +846,11 @@ const customerShopDiscoveryCollection = {
       }),
     },
     {
-      name: '6. Toggle Favorite Shop',
+      name: '6. Add Favorite Shop',
       ...request({
-        method: 'PATCH',
+        method: 'PUT',
         url: '{{base_url}}/{{api_prefix}}/shops/{{shop_id}}/favorite',
-        description: 'Adds or removes the captured shop from the authenticated customer favorite shops list through the shop discovery flow.',
+        description: 'Adds the captured shop to the authenticated customer favorite shops list through the shop discovery flow.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
     },
@@ -834,16 +864,25 @@ const customerShopDiscoveryCollection = {
       }),
     },
     {
-      name: '8. Get Doorstep Shops',
+      name: '8. Remove Favorite Shop',
+      ...request({
+        method: 'DELETE',
+        url: '{{base_url}}/{{api_prefix}}/shops/{{shop_id}}/favorite',
+        description: 'Removes the captured shop from the authenticated customer favorite shops list.',
+        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
+      }),
+    },
+    {
+      name: '9. Get Doorstep Shops',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/shops/doorstep',
+        url: '{{base_url}}/{{api_prefix}}/shops?category=Door-Step',
         description: 'Lists shops with the Door-Step category.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
     },
     {
-      name: '9. Search Services',
+      name: '10. Search Services',
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/services/search?query={{service_search_query}}&gender=male',
@@ -852,10 +891,10 @@ const customerShopDiscoveryCollection = {
       }),
     },
     {
-      name: '10. Search Shops',
+      name: '11. Search Shops',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/shops/search?query={{shop_search_query}}',
+        url: '{{base_url}}/{{api_prefix}}/shops?query={{shop_search_query}}',
         description: 'Searches the customer-visible shop catalogue for the Postman barber shop.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -881,14 +920,14 @@ const customerRatingsCollection = {
       name: '1. Get Past Bookings And Capture Completed Shop ID',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/bookings?type=past&limit=100',
+        url: '{{base_url}}/{{api_prefix}}/bookings?timeframe=past&limit=100',
         description: 'Captures a shop ID from the authenticated customer\'s completed past bookings. This request fails the collection clearly when no eligible booking exists for rating.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           "const response = pm.response.json();",
-          "const bookings = Array.isArray(response.data && response.data.items) ? response.data.items : [];",
-          "const completedBooking = bookings.find((booking) => booking && booking.status === 'completed' && booking.shopId);",
-          "const shopId = completedBooking && completedBooking.shopId && (completedBooking.shopId._id || completedBooking.shopId);",
+          "const bookings = Array.isArray(response.data) ? response.data : [];",
+          "const completedBooking = bookings.find((booking) => booking && booking.status === 'completed' && booking.shop && booking.shop.id);",
+          "const shopId = completedBooking && completedBooking.shop && completedBooking.shop.id;",
           "pm.test('completed booking exists for rating eligibility', function () { pm.expect(shopId, 'A completed past booking is required before submitting a rating.').to.be.ok; });",
           "if (shopId) { pm.collectionVariables.set('shop_id', shopId); pm.globals.set('shared_shop_id', shopId); }"
         ),
@@ -956,7 +995,7 @@ const barberProfileCollection = {
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           "const response = pm.response.json();",
-          "const shopId = response.data && response.data._id;",
+          "const shopId = response.data && response.data.id;",
           "if (shopId) { pm.collectionVariables.set('shop_id', shopId); pm.globals.set('shared_shop_id', shopId); }"
         ),
       }),
@@ -964,46 +1003,26 @@ const barberProfileCollection = {
     {
       name: '2. Update Business Info',
       ...request({
-        method: 'PUT',
+        method: 'PATCH',
         url: '{{base_url}}/{{api_prefix}}/shops/me',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody(`{\n  "firstName": "Test",\n  "lastName": "Barber",\n  "shopOwner": "Test Barber",\n  "dateOfBirth": "1991-01-12",\n  "gender": "Male",\n  "shopName": "Postman Test Barber Studio",\n  "businessCategory": "Barber",\n  "targetCustomers": "male",\n  "shopLocation": "${barberLocationText}",\n  "location": ${barberLocationGeoJson},\n  "amenities": ["Air Conditioning", "Waiting Area", "Parking Area", "Wi-Fi"],\n  "workingDays": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],\n  "workingHours": {\n    "opensAt": "09:00",\n    "closesAt": "20:00"\n  },\n  "breakTimings": [\n    {\n      "startsAt": "13:00",\n      "endsAt": "14:00"\n    }\n  ],\n  "accountHolderName": "Test Barber",\n  "bankName": "HDFC Bank",\n  "upiAddress": "test.barber@upi",\n  "bio": "Updated from the automated Postman profile collection."\n}`),
-        description: 'Updates the barber profile using the onboarding-friendly request shape that the backend validators actually accept. NOTE: Email updates must use PUT /account/email endpoint.',
+        body: jsonBody(`{\n  "firstName": "Test",\n  "lastName": "Barber",\n  "dateOfBirth": "1991-01-12",\n  "gender": "Male",\n  "shopName": "Postman Test Barber Studio",\n  "category": "Barber",\n  "targetCustomers": "male",\n  "address": "${barberLocationText}",\n  "location": ${barberLocationGeoJson},\n  "amenities": ["Air Conditioning", "Waiting Area", "Parking Area", "Wi-Fi"],\n  "workingDays": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],\n  "workingHours": {\n    "openTime": "09:00",\n    "closeTime": "20:00"\n  },\n  "breakTimes": [\n    {\n      "start": "13:00",\n      "end": "14:00"\n    }\n  ],\n  "bio": "Updated from the automated Postman profile collection."\n}`),
+        description: 'Updates only barber profile and business fields. Payout details are managed through /shops/me/payout-details. NOTE: Email updates must use PUT /account/email endpoint.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
     },
     {
-      name: '3. Get UPI Details',
+      name: '3. Get Payout Details',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/shops/me/upi',
-        description: 'Reads the dedicated UPI payload.',
-        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
-      }),
-    },
-    {
-      name: '4. Update UPI Details',
-      ...request({
-        method: 'PUT',
-        url: '{{base_url}}/{{api_prefix}}/shops/me/upi',
-        headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody(`{\n  "accountHolderName": "Test Barber",\n  "bankName": "HDFC Bank",\n  "upiAddress": "test.barber+verified@upi"\n}`),
-        description: 'Updates only the dedicated payment fields.',
-        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
-      }),
-    },
-    {
-      name: '5. Get Bank Details',
-      ...request({
-        method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/shops/me/bank-details',
-        description: 'Reads the complete bank account details with verification status. Account number is masked for security.',
+        url: '{{base_url}}/{{api_prefix}}/shops/me/payout-details',
+        description: 'Reads the complete payout account details with verification status. Account number is masked for security.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           "const response = pm.response.json();",
           "const data = response.data || {};",
           "pm.test('response includes accountHolderName', function () { pm.expect(data).to.have.property('accountHolderName'); });",
-          "pm.test('response includes bankAccount (masked)', function () { pm.expect(data).to.have.property('bankAccount'); });",
+          "pm.test('response includes bankAccountLast4', function () { pm.expect(data).to.have.property('bankAccountLast4'); });",
           "pm.test('response includes ifsc', function () { pm.expect(data).to.have.property('ifsc'); });",
           "pm.test('response includes verificationStatus', function () { pm.expect(data).to.have.property('verificationStatus'); });",
           "pm.test('response includes canReceivePayouts', function () { pm.expect(data).to.have.property('canReceivePayouts'); });"
@@ -1011,26 +1030,26 @@ const barberProfileCollection = {
       }),
     },
     {
-      name: '6. Update Bank Details',
+      name: '4. Update Payout Details',
       ...request({
-        method: 'PUT',
-        url: '{{base_url}}/{{api_prefix}}/shops/me/bank-details',
+        method: 'PATCH',
+        url: '{{base_url}}/{{api_prefix}}/shops/me/payout-details',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
         body: jsonBody(`{\n  "accountHolderName": "Test Barber",\n  "bankName": "HDFC Bank",\n  "bankAccount": "12345678901234",\n  "ifsc": "HDFC0001234",\n  "upiId": "test.barber@upi"\n}`),
-        description: 'Updates complete bank account details including account number and IFSC. Verification status resets to pending on change.',
+        description: 'Updates complete payout account details including account number and IFSC. Verification status resets to pending on change.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           "const response = pm.response.json();",
           "const data = response.data || {};",
-          "pm.test('bankAccount is masked', function () { pm.expect(data.bankAccount).to.match(/\\*{4,}\\d{4}/); });",
+          "pm.test('bankAccountLast4 is present', function () { pm.expect(data.bankAccountLast4).to.match(/^\\d{4}$/); });",
           "pm.test('verificationStatus is pending after update', function () { pm.expect(data.verificationStatus).to.equal('pending'); });"
         ),
       }),
     },
     {
-      name: '7. Ensure Shop Is Open',
+      name: '5. Ensure Shop Is Open',
       ...request({
-        method: 'PUT',
+        method: 'PATCH',
         url: '{{base_url}}/{{api_prefix}}/shops/me/status',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
         body: jsonBody(`{\n  "status": true\n}`),
@@ -1039,9 +1058,9 @@ const barberProfileCollection = {
       }),
     },
     {
-      name: '8. Update Profile Picture',
+      name: '6. Update Profile Picture',
       ...request({
-        method: 'PUT',
+        method: 'PATCH',
         url: '{{base_url}}/{{api_prefix}}/shops/me/picture',
         body: formDataBody([fileField('photo', 'Attach profile picture file manually in Postman')]),
         description: 'Uploads or replaces the owner profile picture.',
@@ -1049,9 +1068,9 @@ const barberProfileCollection = {
       }),
     },
     {
-      name: '9. Update Cover Image',
+      name: '7. Update Cover Image',
       ...request({
-        method: 'PUT',
+        method: 'PATCH',
         url: '{{base_url}}/{{api_prefix}}/shops/me/cover',
         body: formDataBody([fileField('cover', 'Attach cover image file manually in Postman')]),
         description: 'Uploads or replaces the shop cover image.',
@@ -1059,9 +1078,9 @@ const barberProfileCollection = {
       }),
     },
     {
-      name: '10. Update PIN',
+      name: '8. Update PIN',
       ...request({
-        method: 'PUT',
+        method: 'PATCH',
         url: '{{base_url}}/{{api_prefix}}/shops/me/pin',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
         body: jsonBody(`{\n  "currentPin": "{{barber_active_pin}}",\n  "newPin": "{{barber_next_pin}}",\n  "confirmNewPin": "{{barber_next_pin}}"\n}`),
@@ -1082,19 +1101,19 @@ const barberProfileCollection = {
       }),
     },
     {
-      name: '11. Sign-Out Everywhere (Terminal)',
+      name: '9. Sign-Out Everywhere (Terminal)',
       ...request({
-        method: 'POST',
-        url: '{{base_url}}/{{api_prefix}}/shops/me/sign-out-everywhere',
+        method: 'DELETE',
+        url: '{{base_url}}/{{api_prefix}}/account/sessions',
         description: 'Revokes the JWT refresh token, invalidating all sessions. Run this only when you are finished testing.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
     },
     {
-      name: '12. Delete Account (Terminal)',
+      name: '10. Delete Account (Terminal)',
       ...request({
         method: 'DELETE',
-        url: '{{base_url}}/{{api_prefix}}/shops/me',
+        url: '{{base_url}}/{{api_prefix}}/account',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
         body: jsonBody(`{\n  "currentPin": "{{barber_active_pin}}"\n}`),
         description: 'Soft-deletes the barber account and revokes the JWT refresh token. Run this instead of the sign-out request when you want the account deleted.',
@@ -1118,6 +1137,7 @@ const barberEmployeesCollection = {
     ...baseVariables(
       textVariable('employee_id', ''),
       textVariable('employee_phone', ''),
+      textVariable('employee_leave_date', ''),
     ),
   ],
   item: [
@@ -1130,9 +1150,13 @@ const barberEmployeesCollection = {
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           "const response = pm.response.json();",
-          "const employees = Array.isArray(response.data && response.data.items) ? response.data.items : [];",
+          "const employees = Array.isArray(response.data) ? response.data : [];",
           "const preferredEmployee = employees.find((employee) => typeof employee.firstName === 'string' && employee.firstName.includes('Postman')) || employees[0];",
-          "if (preferredEmployee && preferredEmployee._id) { pm.collectionVariables.set('employee_id', preferredEmployee._id); pm.globals.set('shared_employee_id', preferredEmployee._id); }"
+          "if (preferredEmployee && preferredEmployee.id) {",
+          "  const employeeId = preferredEmployee.id;",
+          "  pm.collectionVariables.set('employee_id', employeeId);",
+          "  pm.globals.set('shared_employee_id', employeeId);",
+          "}"
         ),
       }),
     },
@@ -1180,7 +1204,7 @@ const barberEmployeesCollection = {
           [
             "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
             "const response = pm.response.json();",
-            "const employeeId = response.data && response.data._id;",
+            "const employeeId = response.data && response.data.id;",
             "if (employeeId) { pm.collectionVariables.set('employee_id', employeeId); pm.globals.set('shared_employee_id', employeeId); }"
           ]
         ),
@@ -1189,7 +1213,7 @@ const barberEmployeesCollection = {
     {
       name: '4. Update Employee',
       ...request({
-        method: 'PUT',
+        method: 'PATCH',
         url: '{{base_url}}/{{api_prefix}}/employees/{{employee_id}}',
         body: formDataBody([
           textField('firstName', 'Postman'),
@@ -1203,7 +1227,72 @@ const barberEmployeesCollection = {
       }),
     },
     {
-      name: '5. Delete Employee (Terminal)',
+      name: '5. Toggle Employee Status',
+      ...request({
+        method: 'PATCH',
+        url: '{{base_url}}/{{api_prefix}}/employees/{{employee_id}}/status',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "status": false\n}`),
+        description: 'Toggles employee availability status. Accepts boolean (true/false) or string values (yes/no, on/off). Omit status field to toggle current state.',
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          "const response = pm.response.json();",
+          "const data = response.data || {};",
+          "pm.test('response includes isActive', function () { pm.expect(data).to.have.property('isActive'); });",
+          "pm.test('isActive is boolean', function () { pm.expect(data.isActive).to.be.a('boolean'); });"
+        ),
+      }),
+    },
+    {
+      name: '6. Mark Employee Unavailable For Date',
+      ...request({
+        method: 'PATCH',
+        url: '{{base_url}}/{{api_prefix}}/employees/{{employee_id}}/availability',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "dates": ["{{employee_leave_date}}"],\n  "available": false\n}`),
+        description: 'Marks the captured employee unavailable for a generated future date. Existing bookings remain unchanged and affected customers receive booking.employee_unavailable notifications.',
+        event: mergedEvents(
+          [
+            "const date = new Date();",
+            "date.setDate(date.getDate() + 3);",
+            "const leaveDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;",
+            "pm.collectionVariables.set('employee_leave_date', leaveDate);"
+          ],
+          [
+            "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+            "const response = pm.response.json();",
+            "const data = response.data || {};",
+            "pm.test('leave response includes affected booking counts', function () {",
+            "  pm.expect(data).to.have.property('affectedBookings');",
+            "  pm.expect(data).to.have.property('customersNotified');",
+            "  pm.expect(data).to.have.property('blockedDates');",
+            "});",
+            "pm.test('blockedDates includes leave date', function () {",
+            "  pm.expect(data.blockedDates || []).to.include(pm.collectionVariables.get('employee_leave_date'));",
+            "});"
+          ]
+        ),
+      }),
+    },
+    {
+      name: '7. Mark Employee Available Again',
+      ...request({
+        method: 'PATCH',
+        url: '{{base_url}}/{{api_prefix}}/employees/{{employee_id}}/availability',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "dates": ["{{employee_leave_date}}"],\n  "available": true\n}`),
+        description: 'Removes the generated leave date. The system does not notify customers when an employee becomes available again, avoiding multiple conflicting customer messages.',
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          "const response = pm.response.json();",
+          "const data = response.data || {};",
+          "pm.test('availability response includes datesUnblocked', function () { pm.expect(data).to.have.property('datesUnblocked'); });",
+          "pm.test('customers were not notified on availability restore', function () { pm.expect(data.customersNotified).to.equal(0); });"
+        ),
+      }),
+    },
+    {
+      name: '8. Delete Employee (Terminal)',
       ...request({
         method: 'DELETE',
         url: '{{base_url}}/{{api_prefix}}/employees/{{employee_id}}',
@@ -1245,9 +1334,13 @@ const barberServicesCollection = {
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           "const response = pm.response.json();",
-          "const services = Array.isArray(response.data && response.data.items) ? response.data.items : [];",
+          "const services = Array.isArray(response.data) ? response.data : [];",
           "const preferredService = services.find((service) => typeof service.serviceName === 'string' && service.serviceName.includes('Postman')) || services[0];",
-          "if (preferredService && preferredService._id) { pm.collectionVariables.set('service_id', preferredService._id); pm.globals.set('shared_service_id', preferredService._id); }"
+          "if (preferredService && preferredService.id) {",
+          "  const serviceId = preferredService.id;",
+          "  pm.collectionVariables.set('service_id', serviceId);",
+          "  pm.globals.set('shared_service_id', serviceId);",
+          "}"
         ),
       }),
     },
@@ -1264,7 +1357,7 @@ const barberServicesCollection = {
           [
             "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
             "const response = pm.response.json();",
-            "const serviceId = response.data && response.data._id;",
+            "const serviceId = response.data && response.data.id;",
             "if (serviceId) { pm.collectionVariables.set('service_id', serviceId); pm.globals.set('shared_service_id', serviceId); }"
           ]
         ),
@@ -1314,7 +1407,7 @@ const barberServicesCollection = {
 const barberBookingsCollection = {
   info: {
     name: 'EverCut - Barber Bookings',
-    description: 'Barber booking administration collection covering list, status stats, monthly milestone progress, status updates, and explicit booking cancellation.',
+    description: 'Barber booking administration collection covering list with role-specific filters (employeeId, dateFrom, dateTo), status stats, monthly milestone progress, status updates, and explicit booking cancellation. Enhanced with employee and date range filtering for leave management and scheduling.',
     schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
   },
   auth: bearerAuth('barber_access_token'),
@@ -1322,12 +1415,16 @@ const barberBookingsCollection = {
     syncPairs: [
       ['shared_booking_id', 'booking_id_status'],
       ['shared_booking_id', 'booking_id_delete'],
+      ['shared_employee_id', 'employee_id'],
     ],
+    includeDateHelpers: true,
   }),
   variable: [
     ...baseVariables(
       textVariable('booking_id_status', ''),
       textVariable('booking_id_delete', ''),
+      textVariable('employee_id', ''),
+      textVariable('booking_date', ''),
     ),
   ],
   item: [
@@ -1340,12 +1437,17 @@ const barberBookingsCollection = {
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           "const response = pm.response.json();",
-          "const data = response.data || {};",
-          "const bookings = Array.isArray(data.items) ? data.items : [];",
+          "const bookings = Array.isArray(response.data) ? response.data : [];",
+          "bookings.forEach((booking) => {",
+          "  if (booking.employee) {",
+          "    pm.expect(booking.employee).to.have.property('isAvailableOnBookingDate');",
+          "    pm.expect(booking.employee.isAvailableOnBookingDate).to.be.a('boolean');",
+          "  }",
+          "});",
           "const statusBooking = bookings.find((booking) => ['pending', 'confirmed'].includes(booking.status)) || bookings[0];",
           "const deleteBooking = bookings.find((booking) => booking.paymentStatus === 'success') || statusBooking;",
-          "const statusBookingId = statusBooking && (statusBooking._id || statusBooking.bookingId);",
-          "const deleteBookingId = deleteBooking && (deleteBooking._id || deleteBooking.bookingId);",
+          "const statusBookingId = statusBooking && statusBooking.id;",
+          "const deleteBookingId = deleteBooking && deleteBooking.id;",
           "if (statusBookingId) { pm.collectionVariables.set('booking_id_status', statusBookingId); pm.globals.set('shared_booking_id', statusBookingId); }",
           "if (deleteBookingId) { pm.collectionVariables.set('booking_id_delete', deleteBookingId); }"
         ),
@@ -1355,7 +1457,7 @@ const barberBookingsCollection = {
       name: '2. Get Booking Stats',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/bookings/stats',
+        url: '{{base_url}}/{{api_prefix}}/bookings/analytics/summary',
         description: 'Returns booking counts grouped by status.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -1364,7 +1466,7 @@ const barberBookingsCollection = {
       name: '3. Get Booking Milestone Progress',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/bookings/progress',
+        url: '{{base_url}}/{{api_prefix}}/bookings/analytics/milestones',
         description: 'Returns the current month completed-booking milestone progress card data, including the active status, completed count, visible targets, and next reward gap.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -1373,7 +1475,7 @@ const barberBookingsCollection = {
       name: '4. Get Pending Confirmations',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/bookings/pending-confirmations',
+        url: '{{base_url}}/{{api_prefix}}/bookings?status=awaiting_confirmation&paymentStatus=success',
         description: 'Lists all bookings awaiting barber confirmation. These are paid bookings that need explicit barber approval.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -1382,25 +1484,73 @@ const barberBookingsCollection = {
       name: '5. Get Confirmed Bookings',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/bookings/status?status=confirmed',
+        url: '{{base_url}}/{{api_prefix}}/bookings?status=confirmed',
         description: 'Lists confirmed bookings. Paid bookings move through awaiting_confirmation before barber confirmation.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
     },
     {
-      name: '6. Confirm Booking',
+      name: '6. Get Bookings By Employee',
+      ...request({
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/bookings?employeeId={{employee_id}}',
+        description: 'Lists all bookings for a specific employee. Useful for tracking employee performance and managing employee schedules.',
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          "const response = pm.response.json();",
+          "const bookings = Array.isArray(response.data) ? response.data : [];",
+          "pm.test('all bookings belong to the specified employee', function () {",
+          "  const employeeId = pm.collectionVariables.get('employee_id');",
+          "  bookings.forEach((booking) => {",
+          "    pm.expect(booking.employee && booking.employee.id).to.equal(employeeId);",
+          "  });",
+          "});"
+        ),
+      }),
+    },
+    {
+      name: '7. Get Bookings By Date Range',
+      ...request({
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/bookings?dateFrom={{booking_date}}&dateTo={{booking_date}}',
+        description: 'Lists all bookings within a date range. Use same date for both parameters to get bookings for a single day (e.g., today\'s schedule).',
+        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
+      }),
+    },
+    {
+      name: '8. Get Employee Bookings In Date Range',
+      ...request({
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/bookings?employeeId={{employee_id}}&dateFrom={{booking_date}}&dateTo={{booking_date}}',
+        description: 'Lists bookings for a specific employee within a date range. Essential for employee leave management - find affected bookings when employee requests time off.',
+        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
+      }),
+    },
+    {
+      name: '9. Get Employee Bookings With Status Filter',
+      ...request({
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/bookings?employeeId={{employee_id}}&status=confirmed,awaiting_confirmation',
+        description: 'Lists active bookings for an employee (confirmed or awaiting confirmation). Useful for finding bookings that need reassignment when employee is unavailable.',
+        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
+      }),
+    },
+    {
+      name: '10. Confirm Booking',
       ...request({
         method: 'PATCH',
-        url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id_status}}/confirm',
+        url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id_status}}',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "status": "confirmed"\n}`),
         description: 'Barber explicitly confirms a booking, moving it from awaiting_confirmation to confirmed status.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
     },
     {
-      name: '7. Update Booking Status',
+      name: '11. Update Booking Status',
       ...request({
-        method: 'PUT',
-        url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id_status}}/status',
+        method: 'PATCH',
+        url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id_status}}',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
         body: jsonBody(`{\n  "status": "completed"\n}`),
         description: 'Updates the captured booking status. Use `booking_id_status`, not the delete-only booking ID.',
@@ -1408,10 +1558,12 @@ const barberBookingsCollection = {
       }),
     },
     {
-      name: '8. Cancel Paid Booking (Terminal)',
+      name: '12. Cancel Paid Booking (Terminal)',
       ...request({
-        method: 'POST',
-        url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id_delete}}/cancel',
+        method: 'PATCH',
+        url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id_delete}}',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "status": "cancelled"\n}`),
         description: 'Cancels a paid booking only when the booking is still awaiting confirmation.',
         event: testEvent(
           "pm.test('status is 200 or 400', function () { pm.expect(pm.response.code).to.be.oneOf([200, 400]); });",
@@ -1447,9 +1599,13 @@ const barberPhotosCollection = {
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           "const response = pm.response.json();",
-          "const photos = Array.isArray(response.data && response.data.items) ? response.data.items : [];",
+          "const photos = Array.isArray(response.data) ? response.data : [];",
           "const firstPhoto = photos[0];",
-          "if (firstPhoto && firstPhoto._id) { pm.collectionVariables.set('photo_id', firstPhoto._id); pm.globals.set('shared_photo_id', firstPhoto._id); }"
+          "if (firstPhoto && firstPhoto.id) {",
+          "  const photoId = firstPhoto.id;",
+          "  pm.collectionVariables.set('photo_id', photoId);",
+          "  pm.globals.set('shared_photo_id', photoId);",
+          "}"
         ),
       }),
     },
@@ -1469,7 +1625,11 @@ const barberPhotosCollection = {
           "const response = pm.response.json();",
           "const photos = Array.isArray(response.data) ? response.data : [];",
           "const firstPhoto = photos[0];",
-          "if (firstPhoto && firstPhoto._id) { pm.collectionVariables.set('photo_id', firstPhoto._id); pm.globals.set('shared_photo_id', firstPhoto._id); }"
+          "if (firstPhoto && firstPhoto.id) {",
+          "  const photoId = firstPhoto.id;",
+          "  pm.collectionVariables.set('photo_id', photoId);",
+          "  pm.globals.set('shared_photo_id', photoId);",
+          "}"
         ),
       }),
     },
@@ -1553,15 +1713,15 @@ const barberEarningsCollection = {
             "pm.test('response uses paginated envelope', function () {",
             "  const response = pm.response.json();",
             "  pm.expect(response).to.have.property('success', true);",
-            "  pm.expect(response.data).to.have.property('items');",
-            "  pm.expect(response.data).to.have.property('pagination');",
-            "  pm.expect(response.data).to.have.property('monthlyRevenue');",
+            "  pm.expect(response.data).to.be.an('array');",
+            "  pm.expect(response).to.have.nested.property('meta.pagination');",
+            "  pm.expect(response).to.have.nested.property('meta.monthlyRevenue');",
             "});",
             "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
             "pm.test('transactions have required fields', function () {",
             "  const response = pm.response.json();",
-            "  if (response.data.items.length > 0) {",
-            "    const transaction = response.data.items[0];",
+            "  if (response.data.length > 0) {",
+            "    const transaction = response.data[0];",
             "    pm.expect(transaction).to.have.property('transactionId');",
             "    pm.expect(transaction).to.have.property('customer');",
             "    pm.expect(transaction).to.have.property('amount');",
@@ -1569,7 +1729,7 @@ const barberEarningsCollection = {
             "    pm.expect(transaction).to.have.property('timestamp');",
             "    ",
             "    // Save first transaction ID for detail endpoint",
-            "    pm.collectionVariables.set('transaction_id', transaction._id);",
+            "    pm.collectionVariables.set('transaction_id', transaction.id);",
             "  }",
             "});",
           ]
@@ -1655,10 +1815,10 @@ const barberRatingsCollection = {
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           "const response = pm.response.json();",
-          "const ratings = Array.isArray(response.data && response.data.items) ? response.data.items : [];",
+          "const ratings = Array.isArray(response.data) ? response.data : [];",
           "const capture = (variableName, marker) => {",
           "  const match = ratings.find((item) => typeof item.review === 'string' && item.review.includes(marker));",
-          "  const ratingId = match && (match.ratingId || match._id);",
+          "  const ratingId = match && match.id;",
           "  if (ratingId) { pm.collectionVariables.set(variableName, ratingId); }",
           "};",
           "capture('rating_id_add_reply', '[ADD_REPLY_TARGET]');",
@@ -1725,7 +1885,7 @@ const barberRatingsCollection = {
 const paymentsPayoutsCollection = {
   info: {
     name: 'EverCut - Payments & Payouts',
-    description: 'Native PhonePe SDK payment initiation/verification, webhook simulation with automatic signature generation, refund processing, and payout retry for the EverCut dual-provider payment system. PhonePe is used for customer collection; Cashfree Payouts is used for barber disbursement. Webhook requests include pre-request scripts that automatically compute cryptographic signatures (SHA256 for PhonePe, HMAC-SHA256 for Cashfree) using environment variables.',
+    description: 'Native PhonePe SDK payment initiation/verification, refund processing, and payout retry for the EverCut dual-provider payment system. PhonePe is used for customer collection; Cashfree Payouts is used for barber disbursement.',
     schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
   },
   auth: bearerAuth('customer_access_token'),
@@ -1737,11 +1897,7 @@ const paymentsPayoutsCollection = {
       ['merchant_refund_id', 'merchant_refund_id'],
       ['refund_id', 'refund_id'],
       ['payout_id', 'payout_id'],
-      ['payout_transfer_id', 'payout_transfer_id'],
       ['admin_access_token', 'admin_access_token'],
-      ['phonepe_webhook_username', 'phonepe_webhook_username'],
-      ['phonepe_webhook_password', 'phonepe_webhook_password'],
-      ['cashfree_webhook_secret', 'cashfree_webhook_secret'],
     ],
     extra: [
       "// Ensure payment_booking_id is synced ONLY if it hasn't been set manually.",
@@ -1763,10 +1919,6 @@ const paymentsPayoutsCollection = {
       textVariable('merchant_refund_id', '', 'Auto-captured from refund initiation'),
       textVariable('refund_id', '', 'Auto-captured from refund initiation'),
       textVariable('payout_id', '', 'Payout ID for retry operations'),
-      textVariable('payout_transfer_id', '', 'Payout transfer ID from MongoDB - required for payout webhook simulation'),
-      textVariable('phonepe_webhook_username', 'test-phonepe-webhook-user', 'PhonePe webhook username - must match PHONEPE_WEBHOOK_USERNAME in .env'),
-      textVariable('phonepe_webhook_password', 'test-phonepe-webhook-password', 'PhonePe webhook password - must match PHONEPE_WEBHOOK_PASSWORD in .env'),
-      textVariable('cashfree_webhook_secret', 'test-cashfree-client-secret', 'Cashfree webhook secret - must match CASHFREE_PAYOUT_CLIENT_SECRET in .env'),
     ),
   ],
   item: [
@@ -1778,21 +1930,21 @@ const paymentsPayoutsCollection = {
         auth: bearerAuth('customer_access_token'),
         headers: [{ key: 'Content-Type', value: 'application/json' }],
         body: jsonBody(`{\n  "bookingId": "{{payment_booking_id}}"\n}`),
-        description: 'Creates a PhonePe native SDK checkout order for the authenticated customer\'s pending booking. The response returns orderId, token, merchantId, merchantOrderId, and paymentId for the Flutter PhonePe SDK. No redirect URL is returned.',
+        description: 'Creates a PhonePe native SDK checkout order for the authenticated customer\'s pending booking. The response returns id, orderId, token, merchantId, and merchantOrderId for the Flutter PhonePe SDK. No redirect URL is returned.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           "pm.test('captures native payment references', function () {",
           "  const response = pm.response.json();",
           "  pm.expect(response.success).to.equal(true);",
-          "  pm.expect(response.data).to.have.property('paymentId');",
+          "  pm.expect(response.data).to.have.property('id');",
           "  pm.expect(response.data).to.have.property('merchantOrderId');",
           "  pm.expect(response.data).to.have.property('orderId');",
           "  pm.expect(response.data).to.have.property('token');",
           "  pm.expect(response.data).to.have.property('merchantId');",
           "  pm.expect(response.data).to.not.have.property('redirectUrl');",
-          "  pm.collectionVariables.set('payment_id', response.data.paymentId);",
+          "  pm.collectionVariables.set('payment_id', response.data.id);",
           "  pm.collectionVariables.set('merchant_order_id', response.data.merchantOrderId);",
-          "  pm.globals.set('payment_id', response.data.paymentId);",
+          "  pm.globals.set('payment_id', response.data.id);",
           "  pm.globals.set('merchant_order_id', response.data.merchantOrderId);",
           "});"
         ),
@@ -1840,32 +1992,10 @@ const paymentsPayoutsCollection = {
       }),
     },
     {
-      name: '5. Get Payment By Booking',
-      ...request({
-        method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/bookings/{{payment_booking_id}}/payment',
-        auth: bearerAuth('customer_access_token'),
-        description: 'Returns the latest payment transaction for the authenticated customer\'s booking.',
-        event: testEvent(
-          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
-          "const response = pm.response.json();",
-          "const data = response.data || {};",
-          "if (data._id) {",
-          "  pm.collectionVariables.set('payment_id', data._id);",
-          "  pm.globals.set('payment_id', data._id);",
-          "}",
-          "if (data.merchantOrderId) {",
-          "  pm.collectionVariables.set('merchant_order_id', data.merchantOrderId);",
-          "  pm.globals.set('merchant_order_id', data.merchantOrderId);",
-          "}"
-        ),
-      }),
-    },
-    {
       name: '5. Initiate Refund',
       ...request({
         method: 'POST',
-        url: '{{base_url}}/{{api_prefix}}/bookings/{{payment_booking_id}}/refund',
+        url: '{{base_url}}/{{api_prefix}}/bookings/{{payment_booking_id}}/refunds',
         auth: bearerAuth('barber_access_token'),
         headers: [{ key: 'Content-Type', value: 'application/json' }],
         body: jsonBody(`{\n  "reason": "Customer cancelled before payout batch"\n}`),
@@ -1898,220 +2028,16 @@ const paymentsPayoutsCollection = {
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           "pm.test('captures retry payout references when present', function () {",
           "  const response = pm.response.json();",
-          "  if (response.data?._id) {",
-          "    pm.collectionVariables.set('payout_id', response.data._id);",
-          "    pm.globals.set('payout_id', response.data._id);",
+          "  const payoutId = response.data && response.data.id;",
+          "  if (payoutId) {",
+          "    pm.collectionVariables.set('payout_id', payoutId);",
+          "    pm.globals.set('payout_id', payoutId);",
           "  }",
           "});"
         ),
       }),
     },
-    {
-      name: '7. PhonePe Payment Success Webhook',
-      ...request({
-        method: 'POST',
-        url: '{{base_url}}/{{api_prefix}}/payments/webhook',
-        auth: { type: 'noauth' },
-        headers: [
-          { key: 'Content-Type', value: 'application/json' },
-          { key: 'Authorization', value: '{{phonepe_webhook_authorization}}' },
-        ],
-        body: jsonBody(`{\n  "event": "checkout.order.completed",\n  "payload": {\n    "merchantOrderId": "{{merchant_order_id}}",\n    "orderId": "PO{{$timestamp}}",\n    "state": "COMPLETED",\n    "amount": 30300,\n    "paymentDetails": [\n      {\n        "paymentMode": "UPI",\n        "transactionId": "TXN{{$timestamp}}",\n        "amount": 30300,\n        "state": "COMPLETED"\n      }\n    ]\n  }\n}`),
-        description: 'Simulates a PhonePe payment success webhook. The pre-request script computes the SHA256 signature using webhook credentials from environment variables. Backend verifies signature, then calls PhonePe Order Status API for double verification.',
-        event: mergedEvents(
-          [
-            "// Compute PhonePe webhook authorization signature",
-            "const username = pm.collectionVariables.get('phonepe_webhook_username') || pm.environment.get('phonepe_webhook_username') || 'test-phonepe-webhook-user';",
-            "const password = pm.collectionVariables.get('phonepe_webhook_password') || pm.environment.get('phonepe_webhook_password') || 'test-phonepe-webhook-password';",
-            "const authString = username + ':' + password;",
-            "const authSignature = CryptoJS.SHA256(authString).toString(CryptoJS.enc.Hex);",
-            "pm.collectionVariables.set('phonepe_webhook_authorization', authSignature);"
-          ],
-          [
-            "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
-            "pm.test('webhook acknowledged', function () {",
-            "  const response = pm.response.json();",
-            "  pm.expect(response).to.have.property('received');",
-            "  pm.expect(response.received).to.equal(true);",
-            "});"
-          ]
-        ),
-      }),
-    },
-    {
-      name: '8. PhonePe Payment Failure Webhook',
-      ...request({
-        method: 'POST',
-        url: '{{base_url}}/{{api_prefix}}/payments/webhook',
-        auth: { type: 'noauth' },
-        headers: [
-          { key: 'Content-Type', value: 'application/json' },
-          { key: 'Authorization', value: '{{phonepe_webhook_authorization}}' },
-        ],
-        body: jsonBody(`{\n  "event": "checkout.order.failed",\n  "payload": {\n    "merchantOrderId": "{{merchant_order_id}}",\n    "orderId": "PO{{$timestamp}}",\n    "state": "FAILED",\n    "amount": 30300,\n    "paymentDetails": [\n      {\n        "paymentMode": "UPI",\n        "state": "FAILED",\n        "errorCode": "PAYMENT_DECLINED",\n        "detailedErrorCode": "INSUFFICIENT_FUNDS"\n      }\n    ]\n  }\n}`),
-        description: 'Simulates a PhonePe payment failure webhook. Use this to test payment failure handling and booking cancellation logic.',
-        event: mergedEvents(
-          [
-            "// Compute PhonePe webhook authorization signature",
-            "const username = pm.collectionVariables.get('phonepe_webhook_username') || pm.environment.get('phonepe_webhook_username') || 'test-phonepe-webhook-user';",
-            "const password = pm.collectionVariables.get('phonepe_webhook_password') || pm.environment.get('phonepe_webhook_password') || 'test-phonepe-webhook-password';",
-            "const authString = username + ':' + password;",
-            "const authSignature = CryptoJS.SHA256(authString).toString(CryptoJS.enc.Hex);",
-            "pm.collectionVariables.set('phonepe_webhook_authorization', authSignature);"
-          ],
-          [
-            "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
-            "pm.test('webhook acknowledged', function () {",
-            "  const response = pm.response.json();",
-            "  pm.expect(response).to.have.property('received');",
-            "  pm.expect(response.received).to.equal(true);",
-            "});"
-          ]
-        ),
-      }),
-    },
-    {
-      name: '9. PhonePe Refund Completed Webhook',
-      ...request({
-        method: 'POST',
-        url: '{{base_url}}/{{api_prefix}}/payments/webhook',
-        auth: { type: 'noauth' },
-        headers: [
-          { key: 'Content-Type', value: 'application/json' },
-          { key: 'Authorization', value: '{{phonepe_webhook_authorization}}' },
-        ],
-        body: jsonBody(`{\n  "event": "pg.refund.completed",\n  "payload": {\n    "merchantRefundId": "{{merchant_refund_id}}",\n    "refundId": "{{refund_id}}",\n    "originalMerchantOrderId": "{{merchant_order_id}}",\n    "state": "COMPLETED",\n    "amount": 29000\n  }\n}`),
-        description: 'Simulates a PhonePe refund completion webhook. Use this after initiating a refund to test refund success handling.',
-        event: mergedEvents(
-          [
-            "// Compute PhonePe webhook authorization signature",
-            "const username = pm.collectionVariables.get('phonepe_webhook_username') || pm.environment.get('phonepe_webhook_username') || 'test-phonepe-webhook-user';",
-            "const password = pm.collectionVariables.get('phonepe_webhook_password') || pm.environment.get('phonepe_webhook_password') || 'test-phonepe-webhook-password';",
-            "const authString = username + ':' + password;",
-            "const authSignature = CryptoJS.SHA256(authString).toString(CryptoJS.enc.Hex);",
-            "pm.collectionVariables.set('phonepe_webhook_authorization', authSignature);"
-          ],
-          [
-            "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
-            "pm.test('webhook acknowledged', function () {",
-            "  const response = pm.response.json();",
-            "  pm.expect(response).to.have.property('received');",
-            "  pm.expect(response.received).to.equal(true);",
-            "});"
-          ]
-        ),
-      }),
-    },
-    {
-      name: '10. Cashfree Transfer Success Webhook',
-      ...request({
-        method: 'POST',
-        url: '{{base_url}}/{{api_prefix}}/payouts/webhook',
-        auth: { type: 'noauth' },
-        headers: [
-          { key: 'Content-Type', value: 'application/json' },
-          { key: 'x-webhook-timestamp', value: '{{cashfree_webhook_timestamp}}' },
-          { key: 'x-webhook-signature', value: '{{cashfree_webhook_signature}}' },
-        ],
-        body: jsonBody(`{\n  "event": "TRANSFER_SUCCESS",\n  "data": {\n    "transfer": {\n      "transfer_id": "{{payout_transfer_id}}",\n      "cf_transfer_id": "CF{{$timestamp}}",\n      "status": "SUCCESS",\n      "transfer_utr": "UTR{{$timestamp}}",\n      "transfer_amount": 450,\n      "transfer_mode": "upi",\n      "acknowledged": 1,\n      "processed_on": "{{$isoTimestamp}}"\n    }\n  }\n}`),
-        description: 'Simulates a Cashfree payout success webhook. The pre-request script computes the HMAC-SHA256 signature using timestamp + body + secret. Backend verifies signature, then updates payout and booking status.',
-        event: mergedEvents(
-          [
-            "// Compute Cashfree webhook HMAC signature",
-            "const secret = pm.collectionVariables.get('cashfree_webhook_secret') || pm.environment.get('cashfree_webhook_secret') || 'test-cashfree-client-secret';",
-            "const timestamp = Math.floor(Date.now() / 1000).toString();",
-            "pm.collectionVariables.set('cashfree_webhook_timestamp', timestamp);",
-            "",
-            "// Get the transfer ID",
-            "const transferId = pm.collectionVariables.get('payout_transfer_id') || pm.environment.get('payout_transfer_id') || 'PAYOUT_test_' + Date.now();",
-            "",
-            "// Build the raw body",
-            "const bodyObj = {",
-            "  event: 'TRANSFER_SUCCESS',",
-            "  data: {",
-            "    transfer: {",
-            "      transfer_id: transferId,",
-            "      cf_transfer_id: 'CF' + Date.now(),",
-            "      status: 'SUCCESS',",
-            "      transfer_utr: 'UTR' + Date.now(),",
-            "      transfer_amount: 450,",
-            "      transfer_mode: 'upi',",
-            "      acknowledged: 1,",
-            "      processed_on: new Date().toISOString()",
-            "    }",
-            "  }",
-            "};",
-            "const rawBody = JSON.stringify(bodyObj);",
-            "",
-            "// Compute HMAC signature: HMAC-SHA256(timestamp + rawBody, secret)",
-            "const signaturePayload = timestamp + rawBody;",
-            "const signature = CryptoJS.HmacSHA256(signaturePayload, secret).toString(CryptoJS.enc.Base64);",
-            "pm.collectionVariables.set('cashfree_webhook_signature', signature);"
-          ],
-          [
-            "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
-            "pm.test('webhook acknowledged', function () {",
-            "  const response = pm.response.json();",
-            "  pm.expect(response).to.have.property('received');",
-            "  pm.expect(response.received).to.equal(true);",
-            "});"
-          ]
-        ),
-      }),
-    },
-    {
-      name: '11. Cashfree Transfer Failed Webhook',
-      ...request({
-        method: 'POST',
-        url: '{{base_url}}/{{api_prefix}}/payouts/webhook',
-        auth: { type: 'noauth' },
-        headers: [
-          { key: 'Content-Type', value: 'application/json' },
-          { key: 'x-webhook-timestamp', value: '{{cashfree_webhook_timestamp}}' },
-          { key: 'x-webhook-signature', value: '{{cashfree_webhook_signature}}' },
-        ],
-        body: jsonBody(`{\n  "event": "TRANSFER_FAILED",\n  "data": {\n    "transfer": {\n      "transfer_id": "{{payout_transfer_id}}",\n      "cf_transfer_id": "CF{{$timestamp}}",\n      "status": "FAILED",\n      "failure_reason": "INVALID_VPA",\n      "transfer_amount": 450,\n      "transfer_mode": "upi",\n      "acknowledged": 1\n    }\n  }\n}`),
-        description: 'Simulates a Cashfree payout failure webhook. Use this to test payout failure handling and retry logic.',
-        event: mergedEvents(
-          [
-            "// Compute Cashfree webhook HMAC signature",
-            "const secret = pm.collectionVariables.get('cashfree_webhook_secret') || pm.environment.get('cashfree_webhook_secret') || 'test-cashfree-client-secret';",
-            "const timestamp = Math.floor(Date.now() / 1000).toString();",
-            "pm.collectionVariables.set('cashfree_webhook_timestamp', timestamp);",
-            "",
-            "const transferId = pm.collectionVariables.get('payout_transfer_id') || pm.environment.get('payout_transfer_id') || 'PAYOUT_test_' + Date.now();",
-            "",
-            "const bodyObj = {",
-            "  event: 'TRANSFER_FAILED',",
-            "  data: {",
-            "    transfer: {",
-            "      transfer_id: transferId,",
-            "      cf_transfer_id: 'CF' + Date.now(),",
-            "      status: 'FAILED',",
-            "      failure_reason: 'INVALID_VPA',",
-            "      transfer_amount: 450,",
-            "      transfer_mode: 'upi',",
-            "      acknowledged: 1",
-            "    }",
-            "  }",
-            "};",
-            "const rawBody = JSON.stringify(bodyObj);",
-            "",
-            "const signaturePayload = timestamp + rawBody;",
-            "const signature = CryptoJS.HmacSHA256(signaturePayload, secret).toString(CryptoJS.enc.Base64);",
-            "pm.collectionVariables.set('cashfree_webhook_signature', signature);"
-          ],
-          [
-            "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
-            "pm.test('webhook acknowledged', function () {",
-            "  const response = pm.response.json();",
-            "  pm.expect(response).to.have.property('received');",
-            "  pm.expect(response.received).to.equal(true);",
-            "});"
-          ]
-        ),
-      }),
-    },
+
   ],
 };
 
@@ -2145,8 +2071,8 @@ const dashboardCollection = {
       name: '2. Get Today\'s Pulse (Bookings)',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/bookings/stats/today',
-        description: 'Returns real-time occupancy metrics and booking status breakdown for today. Shows booked vs total capacity and counts for All, Pending, Done, and Cancelled bookings. NEW ENDPOINT: Moved from /dashboard/pulse to /bookings/stats/today.',
+        url: '{{base_url}}/{{api_prefix}}/bookings/analytics/today',
+        description: 'Returns real-time occupancy metrics and booking status breakdown for today. Shows booked vs total capacity and counts for All, Pending, Done, and Cancelled bookings.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           "const response = pm.response.json();",
@@ -2167,8 +2093,8 @@ const dashboardCollection = {
       name: '3. Get Staff Availability (Employees)',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/employees/availability',
-        description: 'Returns staff availability and progress tracking for today. Shows each employee\'s completed vs total appointments with progress percentage. NEW ENDPOINT: Moved from /dashboard/staff to /employees/availability.',
+        url: '{{base_url}}/{{api_prefix}}/employees/analytics/availability',
+        description: 'Returns staff availability and progress tracking for today. Shows each employee\'s completed vs total appointments with progress percentage.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           "const response = pm.response.json();",
@@ -2178,7 +2104,7 @@ const dashboardCollection = {
           "if (Array.isArray(data.staff) && data.staff.length > 0) {",
           "  const firstStaff = data.staff[0];",
           "  pm.test('staff item has required fields', function () {",
-          "    pm.expect(firstStaff).to.have.property('employeeId');",
+          "    pm.expect(firstStaff).to.have.property('id');",
           "    pm.expect(firstStaff).to.have.property('name');",
           "    pm.expect(firstStaff).to.have.property('progress');",
           "  });",
@@ -2190,16 +2116,16 @@ const dashboardCollection = {
       name: '4. Get Today\'s Queue - Active (Bookings)',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/bookings/queue?filter=active',
-        description: 'Returns today\'s active appointments (within ±30 minutes of current time). Shows customer name, employee name, time, and services. NEW ENDPOINT: Moved from /dashboard/queue to /bookings/queue.',
+        url: '{{base_url}}/{{api_prefix}}/bookings/analytics/queue?timeframe=active',
+        description: 'Returns today\'s active appointments near the current time. Shows customer name, employee name, time, and services.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           "const response = pm.response.json();",
           "const data = response.data || {};",
-          "pm.test('response includes filter', function () { pm.expect(data).to.have.property('filter'); });",
+          "pm.test('response includes timeframe', function () { pm.expect(data).to.have.property('timeframe'); });",
           "pm.test('response includes active', function () { pm.expect(data).to.have.property('active'); });",
           "pm.test('response includes upcoming', function () { pm.expect(data).to.have.property('upcoming'); });",
-          "pm.test('filter is active', function () { pm.expect(data.filter).to.equal('active'); });"
+          "pm.test('timeframe is active', function () { pm.expect(data.timeframe).to.equal('active'); });"
         ),
       }),
     },
@@ -2207,16 +2133,141 @@ const dashboardCollection = {
       name: '5. Get Today\'s Queue - Upcoming (Bookings)',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/bookings/queue?filter=upcoming',
-        description: 'Returns today\'s upcoming appointments (more than 30 minutes in the future). Shows customer name, employee name, time, and services. NEW ENDPOINT: Moved from /dashboard/queue to /bookings/queue.',
+        url: '{{base_url}}/{{api_prefix}}/bookings/analytics/queue?timeframe=upcoming',
+        description: 'Returns today\'s upcoming appointments. Shows customer name, employee name, time, and services.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           "const response = pm.response.json();",
           "const data = response.data || {};",
-          "pm.test('response includes filter', function () { pm.expect(data).to.have.property('filter'); });",
+          "pm.test('response includes timeframe', function () { pm.expect(data).to.have.property('timeframe'); });",
           "pm.test('response includes active', function () { pm.expect(data).to.have.property('active'); });",
           "pm.test('response includes upcoming', function () { pm.expect(data).to.have.property('upcoming'); });",
-          "pm.test('filter is upcoming', function () { pm.expect(data.filter).to.equal('upcoming'); });"
+          "pm.test('timeframe is upcoming', function () { pm.expect(data.timeframe).to.equal('upcoming'); });"
+        ),
+      }),
+    },
+  ],
+};
+
+const notificationsCollection = {
+  info: {
+    name: 'EverCut - Notifications',
+    description: 'Hybrid FCM + REST notification APIs for device token registration, notification history, unread counts, and read tracking. Use this with either a customer or barber access token.',
+    schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
+  },
+  auth: bearerAuth('customer_access_token'),
+  event: collectionPreRequest({
+    syncPairs: [
+      ['shared_notification_id', 'notification_id'],
+    ],
+  }),
+  variable: [
+    ...baseVariables(
+      textVariable('notification_id', '', 'Notification ID captured from the list endpoint.'),
+    ),
+  ],
+  item: [
+    {
+      name: '1. Register FCM Token',
+      ...request({
+        method: 'POST',
+        url: '{{base_url}}/{{api_prefix}}/notifications/tokens',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "token": "{{fcm_token}}",\n  "platform": "android",\n  "deviceId": "postman-device-1",\n  "appVersion": "1.0.0",\n  "locale": "en-IN"\n}`),
+        description: 'Registers or refreshes an FCM token for the authenticated user. Multiple devices are supported by registering different tokens. Reusing a token reassigns ownership to the current authenticated user.',
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          "pm.test('token document returned', function () {",
+          "  const response = pm.response.json();",
+          "  pm.expect(response.success).to.equal(true);",
+          "  pm.expect(response.data).to.have.property('id');",
+          "  pm.expect(response.data).to.have.property('platform');",
+          "  pm.expect(response.data).to.not.have.property('token');",
+          "});"
+        ),
+      }),
+    },
+    {
+      name: '2. List Notifications And Capture ID',
+      ...request({
+        method: 'GET',
+        url: {
+          raw: '{{base_url}}/{{api_prefix}}/notifications?page=1&limit=20',
+          host: ['{{base_url}}'],
+          path: ['{{api_prefix}}', 'notifications'],
+          query: [
+            { key: 'page', value: '1', description: 'Page number' },
+            { key: 'limit', value: '20', description: 'Page size' },
+            { key: 'read', value: 'false', description: 'Optional read filter', disabled: true },
+            { key: 'type', value: 'hybrid', description: 'Optional notification type filter', disabled: true },
+            { key: 'eventType', value: 'booking.confirmed', description: 'Optional event filter', disabled: true },
+          ],
+        },
+        description: 'Returns notification history from MongoDB. FCM is only the real-time trigger; clients should use this REST endpoint as source of truth.',
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          "const response = pm.response.json();",
+          "pm.test('response uses paginated envelope', function () {",
+          "  pm.expect(response.data).to.be.an('array');",
+          "  pm.expect(response).to.have.nested.property('meta.pagination');",
+          "});",
+          "const notifications = Array.isArray(response.data) ? response.data : [];",
+          "const first = notifications[0];",
+          "if (first && first.id) {",
+          "  const notificationId = first.id;",
+          "  pm.collectionVariables.set('notification_id', notificationId);",
+          "  pm.globals.set('shared_notification_id', notificationId);",
+          "}"
+        ),
+      }),
+    },
+    {
+      name: '3. Get Unread Count',
+      ...request({
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/notifications/unread-count',
+        description: 'Returns the unread notification count for the authenticated user.',
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          "pm.test('unreadCount is present', function () {",
+          "  const response = pm.response.json();",
+          "  pm.expect(response.data).to.have.property('unreadCount');",
+          "});"
+        ),
+      }),
+    },
+    {
+      name: '4. Mark Notification Read',
+      ...request({
+        method: 'PATCH',
+        url: '{{base_url}}/{{api_prefix}}/notifications/{{notification_id}}/read',
+        description: 'Marks one notification as read. Run the list request first to capture notification_id, or set it manually.',
+        event: testEvent("pm.test('status is 200 or 404', function () { pm.expect(pm.response.code).to.be.oneOf([200, 404]); });"),
+      }),
+    },
+    {
+      name: '5. Mark All Notifications Read',
+      ...request({
+        method: 'PATCH',
+        url: '{{base_url}}/{{api_prefix}}/notifications/read-all',
+        description: 'Marks all unread notifications for the authenticated user as read.',
+        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
+      }),
+    },
+    {
+      name: '6. Unregister FCM Token',
+      ...request({
+        method: 'DELETE',
+        url: '{{base_url}}/{{api_prefix}}/notifications/tokens',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "token": "{{fcm_token}}"\n}`),
+        description: 'Revokes the current user device token. The token must belong to the authenticated user; otherwise the operation is a no-op.',
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          "pm.test('revoked flag is present', function () {",
+          "  const response = pm.response.json();",
+          "  pm.expect(response.data).to.have.property('revoked');",
+          "});"
         ),
       }),
     },
@@ -2239,9 +2290,7 @@ const environmentTemplate = {
     { key: 'barber_refresh_token', value: '', enabled: true },
     { key: 'barber_onboarding_token', value: '', enabled: true },
     { key: 'admin_access_token', value: '', enabled: true },
-    { key: 'phonepe_webhook_username', value: 'test-phonepe-webhook-user', enabled: true },
-    { key: 'phonepe_webhook_password', value: 'test-phonepe-webhook-password', enabled: true },
-    { key: 'cashfree_webhook_secret', value: 'test-cashfree-client-secret', enabled: true },
+    { key: 'fcm_token', value: 'postman-fcm-token-{{$timestamp}}', enabled: true },
   ],
   _postman_variable_scope: 'environment',
   _postman_exported_at: new Date().toISOString(),
@@ -2263,4 +2312,5 @@ writeCollection('12-barber-earnings.json', barberEarningsCollection);
 writeCollection('13-barber-ratings.json', barberRatingsCollection);
 writeCollection('14-dashboard.json', dashboardCollection);
 writeCollection('15-payments-payouts.json', paymentsPayoutsCollection);
+writeCollection('16-notifications.json', notificationsCollection);
 writeFileSync(resolve(COLLECTIONS_DIR, 'EverCut.postman_environment.json'), `${JSON.stringify(environmentTemplate, null, 2)}\n`);

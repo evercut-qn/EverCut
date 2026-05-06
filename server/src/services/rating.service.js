@@ -10,6 +10,8 @@ import {
 } from '../utils/api-error.js';
 import { buildPagination } from '../utils/pagination.utils.js';
 import { serializeRating } from '../utils/rating-response.utils.js';
+import notificationEvents from './notification-events.service.js';
+import { sanitizeForResponse } from '../serializers/core.serializer.js';
 
 /**
  * Rating service.
@@ -39,17 +41,17 @@ const normalizeReplyText = (replyText) => {
 const getOwnedShop = async (ownerId) => {
     const shop = await shopRepository.findByOwnerId(ownerId);
     if (!shop) throw new NotFoundError('Shop');
-    return shop;
+    return sanitizeForResponse(shop);
 };
 
 const assertShopExists = async (shopId) => {
     const shop = await shopRepository.findById(shopId);
     if (!shop) throw new NotFoundError('Shop');
-    return shop;
+    return sanitizeForResponse(shop);
 };
 
 const assertRatingBelongsToShop = (rating, shop, message) => {
-    if (String(rating.shopId) !== String(shop._id)) {
+    if (String(rating.shopId) !== String(shop.id)) {
         throw new ForbiddenError(message);
     }
 };
@@ -83,16 +85,9 @@ export const addRating = async (userId, shopId, rating, review) => {
             rating,
             review: normalizedReview,
         });
+        await notificationEvents.notifyRatingReceived({ ratingId: createdRating._id });
 
-        return {
-            ratingId: createdRating._id,
-            shopId: createdRating.shopId,
-            rating: createdRating.rating,
-            review: createdRating.review || '',
-            reply: null,
-            createdAt: createdRating.createdAt,
-            updatedAt: createdRating.updatedAt,
-        };
+        return serializeRating(createdRating);
     } catch (error) {
         if (error?.code === 11000) {
             throw new ConflictError('You have already rated this shop');
@@ -121,7 +116,7 @@ export const getRatingSummary = async (shopId) => {
 
 export const getRatingSummaryForBarber = async (ownerId) => {
     const shop = await getOwnedShop(ownerId);
-    return getRatingSummary(shop._id);
+    return getRatingSummary(shop.id);
 };
 
 export const removeRating = async (ratingId, ownerId) => {
@@ -149,6 +144,7 @@ export const addReplyToRating = async (ratingId, replyText, ownerId) => {
     }
 
     const updatedRating = await ratingRepository.addReply(ratingId, normalizedReplyText, ownerId);
+    await notificationEvents.notifyRatingReply({ ratingId, actorUserId: ownerId });
     return serializeRating(updatedRating);
 };
 
@@ -186,5 +182,5 @@ export const deleteReplyFromRating = async (ratingId, ownerId) => {
 
 export const getRatingsByShopForBarber = async (ownerId, query = {}) => {
     const shop = await getOwnedShop(ownerId);
-    return getRatingsByShop(shop._id, query);
+    return getRatingsByShop(shop.id, query);
 };

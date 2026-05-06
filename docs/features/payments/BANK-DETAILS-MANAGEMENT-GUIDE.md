@@ -1,6 +1,6 @@
-# Bank Details Management Guide
+# Payout Details Management Guide
 
-**Feature:** Complete bank account details management for barber payouts  
+**Feature:** Complete payout account details management for barber payouts  
 **Date:** 2026-05-03  
 **Status:** ✅ IMPLEMENTED
 
@@ -8,7 +8,7 @@
 
 ## OVERVIEW
 
-This guide documents the complete bank details management system for barber shops. Bank details are required for receiving payouts from completed bookings.
+This guide documents the complete payout details management system for barber shops. Payout details are required for receiving payouts from completed bookings.
 
 ### Key Features
 - ✅ Dedicated bank details endpoints (separate from general business info)
@@ -22,9 +22,9 @@ This guide documents the complete bank details management system for barber shop
 
 ## API ENDPOINTS
 
-### 1. GET Bank Details
+### 1. GET Payout Details
 
-**Endpoint:** `GET /api/v1/shops/me/bank-details`
+**Endpoint:** `GET /api/v1/shops/me/payout-details`
 
 **Purpose:** Retrieve current bank account details with verification status
 
@@ -38,7 +38,7 @@ This guide documents the complete bank details management system for barber shop
   "data": {
     "accountHolderName": "John Doe",
     "bankName": "State Bank of India",
-    "bankAccount": "******5678",
+    "bankAccountLast4": "******5678",
     "ifsc": "SBIN0001234",
     "upiId": "john@paytm",
     "verificationStatus": "verified",
@@ -54,7 +54,7 @@ This guide documents the complete bank details management system for barber shop
 **Field Descriptions:**
 - `accountHolderName`: Name on the bank account
 - `bankName`: Name of the bank
-- `bankAccount`: Masked account number (shows last 4 digits only)
+- `bankAccountLast4`: Masked account number (shows last 4 digits only)
 - `ifsc`: IFSC code of the bank branch
 - `upiId`: UPI ID for payouts
 - `verificationStatus`: One of `pending`, `verified`, `failed`
@@ -66,9 +66,9 @@ This guide documents the complete bank details management system for barber shop
 
 ---
 
-### 2. UPDATE Bank Details
+### 2. UPDATE Payout Details
 
-**Endpoint:** `PUT /api/v1/shops/me/bank-details`
+**Endpoint:** `PATCH /api/v1/shops/me/payout-details`
 
 **Purpose:** Update bank account details
 
@@ -100,7 +100,7 @@ This guide documents the complete bank details management system for barber shop
   "data": {
     "accountHolderName": "John Doe",
     "bankName": "State Bank of India",
-    "bankAccount": "******1234",
+    "bankAccountLast4": "******1234",
     "ifsc": "SBIN0001234",
     "upiId": "john@paytm",
     "verificationStatus": "pending",
@@ -311,10 +311,8 @@ Before a payout can be initiated:
 07-barber-profile-shop/
 ├── Get My Shop Profile
 ├── Update Business Info
-├── Get UPI Details
-├── Update UPI Details
-├── Get Bank Details (NEW)
-├── Update Bank Details (NEW)
+├── Get Payout Details
+├── Update Payout Details
 ├── Update PIN
 ├── Update Profile Picture
 ├── Update Cover Image
@@ -323,15 +321,15 @@ Before a payout can be initiated:
 
 ### Sample Requests
 
-**Get Bank Details:**
+**Get Payout Details:**
 ```
-GET {{baseUrl}}/shops/me/bank-details
+GET {{baseUrl}}/shops/me/payout-details
 Authorization: Bearer {{barberAccessToken}}
 ```
 
-**Update Bank Details:**
+**Update Payout Details:**
 ```
-PUT {{baseUrl}}/shops/me/bank-details
+PATCH {{baseUrl}}/shops/me/payout-details
 Authorization: Bearer {{barberAccessToken}}
 Content-Type: application/json
 
@@ -350,16 +348,13 @@ Content-Type: application/json
 
 ### Existing Shops
 - Shops created before this feature will have `payoutConfig: undefined`
-- They can add bank details via the update endpoint
+- They can add payout details via the update endpoint
 - No data migration required
 
-### Backward Compatibility
-- ✅ Existing UPI details endpoint still works
-- ✅ Existing business update endpoint still works
-- ✅ Bank details can be updated via any of these endpoints:
-  - `PUT /shops/me/bank-details` (recommended, dedicated)
-  - `PUT /shops/me/upi` (works, but mixed with UPI)
-  - `PUT /shops/me` (works, but mixed with business info)
+### API Compatibility
+- No backward compatibility is retained for the old shop-scoped payment endpoints.
+- Payout details are managed only through `GET /shops/me/payout-details` and `PATCH /shops/me/payout-details`.
+- General shop profile updates use `PATCH /shops/me` and do not accept payout fields.
 
 ---
 

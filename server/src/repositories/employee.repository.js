@@ -15,7 +15,7 @@ class EmployeeRepository {
         
         if (options.skip !== undefined) query.skip(options.skip);
         if (options.limit !== undefined) query.limit(options.limit);
-        return query.sort({ createdAt: -1 });
+        return query.sort({ createdAt: -1 }).lean();
     }
 
     async countByShopId(shopId) {
@@ -30,6 +30,22 @@ class EmployeeRepository {
         return Employee.findOneAndUpdate(
             { _id: id, shopId },
             { $set: data },
+            { returnDocument: 'after', runValidators: true },
+        );
+    }
+
+    async updateAvailabilityDates(id, shopId, dates, available) {
+        const normalizedDates = [...new Set(dates)]
+            .filter(Boolean)
+            .map((date) => new Date(`${date}T00:00:00.000Z`));
+
+        const update = available
+            ? { $pull: { blockedDates: { $in: normalizedDates } } }
+            : { $addToSet: { blockedDates: { $each: normalizedDates } } };
+
+        return Employee.findOneAndUpdate(
+            { _id: id, shopId },
+            update,
             { returnDocument: 'after', runValidators: true },
         );
     }

@@ -93,7 +93,22 @@ Retrieve paginated transaction history with monthly revenue summary.
 {
   "success": true,
   "message": "Transactions fetched",
-  "data": {
+  "data": [
+    {
+      "id": "6756d8e9f1234567890abcde",
+      "transactionId": "TXN99201458",
+      "customer": {
+        "name": "Elena Vance",
+        "upiId": "9876543210@upi"
+      },
+      "amount": 145.00,
+      "currency": "INR",
+      "status": "completed",
+      "timestamp": "2024-12-13T10:30:00.000Z",
+      "date": "13 DECEMBER 2024"
+    }
+  ],
+  "meta": {
     "monthlyRevenue": {
       "amount": 145000,
       "currency": "INR",
@@ -101,26 +116,10 @@ Retrieve paginated transaction history with monthly revenue summary.
       "changeDirection": "up",
       "period": "December 2024"
     },
-    "items": [
-      {
-        "_id": "6756d8e9f1234567890abcde",
-        "transactionId": "TXN99201458",
-        "customer": {
-          "name": "Elena Vance",
-          "upiId": "9876543210@upi"
-        },
-        "amount": 145.00,
-        "currency": "INR",
-        "status": "completed",
-        "timestamp": "2024-12-13T10:30:00.000Z",
-        "date": "13 DECEMBER 2024"
-      }
-    ],
     "pagination": {
-      "page": 1,
-      "limit": 20,
-      "total": 150,
+      "currentPage": 1,
       "totalPages": 8,
+      "totalDocuments": 150,
       "hasNextPage": true,
       "hasPrevPage": false
     }
@@ -169,7 +168,7 @@ Retrieve detailed information about a specific transaction.
   "success": true,
   "message": "Transaction detail fetched",
   "data": {
-    "_id": "6756d8e9f1234567890abcde",
+    "id": "6756d8e9f1234567890abcde",
     "transactionId": "TXN99201458",
     "customer": {
       "name": "Alex Johnson"
@@ -183,12 +182,12 @@ Retrieve detailed information about a specific transaction.
     },
     "services": [
       {
-        "_id": "6756d8e9f1234567890abcd2",
+        "id": "6756d8e9f1234567890abcd2",
         "name": "Haircut",
         "price": 45.00
       },
       {
-        "_id": "6756d8e9f1234567890abcd3",
+        "id": "6756d8e9f1234567890abcd3",
         "name": "Beard",
         "price": 20.00
       }
@@ -293,7 +292,7 @@ All endpoints follow the standard error format:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `_id` | ObjectId | Transaction database ID |
+| `id` | string | Public payment transaction identifier |
 | `transactionId` | string | Display transaction ID (e.g., "TXN99201458") |
 | `customer.name` | string | Customer full name |
 | `customer.upiId` | string | Customer UPI ID (derived from phone) |

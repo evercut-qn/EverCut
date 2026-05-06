@@ -1,5 +1,6 @@
 import * as smsProvider from './sms-provider.service.js';
 import userRepository from '../repositories/user.repository.js';
+import notificationEvents from './notification-events.service.js';
 import { BadRequestError, ConflictError } from '../utils/api-error.js';
 import logger, { maskPhoneNumber } from '../utils/logger.js';
 
@@ -97,6 +98,10 @@ export const verifyAndUpdatePhone = async (userId, newMobile, otp) => {
     logger.info('Phone number updated successfully', {
         userId,
         newPhone: maskPhoneNumber(normalizedPhone),
+    });
+    await notificationEvents.notifyAccountUpdated({
+        userId,
+        updateType: 'phone',
     });
 
     return {

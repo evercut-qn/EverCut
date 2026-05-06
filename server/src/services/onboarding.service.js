@@ -13,6 +13,9 @@ import { BadRequestError, ConflictError } from '../utils/api-error.js';
 import { normalizeShopSchedule } from '../utils/shop-schedule.utils.js';
 import * as authService from './auth.service.js';
 import { hashPin, validatePinCreation } from './pin.service.js';
+import { serializeCustomerProfile } from '../serializers/customer.serializer.js';
+import { serializePhotos } from '../serializers/photo.serializer.js';
+import { serializeUser } from '../serializers/user.serializer.js';
 
 /**
  * Onboarding service - handles first-time user and barber profile creation.
@@ -96,8 +99,8 @@ const parseBreakTimes = (value) => {
             throw new BadRequestError(`breakTimes[${index}] must be an object`);
         }
 
-        const start = raw.start || raw.startsAt;
-        const end = raw.end || raw.endsAt;
+        const start = raw.start;
+        const end = raw.end;
 
         if (!start || !end) {
             throw new BadRequestError(`breakTimes[${index}] must include start and end`);
@@ -111,41 +114,34 @@ const extractShopImages = (files) => {
     if (!files) return [];
     if (Array.isArray(files)) return files;
 
-    const onboardingImages = files.shopImages || [];
-    const fallbackPhotos = files.photos || [];
-    return [...onboardingImages, ...fallbackPhotos];
+    return files.photos || [];
 };
 
 const normalizeBarberOnboardingInput = (authUser, shopData) => {
-    const firstName = String(shopData.firstName || shopData.ownerFirstName || '').trim();
-    const lastName = String(shopData.lastName || shopData.ownerLastName || '').trim();
+    const firstName = String(shopData.firstName || '').trim();
+    const lastName = String(shopData.lastName || '').trim();
     const ownerNameFromNameParts = `${firstName} ${lastName}`.trim();
-    const ownerName = String(shopData.shopOwner || shopData.ownerName || ownerNameFromNameParts).trim();
+    const ownerName = ownerNameFromNameParts;
 
     const email = String(shopData.email || authUser?.email || '').trim().toLowerCase();
     const phoneNumber = String(authUser?.phoneNumber || '').trim();
-    const category = shopData.shopCategory || shopData.businessCategory || shopData.category;
-    const address = String(shopData.address || shopData.shopLocation || '').trim();
-    const upiId = String(shopData.upiId || shopData.upiAddress || '').trim();
+    const category = shopData.category;
+    const address = String(shopData.address || '').trim();
+    const upiId = String(shopData.upiId || '').trim();
 
     const workingHours = parseJsonIfString(shopData.workingHours, 'workingHours');
     const openTime = String(
         shopData.openTime
-            || shopData.opensAt
             || workingHours?.openTime
-            || workingHours?.opensAt
             || '',
     ).trim();
     const closeTime = String(
         shopData.closeTime
-            || shopData.closesAt
             || workingHours?.closeTime
-            || workingHours?.closesAt
             || '',
     ).trim();
 
-    const facilitiesInput = shopData.facilities ?? shopData.amenities ?? [];
-    const facilities = toArray(facilitiesInput, 'facilities')
+    const facilities = toArray(shopData.amenities ?? [], 'amenities')
         .map((facility) => String(facility).trim())
         .filter(Boolean);
     const invalidFacilities = facilities.filter((facility) => !ALL_SHOP_AMENITIES.includes(facility));
@@ -153,8 +149,7 @@ const normalizeBarberOnboardingInput = (authUser, shopData) => {
         throw new BadRequestError(`Invalid amenities: ${invalidFacilities.join(', ')}`);
     }
 
-    const availableDaysInput = shopData.availableDays ?? shopData.workingDays ?? [];
-    const availableDays = toArray(availableDaysInput, 'availableDays')
+    const availableDays = toArray(shopData.workingDays ?? [], 'workingDays')
         .map((day) => String(day).trim())
         .filter(Boolean);
     const invalidDays = availableDays.filter((day) => !DAYS_OF_WEEK.includes(day));
@@ -162,8 +157,7 @@ const normalizeBarberOnboardingInput = (authUser, shopData) => {
         throw new BadRequestError(`Invalid working days: ${invalidDays.join(', ')}`);
     }
 
-    const breakTimesInput = shopData.breakTimes ?? shopData.breakTimings ?? [];
-    const breakTimes = parseBreakTimes(breakTimesInput);
+    const breakTimes = parseBreakTimes(shopData.breakTimes ?? []);
 
     const targetCustomersRaw = String(shopData.targetCustomers || '').trim().toLowerCase();
     const targetCustomers = {
@@ -181,14 +175,11 @@ const normalizeBarberOnboardingInput = (authUser, shopData) => {
     if (!firstName || !lastName) {
         throw new BadRequestError('firstName and lastName are required');
     }
-    if (!shopData.gender && !shopData.ownerGender) {
+    if (!shopData.gender) {
         throw new BadRequestError('gender is required');
     }
-    if (!shopData.dateOfBirth && !shopData.ownerDateOfBirth) {
+    if (!shopData.dateOfBirth) {
         throw new BadRequestError('dateOfBirth is required');
-    }
-    if (!ownerName) {
-        throw new BadRequestError('shopOwner/ownerName or firstName + lastName are required');
     }
     if (!email) {
         throw new BadRequestError('email is required');
@@ -197,10 +188,10 @@ const normalizeBarberOnboardingInput = (authUser, shopData) => {
         throw new BadRequestError('phoneNumber is required');
     }
     if (!category) {
-        throw new BadRequestError('shopCategory/businessCategory is required');
+        throw new BadRequestError('category is required');
     }
     if (!address) {
-        throw new BadRequestError('address or shopLocation is required');
+        throw new BadRequestError('address is required');
     }
     if (!availableDays.length) {
         throw new BadRequestError('At least one working day is required');
@@ -209,7 +200,7 @@ const normalizeBarberOnboardingInput = (authUser, shopData) => {
         throw new BadRequestError('openTime and closeTime are required');
     }
     if (!upiId) {
-        throw new BadRequestError('upiId or upiAddress is required');
+        throw new BadRequestError('upiId is required');
     }
     if (!accountHolderName || !bankName) {
         throw new BadRequestError('accountHolderName and bankName are required');
@@ -223,8 +214,8 @@ const normalizeBarberOnboardingInput = (authUser, shopData) => {
     return {
         firstName,
         lastName,
-        gender: shopData.gender || shopData.ownerGender,
-        dateOfBirth: shopData.dateOfBirth || shopData.ownerDateOfBirth,
+        gender: shopData.gender,
+        dateOfBirth: shopData.dateOfBirth,
         ownerName,
         shopName: String(shopData.shopName || '').trim(),
         category,
@@ -302,7 +293,11 @@ export const createCustomerOnboarding = async (phoneNumber, profileData, file) =
 
     const tokens = await issueAuthenticationTokens(user);
 
-    return { user, profile, tokens };
+    return {
+        user: serializeUser(user),
+        profile: serializeCustomerProfile(profile),
+        tokens,
+    };
 };
 
 export const createBarberOnboarding = async (phoneNumber, shopData, files) => {
@@ -402,9 +397,9 @@ export const createBarberOnboarding = async (phoneNumber, shopData, files) => {
     const tokens = await issueAuthenticationTokens(user);
 
     return {
-        user,
+        user: serializeUser(user),
         shop: serializeBarberProfile(createdShop, user, { photos }),
-        photos,
+        photos: serializePhotos(photos),
         tokens,
     };
 };

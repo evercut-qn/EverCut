@@ -65,7 +65,7 @@ class CustomerRepository {
                 },
                 { path: 'shopId', select: 'shopName address coverUrl' },
             ],
-        });
+        }).lean();
     }
 
     async findFavoriteBookingsByUserId(userId) {
@@ -80,14 +80,14 @@ class CustomerRepository {
                 },
                 { path: 'shopId', select: 'shopName address coverUrl' },
             ],
-        });
+        }).lean();
     }
 
     async findFavoriteShopsByUserId(userId) {
         return Customer.findOne({ userId }).populate({
             path: 'favoriteShops',
             select: 'shopName address coverUrl category targetCustomers facilities isOpen location',
-        });
+        }).lean();
     }
 }
 

@@ -85,7 +85,7 @@ This report documents the comprehensive implementation of the barber dashboard f
 │  GET /api/dashboard/overview                                 │
 │  GET /api/dashboard/pulse                                    │
 │  GET /api/dashboard/staff                                    │
-│  GET /api/dashboard/queue?filter=active|upcoming            │
+│  GET /api/v1/bookings/analytics/queue?timeframe=active|upcoming │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
@@ -157,7 +157,7 @@ This report documents the comprehensive implementation of the barber dashboard f
   "data": {
     "staff": [
       {
-        "employeeId": "...",
+        "id": "...",
         "name": "Ram Kumar",
         "photoUrl": "...",
         "progress": {
@@ -173,19 +173,19 @@ This report documents the comprehensive implementation of the barber dashboard f
 }
 ```
 
-#### GET /api/dashboard/queue?filter=active
+#### GET /api/v1/bookings/analytics/queue?timeframe=active
 
 **Response:**
 ```json
 {
   "success": true,
   "data": {
-    "filter": "active",
+    "timeframe": "active",
     "active": {
       "count": 3,
       "items": [
         {
-          "bookingId": "...",
+          "id": "...",
           "customer": { "name": "Julian Thorne" },
           "employee": { "name": "Ram Goswami" },
           "time": "11:30 AM",

@@ -111,6 +111,11 @@
               "  pm.expect(response).to.have.property('message');",
               "  pm.expect(response.message).to.be.a('string');",
               "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
               "});",
               "pm.test('status is 201 or 409', function () { pm.expect(pm.response.code).to.be.oneOf([201, 409]); });",
               "if (pm.response.code === 201) {",
@@ -165,12 +170,7 @@
               "type": "text"
             },
             {
-              "key": "shopOwner",
-              "value": "Test Barber",
-              "type": "text"
-            },
-            {
-              "key": "businessCategory",
+              "key": "category",
               "value": "Barber",
               "type": "text"
             },
@@ -180,7 +180,7 @@
               "type": "text"
             },
             {
-              "key": "shopLocation",
+              "key": "address",
               "value": "MG Road, Bengaluru",
               "type": "text"
             },
@@ -202,12 +202,12 @@
             },
             {
               "key": "workingHours",
-              "value": "{\"opensAt\":\"09:00\",\"closesAt\":\"20:00\"}",
+              "value": "{\"openTime\":\"09:00\",\"closeTime\":\"20:00\"}",
               "type": "text"
             },
             {
-              "key": "breakTimings",
-              "value": "[{\"startsAt\":\"13:00\",\"endsAt\":\"14:00\"}]",
+              "key": "breakTimes",
+              "value": "[{\"start\":\"13:00\",\"end\":\"14:00\"}]",
               "type": "text"
             },
             {
@@ -221,7 +221,7 @@
               "type": "text"
             },
             {
-              "key": "upiAddress",
+              "key": "upiId",
               "value": "test.barber@upi",
               "type": "text"
             },
@@ -236,17 +236,17 @@
               "type": "text"
             },
             {
-              "key": "shopImages",
+              "key": "photos",
               "type": "file",
               "description": "Attach shop image 1 of 3 manually in Postman"
             },
             {
-              "key": "shopImages",
+              "key": "photos",
               "type": "file",
               "description": "Attach shop image 2 of 3 manually in Postman"
             },
             {
-              "key": "shopImages",
+              "key": "photos",
               "type": "file",
               "description": "Attach shop image 3 of 3 manually in Postman"
             }
@@ -277,11 +277,17 @@
               "  pm.expect(response).to.have.property('message');",
               "  pm.expect(response.message).to.be.a('string');",
               "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
               "});",
               "pm.test('status is 201 or 409', function () { pm.expect(pm.response.code).to.be.oneOf([201, 409]); });",
               "if (pm.response.code === 201) {",
               "  const data = pm.response.json().data || {};",
-              "  if (data.shop && data.shop._id) pm.globals.set('shared_shop_id', data.shop._id);",
+              "  const shopId = data.shop && data.shop.id;",
+              "  if (shopId) pm.globals.set('shared_shop_id', shopId);",
               "  if (data.accessToken) pm.environment.set('barber_access_token', data.accessToken);",
               "  if (data.refreshToken) pm.environment.set('barber_refresh_token', data.refreshToken);",
               "  pm.environment.unset('barber_onboarding_token');",

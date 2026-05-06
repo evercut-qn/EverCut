@@ -12,16 +12,19 @@ export const handleWebhook = async (req, res) => {
             processed: result.processed,
         });
 
-        return res.status(200).json({ received: true });
+        return res.status(200).json(ApiResponse.success(
+            { received: true, ...result },
+            'Payment webhook processed',
+        ));
     } catch (error) {
         logger.error('[PaymentController] Webhook processing error', {
             error: error.message,
         });
 
-        return res.status(error.statusCode || 500).json({
-            received: false,
-            error: error.message || 'processing_error',
-        });
+        return res.status(error.statusCode || 500).json(ApiResponse.error(
+            error.message || 'processing_error',
+            { received: false },
+        ));
     }
 };
 
@@ -61,16 +64,6 @@ export const verifyPayment = async (req, res, next) => {
         const verificationContext = getValidatedRequestData(req, 'body');
         const result = await paymentService.verifyPayment(req.user._id, id, verificationContext);
         return res.status(200).json(ApiResponse.success(result, 'Payment verified'));
-    } catch (error) {
-        next(error);
-    }
-};
-
-export const getPaymentByBooking = async (req, res, next) => {
-    try {
-        const { id } = getValidatedRequestData(req, 'params');
-        const result = await paymentService.getPaymentByBooking(req.user._id, id);
-        return res.status(200).json(ApiResponse.success(result, 'Payment details'));
     } catch (error) {
         next(error);
     }

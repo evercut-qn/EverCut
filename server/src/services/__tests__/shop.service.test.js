@@ -45,24 +45,25 @@ test('getFavoriteShops returns a paginated customer favorite shop list', async (
 
     const result = await shopService.getFavoriteShops('user-1', { page: 1, limit: 1 });
 
-    assert.deepEqual(result, {
-        items: [{ _id: 'shop-1', shopName: 'One' }],
-        pagination: {
-            currentPage: 1,
-            totalPages: 2,
-            totalDocuments: 2,
-            hasNextPage: true,
-            hasPrevPage: false,
-        },
+    assert.equal(result.items[0].id, 'shop-1');
+    assert.equal(result.items[0].id, 'shop-1');
+    assert.equal('shopId' in result.items[0], false);
+    assert.equal(result.items[0].shopName, 'One');
+    assert.equal('_id' in result.items[0], false);
+    assert.deepEqual(result.pagination, {
+        currentPage: 1,
+        totalPages: 2,
+        totalDocuments: 2,
+        hasNextPage: true,
+        hasPrevPage: false,
     });
 });
 
-test('toggleFavoriteShop removes an existing favorite shop', async (t) => {
+test('removeFavoriteShop removes an existing favorite shop', async (t) => {
     t.mock.method(customerRepository, 'findByUserId', async () => ({
         _id: 'customer-1',
         favoriteShops: ['shop-1'],
     }));
-    t.mock.method(shopRepository, 'findById', async () => ({ _id: 'shop-1' }));
 
     let removed = null;
     t.mock.method(customerRepository, 'removeFavoriteShop', async (userId, shopId) => {
@@ -70,7 +71,7 @@ test('toggleFavoriteShop removes an existing favorite shop', async (t) => {
         return { _id: 'customer-1' };
     });
 
-    const result = await shopService.toggleFavoriteShop('user-1', 'shop-1');
+    const result = await shopService.removeFavoriteShop('user-1', 'shop-1');
 
     assert.deepEqual(removed, { userId: 'user-1', shopId: 'shop-1' });
     assert.deepEqual(result, {

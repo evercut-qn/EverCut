@@ -69,7 +69,7 @@ Based on backend analysis, common issues in booking flows include:
 
 ```
 1. Shop Discovery
-   ├─ GET /api/v1/shops/nearby
+   ├─ GET /api/v1/shops?coordinates=lng,lat
    ├─ Cache results for session
    └─ Display shop list
 
@@ -96,20 +96,20 @@ Based on backend analysis, common issues in booking flows include:
    └─ Trigger availability check
 
 5. Initial Availability Check
-   ├─ GET /employees/:id/available-slots?date=TODAY&serviceId[]=Y
+   ├─ GET /employees/:id/availability?date=TODAY&serviceId=Y
    ├─ Display available time slots and exact availableWindows
    └─ Cache results for current employee+date
 
 6. Employee Selection Change
    ├─ User selects different employee
    ├─ Clear selected time slot
-   ├─ GET /employees/:newId/available-slots?date=CURRENT_DATE&serviceId[]=Y
+   ├─ GET /employees/:newId/availability?date=CURRENT_DATE&serviceId=Y
    └─ Update available time slots
 
 7. Date Selection Change
    ├─ User selects different date
    ├─ Clear selected time slot
-   ├─ GET /employees/:id/available-slots?date=NEW_DATE&serviceId[]=Y
+   ├─ GET /employees/:id/availability?date=NEW_DATE&serviceId=Y
    └─ Update available time slots
 
 8. Time Selection
@@ -164,14 +164,15 @@ Future<List<Shop>> getNearbyShops({
   required double longitude,
   double? radius,
 }) async {
-  final response = await _dio.get('/api/v1/shops/nearby', queryParameters: {
+  final response = await _dio.get('/api/v1/shops', queryParameters: {
     'latitude': latitude,
     'longitude': longitude,
     if (radius != null) 'radius': radius,
   });
 
-  _shopCache.addAll(response.data['shops']);
-  return response.data['shops'].map((json) => Shop.fromJson(json)).toList();
+  final shops = response.data['data'] as List;
+  _shopCache.addAll(shops);
+  return shops.map((json) => Shop.fromJson(json)).toList();
 }
 
 // Called when user selects a shop
@@ -181,7 +182,7 @@ Future<ShopDetails> getShopDetails(String shopId) async {
   }
 
   final response = await _dio.get('/api/v1/shops/$shopId');
-  final shopDetails = ShopDetails.fromJson(response.data);
+  final shopDetails = ShopDetails.fromJson(response.data['data']);
   _shopDetailsCache[shopId] = shopDetails;
   return shopDetails;
 }
@@ -197,7 +198,7 @@ Future<List<Employee>> getShopEmployees(String shopId) async {
   }
 
   final response = await _dio.get('/api/v1/shops/$shopId/employees');
-  final employees = (response.data['employees'] as List)
+  final employees = (response.data['data']['employees'] as List)
       .map((json) => Employee.fromJson(json))
       .toList();
 
@@ -221,14 +222,14 @@ Future<AvailabilityResult> getEmployeeAvailability({
   if (cached != null) return cached;
 
   final response = await _dio.get(
-    '/api/v1/employees/$employeeId/available-slots',
+    '/api/v1/employees/$employeeId/availability',
     queryParameters: {
       'date': date,
-      'serviceId[]': serviceIds, // Always send as array
+      'serviceId': serviceIds,
     },
   );
 
-  final result = AvailabilityResult.fromJson(response.data);
+  final result = AvailabilityResult.fromJson(response.data['data']);
   _bookingCache.setAvailability(cacheKey, result);
   return result;
 }
@@ -249,13 +250,13 @@ Future<BookingResult> createBooking({
     final response = await _dio.post('/api/v1/bookings', data: {
       'shopId': shopId,
       'employeeId': employeeId,
-      'serviceId[]': serviceIds, // Always send as array for consistency
+      'serviceIds': serviceIds,
       'date': date,
       'time': time,
       if (idempotencyKey != null) 'idempotencyKey': idempotencyKey,
     });
 
-    return BookingResult.fromJson(response.data);
+    return BookingResult.fromJson(response.data['data']);
   } on DioException catch (e) {
     if (e.response?.statusCode == 400) {
       final code = e.response?.data['code'] as String?;
@@ -268,7 +269,9 @@ Future<BookingResult> createBooking({
 }
 ```
 
-**Backend contract update (May 3, 2026):** booking creation returns exact range metadata (`time`, `endTime`, `startMinute`, `endMinute`, `durationMinutes`). Availability returns `availableWindows[]` in addition to `slots[]`. Flutter should trust these backend values and should not locally infer continuous availability.
+**Backend contract update (May 4, 2026):** booking creation accepts `serviceIds[]` and returns exact range metadata (`time`, `endTime`, `startMinute`, `endMinute`, `durationMinutes`). Availability returns `availableWindows[]` in addition to `slots[]`. Flutter should trust these backend values and should not locally infer continuous availability.
+
+All JSON responses use the global envelope `{ success, message, data, meta? }`. Paginated APIs place the list directly in `data` and pagination details in `meta.pagination`. A resource's own identifier is always `id`; relation IDs such as `shopId`, `bookingId`, and `serviceIds` appear only in request bodies or when the response does not include the nested relation object. `_id`, domain ID aliases, and Mongoose internals are not part of the mobile contract.
 
 ### 5. **Payment APIs**
 
@@ -346,7 +349,7 @@ class PaymentFlow {
 
       // 3. Verify payment with backend (ALWAYS, regardless of SDK result)
       await _verifyPaymentWithBackend(
-        paymentId: paymentResult.paymentId,
+        paymentId: paymentResult.id,
         sdkStatus: sdkResult.status,
         sdkResponseCode: sdkResult.responseCode,
         sdkMessage: sdkResult.message,
@@ -634,7 +637,7 @@ class BookingCubit extends Cubit<BookingState> {
         date: DateFormat('yyyy-MM-dd').format(s.selectedDate),
         time: s.selectedTime!,
       );
-      emit(state.copyWith(bookingId: booking.bookingId, isLoading: false));
+      emit(state.copyWith(bookingId: booking.id, isLoading: false));
     } on SlotUnavailableException {
       await _loadAvailability();
       emit(state.copyWith(
@@ -1298,7 +1301,7 @@ void main() {
 
 ### **Backend Alignment**
 - [ ] All API endpoints match backend implementation
-- [ ] `serviceId[]` array format confirmed with backend
+- [ ] `serviceIds[]` create-body format and `serviceId` availability query confirmed with backend
 - [ ] Error codes (`SLOT_UNAVAILABLE`, etc.) confirmed with backend
 - [ ] Business rules match backend validation
 - [ ] Payment flow matches backend webhook handling
