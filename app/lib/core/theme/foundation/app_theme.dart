@@ -1,0 +1,275 @@
+// lib/core/theme/foundation/app_theme.dart
+
+import 'package:flutter/material.dart';
+
+import '../components/appbar.dart';
+import '../components/bottom_appbar.dart';
+import '../components/button.dart';
+import '../components/checkbox.dart';
+import '../components/date_picker.dart';
+import '../components/dialog.dart';
+import '../components/divider.dart';
+import '../components/dropdown_menu.dart';
+import '../components/input_decoration.dart';
+import '../components/navigation_bar.dart';
+import '../components/popup_menu.dart';
+import '../components/progress_indicator.dart';
+import '../components/radio.dart';
+import '../components/search_bar.dart';
+import '../components/slider.dart';
+import '../components/switch.dart';
+import '../components/tab_bar.dart';
+import '../components/text.dart';
+import '../components/text_selection.dart';
+import '../components/time_picker.dart';
+import '../components/tooltip.dart';
+
+import 'app_colors.dart';
+
+import 'colors/dark_color_tokens.dart';
+import 'colors/light_color_tokens.dart';
+
+class AppTheme {
+  final BuildContext _context;
+
+  const AppTheme._(this._context);
+
+  factory AppTheme.of(BuildContext context) {
+    return AppTheme._(context);
+  }
+
+  ThemeData get dark => _themeData(
+    appColors: AppColors(
+      redShade50: DarkColorTokens.redShade50,
+      redShade100: DarkColorTokens.redShade100,
+      redShade200: DarkColorTokens.redShade200,
+      redShade300: DarkColorTokens.redShade300,
+      redShade400: DarkColorTokens.redShade400,
+      redShade500: DarkColorTokens.redShade500,
+      redShade600: DarkColorTokens.redShade600,
+      redShade700: DarkColorTokens.redShade700,
+      redShade800: DarkColorTokens.redShade800,
+      redShade900: DarkColorTokens.redShade900,
+      redShade950: DarkColorTokens.redShade950,
+      blueShade50: DarkColorTokens.blueShade50,
+      blueShade100: DarkColorTokens.blueShade100,
+      blueShade200: DarkColorTokens.blueShade200,
+      blueShade300: DarkColorTokens.blueShade300,
+      blueShade400: DarkColorTokens.blueShade400,
+      blueShade500: DarkColorTokens.blueShade500,
+      blueShade600: DarkColorTokens.blueShade600,
+      blueShade700: DarkColorTokens.blueShade700,
+      blueShade800: DarkColorTokens.blueShade800,
+      blueShade900: DarkColorTokens.blueShade900,
+      blueShade950: DarkColorTokens.blueShade950,
+      greenShade50: DarkColorTokens.greenShade50,
+      greenShade100: DarkColorTokens.greenShade100,
+      greenShade200: DarkColorTokens.greenShade200,
+      greenShade300: DarkColorTokens.greenShade300,
+      greenShade400: DarkColorTokens.greenShade400,
+      greenShade500: DarkColorTokens.greenShade500,
+      greenShade600: DarkColorTokens.greenShade600,
+      greenShade700: DarkColorTokens.greenShade700,
+      greenShade800: DarkColorTokens.greenShade800,
+      greenShade900: DarkColorTokens.greenShade900,
+      greenShade950: DarkColorTokens.greenShade950,
+      orangeShade50: DarkColorTokens.orangeShade50,
+      orangeShade100: DarkColorTokens.orangeShade100,
+      orangeShade200: DarkColorTokens.orangeShade200,
+      orangeShade300: DarkColorTokens.orangeShade300,
+      orangeShade400: DarkColorTokens.orangeShade400,
+      orangeShade500: DarkColorTokens.orangeShade500,
+      orangeShade600: DarkColorTokens.orangeShade600,
+      orangeShade700: DarkColorTokens.orangeShade700,
+      orangeShade800: DarkColorTokens.orangeShade800,
+      orangeShade900: DarkColorTokens.orangeShade900,
+      orangeShade950: DarkColorTokens.orangeShade950,
+      neutralShade50: DarkColorTokens.neutralShade50,
+      neutralShade100: DarkColorTokens.neutralShade100,
+      neutralShade150: DarkColorTokens.neutralShade150,
+      neutralShade200: DarkColorTokens.neutralShade200,
+      neutralShade250: DarkColorTokens.neutralShade250,
+      neutralShade300: DarkColorTokens.neutralShade300,
+      neutralShade350: DarkColorTokens.neutralShade350,
+      neutralShade400: DarkColorTokens.neutralShade400,
+      neutralShade450: DarkColorTokens.neutralShade450,
+      neutralShade500: DarkColorTokens.neutralShade500,
+      neutralShade550: DarkColorTokens.neutralShade550,
+      neutralShade600: DarkColorTokens.neutralShade600,
+      neutralShade650: DarkColorTokens.neutralShade650,
+      neutralShade700: DarkColorTokens.neutralShade700,
+      neutralShade750: DarkColorTokens.neutralShade750,
+      neutralShade800: DarkColorTokens.neutralShade800,
+      neutralShade850: DarkColorTokens.neutralShade850,
+      neutralShade900: DarkColorTokens.neutralShade900,
+      neutralShade950: DarkColorTokens.neutralShade950,
+      neutralShade1000: DarkColorTokens.neutralShade1000,
+      neutralShade1050: DarkColorTokens.neutralShade1050,
+      backgroundShade50: DarkColorTokens.backgroundShade50,
+      backgroundShade75: DarkColorTokens.backgroundShade75,
+      backgroundShade100: DarkColorTokens.backgroundShade100,
+      backgroundShade200: DarkColorTokens.backgroundShade200,
+      backgroundShade300: DarkColorTokens.backgroundShade300,
+      backgroundShade400: DarkColorTokens.backgroundShade400,
+      backgroundShade500: DarkColorTokens.backgroundShade500,
+      backgroundShade600: DarkColorTokens.backgroundShade600,
+      backgroundShade700: DarkColorTokens.backgroundShade700,
+      backgroundShade800: DarkColorTokens.backgroundShade800,
+      backgroundShade900: DarkColorTokens.backgroundShade900,
+      backgroundShade950: DarkColorTokens.backgroundShade950,
+      appBarBackgroundColor: DarkColorTokens.appBarBackgroundColor,
+      bottomAppBarBackgroundColor: DarkColorTokens.bottomAppBarBackgroundColor,
+      bottomsheetBackgroundColor: DarkColorTokens.bottomsheetBackgroundColor,
+      datePickerBackgroundColor: DarkColorTokens.datePickerBackgroundColor,
+      dialogBackgroundColor: DarkColorTokens.dialogBackgroundColor,
+      primaryDividerColor: DarkColorTokens.primaryDividerColor,
+      secondaryDividerColor: DarkColorTokens.secondaryDividerColor,
+      dropdownMenuBackgroundColor: DarkColorTokens.dropdownMenuBackgroundColor,
+      navigationBarBackgroundColor: DarkColorTokens.navigationBarBackgroundColor,
+      popupMenuBackgroundColor: DarkColorTokens.popupMenuBackgroundColor,
+      popupMenuDividerColor: DarkColorTokens.popupMenuDividerColor,
+      scaffoldBackgroundColor: DarkColorTokens.scaffoldBackgroundColor,
+      timePickerBackgroundColor: DarkColorTokens.timePickerBackgroundColor,
+    ),
+    brightness: Brightness.dark,
+    themeModeKey: 'Dark',
+    scaffoldBackgroundColor: DarkColorTokens.scaffoldBackgroundColor,
+  );
+
+  ThemeData get light => _themeData(
+    appColors: AppColors(
+      redShade50: LightColorTokens.redShade50,
+      redShade100: LightColorTokens.redShade100,
+      redShade200: LightColorTokens.redShade200,
+      redShade300: LightColorTokens.redShade300,
+      redShade400: LightColorTokens.redShade400,
+      redShade500: LightColorTokens.redShade500,
+      redShade600: LightColorTokens.redShade600,
+      redShade700: LightColorTokens.redShade700,
+      redShade800: LightColorTokens.redShade800,
+      redShade900: LightColorTokens.redShade900,
+      redShade950: LightColorTokens.redShade950,
+      blueShade50: LightColorTokens.blueShade50,
+      blueShade100: LightColorTokens.blueShade100,
+      blueShade200: LightColorTokens.blueShade200,
+      blueShade300: LightColorTokens.blueShade300,
+      blueShade400: LightColorTokens.blueShade400,
+      blueShade500: LightColorTokens.blueShade500,
+      blueShade600: LightColorTokens.blueShade600,
+      blueShade700: LightColorTokens.blueShade700,
+      blueShade800: LightColorTokens.blueShade800,
+      blueShade900: LightColorTokens.blueShade900,
+      blueShade950: LightColorTokens.blueShade950,
+      greenShade50: LightColorTokens.greenShade50,
+      greenShade100: LightColorTokens.greenShade100,
+      greenShade200: LightColorTokens.greenShade200,
+      greenShade300: LightColorTokens.greenShade300,
+      greenShade400: LightColorTokens.greenShade400,
+      greenShade500: LightColorTokens.greenShade500,
+      greenShade600: LightColorTokens.greenShade600,
+      greenShade700: LightColorTokens.greenShade700,
+      greenShade800: LightColorTokens.greenShade800,
+      greenShade900: LightColorTokens.greenShade900,
+      greenShade950: LightColorTokens.greenShade950,
+      orangeShade50: LightColorTokens.orangeShade50,
+      orangeShade100: LightColorTokens.orangeShade100,
+      orangeShade200: LightColorTokens.orangeShade200,
+      orangeShade300: LightColorTokens.orangeShade300,
+      orangeShade400: LightColorTokens.orangeShade400,
+      orangeShade500: LightColorTokens.orangeShade500,
+      orangeShade600: LightColorTokens.orangeShade600,
+      orangeShade700: LightColorTokens.orangeShade700,
+      orangeShade800: LightColorTokens.orangeShade800,
+      orangeShade900: LightColorTokens.orangeShade900,
+      orangeShade950: LightColorTokens.orangeShade950,
+      neutralShade50: LightColorTokens.neutralShade50,
+      neutralShade100: LightColorTokens.neutralShade100,
+      neutralShade150: LightColorTokens.neutralShade150,
+      neutralShade200: LightColorTokens.neutralShade200,
+      neutralShade250: LightColorTokens.neutralShade250,
+      neutralShade300: LightColorTokens.neutralShade300,
+      neutralShade350: LightColorTokens.neutralShade350,
+      neutralShade400: LightColorTokens.neutralShade400,
+      neutralShade450: LightColorTokens.neutralShade450,
+      neutralShade500: LightColorTokens.neutralShade500,
+      neutralShade550: LightColorTokens.neutralShade550,
+      neutralShade600: LightColorTokens.neutralShade600,
+      neutralShade650: LightColorTokens.neutralShade650,
+      neutralShade700: LightColorTokens.neutralShade700,
+      neutralShade750: LightColorTokens.neutralShade750,
+      neutralShade800: LightColorTokens.neutralShade800,
+      neutralShade850: LightColorTokens.neutralShade850,
+      neutralShade900: LightColorTokens.neutralShade900,
+      neutralShade950: LightColorTokens.neutralShade950,
+      neutralShade1000: LightColorTokens.neutralShade1000,
+      neutralShade1050: LightColorTokens.neutralShade1050,
+      backgroundShade50: LightColorTokens.backgroundShade50,
+      backgroundShade75: LightColorTokens.backgroundShade75,
+      backgroundShade100: LightColorTokens.backgroundShade100,
+      backgroundShade200: LightColorTokens.backgroundShade200,
+      backgroundShade300: LightColorTokens.backgroundShade300,
+      backgroundShade400: LightColorTokens.backgroundShade400,
+      backgroundShade500: LightColorTokens.backgroundShade500,
+      backgroundShade600: LightColorTokens.backgroundShade600,
+      backgroundShade700: LightColorTokens.backgroundShade700,
+      backgroundShade800: LightColorTokens.backgroundShade800,
+      backgroundShade900: LightColorTokens.backgroundShade900,
+      backgroundShade950: LightColorTokens.backgroundShade950,
+      appBarBackgroundColor: LightColorTokens.appBarBackgroundColor,
+      bottomAppBarBackgroundColor: LightColorTokens.bottomAppBarBackgroundColor,
+      bottomsheetBackgroundColor: LightColorTokens.bottomsheetBackgroundColor,
+      datePickerBackgroundColor: LightColorTokens.datePickerBackgroundColor,
+      dialogBackgroundColor: LightColorTokens.dialogBackgroundColor,
+      primaryDividerColor: LightColorTokens.primaryDividerColor,
+      secondaryDividerColor: LightColorTokens.secondaryDividerColor,
+      dropdownMenuBackgroundColor: LightColorTokens.dropdownMenuBackgroundColor,
+      navigationBarBackgroundColor: LightColorTokens.navigationBarBackgroundColor,
+      popupMenuBackgroundColor: LightColorTokens.popupMenuBackgroundColor,
+      popupMenuDividerColor: LightColorTokens.popupMenuDividerColor,
+      scaffoldBackgroundColor: LightColorTokens.scaffoldBackgroundColor,
+      timePickerBackgroundColor: LightColorTokens.timePickerBackgroundColor,
+    ),
+    brightness: Brightness.light,
+    themeModeKey: 'Light',
+    scaffoldBackgroundColor: LightColorTokens.scaffoldBackgroundColor,
+  );
+
+  ThemeData _themeData({
+    required AppColors appColors,
+    required Brightness brightness,
+    required String themeModeKey,
+    required Color scaffoldBackgroundColor,
+  }) {
+    return ThemeData(
+      appBarTheme: appBarTheme(_context)[themeModeKey],
+      bottomAppBarTheme: bottomAppBarTheme[themeModeKey],
+      brightness: brightness,
+      checkboxTheme: checkboxTheme(_context)[themeModeKey],
+      datePickerTheme: datePickerTheme(_context)[themeModeKey],
+      dialogTheme: dialogTheme(_context)[themeModeKey],
+      dividerTheme: dividerTheme(_context)[themeModeKey],
+      dropdownMenuTheme: dropdownMenuTheme(_context)[themeModeKey],
+      extensions: <ThemeExtension<AppColors>>[appColors],
+      filledButtonTheme: filledButtonTheme(_context)[themeModeKey],
+      floatingActionButtonTheme: floatingActionButtonTheme(_context)[themeModeKey],
+      fontFamily: 'DMSans',
+      iconButtonTheme: iconButtonTheme(_context)[themeModeKey],
+      inputDecorationTheme: inputDecorationTheme(_context)[themeModeKey],
+      navigationBarTheme: navigationBarTheme(_context)[themeModeKey],
+      outlinedButtonTheme: outlinedButtonTheme(_context)[themeModeKey],
+      popupMenuTheme: popupMenuTheme(_context)[themeModeKey],
+      progressIndicatorTheme: progressIndicatorTheme(_context)[themeModeKey],
+      radioTheme: radioTheme(_context)[themeModeKey],
+      scaffoldBackgroundColor: scaffoldBackgroundColor,
+      searchBarTheme: searchBarTheme(_context)[themeModeKey],
+      sliderTheme: sliderTheme[themeModeKey],
+      switchTheme: switchTheme[themeModeKey],
+      tabBarTheme: tabBarTheme(_context)[themeModeKey],
+      textSelectionTheme: textSelectionTheme[themeModeKey],
+      textTheme: textTheme[themeModeKey],
+      timePickerTheme: timePickerTheme(_context)[themeModeKey],
+      tooltipTheme: tooltipTheme(_context)[themeModeKey],
+      useMaterial3: true,
+    );
+  }
+}
