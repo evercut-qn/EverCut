@@ -59,7 +59,6 @@ const employeeSchema = new mongoose.Schema(
                 bookingId: {
                     type: mongoose.Schema.Types.ObjectId,
                     ref: 'Booking',
-                    index: true,
                 },
                 date: { type: String, required: true },
                 startTime: { type: String, required: true },
