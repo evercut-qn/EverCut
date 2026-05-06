@@ -2,8 +2,11 @@
 
 import 'package:flutter/material.dart';
 
+import '../../../../core/auth/auth_state_notifier.dart';
 import '../../../../core/constants/navigation/route_segments.dart';
+import '../../../../core/di/injection.dart' as di;
 import '../../../../core/theme/foundation/app_icons.dart';
+import '../../../../features/authentication/domain/use_cases/authentication_logout_use_case.dart';
 import '../../../../shared/extensions/context/app_colors_extension.dart';
 import '../../../../shared/extensions/context/device_metrics_extension.dart';
 import '../../../../shared/extensions/context/go_router_extension.dart';
@@ -18,13 +21,50 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  final Set<SettingsTileBlock> _tiles = <SettingsTileBlock>{};
+  Future<void> _handleLogout(BuildContext context) async {
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Log Out'),
+          content: const Text('Are you sure you want to log out?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Log Out'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed == true && context.mounted) {
+      try {
+        // Call logout use case
+        await di.sl<AuthenticationLogoutUseCase>().call();
+        
+        // Clear auth state - this triggers navigation via router
+        await di.sl<AuthStateNotifier>().clear();
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Logout failed: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
+  }
 
   @override
-  void initState() {
-    super.initState();
-
-    _tiles.addAll(<SettingsTileBlock>{
+  Widget build(BuildContext context) {
+    final Set<SettingsTileBlock> tiles = <SettingsTileBlock>{
       SettingsTileBlock(
         heading: 'Account & Preferences',
         tiles: <SettingsTile>{
@@ -86,17 +126,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           SettingsTile(
             icon: AppIcons.solidRoundedLogout01,
-            onTap: () {},
+            onTap: () => _handleLogout(context),
             title: 'Log Out',
             showArrow: false,
           ),
         },
       ),
-    });
-  }
+    };
 
-  @override
-  Widget build(BuildContext context) {
     return SafeArea(
       top: false,
       child: Material(
@@ -171,7 +208,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   padding: EdgeInsets.all(context.scale(24)),
                   child: Column(
                     spacing: context.scale(24),
-                    children: _tiles.map((SettingsTileBlock block) {
+                    children: tiles.map((SettingsTileBlock block) {
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         spacing: context.scale(12),

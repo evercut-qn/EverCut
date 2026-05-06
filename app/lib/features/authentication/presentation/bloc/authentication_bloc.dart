@@ -8,6 +8,7 @@ import '../../domain/use_cases/authentication_otp_send_params.dart';
 import '../../domain/use_cases/authentication_otp_send_use_case.dart';
 import '../../domain/use_cases/authentication_otp_verify_params.dart';
 import '../../domain/use_cases/authentication_otp_verify_use_case.dart';
+import '../../domain/entities/authentication_result.dart';
 
 part 'authentication_event.dart';
 part 'authentication_state.dart';
@@ -29,11 +30,7 @@ class AuthenticationBloc extends Bloc<AuthenticationEvent, AuthenticationState> 
       try {
         emit(AuthenticationOtpSending(event.params.phoneNumber));
 
-        // await authenticationOtpSend(
-        //   AuthenticationOtpSendParams(
-        //     event.params.phoneNumber,
-        //   ),
-        // );
+        await authenticationOtpSend(event.params);
 
         emit(AuthenticationOtpSent(event.params.phoneNumber, '', DateTime.now()));
       } catch (error, stackTrace) {
@@ -48,11 +45,7 @@ class AuthenticationBloc extends Bloc<AuthenticationEvent, AuthenticationState> 
       try {
         emit(AuthenticationOtpResending(event.params.phoneNumber));
 
-        // await authenticationOtpResend(
-        //   AuthenticationOtpResendParams(
-        //     event.params.phoneNumber,
-        //   ),
-        // );
+        await authenticationOtpResend(event.params);
 
         emit(AuthenticationOtpSent(event.params.phoneNumber, '', DateTime.now()));
       } catch (error, stackTrace) {
@@ -63,11 +56,16 @@ class AuthenticationBloc extends Bloc<AuthenticationEvent, AuthenticationState> 
     on<AuthenticationOtpVerify>((
       AuthenticationOtpVerify event,
       Emitter<AuthenticationState> emit,
-    ) {
+    ) async {
       try {
         emit(AuthenticationOtpVerifying(event.params.phoneNumber, event.params.smsCode));
+        final AuthenticationResult result = await authenticationOtpVerify(event.params);
         emit(AuthenticationOtpVerified(event.params.phoneNumber, DateTime.now()));
-        emit(AuthenticationSuccess());
+        if (result is NewMerchantOnboardingRequired) {
+          emit(AuthenticationOnboardingRequired(result.onboardingToken));
+        } else {
+          emit(AuthenticationSuccess());
+        }
       } catch (error, stackTrace) {
         emit(AuthenticationFailure(error.toString(), stackTrace));
       }

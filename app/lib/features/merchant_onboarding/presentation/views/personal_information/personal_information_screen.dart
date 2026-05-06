@@ -33,6 +33,7 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
   final TextEditingController _dateOfBirthController = TextEditingController();
   final TextEditingController _genderController = TextEditingController();
   final DateTime _currentDate = DateTime.now();
+  Gender? _selectedGender;
 
   void _onNextButtonPressed() {
     if (!_formKey.currentState!.validate()) {
@@ -41,6 +42,16 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
         message: 'Please fill in all required fields before continuing to the next steps.',
       );
     } else {
+      final DateTime dateOfBirth = DateFormat('dd MMMM yyyy').parse(_dateOfBirthController.text);
+      context.read<MerchantOnboardingCubit>().updateFields({
+        'firstName': _firstNameController.text.trim(),
+        'lastName': _lastNameController.text.trim(),
+        'email': _emailAddressController.text.trim().toLowerCase(),
+        'gender': (_selectedGender ?? Gender.male).label == 'Transgender'
+            ? 'Other'
+            : (_selectedGender ?? Gender.male).label,
+        'dateOfBirth': dateOfBirth.toIso8601String(),
+      });
       context.read<MerchantOnboardingCubit>().nextPage();
     }
   }
@@ -209,6 +220,11 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
                     }).toList(),
                     labelText: 'Gender',
                     leadingIcon: AppIcons.solidRoundedUserAccount,
+                    onSelected: (int? value) {
+                      if (value != null) {
+                        _selectedGender = GenderExtension.fromValue(value);
+                      }
+                    },
                     validator: (int? value) {
                       if (value == null || value.isNaN || value.isNegative) {
                         return 'Please select your gender.';

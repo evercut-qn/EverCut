@@ -39,8 +39,10 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
   final TextEditingController _targetCustomersController = TextEditingController();
   final TextEditingController _shopLocationController = TextEditingController();
 
-  XFile? _selectedImage;
+  final List<XFile?> _selectedImages = List<XFile?>.filled(3, null);
   Position? _position;
+  BusinessCategory? _selectedBusinessCategory;
+  TargetCustomer? _selectedTargetCustomer;
 
   bool _doesImageHaveError = false;
 
@@ -52,14 +54,52 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
         message: 'Please fill in all required fields before continuing to the next steps.',
       );
     } else {
-      if (_selectedImage == null) {
+      if (_selectedImages.any((image) => image == null)) {
         SnackBars.of(context).showWarningSnackBar(
-          title: 'Image Required',
-          message: 'Please select an image before proceeding with the next steps.',
+          title: 'Images Required',
+          message: 'Please select 3 shop images before proceeding with the next steps.',
         );
       } else {
+        context.read<MerchantOnboardingCubit>().updateFields({
+          'shopName': _shopNameController.text.trim(),
+          'category': _backendCategory(_selectedBusinessCategory ?? BusinessCategory.barberShop),
+          'targetCustomers': _backendTargetCustomers(_selectedTargetCustomer ?? TargetCustomer.men),
+          'address': _shopLocationController.text.trim().isEmpty ? 'Selected shop location' : _shopLocationController.text.trim(),
+          'location': {
+            'type': 'Point',
+            'coordinates': [
+              _position?.longitude ?? 0.0,
+              _position?.latitude ?? 0.0,
+            ],
+          },
+        });
+        context.read<MerchantOnboardingCubit>().updatePhotos(_selectedImages.whereType<XFile>().toList());
         context.read<MerchantOnboardingCubit>().nextPage();
       }
+    }
+  }
+
+  String _backendCategory(BusinessCategory category) {
+    switch (category) {
+      case BusinessCategory.hairSalon:
+        return 'Salon';
+      case BusinessCategory.beautySalon:
+        return 'Beauty Parlour';
+      case BusinessCategory.doorstepService:
+        return 'Door-Step';
+      case BusinessCategory.barberShop:
+        return 'Barber';
+    }
+  }
+
+  String _backendTargetCustomers(TargetCustomer targetCustomer) {
+    switch (targetCustomer) {
+      case TargetCustomer.women:
+        return 'female';
+      case TargetCustomer.unisex:
+        return 'unisex';
+      case TargetCustomer.men:
+        return 'male';
     }
   }
 
@@ -128,6 +168,11 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
                           }).toList(),
                           labelText: 'Business Category',
                           leadingIcon: AppIcons.solidRoundedTag01,
+                          onSelected: (int? value) {
+                            if (value != null) {
+                              _selectedBusinessCategory = BusinessCategoryExtension.fromValue(value);
+                            }
+                          },
                           validator: (int? value) {
                             if (value == null || value.isNaN || value.isNegative) {
                               return 'Please select your business category.';
@@ -153,6 +198,11 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
                           }).toList(),
                           labelText: 'Target Customers',
                           leadingIcon: AppIcons.solidRoundedUserGroup,
+                          onSelected: (int? value) {
+                            if (value != null) {
+                              _selectedTargetCustomer = TargetCustomerExtension.fromValue(value);
+                            }
+                          },
                           validator: (int? value) {
                             if (value == null || value.isNaN || value.isNegative) {
                               return 'Please select your target customers.';
@@ -184,12 +234,16 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
                       ),
                       LayoutBuilder(
                         builder: (BuildContext context, BoxConstraints constraints) {
-                          return SizedBox(
-                            width: constraints.maxWidth * 0.5 - context.scale(8),
-                            child: AspectRatio(
-                              aspectRatio: 1.25,
-                              child: ImageSelector(
-                                builder: (BuildContext context, XFile? selectedImage, VoidCallback onSelect, VoidCallback onRemove) {
+                          return Wrap(
+                            spacing: context.scale(12),
+                            runSpacing: context.scale(12),
+                            children: List<Widget>.generate(3, (int imageIndex) {
+                              return SizedBox(
+                                width: constraints.maxWidth * 0.5 - context.scale(8),
+                                child: AspectRatio(
+                                  aspectRatio: 1.25,
+                                  child: ImageSelector(
+                                    builder: (BuildContext context, XFile? selectedImage, VoidCallback onSelect, VoidCallback onRemove) {
                                   if (selectedImage != null) {
                                     return Stack(
                                       children: [
@@ -198,7 +252,7 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
                                             borderRadius: BorderRadius.circular(context.scale(8)),
                                             clipBehavior: Clip.hardEdge,
                                             child: Image(
-                                              image: FileImage(File(_selectedImage!.path)),
+                                              image: FileImage(File(selectedImage.path)),
                                               errorBuilder: (BuildContext context, Object error, StackTrace? stackTrace) {
                                                 setState(() => (_doesImageHaveError = true));
                                                 return Material(
@@ -323,15 +377,17 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
                                       ),
                                     );
                                   }
-                                },
-                                onChange: (XFile? selectedImage) {
-                                  setState(() {
-                                    _doesImageHaveError = false;
-                                    _selectedImage = selectedImage;
-                                  });
-                                },
-                              ),
-                            ),
+                                    },
+                                    onChange: (XFile? selectedImage) {
+                                      setState(() {
+                                        _doesImageHaveError = false;
+                                        _selectedImages[imageIndex] = selectedImage;
+                                      });
+                                    },
+                                  ),
+                                ),
+                              );
+                            }),
                           );
                         },
                       ),

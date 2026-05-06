@@ -3,7 +3,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../../../core/constants/navigation/route_paths.dart';
+import '../../../../../core/di/injection.dart' as di;
+import '../../../../../core/auth/auth_state_notifier.dart';
+import '../../../../../core/errors/network_exception.dart';
 import '../../../../../core/constants/regex/allowed_characters_regex.dart';
 import '../../../../../core/constants/regex/basic_regex.dart';
 import '../../../../../core/theme/foundation/app_icons.dart';
@@ -17,6 +22,7 @@ import '../../../../../shared/widgets/other/bank_picker_field/bank_picker_field.
 import '../../../../../shared/widgets/overlays/snackbars.dart';
 import '../../../../../shared/widgets/common/section/section_header.dart';
 import '../../cubit/merchant_onboarding_cubit.dart';
+import '../../../domain/repositories/merchant_onboarding_repository.dart';
 
 class PayoutDetailsScreen extends StatefulWidget {
   const PayoutDetailsScreen({super.key});
@@ -34,6 +40,7 @@ class _PayoutDetailsScreenState extends State<PayoutDetailsScreen> {
   final SecureCodeFieldController _confirmSecurityPinFieldController = SecureCodeFieldController(4);
 
   bool _pinVisible = false;
+  bool _submitting = false;
 
   void _togglePinVisibility() {
     setState(() {
@@ -48,7 +55,52 @@ class _PayoutDetailsScreenState extends State<PayoutDetailsScreen> {
         title: 'Incomplete Information',
         message: 'Please fill in all required fields before continuing.',
       );
-    } else {}
+    } else {
+      _completeOnboarding();
+    }
+  }
+
+  Future<void> _completeOnboarding() async {
+    setState(() => _submitting = true);
+    final cubit = context.read<MerchantOnboardingCubit>();
+    cubit.updateFields({
+      'accountHolderName': _accountHolderNameController.text.trim(),
+      'bankName': _bankNameController.text.trim(),
+      'upiId': _upiAddressController.text.trim(),
+      'pin': _securityPinFieldController.value,
+      'confirmPin': _confirmSecurityPinFieldController.value,
+    });
+
+    try {
+      await di.sl<MerchantOnboardingRepository>().completeOnboarding(
+            fields: cubit.draft.fields,
+            photos: cubit.draft.photos,
+          );
+      if (mounted) {
+        context.go(RoutePaths.dashboard);
+      }
+    } on NetworkException catch (error) {
+      if (mounted) {
+        SnackBars.of(context).showErrorSnackBar(
+          title: 'Onboarding Failed',
+          message: error.toString(),
+        );
+        if (error.statusCode == 401) {
+          di.sl<AuthStateNotifier>().clear();
+        }
+      }
+    } catch (error) {
+      if (mounted) {
+        SnackBars.of(context).showErrorSnackBar(
+          title: 'Onboarding Failed',
+          message: error.toString(),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _submitting = false);
+      }
+    }
   }
 
   @override
@@ -277,7 +329,7 @@ class _PayoutDetailsScreenState extends State<PayoutDetailsScreen> {
             ),
             Expanded(
               child: FilledButton(
-                onPressed: _onCompleteButtonPressed,
+                onPressed: _submitting ? null : _onCompleteButtonPressed,
                 child: const Text('Complete'),
               ),
             ),

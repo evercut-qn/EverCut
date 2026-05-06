@@ -50,6 +50,11 @@ class AuthenticationOtpVerified extends AuthenticationState {
 
 class AuthenticationSuccess extends AuthenticationState {}
 
+class AuthenticationOnboardingRequired extends AuthenticationState {
+  final String onboardingToken;
+  AuthenticationOnboardingRequired(this.onboardingToken);
+}
+
 class AuthenticationFailure extends AuthenticationState {
   final String message;
   final StackTrace? stackTrace;

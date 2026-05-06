@@ -1,6 +1,8 @@
 // lib/core/constants/api/api_config.dart
 
+import '../../config/app_environment.dart';
+
 class ApiConfig {
-  static const String baseUrl = '';
-  static const String apiVersion = '/v1';
+  static String get baseUrl => AppEnvironment.apiBaseUrl;
+  static const String apiVersion = '/api/v1';
 }

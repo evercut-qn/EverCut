@@ -90,8 +90,51 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
           message: 'Please make sure to set both opening and closing times for your shop.',
         );
       } else {
+        context.read<MerchantOnboardingCubit>().updateFields({
+          'workingDays': _selectedDays.map(_weekdayLabel).toList(),
+          'openTime': _toTwentyFourHourTime(_shopOpenTimeController.text),
+          'closeTime': _toTwentyFourHourTime(_shopCloseTimeController.text),
+          'breakTimes': _breakTimings
+              .map((breakTime) => {
+                    'start': _toTwentyFourHourTime(breakTime.startsAt),
+                    'end': _toTwentyFourHourTime(breakTime.endsAt),
+                  })
+              .toList(),
+        });
         context.read<MerchantOnboardingCubit>().nextPage();
       }
+    }
+  }
+
+  String _toTwentyFourHourTime(String value) {
+    final RegExp match = RegExp(r'^(\d{1,2}):(\d{2})\s*(AM|PM)$', caseSensitive: false);
+    final RegExpMatch? result = match.firstMatch(value.trim());
+    if (result == null) return value;
+
+    int hour = int.parse(result.group(1)!);
+    final String minute = result.group(2)!;
+    final String meridiem = result.group(3)!.toUpperCase();
+    if (meridiem == 'PM' && hour != 12) hour += 12;
+    if (meridiem == 'AM' && hour == 12) hour = 0;
+    return '${hour.toString().padLeft(2, '0')}:$minute';
+  }
+
+  String _weekdayLabel(Weekday weekday) {
+    switch (weekday) {
+      case Weekday.sunday:
+        return 'Sunday';
+      case Weekday.monday:
+        return 'Monday';
+      case Weekday.tuesday:
+        return 'Tuesday';
+      case Weekday.wednesday:
+        return 'Wednesday';
+      case Weekday.thursday:
+        return 'Thursday';
+      case Weekday.friday:
+        return 'Friday';
+      case Weekday.saturday:
+        return 'Saturday';
     }
   }
 
@@ -253,7 +296,7 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
                       ),
                     ),
                     Align(
-                      alignment: AlignmentGeometry.bottomRight,
+                      alignment: Alignment.bottomRight,
                       child: TextButton(
                         onPressed: _onAddBreakButtonPressed,
                         style: ButtonStyle(

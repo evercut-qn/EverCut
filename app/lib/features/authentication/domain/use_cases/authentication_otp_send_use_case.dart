@@ -9,5 +9,7 @@ class AuthenticationOtpSendUseCase {
 
   const AuthenticationOtpSendUseCase(this.authenticationRepository);
 
-  Future<void> call(AuthenticationOtpSendParams params) async {}
+  Future<void> call(AuthenticationOtpSendParams params) {
+    return authenticationRepository.sendOtp(params.phoneNumber);
+  }
 }

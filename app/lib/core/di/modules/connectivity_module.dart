@@ -17,7 +17,9 @@ import '../../connectivity/presentation/cubit/connectivity_cubit.dart';
 class ConnectivityModule {
   static void register(GetIt sl) {
     sl.registerLazySingleton(() => Connectivity());
-    sl.registerLazySingleton<http.Client>(() => http.Client());
+    if (!sl.isRegistered<http.Client>()) {
+      sl.registerLazySingleton<http.Client>(() => http.Client());
+    }
     sl.registerLazySingleton<ConnectivityPlatformDataSource>(() {
       return ConnectivityPlatformDataSourceImpl(sl<Connectivity>());
     });

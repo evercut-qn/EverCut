@@ -22,6 +22,7 @@ import '../../features/test/presentation/views/test_screen.dart';
 import '../../features/transactions/presentation/views/transaction_details/transaction_details_screen.dart';
 import '../../features/transactions/presentation/views/transactions_screen.dart';
 import '../../shared/widgets/common/appbars/navigation_bar.dart';
+import '../auth/auth_state_notifier.dart';
 import '../connectivity/presentation/views/connection_not_found/connection_not_found_screen.dart';
 import '../constants/navigation/route_paths.dart';
 import '../constants/navigation/route_segments.dart';
@@ -39,8 +40,34 @@ class AppRouter {
   ];
 
   static final GoRouter config = GoRouter(
-    initialLocation: RoutePaths.merchantOnboarding,
+    initialLocation: RoutePaths.authentication,
     navigatorKey: _rootNavigatorKey,
+    refreshListenable: di.sl<AuthStateNotifier>(),
+    redirect: (BuildContext context, GoRouterState state) {
+      final authState = di.sl<AuthStateNotifier>().state;
+      final String location = state.uri.path;
+      final bool isAuthRoute = location.startsWith(RoutePaths.authentication);
+      final bool isOnboardingRoute = location.startsWith(RoutePaths.merchantOnboarding);
+      final bool isConnectionRoute = location == RoutePaths.connectionNotFound;
+
+      if (isConnectionRoute || location == RoutePaths.onboarding) {
+        return null;
+      }
+
+      switch (authState.status) {
+        case AppAuthStatus.unknown:
+          return isAuthRoute ? null : RoutePaths.authentication;
+        case AppAuthStatus.unauthenticated:
+          return isAuthRoute ? null : RoutePaths.authentication;
+        case AppAuthStatus.onboarding:
+          return isOnboardingRoute ? null : RoutePaths.merchantOnboarding;
+        case AppAuthStatus.authenticated:
+          if (isAuthRoute || isOnboardingRoute) {
+            return RoutePaths.dashboard;
+          }
+          return null;
+      }
+    },
     routes: [
       GoRoute(
         path: RoutePaths.connectionNotFound,

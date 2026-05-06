@@ -35,7 +35,7 @@ class _PhoneEntryScreenState extends State<PhoneEntryScreen> {
     if (!_formKey.currentState!.validate()) {
       return;
     } else {
-      di.sl<AuthenticationBloc>().add(
+      context.read<AuthenticationBloc>().add(
         AuthenticationOtpSend(
           AuthenticationOtpSendParams(
             _phoneNumberController.e164PhoneNumber,

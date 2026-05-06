@@ -16,6 +16,17 @@
 	<string>merchant</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.quantneural.evercut.merchant</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>evercutmerchant</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleShortVersionString</key>
 	<string>$(FLUTTER_BUILD_NAME)</string>
 	<key>CFBundleSignature</key>
