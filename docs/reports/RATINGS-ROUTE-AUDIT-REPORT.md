@@ -1,4 +1,4 @@
-﻿# Ratings Route Audit Report
+# Ratings Route Audit Report
 
 > Legacy snapshot: This document records findings against the pre-2026-04-24 role-prefixed routing layout and removed `controllers/customer/*` / `controllers/barber/*` files. Treat route and file references here as historical unless explicitly updated. For the current API surface, see [ROUTING-STRATEGY-ANALYSIS](../architecture/ROUTING-STRATEGY-ANALYSIS.md).
 
@@ -26,10 +26,8 @@ For the Ratings section, the shared persistence layer is:
 - Serializer: `src/utils/rating-response.utils.js`
 - Validator: `src/validators/rating.validator.js`
 
-Role-specific entry points are:
-
-- Customer: `src/routes/customer.routes.js` -> `src/controllers/customer/customer-rating.controller.js`
-- Barber: `src/routes/barber.routes.js` -> `src/controllers/barber/barber-rating.controller.js`
+Current entry point: `src/routes/ratings.routes.js` -> `src/controllers/rating.controller.js`.
+Public shop-specific rating reads are mounted from `src/routes/shops.routes.js`.
 
 ---
 
@@ -39,28 +37,27 @@ Role-specific entry points are:
 
 | Method | Path | Purpose | Validators | Controller | Service |
 | --- | --- | --- | --- | --- | --- |
-| `POST` | `/api/v1/customer/ratings` | Submit one rating for a shop the customer has completed a booking with | `addRatingSchema` | `addRating` | `addRating` |
-| `GET` | `/api/v1/customer/shops/:id/ratings` | List ratings for a specific shop with pagination | `shopIdParamSchema`, `paginationSchema` | `getRatingsByShop` | `getRatingsByShop` |
-| `GET` | `/api/v1/customer/shops/:id/ratings/summary` | Return aggregate rating metrics for a specific shop | `shopIdParamSchema` | `getRatingSummary` | `getRatingSummary` |
+| `POST` | `/api/v1/ratings` | Submit one rating for a shop the customer has completed a booking with | `addRatingSchema` | `addRating` | `addRating` |
+| `GET` | `/api/v1/shops/:id/ratings` | List ratings for a specific shop with pagination | `objectIdParamSchema`, `paginationSchema` | `getShopRatings` | `getRatingsByShop` |
+| `GET` | `/api/v1/shops/:id/ratings/analytics` | Return aggregate rating metrics for a specific shop | `objectIdParamSchema` | `getShopRatingSummary` | `getRatingSummary` |
 
 ### Barber role
 
 | Method | Path | Purpose | Validators | Controller | Service |
 | --- | --- | --- | --- | --- | --- |
-| `GET` | `/api/v1/barber/ratings` | List ratings for the authenticated barber's owned shop with pagination | `paginationSchema` | `getRatings` | `getRatingsByShopForBarber` |
-| `GET` | `/api/v1/barber/ratings/summary` | Return aggregate rating metrics for the authenticated barber's owned shop | None required: no route params, query, or body input | `getRatingSummary` | `getRatingSummaryForBarber` |
-| `POST` | `/api/v1/barber/ratings/:id/reply` | Create a reply on a rating owned by the barber's shop | `objectIdParamSchema`, `addReplySchema` | `addReply` | `addReplyToRating` |
-| `PUT` | `/api/v1/barber/ratings/:id/reply` | Update an existing reply on a rating owned by the barber's shop | `objectIdParamSchema`, `addReplySchema` | `updateReply` | `updateReplyToRating` |
-| `DELETE` | `/api/v1/barber/ratings/:id/reply` | Remove an existing reply from a rating owned by the barber's shop | `objectIdParamSchema` | `deleteReply` | `deleteReplyFromRating` |
-| `DELETE` | `/api/v1/barber/ratings/:id` | Delete a rating owned by the barber's shop | `objectIdParamSchema` | `removeRating` | `removeRating` |
+| `GET` | `/api/v1/ratings` | List ratings for the authenticated barber's owned shop with pagination | `paginationSchema` | `getOwnedRatings` | `getRatingsByShopForBarber` |
+| `GET` | `/api/v1/ratings/analytics` | Return aggregate rating metrics for the authenticated barber's owned shop | None required: no route params, query, or body input | `getOwnedRatingSummary` | `getRatingSummaryForBarber` |
+| `PUT` | `/api/v1/ratings/:id/reply` | Create or update a reply on a rating owned by the barber's shop | `objectIdParamSchema`, `addReplySchema` | `updateReply` | `upsertReplyToRating` |
+| `DELETE` | `/api/v1/ratings/:id/reply` | Remove an existing reply from a rating owned by the barber's shop | `objectIdParamSchema` | `deleteReply` | `deleteReplyFromRating` |
+| `DELETE` | `/api/v1/ratings/:id` | Delete a rating owned by the barber's shop | `objectIdParamSchema` | `deleteRating` | `removeRating` |
 
 ### Naming convention review
 
 Current route naming is mostly coherent:
 
-- Customer reads are nested under the parent shop resource: `/customer/shops/:id/ratings...`
+- Public reads are nested under the parent shop resource: `/shops/:id/ratings...`
 - Customer creates are collection-scoped: `/customer/ratings`
-- Barber routes are owner-scoped under the controlled collection: `/barber/ratings...`
+- Barber routes are owner-scoped under the controlled collection: `/ratings...`
 - Reply management is modeled as a clear sub-resource: `/ratings/:id/reply`
 
 The only parity gap found during this audit was that customer routes already exposed a `summary` read shape while barber routes did not.
@@ -73,7 +70,7 @@ The only parity gap found during this audit was that customer routes already exp
 
 | Missing or incomplete item | Why it was expected | Status |
 | --- | --- | --- |
-| `GET /api/v1/barber/ratings/summary` | The codebase already had a shared rating summary aggregate (`rating.repository.js#getShopSummary`) and customer-facing summary route. Barber already had list access for the same owned shop, so summary access was the missing read-side counterpart. | Implemented |
+| `GET /api/v1/ratings/analytics` | The codebase already had a shared rating summary aggregate (`rating.repository.js#getShopSummary`) and shop-facing summary route. Barber already had list access for the same owned shop, so summary access was the missing read-side counterpart. | Implemented |
 
 ### Additional functional gaps found
 
@@ -98,7 +95,7 @@ The only parity gap found during this audit was that customer routes already exp
 
 | Area | Finding | Action |
 | --- | --- | --- |
-| Route parity | Customer exposed `ratings/summary`, barber did not | Added `/barber/ratings/summary` |
+| Route parity | Shop reads exposed ratings analytics, barber did not | Added `/ratings/analytics` |
 | Verification artifacts | Postman used `_id` while the API emits `ratingId` | Updated generator and generated collection to read `ratingId` first |
 | Documentation | Ratings route references did not describe the barber summary endpoint | Updated docs |
 
@@ -107,7 +104,7 @@ The only parity gap found during this audit was that customer routes already exp
 - `getRatingsByShopForBarber` is slightly verbose but still clear and non-breaking, so it was left as-is.
 - The public response serializer returns a `user` object even though the backing relation is `customerId`.
   This is a naming mismatch at the API-contract level, but changing it now would be a breaking response change. It is better handled in a versioned cleanup.
-- Other barber modules use `stats` for some aggregates (`/bookings/stats`, `/photos/stats`), while ratings uses `summary`.
+- Other barber modules use `stats` for some aggregates (`/bookings/analytics`, `/photos/analytics`), while ratings uses `analytics`.
   This audit kept `summary` for ratings so both customer and barber rating endpoints use the same aggregate naming.
 
 ---
@@ -116,8 +113,8 @@ The only parity gap found during this audit was that customer routes already exp
 
 ### Backend changes
 
-- Added `GET /api/v1/barber/ratings/summary` in `src/routes/barber.routes.js`
-- Added `getRatingSummary` controller in `src/controllers/barber/barber-rating.controller.js`
+- Added `GET /api/v1/ratings/analytics` in `src/routes/ratings.routes.js`
+- Added `getOwnedRatingSummary` controller in `src/controllers/rating.controller.js`
 - Added `getRatingSummaryForBarber(ownerId)` in `src/services/rating.service.js`
 - Added a focused service test covering barber summary resolution through the owned shop
 
@@ -134,8 +131,8 @@ The only parity gap found during this audit was that customer routes already exp
 
 ## 6. Files Modified
 
-- `server/src/routes/barber.routes.js`
-- `server/src/controllers/barber/barber-rating.controller.js`
+- `server/src/routes/ratings.routes.js`
+- `server/src/controllers/rating.controller.js`
 - `server/src/services/rating.service.js`
 - `server/src/services/__tests__/rating.service.test.js`
 - `server/scripts/regenerate-postman-collections.mjs`

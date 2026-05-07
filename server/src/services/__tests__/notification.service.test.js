@@ -74,6 +74,62 @@ test('registerFcmToken upserts a token for the authenticated user and device', a
     assert.equal(result.revokedAt, null);
 });
 
+test('getNotificationSummary returns normalized unread metrics', async (t) => {
+    t.mock.method(notificationRepository, 'countUnread', async (userId) => {
+        assert.equal(userId, 'user-1');
+        return 7;
+    });
+
+    const result = await notificationService.getNotificationSummary('user-1');
+
+    assert.deepEqual(result, {
+        unreadCount: 7,
+    });
+});
+
+test('patchNotification marks one notification read for the authenticated recipient', async (t) => {
+    const readAt = new Date('2026-05-07T08:00:00.000Z');
+    t.mock.method(notificationRepository, 'markRead', async (userId, notificationId) => {
+        assert.equal(userId, 'user-1');
+        assert.equal(notificationId, 'notification-1');
+        return {
+            _id: notificationId,
+            recipientUserId: userId,
+            type: 'hybrid',
+            eventType: 'booking.confirmed',
+            title: 'Booking confirmed',
+            body: 'Your booking is confirmed',
+            status: 'sent',
+            readAt,
+        };
+    });
+
+    const result = await notificationService.patchNotification('user-1', 'notification-1');
+
+    assert.equal(result.id, 'notification-1');
+    assert.equal(result.recipientUserId, 'user-1');
+    assert.equal(result.readAt, readAt);
+});
+
+test('patchNotifications marks all unread notifications for the authenticated recipient', async (t) => {
+    t.mock.method(notificationRepository, 'markAllRead', async (userId) => {
+        assert.equal(userId, 'user-1');
+        return { modifiedCount: 3 };
+    });
+
+    const result = await notificationService.patchNotifications('user-1');
+
+    assert.deepEqual(result, {
+        modifiedCount: 3,
+    });
+});
+
+test('notification service does not expose deprecated read-action method names', () => {
+    assert.equal('getUnreadCount' in notificationService, false);
+    assert.equal('markNotificationRead' in notificationService, false);
+    assert.equal('markAllNotificationsRead' in notificationService, false);
+});
+
 test('notifyUser persists once, sends a hybrid payload to every active device, and marks delivery', async (t) => {
     let createdPayload = null;
     t.mock.method(notificationRepository, 'createIfNotExists', async (payload) => {

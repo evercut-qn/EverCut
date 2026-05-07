@@ -86,16 +86,6 @@ export const updateMyPicture = async (req, res, next) => {
     }
 };
 
-export const toggleMyStatus = async (req, res, next) => {
-    try {
-        const { status } = getValidatedRequestData(req, 'body');
-        const result = await shopService.toggleShopStatus(req.user._id, status);
-        return res.status(200).json(ApiResponse.success(result, 'Shop status updated'));
-    } catch (err) {
-        next(err);
-    }
-};
-
 export const getShopById = async (req, res, next) => {
     try {
         const params = getValidatedRequestData(req, 'params');
@@ -126,21 +116,14 @@ export const getFavoriteShops = async (req, res, next) => {
     }
 };
 
-export const addFavoriteShop = async (req, res, next) => {
+export const setFavoriteShop = async (req, res, next) => {
     try {
         const { id } = getValidatedRequestData(req, 'params');
-        const result = await shopService.addFavoriteShop(req.user._id, id);
-        return res.status(200).json(ApiResponse.success(result, 'Shop added to favorites'));
-    } catch (err) {
-        next(err);
-    }
-};
-
-export const removeFavoriteShop = async (req, res, next) => {
-    try {
-        const { id } = getValidatedRequestData(req, 'params');
-        const result = await shopService.removeFavoriteShop(req.user._id, id);
-        return res.status(200).json(ApiResponse.success(result, 'Shop removed from favorites'));
+        const { favorite } = getValidatedRequestData(req, 'body');
+        const result = favorite
+            ? await shopService.addFavoriteShop(req.user._id, id)
+            : await shopService.removeFavoriteShop(req.user._id, id);
+        return res.status(200).json(ApiResponse.success(result, 'Shop favorite updated'));
     } catch (err) {
         next(err);
     }

@@ -13,6 +13,6 @@ const router = Router();
 router.use(authenticate, authorize(ROLES.CUSTOMER));
 
 router.get('/me', customerController.getMe);
-router.put('/me', uploadCustomerPhoto, validate(updateCustomerSchema, 'body'), customerController.updateMe);
+router.patch('/me', uploadCustomerPhoto, validate(updateCustomerSchema, 'body'), customerController.updateMe);
 
 export default router;

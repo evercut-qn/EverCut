@@ -32,7 +32,9 @@ const ensureRequiredEnv = () => {
 ensureRequiredEnv();
 
 const customerRepository = (await import('../../repositories/customer.repository.js')).default;
+const photoRepository = (await import('../../repositories/photo.repository.js')).default;
 const shopRepository = (await import('../../repositories/shop.repository.js')).default;
+const notificationEvents = (await import('../notification-events.service.js')).default;
 const shopService = await import('../shop.service.js');
 
 test('getFavoriteShops returns a paginated customer favorite shop list', async (t) => {
@@ -102,4 +104,52 @@ test('removeFavoriteShop is idempotent when the shop is no longer visible', asyn
         favorite: false,
         shopId: 'shop-1',
     });
+});
+
+test('updateBusinessInfo persists desired open state and emits a shop-status notification', async (t) => {
+    t.mock.method(shopRepository, 'findByOwnerId', async () => ({
+        _id: 'shop-1',
+        isOpen: true,
+        openTime: '09:00',
+        closeTime: '18:00',
+        breakTimes: [],
+    }));
+    t.mock.method(photoRepository, 'findByShopId', async () => []);
+
+    let updateArgs = null;
+    t.mock.method(shopRepository, 'updateByOwnerId', async (ownerId, updateData) => {
+        updateArgs = { ownerId, updateData };
+        return {
+            _id: 'shop-1',
+            ...updateData,
+        };
+    });
+
+    let accountUpdate = null;
+    t.mock.method(notificationEvents, 'notifyAccountUpdated', async (payload) => {
+        accountUpdate = payload;
+    });
+
+    let statusUpdate = null;
+    t.mock.method(notificationEvents, 'notifyShopStatusUpdated', async (payload) => {
+        statusUpdate = payload;
+    });
+
+    const result = await shopService.updateBusinessInfo('owner-1', { isOpen: false }, {});
+
+    assert.deepEqual(updateArgs, {
+        ownerId: 'owner-1',
+        updateData: { isOpen: false },
+    });
+    assert.deepEqual(accountUpdate, {
+        userId: 'owner-1',
+        updateType: 'shop_profile',
+    });
+    assert.deepEqual(statusUpdate, {
+        ownerId: 'owner-1',
+        shopId: 'shop-1',
+        isOpen: false,
+    });
+    assert.equal(result.shop.isOpen, false);
+    assert.deepEqual(result.updatedFields, ['isOpen']);
 });

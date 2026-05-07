@@ -28,19 +28,19 @@ All collections now assume the backend returns the same JSON envelope for both s
 | `01-authentication.json` | EverCut - Authentication | OTP authentication for customer and barber test users, token capture, and health check |
 | `02-onboarding.json` | EverCut - Onboarding | First-run customer and barber onboarding using onboarding JWTs, with shop schedule normalization to 24-hour storage |
 | `03-customer-profile.json` | EverCut - Customer | Profile read/update and service discovery ID capture |
-| `04-customer-bookings.json` | EverCut - Customer Bookings | Full booking lifecycle: create, schedule update, favorite add/remove, reorder, cancel |
+| `04-customer-bookings.json` | EverCut - Customer Bookings | Full booking lifecycle: create, schedule update, favorite state, reorder, cancel |
 | `05-customer-shop-discovery.json` | EverCut - Customer Shop Discovery | Shop discovery, availability, favorites, and keyword search |
 | `06-customer-ratings.json` | EverCut - Customer Ratings | Submit a rating and read shop rating data |
-| `07-barber-profile-shop.json` | EverCut - Barber Profile & Shop | Shop management: current profile, payout details, status, images, PIN, and account actions |
+| `07-barber-profile-shop.json` | EverCut - Barber Profile & Shop | Shop management: current profile, payout details, open state, media, security, and account actions |
 | `08-barber-employees.json` | EverCut - Barber Employees | Employee CRUD with optional photo upload and 24-hour employee schedule examples |
 | `09-barber-services.json` | EverCut - Barber Services | Service catalogue CRUD (single and bundled services) |
 | `10-barber-bookings.json` | EverCut - Barber Bookings | Booking administration: list filters, analytics, status update, cancellation |
-| `11-barber-photos.json` | EverCut - Barber Photos | Shop gallery: upload, list, stats, delete |
+| `11-barber-photos.json` | EverCut - Barber Photos | Shop gallery: upload, list, analytics, delete |
 | `12-barber-earnings.json` | EverCut - Barber Earnings | Earnings summary (requires completed bookings for non-zero values) |
-| `13-barber-ratings.json` | EverCut - Barber Ratings | Rating listing, summary, reply management, and rating removal |
-| `14-dashboard.json` | EverCut - Dashboard | Dashboard analytics: overview, pulse metrics, staff availability, today's queue |
+| `13-barber-ratings.json` | EverCut - Barber Ratings | Rating listing, analytics, reply management, and rating removal |
+| `14-operational-analytics.json` | EverCut - Operational Analytics | Booking, employee, and earnings analytics through resource-owned endpoints |
 | `15-payments-payouts.json` | EverCut - Payments & Payouts | Native PhonePe SDK payment initiation/verification/status/refunds and Cashfree payout retry |
-| `16-notifications.json` | EverCut - Notifications | FCM token management, notification history, unread counts, and read tracking |
+| `16-notifications.json` | EverCut - Notifications | FCM token management, notification history, summary, and read-state updates |
 | `EverCut.postman_environment.json` | — | Active environment with OTP/JWT variables for local testing |
 | `assets/sample-upload.png` | — | Sample image pre-wired into file-upload requests |
 
@@ -83,15 +83,15 @@ Shop opening, closing, and break times may be sent as either `HH:MM` or `hh:mm A
 
 | # | Method | Endpoint | Description |
 |---|---|---|---|
-| 1 | GET | `/api/v1/bookings?timeframe=upcoming` | List upcoming bookings - captures booking ID |
+| 1 | GET | `/api/v1/bookings?dateFrom={{booking_date}}` | List bookings from the generated date - captures booking ID |
 | 2 | GET | `/api/v1/employees/{{employee_id}}/availability` | Get employee availability |
 | 3 | POST | `/api/v1/bookings` | Create a booking |
 | 4 | GET | `/api/v1/bookings/{{booking_id}}` | Get booking details |
-| 5 | PUT | `/api/v1/bookings/{{booking_id}}/favorite` | Add booking favorite |
+| 5 | PATCH | `/api/v1/bookings/{{booking_id}}/favorite` | Set booking favorite true |
 | 6 | GET | `/api/v1/bookings?favorite=true` | List favorite bookings |
 | 7 | PATCH | `/api/v1/bookings/{{booking_id}}` | Update booking schedule |
 | 8 | POST | `/api/v1/bookings` | Reorder from `sourceBookingId` |
-| 9 | DELETE | `/api/v1/bookings/{{booking_id}}/favorite` | Remove booking favorite |
+| 9 | PATCH | `/api/v1/bookings/{{booking_id}}/favorite` | Set booking favorite false |
 | 10 | PATCH | `/api/v1/bookings/{{booking_id}}` | Cancel booking with `status=cancelled` |
 
 ### `05-customer-shop-discovery.json`
@@ -103,9 +103,9 @@ Shop opening, closing, and break times may be sent as either `HH:MM` or `hh:mm A
 | 3 | GET | `/api/v1/shops/{{shop_id}}/employees` | Get shop employees - captures employee ID |
 | 4 | GET | `/api/v1/employees/{{employee_id}}/availability` | Get employee available slots |
 | 5 | GET | `/api/v1/shops/{{shop_id}}/availability` | Get shop-wide availability |
-| 6 | PUT | `/api/v1/shops/{{shop_id}}/favorite` | Add favorite shop |
+| 6 | PATCH | `/api/v1/shops/{{shop_id}}/favorite` | Set favorite shop true |
 | 7 | GET | `/api/v1/shops/favorites` | List favorite shops |
-| 8 | DELETE | `/api/v1/shops/{{shop_id}}/favorite` | Remove favorite shop |
+| 8 | PATCH | `/api/v1/shops/{{shop_id}}/favorite` | Set favorite shop false |
 | 9 | GET | `/api/v1/shops?category=Door-Step` | Get doorstep shops |
 | 10 | GET | `/api/v1/services/search` | Search services by keyword and gender |
 | 11 | GET | `/api/v1/shops?query={{shop_search_query}}` | Search shops by keyword |
@@ -114,10 +114,10 @@ Shop opening, closing, and break times may be sent as either `HH:MM` or `hh:mm A
 
 | # | Method | Endpoint | Description |
 |---|---|---|---|
-| 1 | GET | `/api/v1/bookings?timeframe=past&limit=100` | Bootstrap: capture a shop ID from a completed past booking |
+| 1 | GET | `/api/v1/bookings?dateTo={{booking_date}}&status=completed&limit=100` | Bootstrap: capture a shop ID from a completed booking |
 | 2 | POST | `/api/v1/ratings` | Submit a rating *(once per customer/shop - returns 409 on rerun)* |
-| 3 | GET | `/api/v1/ratings/shop/{{shop_id}}` | List shop ratings |
-| 4 | GET | `/api/v1/ratings/shop/{{shop_id}}/summary` | Get rating summary |
+| 3 | GET | `/api/v1/shops/{{shop_id}}/ratings` | List shop ratings |
+| 4 | GET | `/api/v1/shops/{{shop_id}}/ratings/analytics` | Get rating analytics |
 
 ### `07-barber-profile-shop.json`
 
@@ -127,10 +127,10 @@ Shop opening, closing, and break times may be sent as either `HH:MM` or `hh:mm A
 | 2 | PATCH | `/api/v1/shops/me` | Update business info |
 | 3 | GET | `/api/v1/shops/me/payout-details` | Get payout details |
 | 4 | PATCH | `/api/v1/shops/me/payout-details` | Update payout details |
-| 5 | PATCH | `/api/v1/shops/me/status` | Ensure shop is open |
-| 6 | PATCH | `/api/v1/shops/me/picture` | Update profile picture |
-| 7 | PATCH | `/api/v1/shops/me/cover` | Update cover image |
-| 8 | PATCH | `/api/v1/shops/me/pin` | Update PIN |
+| 5 | PATCH | `/api/v1/shops/me` | Ensure shop is open |
+| 6 | PATCH | `/api/v1/shops/me/media/picture` | Update profile picture |
+| 7 | PATCH | `/api/v1/shops/me/media/cover` | Update cover image |
+| 8 | PATCH | `/api/v1/shops/me/security` | Update PIN |
 | 9A | DELETE | `/api/v1/account/sessions` | Sign out everywhere *(Terminal)* |
 | 9B | DELETE | `/api/v1/account` | Delete account *(Terminal)* |
 
@@ -144,7 +144,7 @@ Employee `workingHours.start` and `workingHours.end` remain `HH:MM` 24-hour valu
 | 2 | GET | `/api/v1/employees/{{employee_id}}` | Get employee details with statistics |
 | 3 | POST | `/api/v1/employees` | Add employee |
 | 4 | PATCH | `/api/v1/employees/{{employee_id}}` | Update employee |
-| 5 | PATCH | `/api/v1/employees/{{employee_id}}/status` | Toggle employee status |
+| 5 | PATCH | `/api/v1/employees/{{employee_id}}` | Update employee active state |
 | 6 | DELETE | `/api/v1/employees/{{employee_id}}` | Delete employee *(Terminal)* |
 
 ### `09-barber-services.json`
@@ -162,8 +162,7 @@ Employee `workingHours.start` and `workingHours.end` remain `HH:MM` 24-hour valu
 | # | Method | Endpoint | Description |
 |---|---|---|---|
 | 1 | GET | `/api/v1/bookings` | List all bookings - captures IDs for status update and cancellation |
-| 2 | GET | `/api/v1/bookings/analytics/summary` | Get booking stats |
-| 3 | GET | `/api/v1/bookings/analytics/milestones` | Get the monthly completed-booking milestone progress card data |
+| 2 | GET | `/api/v1/bookings/analytics` | Get combined booking analytics |
 | 4 | GET | `/api/v1/bookings?status=awaiting_confirmation&paymentStatus=success` | List pending confirmations |
 | 5 | GET | `/api/v1/bookings?status=confirmed` | Filter bookings by status |
 | 6 | PATCH | `/api/v1/bookings/{{booking_id_status}}` | Confirm a booking |
@@ -176,7 +175,7 @@ Employee `workingHours.start` and `workingHours.end` remain `HH:MM` 24-hour valu
 |---|---|---|---|
 | 1 | GET | `/api/v1/photos` | List gallery photos - captures photo ID |
 | 2 | POST | `/api/v1/photos` | Upload photos |
-| 3 | GET | `/api/v1/photos/stats` | Get photo stats |
+| 3 | GET | `/api/v1/photos/analytics` | Get photo analytics |
 | 4 | GET | `/api/v1/photos/{{photo_id}}` | Get photo by ID |
 | 5 | DELETE | `/api/v1/photos/{{photo_id}}` | Delete photo *(Terminal)* |
 
@@ -191,21 +190,19 @@ Employee `workingHours.start` and `workingHours.end` remain `HH:MM` 24-hour valu
 | # | Method | Endpoint | Description |
 |---|---|---|---|
 | 1 | GET | `/api/v1/ratings` | List ratings - captures seeded IDs for reply/remove operations |
-| 2 | GET | `/api/v1/ratings/summary` | Get the authenticated barber shop's rating summary |
-| 3 | POST | `/api/v1/ratings/{{rating_id_add_reply}}/reply` | Add reply to a rating *(returns 409 on rerun once a reply exists)* |
+| 2 | GET | `/api/v1/ratings/analytics` | Get the authenticated barber shop's rating analytics |
+| 3 | PUT | `/api/v1/ratings/{{rating_id_add_reply}}/reply` | Add or replace reply on a rating |
 | 4 | PUT | `/api/v1/ratings/{{rating_id_update_reply}}/reply` | Update an existing reply |
 | 5 | DELETE | `/api/v1/ratings/{{rating_id_update_reply}}/reply` | Delete a reply |
 | 6 | DELETE | `/api/v1/ratings/{{rating_id_remove_rating}}` | Remove a rating |
 
-### `14-dashboard.json`
+### `14-operational-analytics.json`
 
 | # | Method | Endpoint | Description |
 |---|---|---|---|
-| 1 | GET | `/api/v1/earnings/overview` | Get complete dashboard overview (pulse + staff + queue) |
-| 2 | GET | `/api/v1/bookings/analytics/today` | Get today's pulse metrics (occupancy + status breakdown) |
-| 3 | GET | `/api/v1/employees/analytics/availability` | Get staff availability and progress tracking |
-| 4 | GET | `/api/v1/bookings/analytics/queue?timeframe=active` | Get today's active queue |
-| 5 | GET | `/api/v1/bookings/analytics/queue?timeframe=upcoming` | Get today's upcoming queue |
+| 1 | GET | `/api/v1/bookings/analytics` | Get booking summary, milestones, today pulse, and queue |
+| 2 | GET | `/api/v1/employees/analytics` | Get staff availability and progress tracking |
+| 3 | GET | `/api/v1/earnings` | Get earnings analytics |
 
 ### `15-payments-payouts.json`
 
@@ -224,9 +221,9 @@ Employee `workingHours.start` and `workingHours.end` remain `HH:MM` 24-hour valu
 |---|---|---|---|
 | 1 | POST | `/api/v1/notifications/tokens` | Register or refresh an FCM token for the authenticated user |
 | 2 | GET | `/api/v1/notifications?page=1&limit=20` | List notification history and capture a notification ID |
-| 3 | GET | `/api/v1/notifications/unread-count` | Get unread notification count |
-| 4 | PATCH | `/api/v1/notifications/{{notification_id}}/read` | Mark one notification read |
-| 5 | PATCH | `/api/v1/notifications/read-all` | Mark all notifications read |
+| 3 | GET | `/api/v1/notifications/summary` | Get notification summary |
+| 4 | PATCH | `/api/v1/notifications/{{notification_id}}` | Mark one notification read |
+| 5 | PATCH | `/api/v1/notifications` | Mark all notifications read |
 | 6 | DELETE | `/api/v1/notifications/tokens` | Revoke the authenticated user's FCM token |
 
 ---
@@ -343,7 +340,7 @@ Request 1 captures seeded IDs from the serialized `id` field returned by the API
 
 ### `06-customer-ratings.json` — Add Rating (Request 2)
 
-This collection captures `shop_id` from `GET /bookings?timeframe=past`, not from nearby shop discovery. The authenticated customer must already have at least one completed past booking, otherwise request 1 fails intentionally because the backend allows ratings only for shops the customer has actually completed a booking with.
+This collection captures `shop_id` from completed bookings, not from nearby shop discovery. The authenticated customer must already have at least one completed booking, otherwise request 1 fails intentionally because the backend allows ratings only for shops the customer has actually completed a booking with.
 
 Request 2 succeeds once per customer/shop pair. It returns `409 Conflict` on subsequent runs because the API allows only one rating per customer per shop.
 
@@ -353,9 +350,9 @@ Barber onboarding and shop schedule updates accept either `HH:MM` or `hh:mm AM/P
 
 ### `13-barber-ratings.json` — Add Reply (Request 2)
 
-In the current collection this is request 3, because request 2 now fetches `GET /ratings/summary`.
+In the current collection this is request 3, because request 2 now fetches `GET /ratings/analytics`.
 
-This succeeds once for the seeded no-reply fixture. It returns `409 Conflict` on subsequent runs because `POST /ratings/:id/reply` no longer overwrites an existing reply.
+This succeeds once for the seeded no-reply fixture. It returns `409 Conflict` on subsequent runs if the service rejects replacing an existing reply.
 
 ### `10-barber-bookings.json` — Cancel Paid Booking (Request 8)
 

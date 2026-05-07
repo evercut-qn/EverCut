@@ -378,7 +378,7 @@ export const updateEmployee = async (ownerId, employeeId, data, file) => {
     const normalizedData = normalizeEmployeePayload(data, shop);
     const updateData = {};
 
-    for (const field of ['firstName', 'lastName', 'phoneNumber', 'gender', 'dateOfBirth', 'workingHours', 'blockedDates']) {
+    for (const field of ['firstName', 'lastName', 'phoneNumber', 'gender', 'dateOfBirth', 'workingHours', 'blockedDates', 'isActive']) {
         if (normalizedData[field] !== undefined) {
             updateData[field] = normalizedData[field];
         }
@@ -520,7 +520,7 @@ export const deleteEmployee = async (ownerId, employeeId) => {
     return { message: 'Employee deleted successfully' };
 };
 
-// ── Dashboard Analytics (moved from dashboard.service.js) ────────────────
+// Resource analytics
 
 /**
  * Get staff availability and progress
@@ -581,55 +581,5 @@ export const getStaffAvailability = async (ownerId) => {
     return {
         staff: staffAvailability,
         totalStaff: activeEmployees.length,
-    };
-};
-
-/**
- * Toggle employee availability status
- * Similar to shop status toggle - allows marking employee as available/unavailable
- */
-export const toggleEmployeeStatus = async (ownerId, employeeId, status) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
-    if (!shop) throw new NotFoundError('Shop profile');
-
-    const employee = await employeeRepository.findById(employeeId);
-    if (!employee || String(employee.shopId) !== String(shop._id)) {
-        throw new NotFoundError('Employee');
-    }
-
-    // Normalize status value (similar to shop toggle)
-    let newStatus;
-    if (status === undefined) {
-        // Toggle current status
-        newStatus = !employee.isActive;
-    } else if (typeof status === 'boolean') {
-        newStatus = status;
-    } else if (typeof status === 'string') {
-        const normalized = status.toLowerCase().trim();
-        if (['true', 'yes', 'on'].includes(normalized)) {
-            newStatus = true;
-        } else if (['false', 'no', 'off'].includes(normalized)) {
-            newStatus = false;
-        } else {
-            throw new BadRequestError('status must be a boolean or one of: true, false, yes, no, on, off');
-        }
-    } else {
-        throw new BadRequestError('status must be a boolean or string');
-    }
-
-    const updated = await employeeRepository.updateById(employeeId, shop._id, { isActive: newStatus });
-    if (!updated) throw new NotFoundError('Employee');
-
-    logger.info('Employee status updated', {
-        employeeId,
-        shopId: shop._id,
-        ownerId,
-        isActive: newStatus,
-    });
-
-    return {
-        id: toIdString(updated._id),
-        name: `${updated.firstName} ${updated.lastName}`,
-        isActive: updated.isActive,
     };
 };

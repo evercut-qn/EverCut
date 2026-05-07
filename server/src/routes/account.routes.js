@@ -43,7 +43,7 @@ router.post(
 );
 
 // Email update endpoint
-router.put(
+router.patch(
     '/email',
     validate(updateEmailSchema, 'body'),
     accountController.updateEmail,

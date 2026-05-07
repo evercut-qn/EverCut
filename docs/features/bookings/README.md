@@ -46,8 +46,7 @@ Browse Shops → View Shop → View Employees → Check Availability → Create 
 **Booking:**
 - `POST /api/v1/bookings` - Create booking
 - `PATCH /api/v1/bookings/:id` - Update schedule or status
-- `PUT /api/v1/bookings/:id/favorite` - Add favorite
-- `DELETE /api/v1/bookings/:id/favorite` - Remove favorite
+- `PATCH /api/v1/bookings/:id/favorite` - Set favorite state
 
 **Payment (Native SDK):**
 - `POST /api/v1/payments` - Initiate native SDK payment
@@ -168,10 +167,8 @@ POST   /api/v1/bookings                        Create booking
 GET    /api/v1/bookings                        List with `period`, `favorite`, `status`, or `paymentStatus`
 GET    /api/v1/bookings/:id                    Get booking details
 PATCH  /api/v1/bookings/:id                    Update schedule or status
-PUT    /api/v1/bookings/:id/favorite           Add favorite
-DELETE /api/v1/bookings/:id/favorite           Remove favorite
-GET    /api/v1/bookings/analytics/summary      Booking stats
-GET    /api/v1/bookings/analytics/milestones   Monthly milestone progress
+PATCH  /api/v1/bookings/:id/favorite           Set favorite state
+GET    /api/v1/bookings/analytics              Booking summary, milestones, today pulse, and queue
 ```
 
 ### Scheduling Engine

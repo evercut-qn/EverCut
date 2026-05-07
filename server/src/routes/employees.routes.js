@@ -11,7 +11,6 @@ import {
     addEmployeeSchema,
     employeeAvailabilityQuerySchema,
     employeeIdParamSchema,
-    toggleEmployeeStatusSchema,
     updateEmployeeAvailabilitySchema,
     updateEmployeeSchema,
 } from '../validators/employee.validator.js';
@@ -20,10 +19,11 @@ const router = Router();
 
 router.use(authenticate);
 
-router.get('/analytics/availability', authorize(ROLES.BARBER), employeeController.getStaffAvailability);
+router.get('/analytics', authorize(ROLES.BARBER), employeeController.getStaffAvailability);
 
 router.get(
     '/:id/availability',
+    authorize(ROLES.CUSTOMER, ROLES.BARBER),
     validate(employeeIdParamSchema, 'params'),
     validate(employeeAvailabilityQuerySchema, 'query'),
     employeeController.getEmployeeAvailability,
@@ -35,8 +35,7 @@ router.get('/', validate(paginationSchema, 'query'), employeeController.getEmplo
 router.get('/:id', validate(employeeIdParamSchema, 'params'), employeeController.getEmployeeById);
 router.post('/', uploadEmployeePhoto, validate(addEmployeeSchema, 'body'), employeeController.addEmployee);
 router.patch('/:id', validate(employeeIdParamSchema, 'params'), uploadEmployeePhoto, validate(updateEmployeeSchema, 'body'), employeeController.updateEmployee);
-router.patch('/:id/availability', validate(employeeIdParamSchema, 'params'), validate(updateEmployeeAvailabilitySchema, 'body'), employeeController.updateEmployeeAvailability);
-router.patch('/:id/status', validate(employeeIdParamSchema, 'params'), validate(toggleEmployeeStatusSchema, 'body'), employeeController.toggleEmployeeStatus);
+router.put('/:id/blocked-dates', validate(employeeIdParamSchema, 'params'), validate(updateEmployeeAvailabilitySchema, 'body'), employeeController.updateEmployeeAvailability);
 router.delete('/:id', validate(employeeIdParamSchema, 'params'), employeeController.deleteEmployee);
 
 export default router;

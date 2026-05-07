@@ -162,7 +162,7 @@
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/photos/stats",
+        "url": "{{base_url}}/{{api_prefix}}/photos/analytics",
         "description": "Returns photo counts and storage totals."
       },
       "event": [

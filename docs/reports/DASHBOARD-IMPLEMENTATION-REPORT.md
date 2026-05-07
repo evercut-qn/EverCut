@@ -85,16 +85,16 @@ This report documents the comprehensive implementation of the barber dashboard f
 │  GET /api/dashboard/overview                                 │
 │  GET /api/dashboard/pulse                                    │
 │  GET /api/dashboard/staff                                    │
-│  GET /api/v1/bookings/analytics/queue?timeframe=active|upcoming │
+│  GET /api/v1/bookings/analytics|upcoming │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                  Dashboard Controller                        │
-│  - getTodaysPulse()                                          │
+│  - booking analytics today data                                          │
 │  - getStaffAvailability()                                    │
-│  - getTodaysQueue()                                          │
-│  - getDashboardOverview()                                    │
+│  - booking analytics queue data                                          │
+│  - getOperationalAnalytics()                                    │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
@@ -173,14 +173,14 @@ This report documents the comprehensive implementation of the barber dashboard f
 }
 ```
 
-#### GET /api/v1/bookings/analytics/queue?timeframe=active
+#### GET /api/v1/bookings/analytics
 
 **Response:**
 ```json
 {
   "success": true,
   "data": {
-    "timeframe": "active",
+    "date range": "active",
     "active": {
       "count": 3,
       "items": [
@@ -209,10 +209,10 @@ This report documents the comprehensive implementation of the barber dashboard f
 ### New Files Created
 
 1. **server/src/services/dashboard.service.js** (280 lines)
-   - `getTodaysPulse()` - Occupancy and status metrics
+   - `booking analytics today data` - Occupancy and status metrics
    - `getStaffAvailability()` - Employee progress tracking
-   - `getTodaysQueue()` - Active/upcoming appointments
-   - `getDashboardOverview()` - Combined dashboard data
+   - `booking analytics queue data` - Active/upcoming appointments
+   - `getOperationalAnalytics()` - Combined dashboard data
 
 2. **server/src/controllers/dashboard.controller.js** (50 lines)
    - Request handling for all dashboard endpoints
@@ -395,7 +395,7 @@ This report documents the comprehensive implementation of the barber dashboard f
 ```javascript
 // Example test structure
 describe('Dashboard Service', () => {
-  describe('getTodaysPulse', () => {
+  describe('booking analytics today data', () => {
     it('should calculate occupancy correctly');
     it('should count bookings by status');
     it('should handle shops with no employees');
@@ -407,7 +407,7 @@ describe('Dashboard Service', () => {
     it('should exclude deleted employees');
   });
   
-  describe('getTodaysQueue', () => {
+  describe('booking analytics queue data', () => {
     it('should filter active appointments');
     it('should filter upcoming appointments');
     it('should sort by time');

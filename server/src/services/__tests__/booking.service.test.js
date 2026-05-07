@@ -88,8 +88,76 @@ test('getBookingsByShop loads bookings by shopId so deleted employees do not dis
     assert.equal(result.numberOfCustomers, 2);
 });
 
-test('getBookingMilestoneProgress returns the monthly completed-booking target state for the requested period', async (t) => {
+test('getCustomerBookings applies explicit status, payment, and date filters', async (t) => {
+    t.mock.method(customerRepository, 'findByUserId', async () => ({ _id: 'customer-1' }));
+
+    let countFilter = null;
+    t.mock.method(bookingRepository, 'countAll', async (filter) => {
+        countFilter = filter;
+        return 1;
+    });
+
+    let findArgs = null;
+    t.mock.method(bookingRepository, 'findByCustomer', async (customerId, filters, options) => {
+        findArgs = { customerId, filters, options };
+        return [{ _id: 'booking-1' }];
+    });
+
+    const result = await bookingService.getCustomerBookings('user-1', {
+        page: 1,
+        limit: 10,
+        status: ['confirmed', 'completed'],
+        paymentStatus: 'success',
+        dateFrom: '2026-05-01',
+        dateTo: '2026-05-31',
+    });
+
+    assert.deepEqual(countFilter, {
+        customerId: 'customer-1',
+        status: { $in: ['confirmed', 'completed'] },
+        paymentStatus: 'success',
+        date: {
+            $gte: new Date('2026-05-01T00:00:00.000Z'),
+            $lte: new Date('2026-05-31T23:59:59.999Z'),
+        },
+    });
+    assert.deepEqual(findArgs, {
+        customerId: 'customer-1',
+        filters: {
+            status: { $in: ['confirmed', 'completed'] },
+            paymentStatus: 'success',
+            date: {
+                $gte: new Date('2026-05-01T00:00:00.000Z'),
+                $lte: new Date('2026-05-31T23:59:59.999Z'),
+            },
+        },
+        options: { skip: 0, limit: 10 },
+    });
+    assert.equal(result.items[0].id, 'booking-1');
+});
+
+test('getBookingsByShop rejects employee filters outside the owned shop', async (t) => {
     t.mock.method(shopRepository, 'findByOwnerId', async () => ({ _id: 'shop-1' }));
+    t.mock.method(employeeRepository, 'findById', async () => ({
+        _id: 'employee-2',
+        shopId: 'shop-2',
+    }));
+
+    await assert.rejects(
+        () => bookingService.getBookingsByShop('owner-1', { employeeId: 'employee-2' }),
+        {
+            name: 'BadRequestError',
+            message: 'Employee does not belong to this shop',
+        },
+    );
+});
+
+test('getBookingAnalytics returns the monthly completed-booking target state for the requested period', async (t) => {
+    t.mock.method(shopRepository, 'findByOwnerId', async () => ({ _id: 'shop-1' }));
+    t.mock.method(employeeRepository, 'findByShopId', async () => []);
+    t.mock.method(bookingRepository, 'countAll', async () => 0);
+    t.mock.method(bookingRepository, 'countByStatusForShop', async () => 0);
+    t.mock.method(bookingRepository, 'findByShopId', async () => []);
 
     let capturedArgs = null;
     t.mock.method(bookingRepository, 'countCompletedForShopInDateRange', async (shopId, startDate, endDate) => {
@@ -97,14 +165,14 @@ test('getBookingMilestoneProgress returns the monthly completed-booking target s
         return 500;
     });
 
-    const result = await bookingService.getBookingMilestoneProgress('owner-1', { month: 3, year: 2026 });
+    const result = await bookingService.getBookingAnalytics('owner-1', { month: 3, year: 2026 });
 
     assert.deepEqual(capturedArgs, {
         shopId: 'shop-1',
         startDate: new Date('2026-03-01T00:00:00.000Z'),
         endDate: new Date('2026-04-01T00:00:00.000Z'),
     });
-    assert.deepEqual(result, {
+    assert.deepEqual(result.milestones, {
         period: {
             month: 3,
             year: 2026,
@@ -152,20 +220,102 @@ test('getBookingMilestoneProgress returns the monthly completed-booking target s
     });
 });
 
-test('getBookingMilestoneProgress returns no next milestone once all visible targets are completed', async (t) => {
+test('getBookingAnalytics returns no next milestone once all visible targets are completed', async (t) => {
     t.mock.method(shopRepository, 'findByOwnerId', async () => ({ _id: 'shop-1' }));
+    t.mock.method(employeeRepository, 'findByShopId', async () => []);
+    t.mock.method(bookingRepository, 'countAll', async () => 0);
+    t.mock.method(bookingRepository, 'countByStatusForShop', async () => 0);
+    t.mock.method(bookingRepository, 'findByShopId', async () => []);
     t.mock.method(bookingRepository, 'countCompletedForShopInDateRange', async () => 1200);
 
-    const result = await bookingService.getBookingMilestoneProgress('owner-1', { month: 3, year: 2026 });
+    const result = await bookingService.getBookingAnalytics('owner-1', { month: 3, year: 2026 });
 
-    assert.equal(result.progress.value, 1000);
-    assert.equal(result.progress.percentage, 100);
-    assert.deepEqual(result.currentMilestone, {
+    assert.equal(result.milestones.progress.value, 1000);
+    assert.equal(result.milestones.progress.percentage, 100);
+    assert.deepEqual(result.milestones.currentMilestone, {
         targetBookings: 1000,
         label: '3rd target',
         statusText: '3rd target completed',
     });
-    assert.equal(result.nextMilestone, null);
+    assert.equal(result.milestones.nextMilestone, null);
+});
+
+test('getBookingAnalytics returns summary, milestones, today pulse, and both queue buckets', async (t) => {
+    t.mock.method(shopRepository, 'findByOwnerId', async () => ({
+        _id: 'shop-1',
+        openTime: '09:00',
+        closeTime: '10:00',
+        breakTimes: [],
+    }));
+
+    t.mock.method(employeeRepository, 'findByShopId', async () => ([
+        {
+            _id: 'employee-1',
+            isActive: true,
+            deletedAt: null,
+            workingHours: { start: '09:00', end: '10:00' },
+            blockedDates: [],
+        },
+    ]));
+
+    t.mock.method(bookingRepository, 'countAll', async () => 12);
+    t.mock.method(bookingRepository, 'countByStatusForShop', async (_shopId, status) => ({
+        pending: 2,
+        awaiting_confirmation: 3,
+        completed: 4,
+        cancelled: 1,
+    }[status] || 0));
+    t.mock.method(bookingRepository, 'countCompletedForShopInDateRange', async () => 500);
+    t.mock.method(bookingRepository, 'findByShopId', async (_shopId, filters) => {
+        if (filters.status?.$nin) {
+            return [
+                {
+                    _id: 'active-booking',
+                    customerId: { firstName: 'Active', lastName: 'Customer' },
+                    employeeId: { firstName: 'Active', lastName: 'Barber' },
+                    serviceIds: [{ serviceName: 'Haircut' }],
+                    date: new Date(),
+                    time: '00:00',
+                    status: 'confirmed',
+                },
+                {
+                    _id: 'upcoming-booking',
+                    customerId: { firstName: 'Upcoming', lastName: 'Customer' },
+                    employeeId: { firstName: 'Upcoming', lastName: 'Barber' },
+                    serviceIds: [{ serviceName: 'Shave' }],
+                    date: new Date(),
+                    time: '23:59',
+                    status: 'confirmed',
+                },
+            ];
+        }
+
+        return [
+            {
+                _id: 'today-booking',
+                status: 'confirmed',
+                startMinute: 540,
+                endMinute: 570,
+                durationMinutes: 30,
+            },
+        ];
+    });
+
+    const result = await bookingService.getBookingAnalytics('owner-1', { month: 3, year: 2026 });
+
+    assert.deepEqual(result.summary, {
+        total: 12,
+        pending: 2,
+        awaitingConfirmation: 3,
+        completed: 4,
+        cancelled: 1,
+    });
+    assert.equal(result.milestones.period.label, 'March 2026');
+    assert.equal(result.today.occupancy.unit, 'minutes');
+    assert.equal(result.queue.active.count, 1);
+    assert.equal(result.queue.upcoming.count, 1);
+    assert.equal(result.queue.active.items[0].id, 'active-booking');
+    assert.equal(result.queue.upcoming.items[0].id, 'upcoming-booking');
 });
 
 test('createBooking creates a pending booking that requires payment before confirmation', async (t) => {

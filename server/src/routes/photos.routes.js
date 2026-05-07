@@ -15,7 +15,7 @@ router.use(authenticate, authorize(ROLES.BARBER));
 
 router.get('/', validate(photoFilterQuerySchema, 'query'), photoController.getPhotos);
 router.post('/', uploadShopPhotos, validate(photoUploadSchema, 'body'), photoController.uploadPhotos);
-router.get('/stats', photoController.getPhotoStats);
+router.get('/analytics', photoController.getPhotoStats);
 router.get('/:id', validate(objectIdParamSchema, 'params'), photoController.getPhotoById);
 router.delete('/:id', validate(objectIdParamSchema, 'params'), photoController.deletePhoto);
 

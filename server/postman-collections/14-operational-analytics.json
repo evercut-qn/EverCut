@@ -1,0 +1,165 @@
+{
+  "info": {
+    "name": "EverCut - Operational Analytics",
+    "description": "Operational analytics collection for barber shop owners. Provides booking analytics, employee availability analytics, and earnings through resource-owned endpoints.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{barber_access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": []
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:5000",
+      "type": "string",
+      "description": "Default local API server"
+    },
+    {
+      "key": "api_prefix",
+      "value": "api/v1",
+      "type": "string",
+      "description": "API prefix used by every request"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Get Booking Analytics",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/{{api_prefix}}/bookings/analytics",
+        "description": "Returns booking summary, monthly milestone progress, today pulse metrics, and both active/upcoming queue buckets."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
+              "});",
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "const response = pm.response.json();",
+              "const data = response.data || {};",
+              "pm.test('response includes summary', function () { pm.expect(data).to.have.property('summary'); });",
+              "pm.test('response includes milestones', function () { pm.expect(data).to.have.property('milestones'); });",
+              "pm.test('response includes today', function () { pm.expect(data).to.have.property('today'); });",
+              "pm.test('response includes queue', function () { pm.expect(data).to.have.property('queue'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Get Employee Analytics",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/{{api_prefix}}/employees/analytics",
+        "description": "Returns staff availability and progress tracking for today. Shows each employee's completed vs total appointments with progress percentage."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
+              "});",
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "const response = pm.response.json();",
+              "const data = response.data || {};",
+              "pm.test('response includes staff array', function () { pm.expect(data).to.have.property('staff'); });",
+              "pm.test('response includes totalStaff', function () { pm.expect(data).to.have.property('totalStaff'); });",
+              "if (Array.isArray(data.staff) && data.staff.length > 0) {",
+              "  const firstStaff = data.staff[0];",
+              "  pm.test('staff item has required fields', function () {",
+              "    pm.expect(firstStaff).to.have.property('id');",
+              "    pm.expect(firstStaff).to.have.property('name');",
+              "    pm.expect(firstStaff).to.have.property('progress');",
+              "  });",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Get Earnings",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/{{api_prefix}}/earnings",
+        "description": "Returns financial earnings totals and monthly revenue for the authenticated barber shop."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
+              "});",
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "const response = pm.response.json();",
+              "const data = response.data || {};",
+              "pm.test('response includes monthlyRevenue', function () { pm.expect(data).to.have.property('monthlyRevenue'); });"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

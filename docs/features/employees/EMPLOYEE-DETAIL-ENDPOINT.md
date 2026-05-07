@@ -387,7 +387,7 @@ const fetchEmployeeDetails = async (employeeId) => {
 - `GET /api/employees` - List all employees
 - `POST /api/employees` - Add new employee
 - `PATCH /api/employees/:id` - Update employee
-- `PATCH /api/employees/:id/status` - Toggle employee availability status
+- `PATCH /api/employees/:id` - Toggle employee availability status
 - `DELETE /api/employees/:id` - Delete employee
 - `GET /api/employees/:id/availability` - Employee availability
 - `PATCH /api/v1/employees/:id/availability` - Mark employee available/unavailable for date(s)

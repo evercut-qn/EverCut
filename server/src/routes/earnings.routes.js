@@ -16,7 +16,6 @@ const router = Router();
 router.use(authenticate, authorize(ROLES.BARBER));
 
 router.get('/', earningsController.getEarnings);
-router.get('/overview', earningsController.getDashboardOverview);
 router.get('/transactions', validate(transactionListQuerySchema, 'query'), earningsController.getTransactions);
 router.get('/transactions/statement', validate(statementQuerySchema, 'query'), earningsController.downloadStatement);
 router.get('/transactions/:id', validate(transactionDetailParamsSchema, 'params'), earningsController.getTransactionDetail);

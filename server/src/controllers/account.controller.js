@@ -34,7 +34,7 @@ export const verifyPhoneUpdateOtp = async (req, res) => {
 };
 
 /**
- * PUT /account/email
+ * PATCH /account/email
  * Update user email
  */
 export const updateEmail = async (req, res) => {

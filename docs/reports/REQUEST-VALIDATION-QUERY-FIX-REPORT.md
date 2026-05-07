@@ -183,20 +183,19 @@ The change protects the original failing query path and standardizes every route
 - `POST /api/v1/auth/token/refresh`
 - `POST /api/v1/onboarding/customers`
 - `POST /api/v1/onboarding/barbers`
-- `GET /api/v1/barber/employees`
-- `GET /api/v1/barber/services`
-- `GET /api/v1/barber/bookings`
-- `GET /api/v1/barber/bookings/status`
-- `GET /api/v1/barber/photos`
-- `GET /api/v1/barber/ratings`
-- `GET /api/v1/customer/homepage/services`
-- `GET /api/v1/customer/bookings`
-- `GET /api/v1/customer/shops/nearby`
-- `GET /api/v1/customer/shops/:id/ratings`
-- `GET /api/v1/customer/search/services`
-- `GET /api/v1/customer/search/shops`
-- `GET /api/v1/customer/employees/:id/calendar`
-- all validated body and params routes under `/api/v1/auth`, `/api/v1/onboarding`, `/api/v1/barber`, and `/api/v1/customer`
+- `GET /api/v1/employees`
+- `GET /api/v1/services`
+- `GET /api/v1/bookings`
+- `GET /api/v1/bookings/status`
+- `GET /api/v1/photos`
+- `GET /api/v1/ratings`
+- `GET /api/v1/customers/me/home/services`
+- `GET /api/v1/shops/nearby`
+- `GET /api/v1/shops/:id/ratings`
+- `GET /api/v1/services/search`
+- `GET /api/v1/shops/search`
+- `GET /api/v1/employees/:id/calendar`
+- all validated body and params routes under `/api/v1/auth`, `/api/v1/onboarding`, and the resource routes mounted under `/api/v1`
 
 ---
 

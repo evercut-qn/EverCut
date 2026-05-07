@@ -1,4 +1,4 @@
-﻿# Ratings Section Fixes Report
+# Ratings Section Fixes Report
 
 > Legacy snapshot: This document records findings against the pre-2026-04-24 role-prefixed routing layout and removed `controllers/customer/*` / `controllers/barber/*` files. Treat route and file references here as historical unless explicitly updated. For the current API surface, see [ROUTING-STRATEGY-ANALYSIS](../architecture/ROUTING-STRATEGY-ANALYSIS.md).
 
@@ -48,11 +48,11 @@ Connected consumers also reviewed:
 | Issue | Root Cause | Fix Implemented |
 | --- | --- | --- |
 | Customers could rate shops without ever completing a booking there. | `addRating()` resolved the customer, shop, and duplicate-rating state, but never verified booking eligibility. | Added a booking-level eligibility check through `booking.repository.js`, and `addRating()` now rejects rating creation unless the customer has a completed booking at that shop. |
-| `POST /barber/ratings/:id/reply` could overwrite an existing reply instead of behaving like a create-only route. | `rating.service.js` did not check whether a reply already existed before calling the repository update path. | Added an explicit conflict guard so `POST` now fails with `409 Conflict` when a reply already exists. |
+| Reply writes previously required separate create and update endpoints. | The old split added route surface area without representing a meaningful separate resource state. | Replaced the split with `PUT /ratings/:id/reply`, which creates the reply on first use and updates it thereafter. |
 | Reply add/update endpoints could return stale data or crash on a fresh reply. | `rating.repository.js` used `findByIdAndUpdate()` without `{ new: true }`, so the service received the pre-update document. | Enabled `{ new: true, runValidators: true }` for reply mutations and kept the updated document populated for the response payload. |
 | Duplicate rating writes could still surface as raw MongoDB `11000` errors. | `addRating()` only pre-checked for an existing rating, but the unique index can still win the race on concurrent writes. | Added duplicate-key translation in `rating.service.js` so race-condition duplicates now return a clean `409 Conflict`. |
 | Customer and barber rating list payloads exposed customer email addresses unnecessarily. | The repository populated nested `userId.email`, and the service returned it directly in rating responses. | Removed the nested email population and standardized rating serialization to return only name/photo fields needed by the current API. |
-| `/customer/shops/:id/ratings` and `/customer/shops/:id/ratings/summary` returned empty success payloads even when the shop ID did not exist. | The service counted ratings directly without first resolving the parent shop resource. | Added explicit shop existence checks so unknown shop IDs now return `404 Not Found`. |
+| `/shops/:id/ratings` and `/shops/:id/ratings/analytics` returned empty success payloads even when the shop ID did not exist. | The service counted ratings directly without first resolving the parent shop resource. | Added explicit shop existence checks so unknown shop IDs now return `404 Not Found`. |
 | Ratings embedded in the shop-details response were inconsistent and missed customer photo data. | `shop.service.js` manually rebuilt rating payloads, while `rating.repository.js` did not populate `customer.photoUrl`. | Added a shared rating serializer and expanded the repository populate to include `photoUrl`, then reused that serializer in `shop.service.js`. |
 | Rating summary calculation loaded every rating document into memory. | `rating.repository.js#getShopSummary()` used `find().lean()` plus in-process aggregation. | Replaced the in-memory summary calculation with a MongoDB aggregation pipeline. |
 | Ownership failures in barber rating management used the wrong HTTP semantics. | `rating.service.js` threw `BadRequestError` for "not your shop" cases. | Switched those paths to `ForbiddenError` so authorization failures return `403`. |
@@ -74,7 +74,7 @@ The same ratings-related inconsistencies appeared outside the dedicated ratings 
   The customer ratings collection was still capturing a random nearby shop, which no longer matches the booking-based eligibility rule. The collection now captures `shop_id` from the authenticated customer's completed past bookings and fails clearly when no eligible booking exists.
 
 - `postman-collections/13-barber-ratings.json`
-  The collection assumed add-reply was safely rerunnable with `200 OK`. After fixing the create-only reply behavior, the generated collection and README were updated to document/accept the correct `409 Conflict` rerun outcome.
+  The collection now uses `PUT /ratings/:id/reply` for the single save-reply operation.
 
 - `src/middleware/__tests__/validate.middleware.test.js`
   The validation regression tests were opening a local HTTP socket just to assert sanitized request storage. Those tests now invoke the middleware directly, which keeps the assertions intact and makes the suite safe in sandboxed environments where ephemeral ports may be blocked.

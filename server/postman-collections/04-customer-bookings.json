@@ -158,8 +158,8 @@
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/bookings?timeframe=upcoming",
-        "description": "Lists upcoming bookings and captures the first booking ID and first service ID when they already exist."
+        "url": "{{base_url}}/{{api_prefix}}/bookings?dateFrom={{booking_date}}",
+        "description": "Lists bookings from the generated booking date onward and captures the first booking ID and first service ID when they already exist."
       },
       "event": [
         {
@@ -345,10 +345,24 @@
     {
       "name": "5. Add Booking Favorite",
       "request": {
-        "method": "PUT",
-        "header": [],
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
         "url": "{{base_url}}/{{api_prefix}}/bookings/{{booking_id}}/favorite",
-        "description": "Adds the current booking to the customer favorites list through the booking resource."
+        "description": "Adds the current booking to the customer favorites list through the booking resource.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"favorite\": true\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
       },
       "event": [
         {
@@ -512,10 +526,24 @@
     {
       "name": "9. Remove Booking Favorite",
       "request": {
-        "method": "DELETE",
-        "header": [],
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
         "url": "{{base_url}}/{{api_prefix}}/bookings/{{booking_id}}/favorite",
-        "description": "Removes the current booking from the customer favorites list."
+        "description": "Removes the current booking from the customer favorites list.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"favorite\": false\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
       },
       "event": [
         {

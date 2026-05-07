@@ -58,6 +58,40 @@ const paginateArray = (items, query = {}) => {
         pagination,
     };
 };
+const setFilterValue = (filters, field, value) => {
+    if (Array.isArray(value)) {
+        filters[field] = { $in: value };
+    } else if (value) {
+        filters[field] = value;
+    }
+};
+
+const toUtcDateBoundary = (dateText, endOfDay = false) => {
+    const [year, month, day] = String(dateText).split('-').map(Number);
+    return new Date(Date.UTC(
+        year,
+        month - 1,
+        day,
+        endOfDay ? 23 : 0,
+        endOfDay ? 59 : 0,
+        endOfDay ? 59 : 0,
+        endOfDay ? 999 : 0,
+    ));
+};
+
+const applyDateRangeFilter = (filters, query = {}) => {
+    if (!query.dateFrom && !query.dateTo) return;
+
+    filters.date = {};
+
+    if (query.dateFrom) {
+        filters.date.$gte = toUtcDateBoundary(query.dateFrom);
+    }
+
+    if (query.dateTo) {
+        filters.date.$lte = toUtcDateBoundary(query.dateTo, true);
+    }
+};
 const sumServicePrices = (services = []) => services.reduce(
     (sum, service) => sum + (getEffectiveServicePrice(service) ?? 0),
     0,
@@ -735,9 +769,6 @@ const reorderBooking = async (userId, bookingId, newDate, newTime) => {
 // ── Customer: list bookings ──────────────────────────────────────────────
 
 export const getCustomerBookings = async (userId, query = {}) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
     const customer = await customerRepository.findByUserId(userId);
     if (!customer) throw new NotFoundError('Customer profile');
     const customerId = customer._id;
@@ -746,26 +777,17 @@ export const getCustomerBookings = async (userId, query = {}) => {
         return getFavoriteBookings(userId, query);
     }
 
-    const timeframe = query.timeframe || 'upcoming';
+    const filters = {};
+    setFilterValue(filters, 'status', query.status);
+    setFilterValue(filters, 'paymentStatus', query.paymentStatus);
+    applyDateRangeFilter(filters, query);
 
-    if (timeframe === 'past') {
-        const total = await bookingRepository.countPastByCustomer(customerId, today);
-        const { skip, limit, pagination } = buildPagination(query, total);
-        const items = (await bookingRepository.findPastByCustomer(customerId, today, { skip, limit }))
-            .map(serializeBooking)
-            .filter(Boolean);
-        return { items, pagination };
-    }
-    if (timeframe === 'upcoming') {
-        const total = await bookingRepository.countUpcomingByCustomer(customerId, today);
-        const { skip, limit, pagination } = buildPagination(query, total);
-        const items = (await bookingRepository.findUpcomingByCustomer(customerId, today, { skip, limit }))
-            .map(serializeBooking)
-            .filter(Boolean);
-        return { items, pagination };
-    }
-
-    throw new BadRequestError('Invalid timeframe. Use: past or upcoming');
+    const total = await bookingRepository.countAll({ customerId, ...filters });
+    const { skip, limit, pagination } = buildPagination(query, total);
+    const items = (await bookingRepository.findByCustomer(customerId, filters, { skip, limit }))
+        .map(serializeBooking)
+        .filter(Boolean);
+    return { items, pagination };
 };
 
 const loadCustomer = async (userId) => {
@@ -1188,15 +1210,8 @@ export const getBookingsByShop = async (ownerId, query = {}) => {
     // Build filters
     const filters = {};
     
-    // Status filter
-    if (query.status) {
-        filters.status = query.status;
-    }
-    
-    // Payment status filter
-    if (query.paymentStatus) {
-        filters.paymentStatus = query.paymentStatus;
-    }
+    setFilterValue(filters, 'status', query.status);
+    setFilterValue(filters, 'paymentStatus', query.paymentStatus);
     
     // Employee filter
     if (query.employeeId) {
@@ -1208,22 +1223,7 @@ export const getBookingsByShop = async (ownerId, query = {}) => {
         filters.employeeId = query.employeeId;
     }
     
-    // Date range filter
-    if (query.dateFrom || query.dateTo) {
-        filters.date = {};
-        
-        if (query.dateFrom) {
-            const fromDate = new Date(query.dateFrom);
-            fromDate.setHours(0, 0, 0, 0);
-            filters.date.$gte = fromDate;
-        }
-        
-        if (query.dateTo) {
-            const toDate = new Date(query.dateTo);
-            toDate.setHours(23, 59, 59, 999);
-            filters.date.$lte = toDate;
-        }
-    }
+    applyDateRangeFilter(filters, query);
 
     const total = await bookingRepository.countAll({ shopId: shop._id, ...filters });
     const { skip, limit, pagination } = buildPagination(query, total);
@@ -1310,7 +1310,7 @@ export const updateBookingStatus = async (bookingId, user, status) => {
     throw new ForbiddenError('This endpoint is available only to customers and barbers');
 };
 
-export const getBookingStats = async (ownerId) => {
+const buildBookingSummaryAnalytics = async (ownerId) => {
     const shop = await shopRepository.findByOwnerId(ownerId);
     if (!shop) throw new NotFoundError('Shop');
 
@@ -1324,7 +1324,7 @@ export const getBookingStats = async (ownerId) => {
     return { total, pending, awaitingConfirmation, completed, cancelled };
 };
 
-export const getBookingMilestoneProgress = async (ownerId, query = {}) => {
+const buildMilestoneAnalytics = async (ownerId, query = {}) => {
     const shop = await shopRepository.findByOwnerId(ownerId);
     if (!shop) throw new NotFoundError('Shop');
 
@@ -1378,6 +1378,22 @@ export const getBookingMilestoneProgress = async (ownerId, query = {}) => {
             remainingBookings: nextMilestone.remainingBookings,
             rewardMessage: `Just ${nextMilestone.remainingBookings} more bookings to reach your next reward!`,
         } : null,
+    };
+};
+
+export const getBookingAnalytics = async (ownerId, query = {}) => {
+    const [summary, milestones, today, queue] = await Promise.all([
+        buildBookingSummaryAnalytics(ownerId),
+        buildMilestoneAnalytics(ownerId, query),
+        buildTodayAnalytics(ownerId),
+        buildQueueAnalytics(ownerId),
+    ]);
+
+    return {
+        summary,
+        milestones,
+        today,
+        queue,
     };
 };
 
@@ -1605,13 +1621,13 @@ export const autoCancelAwaitingBookings = async () => {
     return summary;
 };
 
-// ── Dashboard Analytics (moved from dashboard.service.js) ────────────────
+// Resource analytics
 
 /**
  * Get today's pulse metrics - Executive Performance
  * Shows real-time occupancy and booking status breakdown
  */
-export const getTodaysPulse = async (ownerId) => {
+const buildTodayAnalytics = async (ownerId) => {
     const shop = await shopRepository.findByOwnerId(ownerId);
     if (!shop) throw new NotFoundError('Shop');
 
@@ -1719,7 +1735,7 @@ export const getTodaysPulse = async (ownerId) => {
  * Get today's queue - active and upcoming appointments
  * Shows appointments organized by status (active/upcoming)
  */
-export const getTodaysQueue = async (ownerId, timeframe = 'active') => {
+const buildQueueAnalytics = async (ownerId) => {
     const shop = await shopRepository.findByOwnerId(ownerId);
     if (!shop) throw new NotFoundError('Shop');
 
@@ -1796,17 +1812,14 @@ export const getTodaysQueue = async (ownerId, timeframe = 'active') => {
         services: booking.serviceIds?.map((s) => s.serviceName) || [],
     });
 
-    const selectedQueue = timeframe === 'active' ? activeBookings : upcomingBookings;
-
     return {
-        timeframe,
         active: {
             count: activeBookings.length,
-            items: timeframe === 'active' ? selectedQueue.map(formatQueueItem) : [],
+            items: activeBookings.map(formatQueueItem),
         },
         upcoming: {
             count: upcomingBookings.length,
-            items: timeframe === 'upcoming' ? selectedQueue.map(formatQueueItem) : [],
+            items: upcomingBookings.map(formatQueueItem),
         },
     };
 };

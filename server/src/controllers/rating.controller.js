@@ -52,23 +52,12 @@ export const getOwnedRatingSummary = async (req, res, next) => {
     }
 };
 
-export const addReply = async (req, res, next) => {
-    try {
-        const params = getValidatedRequestData(req, 'params');
-        const { replyText } = getValidatedRequestData(req, 'body');
-        const result = await ratingService.addReplyToRating(params.id, replyText, req.user._id);
-        return res.status(200).json(ApiResponse.success(result, 'Reply added successfully'));
-    } catch (err) {
-        next(err);
-    }
-};
-
 export const updateReply = async (req, res, next) => {
     try {
         const params = getValidatedRequestData(req, 'params');
         const { replyText } = getValidatedRequestData(req, 'body');
-        const result = await ratingService.updateReplyToRating(params.id, replyText, req.user._id);
-        return res.status(200).json(ApiResponse.success(result, 'Reply updated successfully'));
+        const result = await ratingService.upsertReplyToRating(params.id, replyText, req.user._id);
+        return res.status(200).json(ApiResponse.success(result, 'Reply saved successfully'));
     } catch (err) {
         next(err);
     }

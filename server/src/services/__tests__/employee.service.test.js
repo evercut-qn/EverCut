@@ -138,6 +138,44 @@ test('addEmployee defaults working hours to normalized 24-hour shop hours', asyn
     assert.deepEqual(createdPayload.workingHours, { start: '09:00', end: '20:00' });
 });
 
+test('updateEmployee persists desired active state through the employee resource update', async (t) => {
+    t.mock.method(shopRepository, 'findByOwnerId', async () => ({
+        _id: 'shop-1',
+        openTime: '09:00',
+        closeTime: '18:00',
+    }));
+    t.mock.method(employeeRepository, 'findById', async () => ({
+        _id: 'employee-1',
+        shopId: 'shop-1',
+        firstName: 'Mina',
+        lastName: 'Stylist',
+        phoneNumber: '+15551234567',
+        isActive: true,
+    }));
+
+    let updateArgs = null;
+    t.mock.method(employeeRepository, 'updateById', async (employeeId, shopId, updateData) => {
+        updateArgs = { employeeId, shopId, updateData };
+        return {
+            _id: employeeId,
+            shopId,
+            firstName: 'Mina',
+            lastName: 'Stylist',
+            phoneNumber: '+15551234567',
+            isActive: updateData.isActive,
+        };
+    });
+
+    const result = await employeeService.updateEmployee('owner-1', 'employee-1', { isActive: false });
+
+    assert.deepEqual(updateArgs, {
+        employeeId: 'employee-1',
+        shopId: 'shop-1',
+        updateData: { isActive: false },
+    });
+    assert.equal(result.isActive, false);
+});
+
 test('updateEmployeeAvailability blocks only new leave dates and notifies affected bookings', async (t) => {
     t.mock.method(shopRepository, 'findByOwnerId', async () => ({ _id: 'shop-1' }));
     t.mock.method(employeeRepository, 'findById', async () => ({

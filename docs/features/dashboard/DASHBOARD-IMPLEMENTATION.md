@@ -61,7 +61,7 @@ This document describes the comprehensive dashboard implementation for the EverC
 
 ### 2. Staff Availability
 
-**Endpoint:** `GET /api/v1/employees/analytics/availability`
+**Endpoint:** `GET /api/v1/employees/analytics`
 
 **Description:** Shows each employee's daily appointment progress and availability.
 
@@ -99,10 +99,10 @@ This document describes the comprehensive dashboard implementation for the EverC
 
 ### 3. Today's Queue
 
-**Endpoint:** `GET /api/v1/bookings/analytics/queue?timeframe=active`
+**Endpoint:** `GET /api/v1/bookings/analytics`
 
 **Query Parameters:**
-- `timeframe`: `active` or `upcoming` (default: `active`)
+- `date range`: `active` or `upcoming` (default: `active`)
 
 **Description:** Shows today's appointments organized by status (active/upcoming).
 
@@ -111,7 +111,7 @@ This document describes the comprehensive dashboard implementation for the EverC
 {
   "success": true,
   "data": {
-    "timeframe": "active",
+    "date range": "active",
     "active": {
       "count": 3,
       "items": [
@@ -236,10 +236,10 @@ No database schema changes required. The dashboard uses existing booking, employ
 All dashboard routes require authentication and BARBER role:
 
 ```
-GET /api/v1/earnings/overview                         - Complete dashboard data
-GET /api/v1/bookings/analytics/today                  - Today's pulse metrics
-GET /api/v1/employees/analytics/availability          - Staff availability
-GET /api/v1/bookings/analytics/queue?timeframe=active - Today's queue
+GET /api/v1/bookings/analytics + /api/v1/employees/analytics + /api/v1/earnings                         - Complete dashboard data
+GET /api/v1/bookings/analytics                  - Today's pulse metrics
+GET /api/v1/employees/analytics          - Staff availability
+GET /api/v1/bookings/analytics - Today's queue
 ```
 
 ---
@@ -287,19 +287,19 @@ GET /api/v1/bookings/analytics/queue?timeframe=active - Today's queue
 
 4. **Get Staff Availability:**
    ```
-   GET /api/v1/employees/analytics/availability
+   GET /api/v1/employees/analytics
    Headers: { "Authorization": "Bearer <token>" }
    ```
 
 5. **Get Active Queue:**
    ```
-   GET /api/v1/bookings/analytics/queue?timeframe=active
+   GET /api/v1/bookings/analytics
    Headers: { "Authorization": "Bearer <token>" }
    ```
 
 6. **Get Upcoming Queue:**
    ```
-   GET /api/v1/bookings/analytics/queue?timeframe=upcoming
+   GET /api/v1/bookings/analytics
    Headers: { "Authorization": "Bearer <token>" }
    ```
 

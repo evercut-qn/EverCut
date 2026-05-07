@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { serializeBooking } from '../booking.serializer.js';
 import { serializeCustomerProfile, serializeCustomerSummary } from '../customer.serializer.js';
@@ -11,6 +14,9 @@ import { serializePhoto } from '../photo.serializer.js';
 import { serializeRating } from '../rating.serializer.js';
 import { serializeService } from '../service.serializer.js';
 import { serializeBarberProfile, serializeShopProfile, serializeShopSummary } from '../shop.serializer.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const srcDir = path.resolve(__dirname, '..', '..');
 
 const ownIdAliasByResource = {
     booking: ['bookingId'],
@@ -130,4 +136,16 @@ test('booking serializer adds employee availability for the booking date without
 
     assert.equal(booking.employee.isAvailableOnBookingDate, false);
     assert.equal('blockedDates' in booking.employee, false);
+});
+
+test('serializers no longer export deprecated API aliases', async () => {
+    const shopSerializer = await readFile(path.join(srcDir, 'serializers', 'shop.serializer.js'), 'utf8');
+    const barberProfileUtils = await readFile(path.join(srcDir, 'utils', 'barber-profile.utils.js'), 'utf8');
+    const coreSerializer = await readFile(path.join(srcDir, 'serializers', 'core.serializer.js'), 'utf8');
+
+    assert.doesNotMatch(shopSerializer, /serializeUpiDetails/);
+    assert.doesNotMatch(shopSerializer, /serializePayoutConfig/);
+    assert.doesNotMatch(barberProfileUtils, /serializeUpiDetails/);
+    assert.doesNotMatch(barberProfileUtils, /serializePayoutConfig/);
+    assert.doesNotMatch(coreSerializer, /serializeList/);
 });

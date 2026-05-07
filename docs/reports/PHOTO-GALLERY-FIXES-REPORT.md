@@ -1,4 +1,4 @@
-﻿# Photo Gallery Fixes Report
+# Photo Gallery Fixes Report
 
 > Legacy snapshot: This document records findings against the pre-2026-04-24 role-prefixed routing layout and removed `controllers/customer/*` / `controllers/barber/*` files. Treat route and file references here as historical unless explicitly updated. For the current API surface, see [ROUTING-STRATEGY-ANALYSIS](../architecture/ROUTING-STRATEGY-ANALYSIS.md).
 
@@ -29,7 +29,7 @@ The following backend flows were verified as already present:
 
 - `GET /api/v1/barber/photos`
 - `POST /api/v1/barber/photos`
-- `GET /api/v1/barber/photos/stats`
+- `GET /api/v1/barber/photos/analytics`
 - `GET /api/v1/barber/photos/:id`
 - `DELETE /api/v1/barber/photos/:id`
 

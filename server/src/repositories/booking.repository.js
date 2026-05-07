@@ -82,13 +82,16 @@ class BookingRepository {
         return Booking.findByIdAndDelete(id);
     }
 
-    async findByCustomer(customerId, filters = {}) {
-        return Booking.find(trustQueryOperators({ customerId, ...filters }))
+    async findByCustomer(customerId, filters = {}, options = {}) {
+        const query = Booking.find(trustQueryOperators({ customerId, ...filters }))
             .populate('serviceIds')
             .populate(EMPLOYEE_POPULATE)
             .populate('shopId', 'shopName address coverUrl')
-            .sort({ date: -1 })
-            .lean();
+            .sort({ date: -1 });
+
+        if (options.skip !== undefined) query.skip(options.skip);
+        if (options.limit !== undefined) query.limit(options.limit);
+        return query.lean();
     }
 
     async findUpcomingByCustomer(customerId, today, options = {}) {

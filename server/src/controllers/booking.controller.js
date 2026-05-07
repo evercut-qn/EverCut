@@ -31,8 +31,8 @@ export const getBookings = async (req, res, next) => {
 
         if (req.user.roleType === ROLES.CUSTOMER) {
             // Customers cannot use barber-only filters
-            if (query.employeeId || query.dateFrom || query.dateTo) {
-                throw new ForbiddenError('Employee and date range filters are only available for barbers');
+            if (query.employeeId) {
+                throw new ForbiddenError('Employee filters are only available for barbers');
             }
             
             const result = await bookingService.getCustomerBookings(req.user._id, query);
@@ -40,8 +40,8 @@ export const getBookings = async (req, res, next) => {
         }
 
         // Barbers cannot use customer-only filters
-        if (query.timeframe || query.favorite) {
-            throw new ForbiddenError('Timeframe and favorite filters are only available for customers');
+        if (query.favorite) {
+            throw new ForbiddenError('Favorite filters are only available for customers');
         }
         
         const result = await bookingService.getBookingsByShop(req.user._id, query);
@@ -88,70 +88,24 @@ export const patchBooking = async (req, res, next) => {
     }
 };
 
-export const addFavoriteBooking = async (req, res, next) => {
+export const setFavoriteBooking = async (req, res, next) => {
     try {
         const { id } = getValidatedRequestData(req, 'params');
-        const result = await bookingService.addFavoriteBooking(req.user._id, id);
-        return res.status(200).json(ApiResponse.success(result, 'Booking added to favorites'));
+        const { favorite } = getValidatedRequestData(req, 'body');
+        const result = favorite
+            ? await bookingService.addFavoriteBooking(req.user._id, id)
+            : await bookingService.removeFavoriteBooking(req.user._id, id);
+        return res.status(200).json(ApiResponse.success(result, 'Booking favorite updated'));
     } catch (err) {
         next(err);
     }
 };
 
-export const removeFavoriteBooking = async (req, res, next) => {
-    try {
-        const { id } = getValidatedRequestData(req, 'params');
-        const result = await bookingService.removeFavoriteBooking(req.user._id, id);
-        return res.status(200).json(ApiResponse.success(result, 'Booking removed from favorites'));
-    } catch (err) {
-        next(err);
-    }
-};
-
-// ============================================================================
-// Barber: Booking Management
-// ============================================================================
-
-export const getBookingStats = async (req, res, next) => {
-    try {
-        const stats = await bookingService.getBookingStats(req.user._id);
-        return res.status(200).json(ApiResponse.success(stats, 'Booking stats'));
-    } catch (err) {
-        next(err);
-    }
-};
-
-export const getBookingMilestoneProgress = async (req, res, next) => {
+export const getBookingAnalytics = async (req, res, next) => {
     try {
         const query = getValidatedRequestData(req, 'query');
-        const progress = await bookingService.getBookingMilestoneProgress(req.user._id, query);
-        return res.status(200).json(ApiResponse.success(progress, 'Booking milestone progress'));
-    } catch (err) {
-        next(err);
-    }
-};
-
-/**
- * Get today's pulse metrics (moved from dashboard)
- */
-export const getTodaysPulse = async (req, res, next) => {
-    try {
-        const pulse = await bookingService.getTodaysPulse(req.user._id);
-        return res.status(200).json(ApiResponse.success(pulse, 'Today\'s pulse fetched'));
-    } catch (err) {
-        next(err);
-    }
-};
-
-/**
- * Get today's queue (active/upcoming) (moved from dashboard)
- */
-export const getTodaysQueue = async (req, res, next) => {
-    try {
-        const query = getValidatedRequestData(req, 'query');
-        const timeframe = query.timeframe || 'active';
-        const queue = await bookingService.getTodaysQueue(req.user._id, timeframe);
-        return res.status(200).json(ApiResponse.success(queue, 'Today\'s queue fetched'));
+        const analytics = await bookingService.getBookingAnalytics(req.user._id, query);
+        return res.status(200).json(ApiResponse.success(analytics, 'Booking analytics fetched'));
     } catch (err) {
         next(err);
     }

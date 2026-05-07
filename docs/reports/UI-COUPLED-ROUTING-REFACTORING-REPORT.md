@@ -47,16 +47,16 @@ All other route files (`auth`, `bookings`, `employees`, `earnings`, `shops`, `se
 - ❌ `server/src/routes/dashboard.routes.js` - **DELETED**
 
 #### **Controllers**
-- ✅ `server/src/controllers/booking.controller.js` - Added `getTodaysPulse()` and `getTodaysQueue()`
+- ✅ `server/src/controllers/booking.controller.js` - Added `booking analytics today data` and `booking analytics queue data`
 - ✅ `server/src/controllers/employee.controller.js` - Added `getStaffAvailability()`
-- ✅ `server/src/controllers/earnings.controller.js` - Added `getDashboardOverview()`
+- ✅ `server/src/controllers/earnings.controller.js` - Added `getOperationalAnalytics()`
 - ✅ `server/src/controllers/customer.controller.js` - Removed `getMyHome()`
 - ❌ `server/src/controllers/dashboard.controller.js` - **DELETED**
 
 #### **Services**
-- ✅ `server/src/services/booking.service.js` - Added `getTodaysPulse()` and `getTodaysQueue()`
+- ✅ `server/src/services/booking.service.js` - Added `booking analytics today data` and `booking analytics queue data`
 - ✅ `server/src/services/employee.service.js` - Added `getStaffAvailability()`
-- ✅ `server/src/services/earnings.service.js` - Added `getDashboardOverview()`
+- ✅ `server/src/services/earnings.service.js` - Added `getOperationalAnalytics()`
 - ✅ `server/src/services/user.service.js` - Removed `getHomeProfile()`
 - ❌ `server/src/services/dashboard.service.js` - **DELETED**
 
@@ -66,7 +66,7 @@ All other route files (`auth`, `bookings`, `employees`, `earnings`, `shops`, `se
 
 #### **Tooling**
 - ✅ `server/scripts/regenerate-postman-collections.mjs` - Updated dashboard collection to use new endpoints
-- ✅ `server/postman-collections/14-dashboard.json` - Regenerated with new endpoints
+- ✅ `server/postman-collections/14-operational-analytics.json` - Regenerated with new endpoints
 - ✅ `server/postman-collections/03-customer-profile.json` - Regenerated without home endpoint
 
 ---
@@ -75,8 +75,8 @@ All other route files (`auth`, `bookings`, `employees`, `earnings`, `shops`, `se
 
 | Old Endpoint | New Endpoint | Status |
 |-------------|--------------|--------|
-| `GET /dashboard/overview` | `GET /earnings/overview` | ✅ Migrated |
-| `GET /dashboard/pulse` | `GET /bookings/stats/today` | ✅ Migrated |
+| `GET /dashboard/overview` | `GET /bookings/analytics + /employees/analytics + /earnings` | ✅ Migrated |
+| `GET /dashboard/pulse` | `GET /bookings/analytics` | ✅ Migrated |
 | `GET /dashboard/staff` | `GET /employees/availability` | ✅ Migrated |
 | `GET /dashboard/queue` | `GET /bookings/queue` | ✅ Migrated |
 | `GET /customers/me/home` | `GET /customers/me` | ❌ Removed |
@@ -105,10 +105,10 @@ All migrated endpoints maintain their original authorization requirements:
 
 | Method | Old Location | New Location | Rationale |
 |--------|-------------|--------------|-----------|
-| `getTodaysPulse()` | dashboard.service | booking.service | Booking analytics |
-| `getTodaysQueue()` | dashboard.service | booking.service | Booking filtering |
+| `booking analytics today data` | dashboard.service | booking.service | Booking analytics |
+| `booking analytics queue data` | dashboard.service | booking.service | Booking filtering |
 | `getStaffAvailability()` | dashboard.service | employee.service | Employee metrics |
-| `getDashboardOverview()` | dashboard.service | earnings.service | Cross-resource aggregation |
+| `getOperationalAnalytics()` | dashboard.service | earnings.service | Cross-resource aggregation |
 
 ---
 
@@ -152,7 +152,7 @@ All migrated endpoints maintain their original authorization requirements:
    - Replace `/customers/me/home` with `/customers/me`
 
 2. **Update Postman collections:**
-   - Re-import `14-dashboard.json`
+   - Re-import `14-operational-analytics.json`
    - Re-import `03-customer-profile.json`
 
 3. **Test affected screens:**
@@ -172,18 +172,18 @@ All migrated endpoints maintain their original authorization requirements:
 
 ### Unit Tests Needed
 
-- [ ] Test `bookingController.getTodaysPulse()`
-- [ ] Test `bookingController.getTodaysQueue()`
+- [ ] Test `bookingController.booking analytics today data`
+- [ ] Test `bookingController.booking analytics queue data`
 - [ ] Test `employeeController.getStaffAvailability()`
-- [ ] Test `earningsController.getDashboardOverview()`
+- [ ] Test `earningsController.getOperationalAnalytics()`
 
 ### Integration Tests Needed
 
-- [ ] Test `GET /bookings/stats/today` returns correct pulse metrics
+- [ ] Test `GET /bookings/analytics` returns correct pulse metrics
 - [ ] Test `GET /employees/availability` returns correct staff data
 - [ ] Test `GET /bookings/queue?filter=active` filters correctly
 - [ ] Test `GET /bookings/queue?filter=upcoming` filters correctly
-- [ ] Test `GET /earnings/overview` aggregates all dashboard data
+- [ ] Test `GET /bookings/analytics + /employees/analytics + /earnings` aggregates all dashboard data
 - [ ] Test `GET /customers/me` returns complete profile
 
 ### End-to-End Tests Needed
@@ -253,7 +253,7 @@ If critical issues arise:
 ### Updated Documents
 
 1. **Postman Collections**
-   - `14-dashboard.json` - Updated to use new endpoints
+   - `14-operational-analytics.json` - Updated to use new endpoints
    - `03-customer-profile.json` - Removed home endpoint
    - All collection descriptions updated with migration notes
 
@@ -268,18 +268,18 @@ If critical issues arise:
 grep -r "dashboard.routes" server/src/routes/
 
 # 2. Check that new endpoints exist
-grep -r "getTodaysPulse" server/src/controllers/
+grep -r "booking analytics today data" server/src/controllers/
 grep -r "getStaffAvailability" server/src/controllers/
-grep -r "getTodaysQueue" server/src/controllers/
+grep -r "booking analytics queue data" server/src/controllers/
 
 # 3. Run the server
 npm start
 
 # 4. Test new endpoints
-curl http://localhost:5000/api/v1/bookings/stats/today -H "Authorization: Bearer {token}"
+curl http://localhost:5000/api/v1/bookings/analytics -H "Authorization: Bearer {token}"
 curl http://localhost:5000/api/v1/employees/availability -H "Authorization: Bearer {token}"
 curl http://localhost:5000/api/v1/bookings/queue?filter=active -H "Authorization: Bearer {token}"
-curl http://localhost:5000/api/v1/earnings/overview -H "Authorization: Bearer {token}"
+curl http://localhost:5000/api/v1/bookings/analytics + /api/v1/employees/analytics + /api/v1/earnings -H "Authorization: Bearer {token}"
 ```
 
 ### Postman Verification
@@ -289,7 +289,7 @@ curl http://localhost:5000/api/v1/earnings/overview -H "Authorization: Bearer {t
 node server/scripts/regenerate-postman-collections.mjs
 
 # Import into Postman
-# - Import 14-dashboard.json
+# - Import 14-operational-analytics.json
 # - Import 03-customer-profile.json
 # - Run collection tests
 ```
@@ -399,7 +399,7 @@ Created:
   docs/reports/UI-COUPLED-ROUTING-REFACTORING-REPORT.md
 
 Regenerated:
-  server/postman-collections/14-dashboard.json
+  server/postman-collections/14-operational-analytics.json
   server/postman-collections/03-customer-profile.json
 ```
 
@@ -421,7 +421,7 @@ Regenerated:
 }
 ```
 
-### After: `/earnings/overview`
+### After: `/bookings/analytics + /employees/analytics + /earnings`
 
 ```json
 {

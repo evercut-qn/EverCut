@@ -34,29 +34,29 @@ export const listNotifications = async (req, res, next) => {
     }
 };
 
-export const getUnreadCount = async (req, res, next) => {
+export const getNotificationSummary = async (req, res, next) => {
     try {
-        const result = await notificationService.getUnreadCount(req.user._id);
-        return res.status(200).json(ApiResponse.success(result, 'Unread count fetched'));
+        const result = await notificationService.getNotificationSummary(req.user._id);
+        return res.status(200).json(ApiResponse.success(result, 'Notification summary fetched'));
     } catch (err) {
         next(err);
     }
 };
 
-export const markNotificationRead = async (req, res, next) => {
+export const patchNotification = async (req, res, next) => {
     try {
         const { id } = getValidatedRequestData(req, 'params');
-        const result = await notificationService.markNotificationRead(req.user._id, id);
-        return res.status(200).json(ApiResponse.success(result, 'Notification marked read'));
+        const result = await notificationService.patchNotification(req.user._id, id);
+        return res.status(200).json(ApiResponse.success(result, 'Notification updated'));
     } catch (err) {
         next(err);
     }
 };
 
-export const markAllNotificationsRead = async (req, res, next) => {
+export const patchNotifications = async (req, res, next) => {
     try {
-        const result = await notificationService.markAllNotificationsRead(req.user._id);
-        return res.status(200).json(ApiResponse.success(result, 'Notifications marked read'));
+        const result = await notificationService.patchNotifications(req.user._id);
+        return res.status(200).json(ApiResponse.success(result, 'Notifications updated'));
     } catch (err) {
         next(err);
     }

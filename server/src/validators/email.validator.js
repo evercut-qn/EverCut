@@ -1,6 +1,6 @@
 import Joi from 'joi';
 
-/** PUT /account/email */
+/** PATCH /account/email */
 export const updateEmailSchema = Joi.object({
     newEmail: Joi.string()
         .email()

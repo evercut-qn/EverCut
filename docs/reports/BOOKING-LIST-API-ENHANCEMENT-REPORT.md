@@ -19,7 +19,7 @@ Enhanced the `GET /api/v1/bookings` API with role-specific filtering capabilitie
 The booking list API had limited filtering capabilities:
 
 **For Customers:**
-- ✅ `timeframe` (past/upcoming)
+- ✅ `date range` (past/upcoming)
 - ✅ `favorite` (boolean)
 - ✅ `status` (booking status)
 - ✅ `paymentStatus` (payment status)
@@ -69,7 +69,7 @@ GET /api/v1/bookings?employeeId=emp1&dateFrom=2026-06-15&dateTo=2026-06-17&statu
 ```javascript
 export const bookingListQuerySchema = paginationSchema.keys({
     // Customer-only filters
-    timeframe: Joi.string().valid('past', 'upcoming'),
+    date range: Joi.string().valid('past', 'upcoming'),
     favorite: Joi.boolean(),
     
     // Shared filters (both customer and barber)
@@ -113,8 +113,8 @@ export const getBookings = async (req, res, next) => {
         }
 
         // Barbers cannot use customer-only filters
-        if (query.timeframe || query.favorite) {
-            throw new ForbiddenError('Timeframe and favorite filters are only available for customers');
+        if (query.date range || query.favorite) {
+            throw new ForbiddenError('date range and favorite filters are only available for customers');
         }
         
         const result = await bookingService.getBookingsByShop(req.user._id, query);
@@ -290,8 +290,8 @@ async findByShopId(shopId, filters = {}, options = {}) {
 ```javascript
 describe('GET /api/v1/bookings', () => {
     describe('Customer filters', () => {
-        it('should allow timeframe filter', async () => {
-            // Test timeframe=upcoming
+        it('should allow date range filter', async () => {
+            // Test date range=upcoming
         });
         
         it('should allow favorite filter', async () => {
@@ -321,7 +321,7 @@ describe('GET /api/v1/bookings', () => {
             // Expect 400 Bad Request
         });
         
-        it('should reject timeframe filter', async () => {
+        it('should reject date range filter', async () => {
             // Expect 403 Forbidden
         });
         
@@ -480,7 +480,7 @@ All existing API calls continue to work without modification:
 
 ```http
 # Customer calls (unchanged)
-GET /api/v1/bookings?timeframe=upcoming
+GET /api/v1/bookings?date range=upcoming
 GET /api/v1/bookings?favorite=true
 GET /api/v1/bookings?status=confirmed
 

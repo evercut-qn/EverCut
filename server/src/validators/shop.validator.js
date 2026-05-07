@@ -114,6 +114,7 @@ export const updateBusinessSchema = Joi.object({
     ),
     breakTimes: breakTimesSchema,
     breakTimings: Joi.forbidden(),
+    isOpen: Joi.boolean(),
     location: Joi.alternatives().try(
         Joi.object({
             type: Joi.string().valid('Point').required(),
@@ -200,11 +201,6 @@ export const updateBusinessSchema = Joi.object({
     })
     .min(1);
 
-export const toggleStatusSchema = Joi.object({
-    status: Joi.alternatives().try(Joi.boolean(), Joi.string()).optional(),
-    isOpen: Joi.any().strip(),
-}).rename('isOpen', 'status', { ignoreUndefined: true, override: false });
-
 export const updatePinSchema = Joi.object({
     currentPin: Joi.string().required(),
     newPin: Joi.string().pattern(new RegExp(`^\\d{${SECURITY_PIN_LENGTH}}$`)).required(),
@@ -216,6 +212,10 @@ export const updatePinSchema = Joi.object({
 
 export const shopIdParamSchema = Joi.object({
     id: objectId.required(),
+});
+
+export const favoritePatchSchema = Joi.object({
+    favorite: Joi.boolean().required(),
 });
 
 export const shopListQuerySchema = Joi.object({

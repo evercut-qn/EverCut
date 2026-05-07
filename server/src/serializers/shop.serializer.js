@@ -43,22 +43,6 @@ const serializeOwner = (plain = {}, userContext = null, privateView = false) => 
     });
 };
 
-export const serializePayoutConfig = (payoutConfig = {}) => {
-    const plain = sanitizeForResponse(payoutConfig || {});
-    return {
-        bankAccountLast4: maskBankAccount(payoutConfig?.bankAccount || plain?.bankAccountLast4),
-        ifsc: plain?.ifsc || null,
-        beneficiaryId: plain?.beneficiaryId || null,
-        beneficiaryCreatedAt: plain?.beneficiaryCreatedAt || null,
-        verifiedAt: plain?.verifiedAt || null,
-        verificationStatus: plain?.verificationStatus || 'unverified',
-    };
-};
-
-export const serializeUpiDetails = (shop) => {
-    return serializeBankDetails(shop);
-};
-
 export const serializeBankDetails = (shop) => {
     const raw = toPlainObject(shop);
     const plain = sanitizeForResponse(raw);

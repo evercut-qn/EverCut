@@ -354,7 +354,7 @@ const authenticationCollection = {
     {
       name: '11. Update Email (Customer)',
       ...request({
-        method: 'PUT',
+        method: 'PATCH',
         url: '{{base_url}}/{{api_prefix}}/account/email',
         auth: bearerAuth('customer_access_token'),
         headers: [{ key: 'Content-Type', value: 'application/json' }],
@@ -497,9 +497,9 @@ const customerCollection = {
     {
       name: '2. Update Profile',
       ...request({
-        method: 'PUT',
+        method: 'PATCH',
         url: '{{base_url}}/{{api_prefix}}/customers/me',
-        description: 'Updates the customer data and reuses the sample image as an optional replacement photo. NOTE: Email updates must use PUT /account/email endpoint.',
+        description: 'Updates the customer data and reuses the sample image as an optional replacement photo. NOTE: Email updates must use PATCH /account/email endpoint.',
         body: formDataBody([
           textField('firstName', 'Test'),
           textField('lastName', 'Customer'),
@@ -577,8 +577,8 @@ const customerBookingsCollection = {
       name: '1. Get Upcoming Bookings And Capture IDs',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/bookings?timeframe=upcoming',
-        description: 'Lists upcoming bookings and captures the first booking ID and first service ID when they already exist.',
+        url: '{{base_url}}/{{api_prefix}}/bookings?dateFrom={{booking_date}}',
+        description: 'Lists bookings from the generated booking date onward and captures the first booking ID and first service ID when they already exist.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           "const response = pm.response.json();",
@@ -655,8 +655,10 @@ const customerBookingsCollection = {
     {
       name: '5. Add Booking Favorite',
       ...request({
-        method: 'PUT',
+        method: 'PATCH',
         url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id}}/favorite',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "favorite": true\n}`),
         description: 'Adds the current booking to the customer favorites list through the booking resource.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -700,8 +702,10 @@ const customerBookingsCollection = {
     {
       name: '9. Remove Booking Favorite',
       ...request({
-        method: 'DELETE',
+        method: 'PATCH',
         url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id}}/favorite',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "favorite": false\n}`),
         description: 'Removes the current booking from the customer favorites list.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -848,8 +852,10 @@ const customerShopDiscoveryCollection = {
     {
       name: '6. Add Favorite Shop',
       ...request({
-        method: 'PUT',
+        method: 'PATCH',
         url: '{{base_url}}/{{api_prefix}}/shops/{{shop_id}}/favorite',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "favorite": true\n}`),
         description: 'Adds the captured shop to the authenticated customer favorite shops list through the shop discovery flow.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -866,8 +872,10 @@ const customerShopDiscoveryCollection = {
     {
       name: '8. Remove Favorite Shop',
       ...request({
-        method: 'DELETE',
+        method: 'PATCH',
         url: '{{base_url}}/{{api_prefix}}/shops/{{shop_id}}/favorite',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "favorite": false\n}`),
         description: 'Removes the captured shop from the authenticated customer favorite shops list.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -920,7 +928,7 @@ const customerRatingsCollection = {
       name: '1. Get Past Bookings And Capture Completed Shop ID',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/bookings?timeframe=past&limit=100',
+        url: '{{base_url}}/{{api_prefix}}/bookings?dateTo={{booking_date}}&status=completed&limit=100',
         description: 'Captures a shop ID from the authenticated customer\'s completed past bookings. This request fails the collection clearly when no eligible booking exists for rating.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
@@ -948,7 +956,7 @@ const customerRatingsCollection = {
       name: '3. Get Shop Ratings',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/ratings/shop/{{shop_id}}',
+        url: '{{base_url}}/{{api_prefix}}/shops/{{shop_id}}/ratings',
         description: 'Lists all ratings for the captured shop, including barber replies.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -957,7 +965,7 @@ const customerRatingsCollection = {
       name: '4. Get Rating Summary',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/ratings/shop/{{shop_id}}/summary',
+        url: '{{base_url}}/{{api_prefix}}/shops/{{shop_id}}/ratings/analytics',
         description: 'Returns the rating summary payload for the captured shop.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -1007,7 +1015,7 @@ const barberProfileCollection = {
         url: '{{base_url}}/{{api_prefix}}/shops/me',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
         body: jsonBody(`{\n  "firstName": "Test",\n  "lastName": "Barber",\n  "dateOfBirth": "1991-01-12",\n  "gender": "Male",\n  "shopName": "Postman Test Barber Studio",\n  "category": "Barber",\n  "targetCustomers": "male",\n  "address": "${barberLocationText}",\n  "location": ${barberLocationGeoJson},\n  "amenities": ["Air Conditioning", "Waiting Area", "Parking Area", "Wi-Fi"],\n  "workingDays": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],\n  "workingHours": {\n    "openTime": "09:00",\n    "closeTime": "20:00"\n  },\n  "breakTimes": [\n    {\n      "start": "13:00",\n      "end": "14:00"\n    }\n  ],\n  "bio": "Updated from the automated Postman profile collection."\n}`),
-        description: 'Updates only barber profile and business fields. Payout details are managed through /shops/me/payout-details. NOTE: Email updates must use PUT /account/email endpoint.',
+        description: 'Updates only barber profile and business fields. Payout details are managed through /shops/me/payout-details. NOTE: Email updates must use PATCH /account/email endpoint.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
     },
@@ -1050,10 +1058,10 @@ const barberProfileCollection = {
       name: '5. Ensure Shop Is Open',
       ...request({
         method: 'PATCH',
-        url: '{{base_url}}/{{api_prefix}}/shops/me/status',
+        url: '{{base_url}}/{{api_prefix}}/shops/me',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody(`{\n  "status": true\n}`),
-        description: 'Explicitly opens the shop so customer discovery and bookings can run immediately after this collection.',
+        body: jsonBody(`{\n  "isOpen": true\n}`),
+        description: 'Explicitly opens the shop through the shop resource so customer discovery and bookings can run immediately after this collection.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
     },
@@ -1061,7 +1069,7 @@ const barberProfileCollection = {
       name: '6. Update Profile Picture',
       ...request({
         method: 'PATCH',
-        url: '{{base_url}}/{{api_prefix}}/shops/me/picture',
+        url: '{{base_url}}/{{api_prefix}}/shops/me/media/picture',
         body: formDataBody([fileField('photo', 'Attach profile picture file manually in Postman')]),
         description: 'Uploads or replaces the owner profile picture.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
@@ -1071,7 +1079,7 @@ const barberProfileCollection = {
       name: '7. Update Cover Image',
       ...request({
         method: 'PATCH',
-        url: '{{base_url}}/{{api_prefix}}/shops/me/cover',
+        url: '{{base_url}}/{{api_prefix}}/shops/me/media/cover',
         body: formDataBody([fileField('cover', 'Attach cover image file manually in Postman')]),
         description: 'Uploads or replaces the shop cover image.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
@@ -1081,7 +1089,7 @@ const barberProfileCollection = {
       name: '8. Update PIN',
       ...request({
         method: 'PATCH',
-        url: '{{base_url}}/{{api_prefix}}/shops/me/pin',
+        url: '{{base_url}}/{{api_prefix}}/shops/me/security',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
         body: jsonBody(`{\n  "currentPin": "{{barber_active_pin}}",\n  "newPin": "{{barber_next_pin}}",\n  "confirmNewPin": "{{barber_next_pin}}"\n}`),
         description: 'Flips the barber PIN between 1234 and 5678 so the request stays rerunnable.',
@@ -1230,10 +1238,10 @@ const barberEmployeesCollection = {
       name: '5. Toggle Employee Status',
       ...request({
         method: 'PATCH',
-        url: '{{base_url}}/{{api_prefix}}/employees/{{employee_id}}/status',
+        url: '{{base_url}}/{{api_prefix}}/employees/{{employee_id}}',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody(`{\n  "status": false\n}`),
-        description: 'Toggles employee availability status. Accepts boolean (true/false) or string values (yes/no, on/off). Omit status field to toggle current state.',
+        body: jsonBody(`{\n  "isActive": false\n}`),
+        description: 'Marks the employee inactive through the employee resource.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           "const response = pm.response.json();",
@@ -1246,8 +1254,8 @@ const barberEmployeesCollection = {
     {
       name: '6. Mark Employee Unavailable For Date',
       ...request({
-        method: 'PATCH',
-        url: '{{base_url}}/{{api_prefix}}/employees/{{employee_id}}/availability',
+        method: 'PUT',
+        url: '{{base_url}}/{{api_prefix}}/employees/{{employee_id}}/blocked-dates',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
         body: jsonBody(`{\n  "dates": ["{{employee_leave_date}}"],\n  "available": false\n}`),
         description: 'Marks the captured employee unavailable for a generated future date. Existing bookings remain unchanged and affected customers receive booking.employee_unavailable notifications.',
@@ -1380,7 +1388,7 @@ const barberServicesCollection = {
     {
       name: '4. Update Service',
       ...request({
-        method: 'PUT',
+        method: 'PATCH',
         url: '{{base_url}}/{{api_prefix}}/services/{{service_id}}',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
         body: jsonBody(`{\n  "serviceFor": "unisex"\n}`),
@@ -1407,7 +1415,7 @@ const barberServicesCollection = {
 const barberBookingsCollection = {
   info: {
     name: 'EverCut - Barber Bookings',
-    description: 'Barber booking administration collection covering list with role-specific filters (employeeId, dateFrom, dateTo), status stats, monthly milestone progress, status updates, and explicit booking cancellation. Enhanced with employee and date range filtering for leave management and scheduling.',
+    description: 'Barber booking administration collection covering list filters, combined analytics, status updates, and explicit booking cancellation.',
     schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
   },
   auth: bearerAuth('barber_access_token'),
@@ -1433,7 +1441,7 @@ const barberBookingsCollection = {
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/bookings',
-        description: 'Reads the barber booking dashboard payload and captures one ID for status updates plus one paid booking ID for the cancellation route when available.',
+        description: 'Reads the barber booking administration payload and captures one ID for status updates plus one paid booking ID for the cancellation route when available.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           "const response = pm.response.json();",
@@ -1454,20 +1462,11 @@ const barberBookingsCollection = {
       }),
     },
     {
-      name: '2. Get Booking Stats',
+      name: '2. Get Booking Analytics',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/bookings/analytics/summary',
-        description: 'Returns booking counts grouped by status.',
-        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
-      }),
-    },
-    {
-      name: '3. Get Booking Milestone Progress',
-      ...request({
-        method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/bookings/analytics/milestones',
-        description: 'Returns the current month completed-booking milestone progress card data, including the active status, completed count, visible targets, and next reward gap.',
+        url: '{{base_url}}/{{api_prefix}}/bookings/analytics',
+        description: 'Returns booking summary, monthly milestone progress, today pulse metrics, and both active/upcoming queue buckets.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
     },
@@ -1637,7 +1636,7 @@ const barberPhotosCollection = {
       name: '3. Get Photo Stats',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/photos/stats',
+        url: '{{base_url}}/{{api_prefix}}/photos/analytics',
         description: 'Returns photo counts and storage totals.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -1834,7 +1833,7 @@ const barberRatingsCollection = {
       name: '2. Get Rating Summary',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/ratings/summary',
+        url: '{{base_url}}/{{api_prefix}}/ratings/analytics',
         description: 'Returns aggregate rating metrics for the authenticated barber shop.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -1842,7 +1841,7 @@ const barberRatingsCollection = {
     {
       name: '3. Add Reply',
       ...request({
-        method: 'POST',
+        method: 'PUT',
         url: '{{base_url}}/{{api_prefix}}/ratings/{{rating_id_add_reply}}/reply',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
         body: jsonBody(`{\n  "replyText": "Thanks for the feedback. We appreciate your visit."\n}`),
@@ -2041,10 +2040,10 @@ const paymentsPayoutsCollection = {
   ],
 };
 
-const dashboardCollection = {
+const analyticsCollection = {
   info: {
-    name: 'EverCut - Dashboard Analytics',
-    description: 'Dashboard analytics collection for barber shop owners. Provides real-time occupancy metrics, staff availability, and today\'s queue through resource-based endpoints. All endpoints require BARBER role authentication. NOTE: Endpoints have been refactored from /dashboard/* to resource-based routes.',
+    name: 'EverCut - Operational Analytics',
+    description: 'Operational analytics collection for barber shop owners. Provides booking analytics, employee availability analytics, and earnings through resource-owned endpoints.',
     schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
   },
   auth: bearerAuth('barber_access_token'),
@@ -2052,48 +2051,27 @@ const dashboardCollection = {
   variable: [...baseVariables()],
   item: [
     {
-      name: '1. Get Dashboard Overview (Aggregated)',
+      name: '1. Get Booking Analytics',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/earnings/overview',
-        description: 'Returns all dashboard sections in a single response: pulse metrics, staff availability, and today\'s queue. Optimized for efficient dashboard loading. NEW ENDPOINT: Moved from /dashboard/overview to /earnings/overview.',
+        url: '{{base_url}}/{{api_prefix}}/bookings/analytics',
+        description: 'Returns booking summary, monthly milestone progress, today pulse metrics, and both active/upcoming queue buckets.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           "const response = pm.response.json();",
           "const data = response.data || {};",
-          "pm.test('response includes pulse', function () { pm.expect(data).to.have.property('pulse'); });",
-          "pm.test('response includes staff', function () { pm.expect(data).to.have.property('staff'); });",
+          "pm.test('response includes summary', function () { pm.expect(data).to.have.property('summary'); });",
+          "pm.test('response includes milestones', function () { pm.expect(data).to.have.property('milestones'); });",
+          "pm.test('response includes today', function () { pm.expect(data).to.have.property('today'); });",
           "pm.test('response includes queue', function () { pm.expect(data).to.have.property('queue'); });"
         ),
       }),
     },
     {
-      name: '2. Get Today\'s Pulse (Bookings)',
+      name: '2. Get Employee Analytics',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/bookings/analytics/today',
-        description: 'Returns real-time occupancy metrics and booking status breakdown for today. Shows booked vs total capacity and counts for All, Pending, Done, and Cancelled bookings.',
-        event: testEvent(
-          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
-          "const response = pm.response.json();",
-          "const data = response.data || {};",
-          "pm.test('response includes occupancy', function () { pm.expect(data).to.have.property('occupancy'); });",
-          "pm.test('response includes statusBreakdown', function () { pm.expect(data).to.have.property('statusBreakdown'); });",
-          "if (data.occupancy) {",
-          "  pm.test('occupancy has required fields', function () {",
-          "    pm.expect(data.occupancy).to.have.property('booked');",
-          "    pm.expect(data.occupancy).to.have.property('total');",
-          "    pm.expect(data.occupancy).to.have.property('percentage');",
-          "  });",
-          "}"
-        ),
-      }),
-    },
-    {
-      name: '3. Get Staff Availability (Employees)',
-      ...request({
-        method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/employees/analytics/availability',
+        url: '{{base_url}}/{{api_prefix}}/employees/analytics',
         description: 'Returns staff availability and progress tracking for today. Shows each employee\'s completed vs total appointments with progress percentage.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
@@ -2113,36 +2091,16 @@ const dashboardCollection = {
       }),
     },
     {
-      name: '4. Get Today\'s Queue - Active (Bookings)',
+      name: '3. Get Earnings',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/bookings/analytics/queue?timeframe=active',
-        description: 'Returns today\'s active appointments near the current time. Shows customer name, employee name, time, and services.',
+        url: '{{base_url}}/{{api_prefix}}/earnings',
+        description: 'Returns financial earnings totals and monthly revenue for the authenticated barber shop.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           "const response = pm.response.json();",
           "const data = response.data || {};",
-          "pm.test('response includes timeframe', function () { pm.expect(data).to.have.property('timeframe'); });",
-          "pm.test('response includes active', function () { pm.expect(data).to.have.property('active'); });",
-          "pm.test('response includes upcoming', function () { pm.expect(data).to.have.property('upcoming'); });",
-          "pm.test('timeframe is active', function () { pm.expect(data.timeframe).to.equal('active'); });"
-        ),
-      }),
-    },
-    {
-      name: '5. Get Today\'s Queue - Upcoming (Bookings)',
-      ...request({
-        method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/bookings/analytics/queue?timeframe=upcoming',
-        description: 'Returns today\'s upcoming appointments. Shows customer name, employee name, time, and services.',
-        event: testEvent(
-          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
-          "const response = pm.response.json();",
-          "const data = response.data || {};",
-          "pm.test('response includes timeframe', function () { pm.expect(data).to.have.property('timeframe'); });",
-          "pm.test('response includes active', function () { pm.expect(data).to.have.property('active'); });",
-          "pm.test('response includes upcoming', function () { pm.expect(data).to.have.property('upcoming'); });",
-          "pm.test('timeframe is upcoming', function () { pm.expect(data.timeframe).to.equal('upcoming'); });"
+          "pm.test('response includes monthlyRevenue', function () { pm.expect(data).to.have.property('monthlyRevenue'); });"
         ),
       }),
     },
@@ -2222,10 +2180,10 @@ const notificationsCollection = {
       }),
     },
     {
-      name: '3. Get Unread Count',
+      name: '3. Get Notification Summary',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/notifications/unread-count',
+        url: '{{base_url}}/{{api_prefix}}/notifications/summary',
         description: 'Returns the unread notification count for the authenticated user.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
@@ -2240,7 +2198,9 @@ const notificationsCollection = {
       name: '4. Mark Notification Read',
       ...request({
         method: 'PATCH',
-        url: '{{base_url}}/{{api_prefix}}/notifications/{{notification_id}}/read',
+        url: '{{base_url}}/{{api_prefix}}/notifications/{{notification_id}}',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "read": true\n}`),
         description: 'Marks one notification as read. Run the list request first to capture notification_id, or set it manually.',
         event: testEvent("pm.test('status is 200 or 404', function () { pm.expect(pm.response.code).to.be.oneOf([200, 404]); });"),
       }),
@@ -2249,7 +2209,9 @@ const notificationsCollection = {
       name: '5. Mark All Notifications Read',
       ...request({
         method: 'PATCH',
-        url: '{{base_url}}/{{api_prefix}}/notifications/read-all',
+        url: '{{base_url}}/{{api_prefix}}/notifications',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "read": true\n}`),
         description: 'Marks all unread notifications for the authenticated user as read.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -2310,7 +2272,7 @@ writeCollection('10-barber-bookings.json', barberBookingsCollection);
 writeCollection('11-barber-photos.json', barberPhotosCollection);
 writeCollection('12-barber-earnings.json', barberEarningsCollection);
 writeCollection('13-barber-ratings.json', barberRatingsCollection);
-writeCollection('14-dashboard.json', dashboardCollection);
+writeCollection('14-operational-analytics.json', analyticsCollection);
 writeCollection('15-payments-payouts.json', paymentsPayoutsCollection);
 writeCollection('16-notifications.json', notificationsCollection);
 writeFileSync(resolve(COLLECTIONS_DIR, 'EverCut.postman_environment.json'), `${JSON.stringify(environmentTemplate, null, 2)}\n`);

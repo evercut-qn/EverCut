@@ -195,11 +195,11 @@
       ]
     },
     {
-      "name": "3. Get Unread Count",
+      "name": "3. Get Notification Summary",
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/notifications/unread-count",
+        "url": "{{base_url}}/{{api_prefix}}/notifications/summary",
         "description": "Returns the unread notification count for the authenticated user."
       },
       "event": [
@@ -236,9 +236,23 @@
       "name": "4. Mark Notification Read",
       "request": {
         "method": "PATCH",
-        "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/notifications/{{notification_id}}/read",
-        "description": "Marks one notification as read. Run the list request first to capture notification_id, or set it manually."
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/{{api_prefix}}/notifications/{{notification_id}}",
+        "description": "Marks one notification as read. Run the list request first to capture notification_id, or set it manually.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"read\": true\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
       },
       "event": [
         {
@@ -270,9 +284,23 @@
       "name": "5. Mark All Notifications Read",
       "request": {
         "method": "PATCH",
-        "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/notifications/read-all",
-        "description": "Marks all unread notifications for the authenticated user as read."
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/{{api_prefix}}/notifications",
+        "description": "Marks all unread notifications for the authenticated user as read.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"read\": true\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
       },
       "event": [
         {

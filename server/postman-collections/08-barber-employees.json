@@ -310,11 +310,11 @@
             "value": "application/json"
           }
         ],
-        "url": "{{base_url}}/{{api_prefix}}/employees/{{employee_id}}/status",
-        "description": "Toggles employee availability status. Accepts boolean (true/false) or string values (yes/no, on/off). Omit status field to toggle current state.",
+        "url": "{{base_url}}/{{api_prefix}}/employees/{{employee_id}}",
+        "description": "Marks the employee inactive through the employee resource.",
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"status\": false\n}",
+          "raw": "{\n  \"isActive\": false\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -355,14 +355,14 @@
     {
       "name": "6. Mark Employee Unavailable For Date",
       "request": {
-        "method": "PATCH",
+        "method": "PUT",
         "header": [
           {
             "key": "Content-Type",
             "value": "application/json"
           }
         ],
-        "url": "{{base_url}}/{{api_prefix}}/employees/{{employee_id}}/availability",
+        "url": "{{base_url}}/{{api_prefix}}/employees/{{employee_id}}/blocked-dates",
         "description": "Marks the captured employee unavailable for a generated future date. Existing bookings remain unchanged and affected customers receive booking.employee_unavailable notifications.",
         "body": {
           "mode": "raw",

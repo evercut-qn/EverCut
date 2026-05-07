@@ -135,7 +135,7 @@ Between when a customer sees a slot as "available" and when they submit the book
 
 ### MODERATE-2: Occupancy Calculation Uses Magic Number
 
-`getTodaysPulse()` hardcodes `slotsPerEmployee = 16` (8h × 2 slots/hr) instead of computing from actual employee working hours and booked slot durations.
+`booking analytics today data` hardcodes `slotsPerEmployee = 16` (8h × 2 slots/hr) instead of computing from actual employee working hours and booked slot durations.
 
 ### MODERATE-3: `findConflict()` Repository Method Is Unused
 

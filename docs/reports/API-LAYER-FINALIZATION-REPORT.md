@@ -67,10 +67,10 @@ All endpoints are mounted under `/api/v1`.
 - `PUT /shops/me` - barber
 - `GET /shops/me/upi` - barber
 - `PUT /shops/me/upi` - barber
-- `PUT /shops/me/pin` - barber
-- `PUT /shops/me/picture` - barber
-- `PUT /shops/me/cover` - barber
-- `PUT /shops/me/status` - barber
+- `PUT /shops/me/security` - barber
+- `PUT /shops/me/media/picture` - barber
+- `PUT /shops/me/media/cover` - barber
+- `PUT /shops/me` - barber
 - `POST /shops/me/sign-out-everywhere` - barber
 - `DELETE /shops/me` - barber
 - `GET /shops/nearby/services` - public
@@ -109,8 +109,8 @@ All endpoints are mounted under `/api/v1`.
 - `GET /bookings?type=favorites` - customer, list favorite bookings
 - `GET /bookings/status` - barber
 - `GET /bookings/pending-confirmations` - barber
-- `GET /bookings/stats` - barber
-- `GET /bookings/progress` - barber
+- `GET /bookings/analytics` - barber
+- `GET /bookings/analytics` - barber
 - `GET /bookings/:id` - customer/barber
 - `GET /bookings/:id/confirmation` - customer
 - `PUT /bookings/:id` - customer
@@ -128,18 +128,17 @@ All endpoints are mounted under `/api/v1`.
 
 - `GET /photos` - barber
 - `POST /photos` - barber
-- `GET /photos/stats` - barber
+- `GET /photos/analytics` - barber
 - `GET /photos/:id` - barber
 - `DELETE /photos/:id` - barber
 
 ### Ratings
 
-- `GET /ratings/shop/:id` - public
-- `GET /ratings/shop/:id/summary` - public
-- `GET /ratings/summary` - barber
+- `GET /shops/:id/ratings` - public
+- `GET /shops/:id/ratings/analytics` - public
+- `GET /ratings/analytics` - barber
 - `GET /ratings` - barber
 - `POST /ratings` - customer
-- `POST /ratings/:id/reply` - barber
 - `PUT /ratings/:id/reply` - barber
 - `DELETE /ratings/:id/reply` - barber
 - `DELETE /ratings/:id` - barber

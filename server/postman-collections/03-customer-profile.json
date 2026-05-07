@@ -90,10 +90,10 @@
     {
       "name": "2. Update Profile",
       "request": {
-        "method": "PUT",
+        "method": "PATCH",
         "header": [],
         "url": "{{base_url}}/{{api_prefix}}/customers/me",
-        "description": "Updates the customer data and reuses the sample image as an optional replacement photo. NOTE: Email updates must use PUT /account/email endpoint.",
+        "description": "Updates the customer data and reuses the sample image as an optional replacement photo. NOTE: Email updates must use PATCH /account/email endpoint.",
         "body": {
           "mode": "formdata",
           "formdata": [

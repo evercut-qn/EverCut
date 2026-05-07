@@ -106,7 +106,3 @@ export const sanitizeForResponse = (value, seen = new WeakSet()) => {
 
     return output;
 };
-
-export const serializeList = (items = [], serializer = sanitizeForResponse) => (
-    Array.isArray(items) ? items.map((item) => serializer(item)) : []
-);

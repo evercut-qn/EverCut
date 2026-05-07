@@ -365,26 +365,4 @@ export const generateStatement = async (ownerId, query) => {
     };
 };
 
-// ── Dashboard Analytics (moved from dashboard.service.js) ────────────────
-
-/**
- * Get comprehensive dashboard data (all sections combined)
- * Aggregates pulse, staff, and queue data
- */
-export const getDashboardOverview = async (ownerId) => {
-    // Import the services dynamically to avoid circular dependencies
-    const bookingService = await import('./booking.service.js');
-    const employeeService = await import('./employee.service.js');
-
-    const [pulse, staff, queue] = await Promise.all([
-        bookingService.getTodaysPulse(ownerId),
-        employeeService.getStaffAvailability(ownerId),
-        bookingService.getTodaysQueue(ownerId, 'active'),
-    ]);
-
-    return {
-        pulse,
-        staff,
-        queue,
-    };
-};
+// Resource analytics

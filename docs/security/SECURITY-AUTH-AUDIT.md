@@ -153,7 +153,7 @@ The strict rule: **User identity MUST always come from `req.user` (set by auth m
 | Controller | Function | Identity Source | Status |
 |---|---|---|---|
 | `barber-booking.controller` | `getBookings` | `req.user._id` | ✅ |
-| `barber-booking.controller` | `getBookingStats` | `req.user._id` | ✅ |
+| `barber-booking.controller` | `getBookingAnalytics` | `req.user._id` | ✅ |
 | `barber-booking.controller` | `updateBookingStatus` | `req.user._id` | ✅ |
 | `barber-booking.controller` | `deleteBooking` | `req.user._id` | ✅ |
 | `barber-booking.controller` | `getBookingsByStatus` | `req.user._id` | ✅ |
@@ -186,7 +186,7 @@ The strict rule: **User identity MUST always come from `req.user` (set by auth m
 | `barber-shop.controller` | `updateBusinessInfo` | `req.user._id` | ✅ |
 | `barber-shop.controller` | `getUpiDetails` | `req.user._id` | ✅ |
 | `barber-shop.controller` | `updateUpiDetails` | `req.user._id` | ✅ |
-| `barber-shop.controller` | `toggleShopStatus` | `req.user._id` | ✅ |
+| `barber-shop.controller` | `updateBusinessInfo isOpen handling` | `req.user._id` | ✅ |
 | `customer-booking.controller` | `bookSalon` | `req.user._id` | ✅ |
 | `customer-booking.controller` | `getBookings` | `req.user._id` | ✅ |
 | `customer-booking.controller` | `getBookingDetails` | `req.user._id` | ✅ |
@@ -222,8 +222,8 @@ The strict rule: **User identity MUST always come from `req.user` (set by auth m
 | `photo.getPhotoById` | scoped by `shopId` via ownerId | ✅ |
 | `photo.deletePhoto` | scoped by `shopId` via ownerId | ✅ |
 | `rating.removeRating` | `rating.shopId === shop._id` | ✅ |
-| `rating.addReplyToRating` | `rating.shopId === shop._id` | ✅ |
-| `rating.updateReplyToRating` | `rating.shopId === shop._id` | ✅ |
+| `rating.upsertReplyToRating` | `rating.shopId === shop._id` | ✅ |
+| `rating.upsertReplyToRating` | `rating.shopId === shop._id` | ✅ |
 | `rating.deleteReplyFromRating` | `rating.shopId === shop._id` | ✅ |
 | `serviceCatalog.updateService` | scoped by `shopId` | ✅ |
 | `serviceCatalog.deleteService` | scoped by `shopId` | ✅ |

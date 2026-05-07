@@ -28,3 +28,7 @@ export const notificationListQuerySchema = paginationSchema.keys({
 export const notificationIdParamSchema = Joi.object({
     id: objectId.required(),
 });
+
+export const notificationPatchSchema = Joi.object({
+    read: Joi.boolean().valid(true).required(),
+});

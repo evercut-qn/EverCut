@@ -153,6 +153,7 @@ export const updateEmployeeSchema = Joi.object({
     dateOfBirth: Joi.date().max('now'),
     workingHours: workingHoursSchema,
     blockedDates: blockedDatesSchema,
+    isActive: Joi.boolean(),
 });
 
 export const employeeIdParamSchema = Joi.object({
@@ -167,18 +168,6 @@ export const employeeAvailabilityQuerySchema = Joi.object({
         objectId,
         Joi.array().items(objectId).min(1),
     ).required(),
-});
-
-export const toggleEmployeeStatusSchema = Joi.object({
-    status: Joi.alternatives()
-        .try(
-            Joi.boolean(),
-            Joi.string().valid('true', 'false', 'yes', 'no', 'on', 'off'),
-        )
-        .optional()
-        .messages({
-            'any.only': 'status must be a boolean or one of: true, false, yes, no, on, off',
-        }),
 });
 
 export const updateEmployeeAvailabilitySchema = Joi.object({

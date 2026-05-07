@@ -148,12 +148,11 @@ Frontend clients should show an informational warning when `employee.isAvailable
 | Method | Endpoint | Auth | Purpose |
 |--------|----------|------|---------|
 | POST | `/api/v1/bookings` | CUSTOMER | Create booking |
-| GET | `/api/v1/bookings` | CUSTOMER | List bookings (supports: timeframe, favorite, status, paymentStatus) |
+| GET | `/api/v1/bookings` | CUSTOMER | List bookings (supports: date range, favorite, status, paymentStatus) |
 | GET | `/api/v1/bookings/:id` | CUSTOMER | Get booking details |
 | PATCH | `/api/v1/bookings/:id` | CUSTOMER | Update schedule or cancel with `status=cancelled` |
 | POST | `/api/v1/bookings` | CUSTOMER | Reorder from `sourceBookingId` |
-| PUT | `/api/v1/bookings/:id/favorite` | CUSTOMER | Add favorite |
-| DELETE | `/api/v1/bookings/:id/favorite` | CUSTOMER | Remove favorite |
+| PATCH | `/api/v1/bookings/:id/favorite` | CUSTOMER | Set favorite state with `{ "favorite": true/false }` |
 
 ### Booking Management (Barber)
 
@@ -162,10 +161,7 @@ Frontend clients should show an informational warning when `employee.isAvailable
 | GET | `/api/v1/bookings` | BARBER | List all bookings (supports: employeeId, dateFrom, dateTo, status, paymentStatus) |
 | GET | `/api/v1/bookings?status=awaiting_confirmation&paymentStatus=success` | BARBER | List pending confirmations |
 | GET | `/api/v1/bookings?employeeId=X&dateFrom=Y&dateTo=Z` | BARBER | Filter by employee and date range |
-| GET | `/api/v1/bookings/analytics/summary` | BARBER | Get statistics |
-| GET | `/api/v1/bookings/analytics/milestones` | BARBER | Get milestone progress |
-| GET | `/api/v1/bookings/analytics/today` | BARBER | Get today's dashboard summary |
-| GET | `/api/v1/bookings/analytics/queue` | BARBER | Get today's queue |
+| GET | `/api/v1/bookings/analytics` | BARBER | Get summary, milestone, today pulse, and queue analytics |
 | PATCH | `/api/v1/bookings/:id` | BARBER | Confirm, complete, no-show, or cancel |
 
 ### Payment & Refunds
@@ -570,7 +566,8 @@ The `GET /api/v1/bookings` endpoint provides role-specific filtering capabilitie
 
 | Parameter | Type | Values | Description |
 |-----------|------|--------|-------------|
-| `timeframe` | string | `past`, `upcoming` | Filter by time relative to today |
+| `dateFrom` | string | YYYY-MM-DD | Start date, inclusive |
+| `dateTo` | string | YYYY-MM-DD | End date, inclusive |
 | `favorite` | boolean | `true`, `false` | Show only favorite bookings |
 | `status` | string | See status values below | Filter by booking status |
 | `paymentStatus` | string | See payment status values below | Filter by payment status |
@@ -580,12 +577,12 @@ The `GET /api/v1/bookings` endpoint provides role-specific filtering capabilitie
 **Example Requests:**
 
 ```http
-# Get upcoming bookings
-GET /api/v1/bookings?timeframe=upcoming
+# Get bookings from a date onward
+GET /api/v1/bookings?dateFrom=2026-05-07
 Authorization: Bearer <customer_token>
 
-# Get past confirmed bookings
-GET /api/v1/bookings?timeframe=past&status=confirmed
+# Get completed bookings before a date
+GET /api/v1/bookings?dateTo=2026-05-07&status=completed
 Authorization: Bearer <customer_token>
 
 # Get favorite bookings
@@ -767,27 +764,25 @@ Authorization: Bearer <barber_token>
 
 **Customer Restrictions:**
 ```json
-// ❌ Customers cannot use barber-only filters
+// Customers cannot use barber-only filters
 GET /api/v1/bookings?employeeId=X
-GET /api/v1/bookings?dateFrom=2026-05-01
 
 // Response: 403 Forbidden
 {
   "success": false,
-  "message": "Employee and date range filters are only available for barbers"
+  "message": "Employee filters are only available for barbers"
 }
 ```
 
 **Barber Restrictions:**
 ```json
-// ❌ Barbers cannot use customer-only filters
-GET /api/v1/bookings?timeframe=upcoming
+// Barbers cannot use customer-only filters
 GET /api/v1/bookings?favorite=true
 
 // Response: 403 Forbidden
 {
   "success": false,
-  "message": "Timeframe and favorite filters are only available for customers"
+  "message": "Favorite filters are only available for customers"
 }
 ```
 
@@ -829,12 +824,12 @@ GET /api/v1/bookings?dateFrom=05-01-2026
 
 1. **View Upcoming Appointments**
    ```http
-   GET /api/v1/bookings?timeframe=upcoming&status=confirmed
+   GET /api/v1/bookings?dateFrom=2026-05-07&status=confirmed
    ```
 
 2. **Check Booking History**
    ```http
-   GET /api/v1/bookings?timeframe=past&page=1&limit=20
+   GET /api/v1/bookings?dateTo=2026-05-07&page=1&limit=20
    ```
 
 3. **Find Favorite Bookings to Reorder**

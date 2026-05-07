@@ -48,7 +48,7 @@
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/bookings?timeframe=past&limit=100",
+        "url": "{{base_url}}/{{api_prefix}}/bookings?dateTo={{booking_date}}&status=completed&limit=100",
         "description": "Captures a shop ID from the authenticated customer's completed past bookings. This request fails the collection clearly when no eligible booking exists for rating."
       },
       "event": [
@@ -136,7 +136,7 @@
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/ratings/shop/{{shop_id}}",
+        "url": "{{base_url}}/{{api_prefix}}/shops/{{shop_id}}/ratings",
         "description": "Lists all ratings for the captured shop, including barber replies."
       },
       "event": [
@@ -170,7 +170,7 @@
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/ratings/shop/{{shop_id}}/summary",
+        "url": "{{base_url}}/{{api_prefix}}/shops/{{shop_id}}/ratings/analytics",
         "description": "Returns the rating summary payload for the captured shop."
       },
       "event": [

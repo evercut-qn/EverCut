@@ -28,7 +28,7 @@ All phone and email updates are now centralized under the `/account` endpoint. T
 
 ### After (Centralized Updates)
 ```
-✅ PUT /account/email { newEmail: "new@email.com" }
+✅ PATCH /account/email { newEmail: "new@email.com" }
 ✅ POST /account/phone/send-otp { newMobile: "9876543299" }
 ✅ POST /account/phone/verify-otp { newMobile: "9876543299", otp: "123456" }
 ✅ Single location, consistent security

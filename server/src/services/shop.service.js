@@ -63,6 +63,7 @@ const ALLOWED_UPDATE_FIELDS = [
     'openTime',
     'closeTime',
     'breakTimes',
+    'isOpen',
 ];
 
 const parseJsonIfString = (value) => {
@@ -314,6 +315,13 @@ export const updateBusinessInfo = async (ownerId, body, userContext) => {
         userId: ownerId,
         updateType: 'shop_profile',
     });
+    if (hasOwn(updateData, 'isOpen') && Boolean(shop.isOpen) !== Boolean(updated.isOpen)) {
+        await notificationEvents.notifyShopStatusUpdated({
+            ownerId,
+            shopId: updated._id,
+            isOpen: updated.isOpen,
+        });
+    }
 
     return {
         shop: serializeBarberProfile(updated, userContext, { photos }),
@@ -372,32 +380,6 @@ export const updatePayoutDetails = async (ownerId, body) => {
     // await payoutService.createOrUpdateBeneficiary(updated);
 
     return serializeBankDetails(updated);
-};
-
-export const toggleShopStatus = async (ownerId, requestedStatus) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
-    if (!shop) throw new NotFoundError('Shop profile');
-
-    let isOpen;
-    if (typeof requestedStatus === 'boolean') {
-        isOpen = requestedStatus;
-    } else if (typeof requestedStatus === 'string') {
-        const s = requestedStatus.trim().toLowerCase();
-        if (['true', '1', 'yes', 'on'].includes(s)) isOpen = true;
-        else if (['false', '0', 'no', 'off'].includes(s)) isOpen = false;
-    }
-
-    if (typeof isOpen !== 'boolean') isOpen = !shop.isOpen;
-
-    shop.isOpen = isOpen;
-    await shop.save();
-    await notificationEvents.notifyShopStatusUpdated({
-        ownerId,
-        shopId: shop._id,
-        isOpen: shop.isOpen,
-    });
-
-    return { isOpen: shop.isOpen };
 };
 
 export const getShopInfoForCustomer = async (shopId) => {

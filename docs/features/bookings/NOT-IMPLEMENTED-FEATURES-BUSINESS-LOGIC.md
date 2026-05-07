@@ -39,7 +39,7 @@ Provide a mechanism for customers to confirm service delivery, reducing disputes
 - Customer has three choices:
   - **Yes** - Service was received satisfactorily
   - **No** - Service was not received or unsatisfactory
-  - **No Response** - Customer doesn't respond within timeframe
+  - **No Response** - Customer doesn't respond within the confirmation window
 
 #### Rule 1.3: Payment Release
 - Payment is held until customer confirms OR 48 hours pass
