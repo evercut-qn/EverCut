@@ -18,10 +18,10 @@ class ShopEndpoints {
 
 class RatingEndpoints {
   static const String ratings = '/ratings';
-  static const String summary = '/ratings/summary';
+  static const String summary = '/ratings/analytics';
   
-  static String shopRatings(String shopId) => '/ratings/shop/$shopId';
-  static String shopRatingSummary(String shopId) => '/ratings/shop/$shopId/summary';
+  static String shopRatings(String shopId) => '/shops/$shopId/ratings';
+  static String shopRatingSummary(String shopId) => '/shops/$shopId/ratings/analytics';
   static String ratingReply(String ratingId) => '/ratings/$ratingId/reply';
   static String deleteRating(String ratingId) => '/ratings/$ratingId';
 }

@@ -32,13 +32,13 @@ abstract class RatingRemoteDataSource {
   /// Get rating summary for barber's own shop (Barber only)
   Future<RatingSummaryDto> getOwnedRatingSummary();
 
-  /// Add reply to a rating (Barber only)
+  /// Save reply to a rating (Barber only)
   Future<RatingDto> addReply({
     required String ratingId,
     required String replyText,
   });
 
-  /// Update reply to a rating (Barber only)
+  /// Save reply to a rating (Barber only)
   Future<RatingDto> updateReply({
     required String ratingId,
     required String replyText,

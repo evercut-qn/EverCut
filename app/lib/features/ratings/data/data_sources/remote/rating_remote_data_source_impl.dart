@@ -129,7 +129,7 @@ class RatingRemoteDataSourceImpl implements RatingRemoteDataSource {
     required String ratingId,
     required String replyText,
   }) async {
-    final response = await apiClient.post<Map<String, dynamic>>(
+    final response = await apiClient.put<Map<String, dynamic>>(
       RatingEndpoints.ratingReply(ratingId),
       body: {'replyText': replyText},
       parseData: _map,

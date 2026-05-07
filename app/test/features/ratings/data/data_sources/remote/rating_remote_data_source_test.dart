@@ -176,12 +176,12 @@ void main() {
     });
 
     group('addReply', () {
-      test('should successfully add a reply to rating', () async {
+      test('should successfully save a reply to rating', () async {
         // Arrange
         final responseBody = '''
         {
           "success": true,
-          "message": "Reply added successfully",
+          "message": "Reply saved successfully",
           "data": {
             "id": "$testRatingId",
             "shopId": "$testShopId",
@@ -202,7 +202,7 @@ void main() {
         }
         ''';
 
-        when(mockHttpClient.post(
+        when(mockHttpClient.put(
           any,
           headers: anyNamed('headers'),
           body: anyNamed('body'),

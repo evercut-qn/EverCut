@@ -32,13 +32,13 @@ abstract class RatingRepository {
   /// Get rating summary for barber's own shop (Barber only)
   Future<RatingSummary> getOwnedRatingSummary();
 
-  /// Add reply to a rating (Barber only)
+  /// Save reply to a rating (Barber only)
   Future<Rating> addReply({
     required String ratingId,
     required String replyText,
   });
 
-  /// Update reply to a rating (Barber only)
+  /// Save reply to a rating (Barber only)
   Future<Rating> updateReply({
     required String ratingId,
     required String replyText,
