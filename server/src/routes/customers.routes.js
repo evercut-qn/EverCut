@@ -10,6 +10,7 @@ import { updateCustomerSchema } from '../validators/customer.validator.js';
 
 const router = Router();
 
+// All customer routes require authentication and CUSTOMER role
 router.use(authenticate, authorize(ROLES.CUSTOMER));
 
 router.get('/me', customerController.getMe);

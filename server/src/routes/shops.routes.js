@@ -24,9 +24,30 @@ import {
 
 const router = Router();
 
+// ============================================================================
+// Public Routes (no authentication required)
+// ============================================================================
+
+// Shop discovery and browsing
 router.get('/', validate(shopListQuerySchema, 'query'), shopController.getShops);
 router.get('/services', validate(servicesByGenderQuerySchema, 'query'), shopController.getNearbyServices);
+router.get('/:id', validate(shopIdParamSchema, 'params'), shopController.getShopById);
+router.get('/:id/employees', validate(shopIdParamSchema, 'params'), shopController.getShopEmployees);
+router.get('/:id/ratings', validate(shopIdParamSchema, 'params'), validate(paginationSchema, 'query'), ratingController.getShopRatings);
+router.get('/:id/ratings/analytics', validate(shopIdParamSchema, 'params'), ratingController.getShopRatingSummary);
+
+// ============================================================================
+// Protected Routes (authentication required)
+// ============================================================================
+
+// Customer-specific routes
 router.get('/favorites', authenticate, authorize(ROLES.CUSTOMER), validate(paginationSchema, 'query'), shopController.getFavoriteShops);
+router.patch('/:id/favorite', authenticate, authorize(ROLES.CUSTOMER), validate(shopIdParamSchema, 'params'), validate(shopFavoritePatchSchema, 'body'), shopController.setFavoriteShop);
+
+// Shared routes (CUSTOMER + BARBER)
+router.get('/:id/availability', authenticate, authorize(ROLES.CUSTOMER, ROLES.BARBER), validate(shopIdParamSchema, 'params'), validate(shopAvailabilityQuerySchema, 'query'), shopController.getShopAvailability);
+
+// Barber-specific routes
 router.get('/me', authenticate, authorize(ROLES.BARBER), shopController.getMyShop);
 router.patch('/me', authenticate, authorize(ROLES.BARBER), validate(updateBusinessSchema, 'body'), shopController.updateMyShop);
 router.get('/me/payout-details', authenticate, authorize(ROLES.BARBER), shopController.getPayoutDetails);
@@ -34,11 +55,5 @@ router.patch('/me/payout-details', authenticate, authorize(ROLES.BARBER), valida
 router.patch('/me/security', authenticate, authorize(ROLES.BARBER), validate(updatePinSchema, 'body'), shopController.updateMyPin);
 router.patch('/me/media/picture', authenticate, authorize(ROLES.BARBER), uploadBarberProfilePhoto, shopController.updateMyPicture);
 router.patch('/me/media/cover', authenticate, authorize(ROLES.BARBER), uploadShopCover, shopController.updateMyCover);
-router.get('/:id/employees', validate(shopIdParamSchema, 'params'), shopController.getShopEmployees);
-router.get('/:id/availability', authenticate, authorize(ROLES.CUSTOMER, ROLES.BARBER), validate(shopIdParamSchema, 'params'), validate(shopAvailabilityQuerySchema, 'query'), shopController.getShopAvailability);
-router.get('/:id/ratings', validate(shopIdParamSchema, 'params'), validate(paginationSchema, 'query'), ratingController.getShopRatings);
-router.get('/:id/ratings/analytics', validate(shopIdParamSchema, 'params'), ratingController.getShopRatingSummary);
-router.patch('/:id/favorite', authenticate, authorize(ROLES.CUSTOMER), validate(shopIdParamSchema, 'params'), validate(shopFavoritePatchSchema, 'body'), shopController.setFavoriteShop);
-router.get('/:id', validate(shopIdParamSchema, 'params'), shopController.getShopById);
 
 export default router;

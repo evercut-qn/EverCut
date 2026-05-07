@@ -13,7 +13,11 @@ import {
 
 const router = Router();
 
-// OTP endpoints (public)
+// ============================================================================
+// Public Routes (no authentication required)
+// ============================================================================
+
+// OTP endpoints
 router.post(
     '/otp/send',
     otpRateLimiter({
@@ -56,8 +60,14 @@ router.post(
     authController.resendOtp,
 );
 
-// Token endpoints
+// Token refresh endpoint (public - uses refresh token)
 router.post('/token/refresh', validate(refreshTokenSchema, 'body'), authController.refreshToken);
+
+// ============================================================================
+// Protected Routes (authentication required)
+// ============================================================================
+
+// Logout endpoint
 router.post('/logout', authenticate, authController.logout);
 
 export default router;

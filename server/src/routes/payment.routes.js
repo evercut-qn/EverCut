@@ -14,11 +14,14 @@ import { ROLES } from '../utils/constants.js';
 
 const router = Router();
 
+// Webhook route - public but protected by signature verification in service layer
 router.post('/webhook', paymentController.handleWebhook);
+
+// All other payment routes require authentication
+router.use(authenticate);
 
 router.get(
     '/',
-    authenticate,
     authorize(ROLES.CUSTOMER, ROLES.BARBER, ROLES.ADMIN),
     validate(paymentListQuerySchema, 'query'),
     paymentController.getPayments,
@@ -26,7 +29,6 @@ router.get(
 
 router.post(
     '/',
-    authenticate,
     authorize(ROLES.CUSTOMER),
     validate(initiatePaymentSchema, 'body'),
     paymentController.initiatePayment,
@@ -34,7 +36,6 @@ router.post(
 
 router.post(
     '/:id/verify',
-    authenticate,
     authorize(ROLES.CUSTOMER),
     validate(paymentIdParamSchema, 'params'),
     validate(verifyPaymentSchema, 'body'),
@@ -43,7 +44,6 @@ router.post(
 
 router.get(
     '/:id',
-    authenticate,
     authorize(ROLES.CUSTOMER, ROLES.BARBER, ROLES.ADMIN),
     validate(paymentIdParamSchema, 'params'),
     paymentController.getPaymentStatus,

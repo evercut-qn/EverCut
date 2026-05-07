@@ -13,6 +13,7 @@ import {
 
 const router = Router();
 
+// All notification routes require authentication
 router.use(authenticate);
 
 router.post('/tokens', validate(registerFcmTokenSchema, 'body'), notificationController.registerFcmToken);

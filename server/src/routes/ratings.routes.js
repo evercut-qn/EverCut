@@ -10,6 +10,7 @@ import { addRatingSchema, addReplySchema } from '../validators/rating.validator.
 
 const router = Router();
 
+// All rating routes require authentication
 router.use(authenticate);
 
 router.get('/analytics', authorize(ROLES.BARBER), ratingController.getOwnedRatingSummary);

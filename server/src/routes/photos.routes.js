@@ -11,6 +11,7 @@ import { photoFilterQuerySchema, photoUploadSchema } from '../validators/photo.v
 
 const router = Router();
 
+// All photo routes require authentication and BARBER role
 router.use(authenticate, authorize(ROLES.BARBER));
 
 router.get('/', validate(photoFilterQuerySchema, 'query'), photoController.getPhotos);

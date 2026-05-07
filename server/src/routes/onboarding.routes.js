@@ -13,6 +13,10 @@ import * as onboardingController from '../controllers/onboarding.controller.js';
 
 const router = Router();
 
+// ============================================================================
+// Onboarding Routes (require onboarding token from OTP verification)
+// ============================================================================
+
 /**
  * POST /api/v1/onboarding/customers
  * Create customer after OTP verification with onboarding token.

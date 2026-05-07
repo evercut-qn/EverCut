@@ -19,7 +19,7 @@ import { refundSchema } from '../validators/payment.validator.js';
 const router = Router();
 
 // ============================================================================
-// Authenticated Booking Routes
+// All booking routes require authentication
 // ============================================================================
 
 router.use(authenticate);

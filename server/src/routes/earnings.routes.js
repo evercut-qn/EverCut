@@ -13,6 +13,7 @@ import {
 
 const router = Router();
 
+// All earnings routes require authentication and BARBER role
 router.use(authenticate, authorize(ROLES.BARBER));
 
 router.get('/', earningsController.getEarnings);
