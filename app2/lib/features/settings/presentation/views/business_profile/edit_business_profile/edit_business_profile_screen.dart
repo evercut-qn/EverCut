@@ -1,0 +1,173 @@
+// lib/features/settings/presentation/views/business_profile/edit_business_profile/edit_business_profile_screen.dart
+
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:geolocator/geolocator.dart';
+
+import '../../../../../../core/constants/regex/allowed_characters_regex.dart';
+import '../../../../../../core/theme/foundation/app_icons.dart';
+import '../../../../../../shared/enums/business_category.dart';
+import '../../../../../../shared/enums/target_customer.dart';
+import '../../../../../../shared/extensions/context/device_metrics_extension.dart';
+import '../../../../../../shared/widgets/common/appbars/bottom_appbar.dart';
+import '../../../../../../shared/widgets/common/inputs/dropdown_menu.dart';
+import '../../../../../../shared/widgets/common/inputs/location_picker_field.dart';
+import '../../../../../../shared/widgets/common/inputs/text_form_field.dart';
+import '../../../../../../shared/widgets/common/section/section_header.dart';
+import '../../../../../../shared/widgets/overlays/snackbars.dart';
+
+class EditBusinessProfileScreen extends StatefulWidget {
+  const EditBusinessProfileScreen({super.key});
+
+  @override
+  State<EditBusinessProfileScreen> createState() => _EditBusinessProfileScreenState();
+}
+
+class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen> {
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
+  final TextEditingController _shopNameController = TextEditingController();
+  final TextEditingController _businessCategoryController = TextEditingController();
+  final TextEditingController _targetCustomersController = TextEditingController();
+  final TextEditingController _shopLocationController = TextEditingController();
+
+  // Position? _position;
+
+  void _onUpdateBusinessProfileButtonPressed() {
+    if (!_formKey.currentState!.validate()) {
+      SnackBars.of(context).showWarningSnackBar(
+        title: 'Incomplete Information',
+        message: 'Please fill in all required fields correctly before saving your changes.',
+      );
+    } else {}
+  }
+
+  @override
+  void dispose() {
+    _shopNameController.dispose();
+    _businessCategoryController.dispose();
+    _targetCustomersController.dispose();
+    _shopLocationController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Edit Business Profile')),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: EdgeInsets.all(context.scale(24)),
+          child: Column(
+            spacing: context.scale(18),
+            children: [
+              const SectionHeader(
+                title: 'Edit Your Business Profile',
+                description: 'Update your business details to keep your profile current. Make sure all information is accurate.',
+              ),
+              Form(
+                autovalidateMode: AutovalidateMode.onUnfocus,
+                key: _formKey,
+                child: Column(
+                  spacing: context.scale(16),
+                  children: [
+                    CustomTextFormField(
+                      controller: _shopNameController,
+                      inputFormatters: [
+                        TextInputFormatter.withFunction((TextEditingValue oldValue, TextEditingValue newValue) {
+                          if (RegExp(AllowedCharactersRegEx.words).hasMatch(newValue.text)) {
+                            return newValue;
+                          } else {
+                            return oldValue;
+                          }
+                        }),
+                      ],
+                      keyboardType: TextInputType.text,
+                      labelText: 'Shop Name',
+                      prefixIcon: AppIcons.solidRoundedStore03,
+                      textCapitalization: TextCapitalization.words,
+                      validator: (String? text) {
+                        if (text == null || text.isEmpty) {
+                          return 'Please enter your shop name.';
+                        } else {
+                          return null;
+                        }
+                      },
+                    ),
+                    CustomDropdownMenu<int>(
+                      controller: _businessCategoryController,
+                      dropdownMenuEntries: BusinessCategoryEnum.values.map<DropdownMenuEntry<int>>((BusinessCategoryEnum businessCategory) {
+                        return DropdownMenuEntry<int>(
+                          label: businessCategory.label,
+                          leadingIcon: Padding(
+                            padding: EdgeInsets.only(left: context.scale(6)),
+                            child: Icon(
+                              businessCategory.icon,
+                              size: context.scale(20),
+                            ),
+                          ),
+                          value: businessCategory.value,
+                        );
+                      }).toList(),
+                      labelText: 'Business Category',
+                      leadingIcon: AppIcons.solidRoundedTag01,
+                      validator: (int? value) {
+                        if (value == null || value.isNaN || value.isNegative) {
+                          return 'Please select your business category.';
+                        } else {
+                          return null;
+                        }
+                      },
+                    ),
+                    CustomDropdownMenu<int>(
+                      controller: _targetCustomersController,
+                      dropdownMenuEntries: TargetCustomerEnum.values.map<DropdownMenuEntry<int>>((TargetCustomerEnum targetCustomer) {
+                        return DropdownMenuEntry<int>(
+                          label: targetCustomer.label,
+                          leadingIcon: Padding(
+                            padding: EdgeInsets.only(left: context.scale(6)),
+                            child: Icon(
+                              targetCustomer.icon,
+                              size: context.scale(20),
+                            ),
+                          ),
+                          value: targetCustomer.value,
+                        );
+                      }).toList(),
+                      labelText: 'Target Customers',
+                      leadingIcon: AppIcons.solidRoundedUserGroup,
+                      validator: (int? value) {
+                        if (value == null || value.isNaN || value.isNegative) {
+                          return 'Please select your target customers.';
+                        } else {
+                          return null;
+                        }
+                      },
+                    ),
+                    LocationPickerField(
+                      controller: _shopLocationController,
+                      onChange: (Position position) {
+                        // _position = position;
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      bottomNavigationBar: CustomBottomAppBar(
+        child: Row(
+          children: [
+            Expanded(
+              child: FilledButton(
+                onPressed: _onUpdateBusinessProfileButtonPressed,
+                child: const Text('Update Business Profile'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
