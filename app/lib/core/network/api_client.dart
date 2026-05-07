@@ -51,6 +51,34 @@ class ApiClient {
     );
   }
 
+  Future<ApiResponse<T>> put<T>(
+    String path, {
+    Map<String, dynamic>? body,
+    T Function(Object? value)? parseData,
+    bool authenticated = true,
+  }) {
+    return _send<T>(
+      'PUT',
+      path,
+      body: body,
+      parseData: parseData,
+      authenticated: authenticated,
+    );
+  }
+
+  Future<ApiResponse<T>> delete<T>(
+    String path, {
+    T Function(Object? value)? parseData,
+    bool authenticated = true,
+  }) {
+    return _send<T>(
+      'DELETE',
+      path,
+      parseData: parseData,
+      authenticated: authenticated,
+    );
+  }
+
   Future<ApiResponse<T>> _send<T>(
     String method,
     String path, {
@@ -112,6 +140,10 @@ class ApiClient {
         return httpClient.get(uri, headers: headers);
       case 'POST':
         return httpClient.post(uri, headers: headers, body: encodedBody);
+      case 'PUT':
+        return httpClient.put(uri, headers: headers, body: encodedBody);
+      case 'DELETE':
+        return httpClient.delete(uri, headers: headers, body: encodedBody);
       default:
         throw NetworkException('Unsupported HTTP method: $method');
     }

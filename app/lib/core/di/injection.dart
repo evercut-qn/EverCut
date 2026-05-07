@@ -8,7 +8,9 @@ import 'modules/authentication_module.dart';
 import 'modules/connectivity_module.dart';
 import 'modules/network_module.dart';
 import 'modules/onboarding_module.dart';
+import 'modules/rating_module.dart';
 import 'modules/router_module.dart';
+import 'modules/service_module.dart';
 import 'modules/storage_module.dart';
 import 'modules/theme_module.dart';
 
@@ -24,6 +26,8 @@ Future<void> init() async {
   ThemeModule.register(sl);
   AuthenticationModule.register(sl);
   OnboardingModule.register(sl);
+  RatingModule.register(sl);
+  ServiceModule.register(sl);
   await sl<AuthStateNotifier>().restore();
   RouterModule.register(sl);
   await sl.allReady();

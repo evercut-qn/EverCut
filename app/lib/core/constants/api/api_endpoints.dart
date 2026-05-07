@@ -15,3 +15,19 @@ class OnboardingEndpoints {
 class ShopEndpoints {
   static const String me = '/shops/me';
 }
+
+class RatingEndpoints {
+  static const String ratings = '/ratings';
+  static const String summary = '/ratings/summary';
+  
+  static String shopRatings(String shopId) => '/ratings/shop/$shopId';
+  static String shopRatingSummary(String shopId) => '/ratings/shop/$shopId/summary';
+  static String ratingReply(String ratingId) => '/ratings/$ratingId/reply';
+  static String deleteRating(String ratingId) => '/ratings/$ratingId';
+}
+
+class ServiceEndpoints {
+  static const String services = '/services';
+  
+  static String serviceById(String serviceId) => '/services/$serviceId';
+}
