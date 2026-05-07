@@ -18,17 +18,18 @@ class CustomNavigationBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        border: Border(
-          top: BorderSide(
-            color: context.appColors.primaryDividerColor,
-          ),
+    return Material(
+      shape: Border(
+        top: BorderSide(
+          color: context.appColors.primaryDividerColor,
         ),
       ),
       child: NavigationBar(
         destinations: destinations,
+        indicatorColor: Colors.transparent,
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
         onDestinationSelected: onDestinationSelected,
+        overlayColor: WidgetStateColor.transparent,
         selectedIndex: selectedIndex,
       ),
     );

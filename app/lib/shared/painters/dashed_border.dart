@@ -2,18 +2,7 @@
 
 import 'package:flutter/material.dart';
 
-class _CircularIntervalList<T> {
-  List values;
-  int index = 0;
-
-  _CircularIntervalList(this.values);
-
-  dynamic get next {
-    final currentValue = values[index];
-    index = (index + 1) % values.length;
-    return currentValue;
-  }
-}
+import '../models/circular_interval_list.dart';
 
 class DashedBorderPainter extends CustomPainter {
   final Color color;
@@ -41,7 +30,7 @@ class DashedBorderPainter extends CustomPainter {
 
     final path = _getDashPath(
       path: _getPath(size),
-      dashArray: _CircularIntervalList(dashPattern ?? [3, 1]),
+      dashArray: CircularIntervalListModel(dashPattern ?? [3, 1]),
     );
 
     canvas.drawPath(path, paint);
@@ -72,7 +61,7 @@ class DashedBorderPainter extends CustomPainter {
 
   Path _getDashPath({
     required Path path,
-    required _CircularIntervalList dashArray,
+    required CircularIntervalListModel dashArray,
   }) {
     final dashedPath = Path();
 

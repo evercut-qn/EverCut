@@ -356,11 +356,96 @@ class TransactionDetailsScreen extends StatelessWidget {
                                 spacing: context.scale(16),
                                 children: [
                                   Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    spacing: context.scale(16),
+                                    children: [
+                                      Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        spacing: context.scale(2),
+                                        children: [
+                                          Text(
+                                            'Haircut',
+                                            textAlign: TextAlign.left,
+                                            style: TextStyle(
+                                              color: context.appColors.neutralShade650,
+                                              fontSize: context.scale(14),
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                          Text(
+                                            '30 Min',
+                                            textAlign: TextAlign.left,
+                                            style: TextStyle(
+                                              color: context.appColors.neutralShade650,
+                                              fontSize: context.scale(12),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      Text(
+                                        '₹45.00',
+                                        textAlign: TextAlign.right,
+                                        style: TextStyle(
+                                          color: context.appColors.neutralShade650,
+                                          fontSize: context.scale(14),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    spacing: context.scale(16),
+                                    children: [
+                                      Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        spacing: context.scale(2),
+                                        children: [
+                                          Text(
+                                            'Beard',
+                                            textAlign: TextAlign.left,
+                                            style: TextStyle(
+                                              color: context.appColors.neutralShade650,
+                                              fontSize: context.scale(14),
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                          Text(
+                                            '15 Min',
+                                            textAlign: TextAlign.left,
+                                            style: TextStyle(
+                                              color: context.appColors.neutralShade650,
+                                              fontSize: context.scale(12),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      Text(
+                                        '₹20.00',
+                                        textAlign: TextAlign.right,
+                                        style: TextStyle(
+                                          color: context.appColors.neutralShade650,
+                                          fontSize: context.scale(14),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                              Divider(
+                                color: context.appColors.backgroundShade100,
+                                height: 1.0,
+                              ),
+                              Column(
+                                spacing: context.scale(16),
+                                children: [
+                                  Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     spacing: context.scale(16),
                                     children: [
                                       Text(
-                                        'Haircut',
+                                        'Sub-Total',
                                         textAlign: TextAlign.left,
                                         style: TextStyle(
                                           color: context.appColors.neutralShade650,
@@ -369,7 +454,7 @@ class TransactionDetailsScreen extends StatelessWidget {
                                         ),
                                       ),
                                       Text(
-                                        '₹45.00',
+                                        '₹55.00',
                                         textAlign: TextAlign.right,
                                         style: TextStyle(
                                           color: context.appColors.neutralShade650,
@@ -383,7 +468,7 @@ class TransactionDetailsScreen extends StatelessWidget {
                                     spacing: context.scale(16),
                                     children: [
                                       Text(
-                                        'Beard',
+                                        'Platform Fee',
                                         textAlign: TextAlign.left,
                                         style: TextStyle(
                                           color: context.appColors.neutralShade650,
@@ -392,7 +477,30 @@ class TransactionDetailsScreen extends StatelessWidget {
                                         ),
                                       ),
                                       Text(
-                                        '₹20.00',
+                                        '₹5.00',
+                                        textAlign: TextAlign.right,
+                                        style: TextStyle(
+                                          color: context.appColors.neutralShade650,
+                                          fontSize: context.scale(14),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    spacing: context.scale(16),
+                                    children: [
+                                      Text(
+                                        'Total Duration',
+                                        textAlign: TextAlign.left,
+                                        style: TextStyle(
+                                          color: context.appColors.neutralShade650,
+                                          fontSize: context.scale(14),
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      Text(
+                                        '45 Min',
                                         textAlign: TextAlign.right,
                                         style: TextStyle(
                                           color: context.appColors.neutralShade650,
@@ -436,7 +544,7 @@ class TransactionDetailsScreen extends StatelessWidget {
                                     ),
                                   ),
                                   Text(
-                                    '₹55.00',
+                                    '₹60.00',
                                     textAlign: TextAlign.right,
                                     style: TextStyle(
                                       color: context.appColors.neutralShade650,

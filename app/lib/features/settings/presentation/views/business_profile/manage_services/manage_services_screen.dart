@@ -6,6 +6,7 @@ import '../../../../../../core/theme/foundation/app_icons.dart';
 import '../../../../../../shared/extensions/context/app_colors_extension.dart';
 import '../../../../../../shared/extensions/context/device_metrics_extension.dart';
 import '../../../../../../shared/models/dropdown_menu_option.dart';
+import '../../../../../../shared/painters/dashed_border.dart';
 import '../../../../../../shared/widgets/common/inputs/dropdown_menu.dart';
 import '../../../../../../shared/widgets/common/inputs/text_form_field.dart';
 import '../../../../../../shared/widgets/common/section/section_header.dart';
@@ -33,6 +34,7 @@ class _ManageServicesScreenState extends State<ManageServicesScreen> {
             ],
           ),
         ),
+        backgroundColor: context.appColors.backgroundShade75,
         body: SafeArea(
           child: TabBarView(
             children: [
@@ -43,153 +45,251 @@ class _ManageServicesScreenState extends State<ManageServicesScreen> {
                   children: [
                     Material(
                       clipBehavior: Clip.hardEdge,
-                      color: context.appColors.backgroundShade100,
+                      color: context.appColors.backgroundShade50,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(context.scale(12)),
                         side: BorderSide(color: context.appColors.backgroundShade200),
                       ),
-                      child: IntrinsicHeight(
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Padding(
-                                padding: EdgeInsets.all(context.scale(12)),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.center,
-                                  spacing: context.scale(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Padding(
+                            padding: EdgeInsets.all(context.scale(16)),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              spacing: context.scale(16),
+                              children: [
+                                Row(
+                                  spacing: context.scale(16),
                                   children: [
-                                    AspectRatio(
-                                      aspectRatio: 1.0,
+                                    SizedBox.square(
+                                      dimension: context.scale(56),
                                       child: Material(
                                         borderRadius: BorderRadius.circular(context.scale(6)),
-                                        color: context.appColors.backgroundShade200,
+                                        color: context.appColors.backgroundShade100,
                                       ),
                                     ),
-                                    Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      spacing: context.scale(4.25),
-                                      children: [
-                                        Text(
-                                          'Hair Cut',
-                                          style: TextStyle(
-                                            color: context.appColors.neutralShade850,
-                                            fontSize: context.scale(14),
-                                            fontWeight: FontWeight.w700,
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        spacing: context.scale(6),
+                                        children: [
+                                          Text(
+                                            'Hair Cut',
+                                            style: TextStyle(
+                                              color: context.appColors.neutralShade850,
+                                              fontSize: context.scale(14),
+                                              fontWeight: FontWeight.w700,
+                                            ),
                                           ),
-                                        ),
-                                        IntrinsicHeight(
-                                          child: Row(
-                                            spacing: context.scale(8),
-                                            children: [
-                                              Row(
-                                                spacing: context.scale(6),
-                                                children: [
-                                                  Icon(
-                                                    AppIcons.solidRoundedUserAccount,
-                                                    color: context.appColors.blueShade100,
-                                                    size: context.scale(16),
-                                                  ),
-                                                  Text(
-                                                    'Male',
-                                                    style: TextStyle(
-                                                      color: context.appColors.neutralShade450,
-                                                      fontSize: context.scale(12),
+                                          IntrinsicHeight(
+                                            child: Row(
+                                              spacing: context.scale(8),
+                                              children: [
+                                                Row(
+                                                  spacing: context.scale(6),
+                                                  children: [
+                                                    Icon(
+                                                      AppIcons.solidRoundedUserAccount,
+                                                      color: context.appColors.blueShade100,
+                                                      size: context.scale(16),
                                                     ),
-                                                  ),
-                                                ],
-                                              ),
-                                              VerticalDivider(
-                                                color: context.appColors.backgroundShade200,
-                                                width: 1.0,
-                                              ),
-                                              Row(
-                                                spacing: context.scale(6),
-                                                children: [
-                                                  Icon(
-                                                    AppIcons.solidRoundedMoney01,
-                                                    color: context.appColors.greenShade100,
-                                                    size: context.scale(16),
-                                                  ),
-                                                  Text(
-                                                    '₹100',
-                                                    style: TextStyle(
-                                                      color: context.appColors.neutralShade450,
-                                                      fontSize: context.scale(12),
+                                                    Text(
+                                                      'Male',
+                                                      maxLines: 1,
+                                                      style: TextStyle(
+                                                        color: context.appColors.neutralShade650,
+                                                        fontSize: context.scale(12),
+                                                        overflow: TextOverflow.ellipsis,
+                                                      ),
                                                     ),
-                                                  ),
-                                                ],
-                                              ),
-                                              VerticalDivider(
-                                                color: context.appColors.backgroundShade200,
-                                                width: 1.0,
-                                              ),
-                                              Row(
-                                                spacing: context.scale(6),
-                                                children: [
-                                                  Icon(
-                                                    AppIcons.solidRoundedDiscount,
-                                                    color: context.appColors.orangeShade100,
-                                                    size: context.scale(16),
-                                                  ),
-                                                  Text(
-                                                    '₹20',
-                                                    style: TextStyle(
-                                                      color: context.appColors.neutralShade450,
-                                                      fontSize: context.scale(12),
+                                                  ],
+                                                ),
+                                                VerticalDivider(
+                                                  color: context.appColors.backgroundShade200,
+                                                  width: 1.0,
+                                                ),
+                                                Row(
+                                                  spacing: context.scale(6),
+                                                  children: [
+                                                    Icon(
+                                                      AppIcons.solidRoundedMoney01,
+                                                      color: context.appColors.greenShade100,
+                                                      size: context.scale(16),
                                                     ),
-                                                  ),
-                                                ],
-                                              ),
-                                            ],
+                                                    Text(
+                                                      '₹100',
+                                                      maxLines: 1,
+                                                      style: TextStyle(
+                                                        color: context.appColors.neutralShade650,
+                                                        fontSize: context.scale(12),
+                                                        overflow: TextOverflow.ellipsis,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                                VerticalDivider(
+                                                  color: context.appColors.backgroundShade200,
+                                                  width: 1.0,
+                                                ),
+                                                Row(
+                                                  spacing: context.scale(6),
+                                                  children: [
+                                                    Icon(
+                                                      AppIcons.solidRoundedTimer02,
+                                                      color: context.appColors.orangeShade100,
+                                                      size: context.scale(16),
+                                                    ),
+                                                    Text(
+                                                      '01 Hr 30 Min',
+                                                      maxLines: 1,
+                                                      style: TextStyle(
+                                                        color: context.appColors.neutralShade650,
+                                                        fontSize: context.scale(12),
+                                                        overflow: TextOverflow.ellipsis,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ],
+                                            ),
                                           ),
-                                        ),
-                                      ],
+                                        ],
+                                      ),
                                     ),
                                   ],
                                 ),
-                              ),
-                            ),
-                            VerticalDivider(
-                              color: context.appColors.backgroundShade200,
-                              width: 1.0,
-                            ),
-                            IntrinsicWidth(
-                              child: Column(
-                                children: [
-                                  Expanded(
+                                Material(
+                                  borderRadius: BorderRadius.circular(context.scale(6)),
+                                  color: context.appColors.greenShade100.withAlpha(31),
+                                  child: CustomPaint(
+                                    painter: DashedBorderPainter(
+                                      borderRadius: context.scale(6),
+                                      color: context.appColors.greenShade100,
+                                      dashPattern: [context.scale(4), context.scale(4)],
+                                    ),
                                     child: Padding(
                                       padding: EdgeInsets.all(context.scale(12)),
-                                      child: Center(
-                                        child: Icon(
-                                          AppIcons.solidRoundedPen01,
-                                          color: context.appColors.neutralShade550,
-                                          size: context.scale(16),
+                                      child: IntrinsicHeight(
+                                        child: Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          spacing: context.scale(12),
+                                          children: [
+                                            Row(
+                                              mainAxisAlignment: MainAxisAlignment.center,
+                                              spacing: context.scale(8),
+                                              children: [
+                                                Text(
+                                                  'You earn',
+                                                  maxLines: 1,
+                                                  style: TextStyle(
+                                                    color: context.appColors.neutralShade650,
+                                                    fontSize: context.scale(10),
+                                                    fontWeight: FontWeight.w700,
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                                Text(
+                                                  '₹80',
+                                                  maxLines: 1,
+                                                  style: TextStyle(
+                                                    color: context.appColors.greenShade300,
+                                                    fontSize: context.scale(16),
+                                                    fontWeight: FontWeight.w700,
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            Material(
+                                              borderRadius: BorderRadius.circular(context.scale(6)),
+                                              clipBehavior: Clip.hardEdge,
+                                              color: context.appColors.greenShade300,
+                                              child: Padding(
+                                                padding: EdgeInsets.symmetric(
+                                                  horizontal: context.scale(12),
+                                                  vertical: context.scale(8),
+                                                ),
+                                                child: Text(
+                                                  '₹20 OFF',
+                                                  maxLines: 1,
+                                                  style: TextStyle(
+                                                    color: context.appColors.neutralShade50,
+                                                    fontSize: context.scale(10),
+                                                    fontWeight: FontWeight.w700,
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
                                     ),
                                   ),
-                                  Divider(
+                                ),
+                              ],
+                            ),
+                          ),
+                          Divider(
+                            color: context.appColors.backgroundShade200,
+                            height: 1.0,
+                          ),
+                          IntrinsicHeight(
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: InkWell(
+                                    highlightColor: context.appColors.backgroundShade200.withAlpha(31),
+                                    onTap: () {},
+                                    splashColor: context.appColors.backgroundShade200.withAlpha(63),
+                                    child: Padding(
+                                      padding: EdgeInsets.all(context.scale(18)),
+                                      child: Center(
+                                        child: Text(
+                                          'Delete',
+                                          style: TextStyle(
+                                            color: context.appColors.redShade100,
+                                            fontSize: context.scale(12.75),
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                Padding(
+                                  padding: EdgeInsets.symmetric(vertical: context.scale(12)),
+                                  child: VerticalDivider(
                                     color: context.appColors.backgroundShade200,
-                                    height: 1.0,
+                                    width: 1.0,
                                   ),
-                                  Expanded(
+                                ),
+                                Expanded(
+                                  child: InkWell(
+                                    highlightColor: context.appColors.backgroundShade200.withAlpha(31),
+                                    onTap: () {},
+                                    splashColor: context.appColors.backgroundShade200.withAlpha(63),
                                     child: Padding(
-                                      padding: EdgeInsets.all(context.scale(12)),
+                                      padding: EdgeInsets.all(context.scale(18)),
                                       child: Center(
-                                        child: Icon(
-                                          AppIcons.solidRoundedDelete02,
-                                          color: context.appColors.neutralShade550,
-                                          size: context.scale(16),
+                                        child: Text(
+                                          'Edit',
+                                          style: TextStyle(
+                                            color: context.appColors.neutralShade650,
+                                            fontSize: context.scale(12.75),
+                                            fontWeight: FontWeight.w600,
+                                          ),
                                         ),
                                       ),
                                     ),
                                   ),
-                                ],
-                              ),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -202,152 +302,184 @@ class _ManageServicesScreenState extends State<ManageServicesScreen> {
                   children: [
                     Material(
                       clipBehavior: Clip.hardEdge,
-                      color: context.appColors.backgroundShade100,
+                      color: context.appColors.backgroundShade50,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(context.scale(12)),
                         side: BorderSide(color: context.appColors.backgroundShade200),
                       ),
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          IntrinsicHeight(
-                            child: Row(
+                          Padding(
+                            padding: EdgeInsets.all(context.scale(16)),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              spacing: context.scale(16),
                               children: [
-                                Expanded(
-                                  child: Padding(
-                                    padding: EdgeInsets.all(context.scale(12)),
-                                    child: Row(
-                                      crossAxisAlignment: CrossAxisAlignment.center,
-                                      spacing: context.scale(12),
-                                      children: [
-                                        AspectRatio(
-                                          aspectRatio: 1.0,
-                                          child: Material(
-                                            borderRadius: BorderRadius.circular(context.scale(6)),
-                                            color: context.appColors.backgroundShade200,
-                                          ),
-                                        ),
-                                        Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          mainAxisAlignment: MainAxisAlignment.center,
-                                          spacing: context.scale(4.25),
-                                          children: [
-                                            Text(
-                                              'Dashing Star',
-                                              style: TextStyle(
-                                                color: context.appColors.neutralShade850,
-                                                fontSize: context.scale(14),
-                                                fontWeight: FontWeight.w700,
-                                              ),
+                                Row(
+                                  spacing: context.scale(16),
+                                  children: [
+                                    SizedBox.square(
+                                      dimension: context.scale(56),
+                                      child: Material(
+                                        borderRadius: BorderRadius.circular(context.scale(6)),
+                                        color: context.appColors.backgroundShade100,
+                                      ),
+                                    ),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        spacing: context.scale(4.25),
+                                        children: [
+                                          Text(
+                                            'Dashing Star',
+                                            style: TextStyle(
+                                              color: context.appColors.neutralShade850,
+                                              fontSize: context.scale(14),
+                                              fontWeight: FontWeight.w700,
                                             ),
-                                            IntrinsicHeight(
-                                              child: Row(
-                                                spacing: context.scale(8),
-                                                children: [
-                                                  Row(
-                                                    spacing: context.scale(6),
-                                                    children: [
-                                                      Icon(
-                                                        AppIcons.solidRoundedUserAccount,
-                                                        color: context.appColors.blueShade100,
-                                                        size: context.scale(16),
+                                          ),
+                                          IntrinsicHeight(
+                                            child: Row(
+                                              spacing: context.scale(8),
+                                              children: [
+                                                Row(
+                                                  spacing: context.scale(6),
+                                                  children: [
+                                                    Icon(
+                                                      AppIcons.solidRoundedUserAccount,
+                                                      color: context.appColors.blueShade100,
+                                                      size: context.scale(16),
+                                                    ),
+                                                    Text(
+                                                      'Male',
+                                                      style: TextStyle(
+                                                        color: context.appColors.neutralShade650,
+                                                        fontSize: context.scale(12),
                                                       ),
-                                                      Text(
-                                                        'Male',
-                                                        style: TextStyle(
-                                                          color: context.appColors.neutralShade450,
-                                                          fontSize: context.scale(12),
-                                                        ),
+                                                    ),
+                                                  ],
+                                                ),
+                                                VerticalDivider(
+                                                  color: context.appColors.backgroundShade200,
+                                                  width: 1.0,
+                                                ),
+                                                Row(
+                                                  spacing: context.scale(6),
+                                                  children: [
+                                                    Icon(
+                                                      AppIcons.solidRoundedMoney01,
+                                                      color: context.appColors.greenShade100,
+                                                      size: context.scale(16),
+                                                    ),
+                                                    Text(
+                                                      '₹100',
+                                                      style: TextStyle(
+                                                        color: context.appColors.neutralShade650,
+                                                        fontSize: context.scale(12),
                                                       ),
-                                                    ],
+                                                    ),
+                                                  ],
+                                                ),
+                                                VerticalDivider(
+                                                  color: context.appColors.backgroundShade200,
+                                                  width: 1.0,
+                                                ),
+                                                Row(
+                                                  spacing: context.scale(6),
+                                                  children: [
+                                                    Icon(
+                                                      AppIcons.solidRoundedTimer02,
+                                                      color: context.appColors.orangeShade100,
+                                                      size: context.scale(16),
+                                                    ),
+                                                    Text(
+                                                      '01 Hr 30 Min',
+                                                      maxLines: 1,
+                                                      style: TextStyle(
+                                                        color: context.appColors.neutralShade650,
+                                                        fontSize: context.scale(12),
+                                                        overflow: TextOverflow.ellipsis,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                Material(
+                                  borderRadius: BorderRadius.circular(context.scale(6)),
+                                  color: context.appColors.greenShade100.withAlpha(31),
+                                  child: CustomPaint(
+                                    painter: DashedBorderPainter(
+                                      borderRadius: context.scale(6),
+                                      color: context.appColors.greenShade100,
+                                      dashPattern: [context.scale(4), context.scale(4)],
+                                    ),
+                                    child: Padding(
+                                      padding: EdgeInsets.all(context.scale(12)),
+                                      child: IntrinsicHeight(
+                                        child: Row(
+                                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                          spacing: context.scale(12),
+                                          children: [
+                                            Row(
+                                              mainAxisAlignment: MainAxisAlignment.center,
+                                              spacing: context.scale(8),
+                                              children: [
+                                                Text(
+                                                  'You earn',
+                                                  maxLines: 1,
+                                                  style: TextStyle(
+                                                    color: context.appColors.neutralShade650,
+                                                    fontSize: context.scale(10),
+                                                    fontWeight: FontWeight.w700,
+                                                    overflow: TextOverflow.ellipsis,
                                                   ),
-                                                  VerticalDivider(
-                                                    color: context.appColors.backgroundShade200,
-                                                    width: 1.0,
+                                                ),
+                                                Text(
+                                                  '₹80',
+                                                  maxLines: 1,
+                                                  style: TextStyle(
+                                                    color: context.appColors.greenShade300,
+                                                    fontSize: context.scale(16),
+                                                    fontWeight: FontWeight.w700,
+                                                    overflow: TextOverflow.ellipsis,
                                                   ),
-                                                  Row(
-                                                    spacing: context.scale(6),
-                                                    children: [
-                                                      Icon(
-                                                        AppIcons.solidRoundedMoney01,
-                                                        color: context.appColors.greenShade100,
-                                                        size: context.scale(16),
-                                                      ),
-                                                      Text(
-                                                        '₹100',
-                                                        style: TextStyle(
-                                                          color: context.appColors.neutralShade450,
-                                                          fontSize: context.scale(12),
-                                                        ),
-                                                      ),
-                                                    ],
+                                                ),
+                                              ],
+                                            ),
+                                            Material(
+                                              borderRadius: BorderRadius.circular(context.scale(6)),
+                                              clipBehavior: Clip.hardEdge,
+                                              color: context.appColors.greenShade300,
+                                              child: Padding(
+                                                padding: EdgeInsets.symmetric(
+                                                  horizontal: context.scale(12),
+                                                  vertical: context.scale(8),
+                                                ),
+                                                child: Text(
+                                                  '₹20 OFF',
+                                                  maxLines: 1,
+                                                  style: TextStyle(
+                                                    color: context.appColors.neutralShade50,
+                                                    fontSize: context.scale(10),
+                                                    fontWeight: FontWeight.w700,
+                                                    overflow: TextOverflow.ellipsis,
                                                   ),
-                                                  VerticalDivider(
-                                                    color: context.appColors.backgroundShade200,
-                                                    width: 1.0,
-                                                  ),
-                                                  Row(
-                                                    spacing: context.scale(6),
-                                                    children: [
-                                                      Icon(
-                                                        AppIcons.solidRoundedDiscount,
-                                                        color: context.appColors.orangeShade100,
-                                                        size: context.scale(16),
-                                                      ),
-                                                      Text(
-                                                        '₹20',
-                                                        style: TextStyle(
-                                                          color: context.appColors.neutralShade450,
-                                                          fontSize: context.scale(12),
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ],
+                                                ),
                                               ),
                                             ),
                                           ],
                                         ),
-                                      ],
+                                      ),
                                     ),
-                                  ),
-                                ),
-                                VerticalDivider(
-                                  color: context.appColors.backgroundShade200,
-                                  width: 1.0,
-                                ),
-                                IntrinsicWidth(
-                                  child: Column(
-                                    children: [
-                                      Expanded(
-                                        child: Padding(
-                                          padding: EdgeInsets.all(context.scale(12)),
-                                          child: Center(
-                                            child: Icon(
-                                              AppIcons.solidRoundedPen01,
-                                              color: context.appColors.neutralShade550,
-                                              size: context.scale(16),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                      Divider(
-                                        color: context.appColors.backgroundShade200,
-                                        height: 1.0,
-                                      ),
-                                      Expanded(
-                                        child: Padding(
-                                          padding: EdgeInsets.all(context.scale(12)),
-                                          child: Center(
-                                            child: Icon(
-                                              AppIcons.solidRoundedDelete02,
-                                              color: context.appColors.neutralShade550,
-                                              size: context.scale(16),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
                                   ),
                                 ),
                               ],
@@ -358,31 +490,88 @@ class _ManageServicesScreenState extends State<ManageServicesScreen> {
                             height: 1.0,
                           ),
                           Padding(
-                            padding: EdgeInsets.all(context.scale(12)),
+                            padding: EdgeInsets.all(context.scale(16)),
                             child: Wrap(
                               alignment: WrapAlignment.start,
                               runAlignment: WrapAlignment.start,
-                              runSpacing: context.scale(8),
-                              spacing: context.scale(8),
+                              runSpacing: context.scale(12),
+                              spacing: context.scale(12),
                               children: ['Hair Cut', 'Beard', 'Facial', 'Massage', 'Hair Color', 'Clean-Up'].map((entry) {
-                                return Container(
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(context.scale(6)),
-                                    color: context.appColors.backgroundShade200,
-                                  ),
-                                  padding: EdgeInsets.symmetric(
-                                    horizontal: context.scale(12),
-                                    vertical: context.scale(6),
-                                  ),
-                                  child: Text(
-                                    entry,
-                                    style: TextStyle(
-                                      color: context.appColors.neutralShade650,
-                                      fontSize: context.scale(12),
+                                return Material(
+                                  borderRadius: BorderRadius.circular(context.scale(6)),
+                                  color: context.appColors.backgroundShade100,
+                                  child: Padding(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: context.scale(12),
+                                      vertical: context.scale(6),
+                                    ),
+                                    child: Text(
+                                      entry,
+                                      style: TextStyle(
+                                        color: context.appColors.neutralShade650,
+                                        fontSize: context.scale(12),
+                                      ),
                                     ),
                                   ),
                                 );
                               }).toList(),
+                            ),
+                          ),
+                          Divider(
+                            color: context.appColors.backgroundShade200,
+                            height: 1.0,
+                          ),
+                          IntrinsicHeight(
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: InkWell(
+                                    highlightColor: context.appColors.backgroundShade200.withAlpha(31),
+                                    onTap: () {},
+                                    splashColor: context.appColors.backgroundShade200.withAlpha(63),
+                                    child: Padding(
+                                      padding: EdgeInsets.all(context.scale(18)),
+                                      child: Center(
+                                        child: Text(
+                                          'Delete',
+                                          style: TextStyle(
+                                            color: context.appColors.redShade100,
+                                            fontSize: context.scale(12.75),
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                Padding(
+                                  padding: EdgeInsets.symmetric(vertical: context.scale(12)),
+                                  child: VerticalDivider(
+                                    color: context.appColors.backgroundShade200,
+                                    width: 1.0,
+                                  ),
+                                ),
+                                Expanded(
+                                  child: InkWell(
+                                    highlightColor: context.appColors.backgroundShade200.withAlpha(31),
+                                    onTap: () {},
+                                    splashColor: context.appColors.backgroundShade200.withAlpha(63),
+                                    child: Padding(
+                                      padding: EdgeInsets.all(context.scale(18)),
+                                      child: Center(
+                                        child: Text(
+                                          'Edit',
+                                          style: TextStyle(
+                                            color: context.appColors.neutralShade650,
+                                            fontSize: context.scale(12.75),
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
@@ -463,8 +652,11 @@ class _AddSingleServiceState extends State<AddSingleService> {
                         const DropdownMenuEntry(value: 'Massage', label: 'Massage'),
                         const DropdownMenuEntry(value: 'Hair Color', label: 'Hair Color'),
                       ],
+                      enableFilter: true,
+                      enableSearch: true,
                       labelText: 'Select Service',
                       leadingIcon: AppIcons.solidRoundedChairBarber,
+                      requestFocusOnTap: true,
                     ),
                     Row(
                       spacing: context.scale(16),
@@ -499,13 +691,20 @@ class _AddSingleServiceState extends State<AddSingleService> {
                         Expanded(
                           child: CustomTextFormField(
                             labelText: 'Price',
+                            keyboardType: TextInputType.number,
                             prefixIcon: AppIcons.solidRoundedMoney01,
                           ),
                         ),
                       ],
                     ),
                     CustomTextFormField(
+                      keyboardType: TextInputType.number,
+                      labelText: 'Duration',
+                      prefixIcon: AppIcons.solidRoundedTimer02,
+                    ),
+                    CustomTextFormField(
                       labelText: 'Offer Amount',
+                      keyboardType: TextInputType.number,
                       prefixIcon: AppIcons.solidRoundedDiscount,
                     ),
                   ],
@@ -589,8 +788,11 @@ class _AddBundleServiceState extends State<AddBundleService> {
                           const DropdownMenuEntry(value: 'Massage', label: 'Massage'),
                           const DropdownMenuEntry(value: 'Hair Color', label: 'Hair Color'),
                         ],
+                        enableFilter: true,
+                        enableSearch: true,
                         labelText: 'Select Service',
                         leadingIcon: AppIcons.solidRoundedChairBarber,
+                        requestFocusOnTap: true,
                       ),
                       Material(
                         borderRadius: BorderRadius.circular(context.scale(6)),
@@ -672,13 +874,20 @@ class _AddBundleServiceState extends State<AddBundleService> {
                       Expanded(
                         child: CustomTextFormField(
                           labelText: 'Price',
+                          keyboardType: TextInputType.number,
                           prefixIcon: AppIcons.solidRoundedMoney01,
                         ),
                       ),
                     ],
                   ),
                   CustomTextFormField(
+                    keyboardType: TextInputType.number,
+                    labelText: 'Duration',
+                    prefixIcon: AppIcons.solidRoundedTimer02,
+                  ),
+                  CustomTextFormField(
                     labelText: 'Offer Amount',
+                    keyboardType: TextInputType.number,
                     prefixIcon: AppIcons.solidRoundedDiscount,
                   ),
                 ],

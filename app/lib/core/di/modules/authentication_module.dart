@@ -2,10 +2,10 @@
 
 import 'package:get_it/get_it.dart';
 
-import '../../../core/auth/session_store.dart';
-import '../../../core/auth/auth_state_notifier.dart';
-import '../../../core/network/api_client.dart';
-import '../../../core/network/auth_token_refresher.dart';
+import '../../auth/session_store.dart';
+import '../../auth/auth_state_notifier.dart';
+import '../../network/api_client.dart';
+import '../../network/auth_token_refresher.dart';
 import '../../../features/authentication/data/data_sources/local/authentication_local_data_source.dart';
 import '../../../features/authentication/data/data_sources/local/authentication_local_data_source_impl.dart';
 import '../../../features/authentication/data/data_sources/remote/authentication_remote_data_source.dart';

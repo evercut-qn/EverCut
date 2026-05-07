@@ -85,6 +85,7 @@ class _DatePickerFieldState extends State<DatePickerField> {
   Widget build(BuildContext context) {
     return CustomTextFormField(
       autovalidateMode: widget.autovalidateMode ?? AutovalidateMode.onUserInteraction,
+      canRequestFocus: false,
       controller: widget.controller,
       errorMaxLines: widget.errorMaxLines,
       filled: widget.filled,

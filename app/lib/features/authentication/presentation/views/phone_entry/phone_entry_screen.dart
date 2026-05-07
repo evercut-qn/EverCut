@@ -15,10 +15,12 @@ import '../../../../../shared/extensions/context/go_router_extension.dart';
 import '../../../../../shared/widgets/common/dividers/centered_text_divider.dart';
 import '../../../../../shared/widgets/other/loaders/shimmer_container.dart';
 import '../../../../../shared/widgets/other/phone_text_field/phone_text_field.dart';
-import '../../../../../shared/widgets/other/phone_text_field/presentation/controller/phone_text_field_controller.dart';
 import '../../../../../shared/widgets/overlays/bottomsheet.dart';
+import '../../../../../shared/widgets/overlays/snackbars.dart';
 import '../../../domain/use_cases/authentication_otp_send_params.dart';
 import '../../bloc/authentication_bloc.dart';
+import '../../widgets/privacy_policy_dialog.dart';
+import '../../widgets/terms_of_service_dialog.dart';
 
 class PhoneEntryScreen extends StatefulWidget {
   const PhoneEntryScreen({super.key});
@@ -35,7 +37,7 @@ class _PhoneEntryScreenState extends State<PhoneEntryScreen> {
     if (!_formKey.currentState!.validate()) {
       return;
     } else {
-      context.read<AuthenticationBloc>().add(
+      di.sl<AuthenticationBloc>().add(
         AuthenticationOtpSend(
           AuthenticationOtpSendParams(
             _phoneNumberController.e164PhoneNumber,
@@ -45,21 +47,13 @@ class _PhoneEntryScreenState extends State<PhoneEntryScreen> {
     }
   }
 
-  void _onTermsOfUseTextTap() => showCustomBottomsheet(
-    builder: (BuildContext context) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-      );
-    },
+  void _onTermsOfServiceTextTap() => showCustomBottomsheet(
+    builder: (BuildContext context) => TermsOfServiceDialogWidget(),
     context: context,
   );
 
   void _onPrivacyPolicyTextTap() => showCustomBottomsheet(
-    builder: (BuildContext context) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-      );
-    },
+    builder: (BuildContext context) => PrivacyPolicyDialogWidget(),
     context: context,
   );
 
@@ -96,13 +90,12 @@ class _PhoneEntryScreenState extends State<PhoneEntryScreen> {
                                     width: context.scale(175),
                                     placeholderBuilder: (BuildContext context) {
                                       return Shimmer.fromColors(
-                                        baseColor: context.appColors.neutralShade200.withAlpha(50),
-                                        highlightColor: context.appColors.neutralShade300.withAlpha(150),
+                                        baseColor: context.appColors.backgroundShade75,
+                                        highlightColor: context.appColors.backgroundShade150,
                                         child: ShimmerContainer(
-                                          borderRadius: 4,
-                                          color: context.appColors.neutralShade200.withAlpha(150),
-                                          height: 71.1,
-                                          width: 175,
+                                          color: context.appColors.backgroundShade75,
+                                          height: context.scale(71.1),
+                                          width: context.scale(175),
                                         ),
                                       );
                                     },
@@ -152,7 +145,23 @@ class _PhoneEntryScreenState extends State<PhoneEntryScreen> {
                               showCountrySelection: false,
                             ),
                           ),
-                          BlocListener<AuthenticationBloc, AuthenticationState>(
+                          BlocConsumer<AuthenticationBloc, AuthenticationState>(
+                            buildWhen: (AuthenticationState previous, AuthenticationState current) {
+                              return current is AuthenticationOtpSending || previous is AuthenticationOtpSending;
+                            },
+                            builder: (BuildContext context, AuthenticationState state) {
+                              final bool isLoading = state is AuthenticationOtpSending;
+                              return Opacity(
+                                opacity: !isLoading ? 1.0 : 0.5,
+                                child: FilledButton(
+                                  onPressed: !isLoading ? _onContinueButtonPressed : null,
+                                  child: const Text('Continue'),
+                                ),
+                              );
+                            },
+                            listenWhen: (AuthenticationState previous, AuthenticationState current) {
+                              return current is AuthenticationOtpSent || current is AuthenticationFailure;
+                            },
                             listener: (BuildContext context, AuthenticationState state) {
                               if (state is AuthenticationOtpSent) {
                                 context.pushNested(
@@ -161,23 +170,13 @@ class _PhoneEntryScreenState extends State<PhoneEntryScreen> {
                                     'phoneNumber': _phoneNumberController.e164PhoneNumber,
                                   },
                                 );
-                              }
-
-                              if (state is AuthenticationFailure) {
-                                debugPrint('${state.message}\n${state.stackTrace}');
+                              } else if (state is AuthenticationFailure) {
+                                SnackBars.of(context).showErrorSnackBar(
+                                  title: 'Couldn’t continue',
+                                  message: state.message,
+                                );
                               }
                             },
-                            child: BlocBuilder<AuthenticationBloc, AuthenticationState>(
-                              builder: (BuildContext context, AuthenticationState state) {
-                                return Opacity(
-                                  opacity: state is! AuthenticationOtpSending ? 1.0 : 0.5,
-                                  child: FilledButton(
-                                    onPressed: state is! AuthenticationOtpSending ? _onContinueButtonPressed : null,
-                                    child: const Text('Continue'),
-                                  ),
-                                );
-                              },
-                            ),
                           ),
                         ],
                       ),
@@ -195,8 +194,8 @@ class _PhoneEntryScreenState extends State<PhoneEntryScreen> {
                   ),
                   children: <TextSpan>[
                     TextSpan(
-                      text: '\nTerms of Use',
-                      recognizer: TapGestureRecognizer()..onTap = _onTermsOfUseTextTap,
+                      text: '\nTerms of Service',
+                      recognizer: TapGestureRecognizer()..onTap = _onTermsOfServiceTextTap,
                       style: TextStyle(
                         color: context.appColors.blueShade100,
                         decoration: TextDecoration.underline,

@@ -1,20 +1,6 @@
 // lib/shared/widgets/other/phone_text_field/presentation/controller/phone_text_field_controller.dart
 
-import 'package:flutter/material.dart';
-
-import '../../../../common/icons/flag_icon.dart';
-import '../../data/data_sources/local/country_local_data_source.dart';
-import '../../data/data_sources/local/country_local_data_source_impl.dart';
-import '../../data/repositories/country_repository_impl.dart';
-import '../../domain/entities/country.dart';
-import '../../domain/entities/country_dialing_info.dart';
-import '../../domain/entities/country_group.dart';
-import '../../domain/repositories/country_repository.dart';
-import '../../domain/use_cases/format_phone_number_use_case.dart';
-import '../../domain/use_cases/get_all_countries_use_case.dart';
-import '../../domain/use_cases/get_country_by_dial_code_use_case.dart';
-import '../../domain/use_cases/get_country_by_iso_code_use_case.dart';
-import '../../domain/use_cases/search_countries_use_case.dart';
+part of '../../phone_text_field.dart';
 
 class PhoneTextFieldController {
   late final CountryLocalDataSource _countryLocalDataSource;

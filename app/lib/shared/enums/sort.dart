@@ -1,13 +1,13 @@
 // lib/shared/enums/sort.dart
 
-enum SortBy {
+enum SortByEnum {
   amount,
   date,
   name,
   status,
 }
 
-enum SortOrder {
+enum SortOrderEnum {
   ascending,
   descending,
 }

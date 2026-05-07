@@ -1,23 +1,28 @@
 // lib/shared/models/sort_option.dart
 
+import 'package:equatable/equatable.dart';
+
 import '../enums/sort.dart';
 
-class SortOption {
-  final SortBy sortBy;
-  final SortOrder sortOrder;
+class SortOptionModel extends Equatable {
+  final SortByEnum sortBy;
+  final SortOrderEnum sortOrder;
 
-  const SortOption({
+  const SortOptionModel({
     required this.sortBy,
-    this.sortOrder = SortOrder.ascending, // default
+    this.sortOrder = SortOrderEnum.ascending,
   });
 
-  SortOption copyWith({
-    SortBy? sortBy,
-    SortOrder? sortOrder,
+  SortOptionModel copyWith({
+    SortByEnum? sortBy,
+    SortOrderEnum? sortOrder,
   }) {
-    return SortOption(
+    return SortOptionModel(
       sortBy: sortBy ?? this.sortBy,
       sortOrder: sortOrder ?? this.sortOrder,
     );
   }
+
+  @override
+  List<Object?> get props => [sortBy, sortOrder];
 }

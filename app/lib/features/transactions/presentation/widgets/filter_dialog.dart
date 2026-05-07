@@ -8,34 +8,33 @@ import '../../../../shared/enums/date_range_type.dart';
 import '../../../../shared/enums/sort.dart';
 import '../../../../shared/extensions/context/app_colors_extension.dart';
 import '../../../../shared/extensions/context/device_metrics_extension.dart';
-import '../../../../shared/extensions/enum/date_range_type.dart';
 import '../../../../shared/models/date_range.dart';
 import '../../../../shared/models/list_tile_option.dart';
 import '../../../../shared/models/sort_option.dart';
-import '../../../../shared/utils/formatters/money.dart';
+import '../../../../shared/utils/formatters/number.dart';
 import '../../../../shared/widgets/common/inputs/text_form_field.dart';
 import '../../../../shared/widgets/overlays/dialogs.dart';
 import '../models/transaction_filter.dart';
 
-class FilterDialog extends StatefulWidget {
-  final TransactionFilter initialValue;
-  final ValueSetter<TransactionFilter> onApplyPressed;
+class FilterDialogWidget extends StatefulWidget {
+  final TransactionFilterModel initialValue;
+  final ValueSetter<TransactionFilterModel> onApplyPressed;
 
-  const FilterDialog({
+  const FilterDialogWidget({
     super.key,
     required this.initialValue,
     required this.onApplyPressed,
   });
 
   @override
-  State<FilterDialog> createState() => _FilterDialogState();
+  State<FilterDialogWidget> createState() => _FilterDialogWidgetState();
 }
 
-class _FilterDialogState extends State<FilterDialog> {
-  final List<String> _tabs = ['Date Range', 'Amount', 'Type', 'Status', 'Sort'];
+class _FilterDialogWidgetState extends State<FilterDialogWidget> {
+  final List<String> _tabs = ['Date Range', 'Amount', 'Status', 'Sort'];
 
   int _selectedTabIndex = 0;
-  DateRange _dateRange = DateRange(
+  DateRangeModel _dateRange = DateRangeModel(
     from: DateTime.now(),
     to: DateTime.now(),
   );
@@ -47,7 +46,10 @@ class _FilterDialogState extends State<FilterDialog> {
   // final List<TransactionAction> _selectedActions = [];
   // final List<TransactionStatus> _selectedStatuses = [];
 
-  late SortOption _sortOption;
+  SortOptionModel _sortOption = SortOptionModel(
+    sortBy: SortByEnum.date,
+    sortOrder: SortOrderEnum.descending,
+  );
 
   @override
   void initState() {
@@ -55,13 +57,13 @@ class _FilterDialogState extends State<FilterDialog> {
 
     _dateRange = widget.initialValue.dateRange;
 
-    _minAmountController.text = MoneyFormatter.formatDouble(widget.initialValue.amountRange.min);
-    _maxAmountController.text = MoneyFormatter.formatDouble(widget.initialValue.amountRange.max);
+    _minAmountController.text = NumberFormatter.formatDouble(widget.initialValue.amountRange.min);
+    _maxAmountController.text = NumberFormatter.formatDouble(widget.initialValue.amountRange.max);
 
     // _selectedActions.addAll(initial.actions);
     // _selectedStatuses.addAll(initial.statuses);
 
-    _sortOption = widget.initialValue.sortOption;
+    _sortOption = widget.initialValue.sortOption ?? _sortOption;
   }
 
   // Future<void> _onApplyPressed() async {
@@ -155,7 +157,7 @@ class _FilterDialogState extends State<FilterDialog> {
                   children: [
                     _DateSelectionWidget(
                       initialDateRange: _dateRange,
-                      onDateChange: (DateRange dateRange) {
+                      onDateChange: (DateRangeModel dateRange) {
                         _dateRange = dateRange;
                       },
                     ),
@@ -164,7 +166,6 @@ class _FilterDialogState extends State<FilterDialog> {
                       minAmountController: _minAmountController,
                       maxAmountController: _maxAmountController,
                     ),
-                    const SizedBox(),
                     const SizedBox(),
                     // _SelectableListWidget<TransactionAction>(
                     //   description: 'Select one or more types to filter transaction results.',
@@ -194,19 +195,19 @@ class _FilterDialogState extends State<FilterDialog> {
                     //     });
                     //   },
                     // ),
-                    _SortWidget<SortBy, SortOrder>(
+                    _SortWidget<SortByEnum, SortOrderEnum>(
                       sortBy: _sortOption.sortBy,
                       sortOrder: _sortOption.sortOrder,
-                      sortByOptions: const <ListTileOption<SortBy>>{
-                        ListTileOption(icon: AppIcons.solidRoundedMoney02, title: 'Amount', value: SortBy.amount),
-                        ListTileOption(icon: AppIcons.solidRoundedCalendar02, title: 'Date', value: SortBy.date),
-                        ListTileOption(icon: AppIcons.solidRoundedInformationCircle, title: 'Status', value: SortBy.status),
+                      sortByOptions: const <ListTileOption<SortByEnum>>{
+                        ListTileOption(icon: AppIcons.solidRoundedMoney02, title: 'Amount', value: SortByEnum.amount),
+                        ListTileOption(icon: AppIcons.solidRoundedCalendar02, title: 'Date', value: SortByEnum.date),
+                        ListTileOption(icon: AppIcons.solidRoundedInformationCircle, title: 'Status', value: SortByEnum.status),
                       },
-                      sortOrderOptions: const <ListTileOption<SortOrder>>{
-                        ListTileOption(icon: AppIcons.solidRoundedSortByUp01, title: 'Ascending', value: SortOrder.ascending),
-                        ListTileOption(icon: AppIcons.solidRoundedSortByDown01, title: 'Descending', value: SortOrder.descending),
+                      sortOrderOptions: const <ListTileOption<SortOrderEnum>>{
+                        ListTileOption(icon: AppIcons.solidRoundedSortByUp01, title: 'Ascending', value: SortOrderEnum.ascending),
+                        ListTileOption(icon: AppIcons.solidRoundedSortByDown01, title: 'Descending', value: SortOrderEnum.descending),
                       },
-                      onSortByChanged: (SortBy sortBy) {
+                      onSortByChanged: (SortByEnum sortBy) {
                         if (sortBy != _sortOption.sortBy) {
                           setState(() {
                             _sortOption = _sortOption.copyWith(
@@ -215,7 +216,7 @@ class _FilterDialogState extends State<FilterDialog> {
                           });
                         }
                       },
-                      onSortOrderChanged: (SortOrder sortOrder) {
+                      onSortOrderChanged: (SortOrderEnum sortOrder) {
                         if (sortOrder != _sortOption.sortOrder) {
                           setState(() {
                             _sortOption = _sortOption.copyWith(
@@ -277,8 +278,8 @@ class _FilterDialogState extends State<FilterDialog> {
 }
 
 class _DateSelectionWidget extends StatefulWidget {
-  final DateRange initialDateRange;
-  final ValueSetter<DateRange> onDateChange;
+  final DateRangeModel initialDateRange;
+  final ValueSetter<DateRangeModel> onDateChange;
 
   const _DateSelectionWidget({
     required this.initialDateRange,
@@ -293,44 +294,44 @@ class _DateSelectionWidgetState extends State<_DateSelectionWidget> {
   final TextEditingController _fromDateController = TextEditingController();
   final TextEditingController _toDateController = TextEditingController();
 
-  DateRangeType _selectedDateRange = DateRangeType.today;
+  DateRangeEnum _selectedDateRange = DateRangeEnum.today;
 
   String _formatDate(DateTime dateTime) => DateFormat('dd MMM yyyy').format(dateTime);
   DateTime _parseDate(String dateTime) => DateFormat('dd MMM yyyy').parse(dateTime);
   DateTime _stripTime(DateTime dateTime) => DateTime(dateTime.year, dateTime.month, dateTime.day);
 
-  DateRangeType _handleChanges({
+  DateRangeEnum _handleChanges({
     required DateTime today,
     required DateTime fromDate,
     required DateTime toDate,
   }) {
     final yesterday = today.subtract(const Duration(days: 1));
     if (fromDate == toDate && toDate == yesterday) {
-      return DateRangeType.yesterday;
+      return DateRangeEnum.yesterday;
     }
 
     if (fromDate == toDate && toDate == today) {
-      return DateRangeType.today;
+      return DateRangeEnum.today;
     }
 
     final tomorrow = today.add(const Duration(days: 1));
     if (fromDate == toDate && toDate == tomorrow) {
-      return DateRangeType.tomorrow;
+      return DateRangeEnum.tomorrow;
     }
 
     final thisWeekStart = today.subtract(Duration(days: today.weekday - 1));
     final thisWeekEnd = today;
     if (fromDate == thisWeekStart && thisWeekEnd == toDate) {
-      return DateRangeType.thisWeek;
+      return DateRangeEnum.thisWeek;
     }
 
     final lastWeekStart = today.subtract(Duration(days: today.weekday + 6));
     final lastWeekEnd = lastWeekStart.add(const Duration(days: 6));
     if (fromDate == lastWeekStart && lastWeekEnd == toDate) {
-      return DateRangeType.lastWeek;
+      return DateRangeEnum.lastWeek;
     }
 
-    return DateRangeType.custom;
+    return DateRangeEnum.custom;
   }
 
   Future<void> _selectDate({bool isFromDate = false}) async {
@@ -363,7 +364,7 @@ class _DateSelectionWidgetState extends State<_DateSelectionWidget> {
               toDate: adjustedToDate,
             );
 
-            widget.onDateChange(DateRange(from: strippedDate, to: adjustedToDate));
+            widget.onDateChange(DateRangeModel(from: strippedDate, to: adjustedToDate));
           } else {
             _toDateController.text = _formatDate(strippedDate);
 
@@ -375,39 +376,39 @@ class _DateSelectionWidgetState extends State<_DateSelectionWidget> {
               toDate: strippedDate,
             );
 
-            widget.onDateChange(DateRange(from: adjustedFromDate, to: strippedDate));
+            widget.onDateChange(DateRangeModel(from: adjustedFromDate, to: strippedDate));
           }
         });
       }
     });
   }
 
-  DateRange? _calculateDateRange(DateRangeType range) {
+  DateRangeModel? _calculateDateRange(DateRangeEnum range) {
     final today = _stripTime(DateTime.now());
     switch (range) {
-      case DateRangeType.yesterday:
+      case DateRangeEnum.yesterday:
         final yesterday = today.subtract(Duration(days: 1));
-        return DateRange(from: yesterday, to: yesterday);
-      case DateRangeType.today:
-        return DateRange(from: today, to: today);
-      case DateRangeType.tomorrow:
+        return DateRangeModel(from: yesterday, to: yesterday);
+      case DateRangeEnum.today:
+        return DateRangeModel(from: today, to: today);
+      case DateRangeEnum.tomorrow:
         final tomorrow = today.add(const Duration(days: 1));
-        return DateRange(from: tomorrow, to: tomorrow);
-      case DateRangeType.thisWeek:
-        return DateRange(
+        return DateRangeModel(from: tomorrow, to: tomorrow);
+      case DateRangeEnum.thisWeek:
+        return DateRangeModel(
           from: today.subtract(Duration(days: today.weekday - 1)),
           to: today,
         );
-      case DateRangeType.lastWeek:
+      case DateRangeEnum.lastWeek:
         final lastWeekStart = today.subtract(Duration(days: today.weekday + 6));
         final lastWeekEnd = lastWeekStart.add(Duration(days: 6));
-        return DateRange(from: lastWeekStart, to: lastWeekEnd);
-      case DateRangeType.custom:
+        return DateRangeModel(from: lastWeekStart, to: lastWeekEnd);
+      case DateRangeEnum.custom:
         return null;
     }
   }
 
-  void _applyDateRange(DateRangeType range) {
+  void _applyDateRange(DateRangeEnum range) {
     final date = _calculateDateRange(range);
     if (date == null) {
       return;
@@ -418,7 +419,7 @@ class _DateSelectionWidgetState extends State<_DateSelectionWidget> {
         _toDateController.text = _formatDate(date.to);
       });
 
-      widget.onDateChange(DateRange(from: date.from, to: date.to));
+      widget.onDateChange(DateRangeModel(from: date.from, to: date.to));
     }
   }
 
@@ -488,7 +489,7 @@ class _DateSelectionWidgetState extends State<_DateSelectionWidget> {
                   runAlignment: WrapAlignment.start,
                   runSpacing: context.scale(12),
                   spacing: context.scale(12),
-                  children: DateRangeType.values.map((DateRangeType type) {
+                  children: DateRangeEnum.values.map((DateRangeEnum type) {
                     return GestureDetector(
                       onTap: () => _applyDateRange(type),
                       child: Container(
@@ -557,7 +558,7 @@ class _AmountSelectionWidget extends StatelessWidget {
                   CustomTextFormField(
                     controller: minAmountController,
                     errorMaxLines: 3,
-                    inputFormatters: [MoneyFormatter(maxValue: 10000)],
+                    inputFormatters: [NumberFormatter(maxValue: 10000)],
                     keyboardType: TextInputType.numberWithOptions(decimal: true),
                     labelText: 'Min Amount',
                     prefixIcon: AppIcons.solidRoundedMoney01,
@@ -566,11 +567,11 @@ class _AmountSelectionWidget extends StatelessWidget {
                         return 'Please enter a minimum amount.';
                       }
 
-                      final minAmount = MoneyFormatter.getRawValue(value);
+                      final minAmount = NumberFormatter.getRawValue(value);
                       if (minAmount < 0) return 'Min amount cannot be negative.';
                       if (minAmount > 4999) return 'Min amount cannot exceed ₹4999.';
                       if (maxAmountController.text.isNotEmpty) {
-                        final maxAmount = MoneyFormatter.getRawValue(maxAmountController.text);
+                        final maxAmount = NumberFormatter.getRawValue(maxAmountController.text);
                         if (minAmount >= maxAmount) {
                           return 'Min amount must be less than max amount.';
                         }
@@ -582,7 +583,7 @@ class _AmountSelectionWidget extends StatelessWidget {
                   CustomTextFormField(
                     controller: maxAmountController,
                     errorMaxLines: 3,
-                    inputFormatters: [MoneyFormatter(maxValue: 10000)],
+                    inputFormatters: [NumberFormatter(maxValue: 10000)],
                     keyboardType: TextInputType.numberWithOptions(decimal: true),
                     labelText: 'Max Amount',
                     prefixIcon: AppIcons.solidRoundedMoney01,
@@ -591,11 +592,11 @@ class _AmountSelectionWidget extends StatelessWidget {
                         return 'Please enter a maximum amount.';
                       }
 
-                      final maxAmount = MoneyFormatter.getRawValue(value);
+                      final maxAmount = NumberFormatter.getRawValue(value);
                       if (maxAmount <= 0) return 'Max amount must be greater than zero.';
                       if (maxAmount > 5000) return 'Max amount cannot exceed ₹5000.';
                       if (minAmountController.text.isNotEmpty) {
-                        final minAmount = MoneyFormatter.getRawValue(minAmountController.text);
+                        final minAmount = NumberFormatter.getRawValue(minAmountController.text);
                         if (maxAmount <= minAmount) {
                           return 'Max amount must be greater than min amount.';
                         }

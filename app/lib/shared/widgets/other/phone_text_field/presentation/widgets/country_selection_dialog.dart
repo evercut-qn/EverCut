@@ -1,18 +1,6 @@
 // lib/shared/widgets/other/phone_text_field/presentation/widgets/country_selection_dialog.dart
 
-import 'package:flutter/material.dart';
-import 'package:flutter_svg/svg.dart';
-import 'package:go_router/go_router.dart';
-import 'package:shimmer/shimmer.dart';
-
-import '../../../../../../core/theme/presentation/widgets/theme_mode_builder.dart';
-import '../../../../../extensions/context/app_colors_extension.dart';
-import '../../../../../extensions/context/device_metrics_extension.dart';
-import '../../../../common/appbars/search_bar.dart';
-import '../../../../common/icons/flag_icon.dart';
-import '../../../loaders/shimmer_container.dart';
-import '../../domain/entities/country.dart';
-import '../controller/phone_text_field_controller.dart';
+part of '../../phone_text_field.dart';
 
 class CountrySelectionDialog extends StatefulWidget {
   final PhoneTextFieldController controller;
@@ -153,11 +141,10 @@ class _CountrySelectionDialogState extends State<CountrySelectionDialog> {
                           width: illustrationSize,
                           placeholderBuilder: (BuildContext context) {
                             return Shimmer.fromColors(
-                              baseColor: context.appColors.neutralShade200.withAlpha(50),
-                              highlightColor: context.appColors.neutralShade300.withAlpha(150),
+                              baseColor: context.appColors.backgroundShade75,
+                              highlightColor: context.appColors.backgroundShade150,
                               child: ShimmerContainer(
-                                borderRadius: 4,
-                                color: context.appColors.neutralShade200.withAlpha(150),
+                                color: context.appColors.backgroundShade75,
                                 width: illustrationSize,
                                 height: illustrationSize,
                               ),

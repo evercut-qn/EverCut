@@ -59,7 +59,7 @@ NavigationBarThemeData _navigationBarTheme({
         return TextStyle(
           color: selectedTextColor,
           fontSize: context.scale(12),
-          fontWeight: FontWeight.bold,
+          fontWeight: FontWeight.w700,
         );
       }
       return TextStyle(

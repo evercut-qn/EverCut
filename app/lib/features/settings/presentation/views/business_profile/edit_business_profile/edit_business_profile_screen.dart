@@ -2,15 +2,16 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 
 import '../../../../../../core/constants/regex/allowed_characters_regex.dart';
 import '../../../../../../core/theme/foundation/app_icons.dart';
+import '../../../../../../shared/enums/business_category.dart';
+import '../../../../../../shared/enums/target_customer.dart';
 import '../../../../../../shared/extensions/context/device_metrics_extension.dart';
-import '../../../../../../shared/models/dropdown_menu_option.dart';
 import '../../../../../../shared/widgets/common/appbars/bottom_appbar.dart';
 import '../../../../../../shared/widgets/common/inputs/dropdown_menu.dart';
+import '../../../../../../shared/widgets/common/inputs/location_picker_field.dart';
 import '../../../../../../shared/widgets/common/inputs/text_form_field.dart';
 import '../../../../../../shared/widgets/common/section/section_header.dart';
 import '../../../../../../shared/widgets/overlays/snackbars.dart';
@@ -29,85 +30,7 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen> {
   final TextEditingController _targetCustomersController = TextEditingController();
   final TextEditingController _shopLocationController = TextEditingController();
 
-  final List<DropdownMenuOption> _businessCategories = <DropdownMenuOption>[
-    DropdownMenuOption(icon: AppIcons.solidRoundedChairBarber, label: 'Barber Shop', value: 0),
-    DropdownMenuOption(icon: AppIcons.solidRoundedHairDryer, label: 'Hair Salon', value: 1),
-    DropdownMenuOption(icon: AppIcons.solidRoundedThread, label: 'Beauty Salon', value: 2),
-    DropdownMenuOption(icon: AppIcons.solidRoundedDoor02, label: 'Doorstep Service', value: 3),
-  ];
-
-  final List<DropdownMenuOption> _targetCustomers = <DropdownMenuOption>[
-    DropdownMenuOption(icon: AppIcons.solidRoundedMan, label: 'Men', value: 0),
-    DropdownMenuOption(icon: AppIcons.solidRoundedWoman, label: 'Women', value: 0),
-    DropdownMenuOption(icon: AppIcons.solidRoundedManWoman, label: 'Unisex', value: 0),
-  ];
-
-  Position? _position;
-
-  Future<Position> _determinePosition() async {
-    if (!await Geolocator.isLocationServiceEnabled()) {
-      return Future.error('Location services are disabled.');
-    } else {
-      LocationPermission permission = await Geolocator.checkPermission();
-
-      switch (permission) {
-        case LocationPermission.denied:
-          permission = await Geolocator.requestPermission();
-
-          if (permission == LocationPermission.denied) {
-            return Future.error('Location permissions are denied.');
-          } else if (permission == LocationPermission.deniedForever) {
-            return Future.error('Location permissions are permanently denied, we cannot request permissions.');
-          } else {
-            return await Geolocator.getCurrentPosition();
-          }
-        case LocationPermission.deniedForever:
-          return Future.error('Location permissions are permanently denied, we cannot request permissions.');
-        case LocationPermission.whileInUse:
-        case LocationPermission.always:
-          return await Geolocator.getCurrentPosition();
-        case LocationPermission.unableToDetermine:
-          return Future.error('Unable to determine location permission status.');
-      }
-    }
-  }
-
-  Future<void> _onShopLocationTextFormFieldTap() async {
-    try {
-      final position = await _determinePosition();
-
-      _position = position;
-
-      final placemarks = await placemarkFromCoordinates(position.latitude, position.longitude);
-      if (placemarks.isNotEmpty) {
-        final List<String?> rawData = [
-          placemarks.first.street,
-          placemarks.first.locality,
-          placemarks.first.subAdministrativeArea,
-          placemarks.first.administrativeArea,
-          placemarks.first.country,
-          placemarks.first.postalCode,
-        ];
-
-        final List<String?> data = rawData.map((String? element) {
-          if (element != null && element.isNotEmpty) {
-            return element;
-          }
-        }).toList();
-
-        _shopLocationController.text = data.join(', ');
-      } else {
-        _shopLocationController.text = '${position.latitude}° N, ${position.longitude}° E';
-      }
-    } catch (error) {
-      if (mounted) {
-        SnackBars.of(context).showErrorSnackBar(
-          title: 'Location Access Failed',
-          message: 'We couldn’t access your location. Please check your location permissions and try again.',
-        );
-      }
-    }
-  }
+  // Position? _position;
 
   void _onUpdateBusinessProfileButtonPressed() {
     if (!_formKey.currentState!.validate()) {
@@ -142,6 +65,7 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen> {
                 description: 'Update your business details to keep your profile current. Make sure all information is accurate.',
               ),
               Form(
+                autovalidateMode: AutovalidateMode.onUnfocus,
                 key: _formKey,
                 child: Column(
                   spacing: context.scale(16),
@@ -171,17 +95,17 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen> {
                     ),
                     CustomDropdownMenu<int>(
                       controller: _businessCategoryController,
-                      dropdownMenuEntries: _businessCategories.map<DropdownMenuEntry<int>>((DropdownMenuOption item) {
+                      dropdownMenuEntries: BusinessCategoryEnum.values.map<DropdownMenuEntry<int>>((BusinessCategoryEnum businessCategory) {
                         return DropdownMenuEntry<int>(
-                          label: item.label,
+                          label: businessCategory.label,
                           leadingIcon: Padding(
                             padding: EdgeInsets.only(left: context.scale(6)),
                             child: Icon(
-                              item.icon,
+                              businessCategory.icon,
                               size: context.scale(20),
                             ),
                           ),
-                          value: item.value,
+                          value: businessCategory.value,
                         );
                       }).toList(),
                       labelText: 'Business Category',
@@ -196,17 +120,17 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen> {
                     ),
                     CustomDropdownMenu<int>(
                       controller: _targetCustomersController,
-                      dropdownMenuEntries: _targetCustomers.map<DropdownMenuEntry<int>>((DropdownMenuOption item) {
+                      dropdownMenuEntries: TargetCustomerEnum.values.map<DropdownMenuEntry<int>>((TargetCustomerEnum targetCustomer) {
                         return DropdownMenuEntry<int>(
-                          label: item.label,
+                          label: targetCustomer.label,
                           leadingIcon: Padding(
                             padding: EdgeInsets.only(left: context.scale(6)),
                             child: Icon(
-                              item.icon,
+                              targetCustomer.icon,
                               size: context.scale(20),
                             ),
                           ),
-                          value: item.value,
+                          value: targetCustomer.value,
                         );
                       }).toList(),
                       labelText: 'Target Customers',
@@ -219,31 +143,10 @@ class _EditBusinessProfileScreenState extends State<EditBusinessProfileScreen> {
                         }
                       },
                     ),
-                    CustomTextFormField(
+                    LocationPickerField(
                       controller: _shopLocationController,
-                      inputFormatters: [
-                        TextInputFormatter.withFunction((TextEditingValue oldValue, TextEditingValue newValue) {
-                          if (RegExp(AllowedCharactersRegEx.words).hasMatch(newValue.text)) {
-                            return newValue;
-                          } else {
-                            return oldValue;
-                          }
-                        }),
-                      ],
-                      keyboardType: TextInputType.text,
-                      labelText: 'Shop Location',
-                      onTap: _onShopLocationTextFormFieldTap,
-                      onSuffixIconPressed: _onShopLocationTextFormFieldTap,
-                      prefixIcon: AppIcons.solidRoundedStoreLocation02,
-                      suffixIcon: AppIcons.solidRoundedLocation04,
-                      readOnly: true,
-                      textCapitalization: TextCapitalization.words,
-                      validator: (String? text) {
-                        if (text == null || text.isEmpty) {
-                          return 'Please enter your shop location.';
-                        } else {
-                          return null;
-                        }
+                      onChange: (Position position) {
+                        // _position = position;
                       },
                     ),
                   ],

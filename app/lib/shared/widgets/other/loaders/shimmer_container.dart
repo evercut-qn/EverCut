@@ -6,7 +6,7 @@ import '../../../extensions/context/app_colors_extension.dart';
 import '../../../extensions/context/device_metrics_extension.dart';
 
 class ShimmerContainer extends StatelessWidget {
-  final double borderRadius;
+  final double? borderRadius;
   final Color? color;
   final double width;
   final double height;
@@ -14,19 +14,19 @@ class ShimmerContainer extends StatelessWidget {
   const ShimmerContainer({
     super.key,
     this.color,
-    this.borderRadius = 4,
+    this.borderRadius,
     this.width = double.infinity,
     this.height = double.infinity,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: context.scale(width),
-      height: context.scale(height),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(context.scale(borderRadius)),
-        color: color ?? context.appColors.neutralShade800,
+    return Material(
+      borderRadius: BorderRadius.circular(borderRadius ?? context.scale(4)),
+      color: color ?? context.appColors.backgroundShade200,
+      child: SizedBox(
+        width: width,
+        height: height,
       ),
     );
   }

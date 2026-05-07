@@ -8,15 +8,14 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../../../core/constants/regex/allowed_characters_regex.dart';
 import '../../../../../../core/constants/regex/basic_regex.dart';
 import '../../../../../../core/theme/foundation/app_icons.dart';
+import '../../../../../../shared/enums/gender.dart';
 import '../../../../../../shared/extensions/context/app_colors_extension.dart';
 import '../../../../../../shared/extensions/context/device_metrics_extension.dart';
-import '../../../../../../shared/models/dropdown_menu_option.dart';
 import '../../../../../../shared/widgets/common/inputs/date_picker_field.dart';
 import '../../../../../../shared/widgets/common/inputs/dropdown_menu.dart';
 import '../../../../../../shared/widgets/common/inputs/text_form_field.dart';
 import '../../../../../../shared/widgets/common/section/section_header.dart';
 import '../../../../../../shared/widgets/other/phone_text_field/phone_text_field.dart';
-import '../../../../../../shared/widgets/other/phone_text_field/presentation/controller/phone_text_field_controller.dart';
 import '../../../../../../shared/widgets/overlays/bottomsheet.dart';
 import '../../../../../../shared/widgets/overlays/snackbars.dart';
 
@@ -186,12 +185,7 @@ class _EmployeeAddBottomSheetState extends State<EmployeeAddBottomSheet> {
   final PhoneTextFieldController _phoneNumberController = PhoneTextFieldController();
   final TextEditingController _dateOfBirthController = TextEditingController();
   final TextEditingController _genderController = TextEditingController();
-
-  final List<DropdownMenuOption> _genders = const <DropdownMenuOption>[
-    DropdownMenuOption(icon: Icons.male, label: 'Male', value: 0),
-    DropdownMenuOption(icon: Icons.female, label: 'Female', value: 1),
-    DropdownMenuOption(icon: Icons.transgender, label: 'Transgender', value: 2),
-  ];
+  final DateTime _currentDate = DateTime.now();
 
   void _onAddEmployeeButtonPressed() {
     if (!_formKey.currentState!.validate()) {
@@ -340,11 +334,11 @@ class _EmployeeAddBottomSheetState extends State<EmployeeAddBottomSheet> {
                       showCountrySelection: false,
                     ),
                     DatePickerField(
-                      autovalidateMode: AutovalidateMode.disabled,
                       controller: _dateOfBirthController,
                       errorMaxLines: 3,
                       keyboardType: TextInputType.datetime,
                       labelText: 'Date of Birth',
+                      lastDate: DateTime(_currentDate.year - 18, _currentDate.month, _currentDate.day),
                       textCapitalization: TextCapitalization.none,
                       validator: (String? text) {
                         if (text == null || text.isEmpty) {
@@ -354,15 +348,10 @@ class _EmployeeAddBottomSheetState extends State<EmployeeAddBottomSheet> {
                             return 'Please enter a valid date (e.g. 01 January 1901).';
                           } else {
                             try {
-                              final dateOfBirth = DateFormat('dd MMMM yyyy').parse(text);
-                              final currentDate = DateTime.now();
+                              final DateTime dateOfBirth = DateFormat('dd MMMM yyyy').parse(text);
+                              final DateTime cutOffDate = DateTime(_currentDate.year - 18, _currentDate.month, _currentDate.day);
 
-                              int age = currentDate.year - dateOfBirth.year;
-                              if (currentDate.month < dateOfBirth.month || (currentDate.month == dateOfBirth.month && currentDate.day < dateOfBirth.day)) {
-                                age--;
-                              }
-
-                              if (age < 18) {
+                              if (dateOfBirth.isAfter(cutOffDate)) {
                                 return 'You must be at least 18 years old to continue.';
                               } else {
                                 return null;
@@ -375,19 +364,18 @@ class _EmployeeAddBottomSheetState extends State<EmployeeAddBottomSheet> {
                       },
                     ),
                     CustomDropdownMenu<int>(
-                      autovalidateMode: AutovalidateMode.onUnfocus,
                       controller: _genderController,
-                      dropdownMenuEntries: _genders.map<DropdownMenuEntry<int>>((DropdownMenuOption item) {
+                      dropdownMenuEntries: GenderEnum.values.map<DropdownMenuEntry<int>>((GenderEnum gender) {
                         return DropdownMenuEntry<int>(
-                          label: item.label,
+                          label: gender.label,
                           leadingIcon: Padding(
                             padding: EdgeInsets.only(left: context.scale(6)),
                             child: Icon(
-                              item.icon,
+                              gender.icon,
                               size: context.scale(20),
                             ),
                           ),
-                          value: item.value,
+                          value: gender.value,
                         );
                       }).toList(),
                       labelText: 'Gender',

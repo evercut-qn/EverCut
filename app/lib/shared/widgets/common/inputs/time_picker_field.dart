@@ -94,7 +94,8 @@ class _TimePickerFieldState extends State<TimePickerField> {
   @override
   Widget build(BuildContext context) {
     return CustomTextFormField(
-      autovalidateMode: widget.autovalidateMode,
+      autovalidateMode: widget.autovalidateMode ?? AutovalidateMode.onUserInteraction,
+      canRequestFocus: false,
       controller: widget.controller,
       errorMaxLines: widget.errorMaxLines,
       filled: widget.filled,

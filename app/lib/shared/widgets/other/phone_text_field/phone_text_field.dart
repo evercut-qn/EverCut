@@ -1,7 +1,9 @@
 // lib/shared/widgets/other/phone_text_field/phone_text_field.dart
 
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/svg.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shimmer/shimmer.dart';
 
 import '../../../../core/navigation/transitions/transitions.dart';
 import '../../../../core/theme/foundation/app_icons.dart';
@@ -11,12 +13,26 @@ import '../../../../core/theme/presentation/widgets/theme_mode_builder.dart';
 import '../../../extensions/context/app_colors_extension.dart';
 import '../../../extensions/context/device_metrics_extension.dart';
 import '../../../utils/formatters/phone_number.dart';
+import '../../common/appbars/search_bar.dart';
 import '../../common/icons/flag_icon.dart';
 import '../../overlays/dialogs.dart';
 
+import '../loaders/shimmer_container.dart';
+import 'data/data_sources/local/country_local_data_source.dart';
+import 'data/data_sources/local/country_local_data_source_impl.dart';
+import 'data/repositories/country_repository_impl.dart';
 import 'domain/entities/country.dart';
-import 'presentation/controller/phone_text_field_controller.dart';
-import 'presentation/widgets/country_selection_dialog.dart';
+import 'domain/entities/country_dialing_info.dart';
+import 'domain/entities/country_group.dart';
+import 'domain/repositories/country_repository.dart';
+import 'domain/use_cases/format_phone_number_use_case.dart';
+import 'domain/use_cases/get_all_countries_use_case.dart';
+import 'domain/use_cases/get_country_by_dial_code_use_case.dart';
+import 'domain/use_cases/get_country_by_iso_code_use_case.dart';
+import 'domain/use_cases/search_countries_use_case.dart';
+
+part 'presentation/controller/phone_text_field_controller.dart';
+part 'presentation/widgets/country_selection_dialog.dart';
 
 class PhoneTextField extends StatelessWidget {
   final AutovalidateMode? autovalidateMode;
@@ -62,7 +78,6 @@ class PhoneTextField extends StatelessWidget {
                   await Dialogs.of(context).showFullscreenDialog<Country?>(
                     barrierDismissible: false,
                     barrierLabel: 'Close Country Selection Dialog',
-                    routeSettings: RouteSettings(name: '${GoRouterState.of(context).matchedLocation}/country_selection_dialog'),
                     child: CountrySelectionDialog(controller),
                     transition: Transitions.rightToLeftFade,
                     transitionDuration: const Duration(milliseconds: 150),

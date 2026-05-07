@@ -25,12 +25,16 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
   @override
   void initState() {
     super.initState();
-
     _profileActions.addAll(<SettingsTile>{
       SettingsTile(
         icon: AppIcons.solidRoundedPropertyEdit,
         title: 'Edit Business Profile',
         onTap: () => context.pushNested(RouteSegments.editBusinessProfile),
+      ),
+      SettingsTile(
+        icon: AppIcons.solidRoundedPayment01,
+        title: 'Bank Account Details',
+        onTap: () => context.pushNested(RouteSegments.bankAccountDetails),
       ),
       SettingsTile(
         icon: AppIcons.solidRoundedUserGroup,
@@ -43,9 +47,14 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
         onTap: () => context.pushNested(RouteSegments.manageServices),
       ),
       SettingsTile(
-        icon: AppIcons.solidRoundedPayment01,
-        title: 'UPI Details',
-        onTap: () => context.pushNested(RouteSegments.upiDetails),
+        icon: AppIcons.solidRoundedCheckList,
+        title: 'Amenities',
+        onTap: () => context.pushNested(RouteSegments.amenities),
+      ),
+      SettingsTile(
+        icon: AppIcons.solidRoundedClock01,
+        title: 'Availability',
+        onTap: () {},
       ),
     });
   }
@@ -75,30 +84,44 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
                                   child: ClipPath(
                                     clipBehavior: Clip.hardEdge,
                                     clipper: ShopImageSectionClipper(context),
-                                    child: Container(
-                                      alignment: Alignment.bottomLeft,
-                                      clipBehavior: Clip.hardEdge,
-                                      decoration: BoxDecoration(
-                                        gradient: LinearGradient(
-                                          begin: Alignment.topCenter,
-                                          colors: [Colors.transparent, Colors.black],
-                                          end: Alignment.bottomCenter,
-                                        ),
-                                      ),
-                                      padding: EdgeInsets.all(context.scale(18)),
-                                      child: SizedBox(
-                                        width: constraints.maxWidth - constraints.maxHeight * 0.3 - context.scale(34),
-                                        child: Text(
-                                          'Lorem Ipsum is simply dummy text of the printing and typesetting industry.',
-                                          maxLines: 2,
-                                          style: TextStyle(
-                                            color: LightColorTokens.scaffoldBackgroundColor,
-                                            fontSize: context.scale(18),
-                                            fontWeight: FontWeight.w700,
-                                            overflow: TextOverflow.ellipsis,
+                                    child: Stack(
+                                      children: [
+                                        Positioned.fill(
+                                          child: Material(
+                                            color: Colors.transparent,
                                           ),
                                         ),
-                                      ),
+                                        Positioned.fill(
+                                          child: DecoratedBox(
+                                            decoration: BoxDecoration(
+                                              gradient: LinearGradient(
+                                                begin: Alignment.topCenter,
+                                                colors: const [Colors.transparent, Colors.black54],
+                                                end: Alignment.bottomCenter,
+                                              ),
+                                            ),
+                                            child: Align(
+                                              alignment: Alignment.bottomLeft,
+                                              child: Padding(
+                                                padding: EdgeInsets.all(context.scale(18)),
+                                                child: SizedBox(
+                                                  width: constraints.maxWidth - constraints.maxHeight * 0.3 - context.scale(34),
+                                                  child: Text(
+                                                    'Lorem Ipsum is simply dummy text of the printing and typesetting industry.',
+                                                    maxLines: 2,
+                                                    style: TextStyle(
+                                                      color: LightColorTokens.scaffoldBackgroundColor,
+                                                      fontSize: context.scale(18),
+                                                      fontWeight: FontWeight.w700,
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ),
@@ -107,16 +130,26 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
                                 bottom: 0,
                                 right: 0,
                                 child: Material(
-                                  color: context.appColors.backgroundShade100,
                                   clipBehavior: Clip.hardEdge,
+                                  color: context.appColors.backgroundShade75,
                                   shape: CircleBorder(
                                     side: BorderSide(
                                       color: context.appColors.backgroundShade200,
                                       width: context.scale(2),
                                     ),
                                   ),
-                                  child: SizedBox.square(
-                                    dimension: constraints.maxHeight * 0.3 - context.scale(16),
+                                  child: InkWell(
+                                    highlightColor: context.appColors.backgroundShade200.withAlpha(63),
+                                    onTap: () {},
+                                    splashColor: context.appColors.backgroundShade200.withAlpha(127),
+                                    child: SizedBox.square(
+                                      dimension: constraints.maxHeight * 0.3 - context.scale(16),
+                                      child: Icon(
+                                        AppIcons.solidRoundedImageUpload,
+                                        color: context.appColors.neutralShade650,
+                                        size: context.scale(20),
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ),
@@ -297,7 +330,7 @@ class ShopImageSectionPainter extends CustomPainter {
 
     final fillPaint = Paint();
 
-    fillPaint.color = context.appColors.backgroundShade100;
+    fillPaint.color = context.appColors.backgroundShade75;
     fillPaint.style = PaintingStyle.fill;
 
     canvas.drawPath(path, fillPaint);

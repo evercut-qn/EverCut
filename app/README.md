@@ -1,36 +1,16 @@
-# EverCut Merchant App
+# merchant
 
-Flutter merchant/barber client for EverCut.
+A new Flutter project.
 
-## Backend Configuration
+## Getting Started
 
-The app reads its API URL from `--dart-define`.
+This project is a starting point for a Flutter application.
 
-Default development value:
+A few resources to get you started if this is your first Flutter project:
 
-```bash
-http://10.0.2.2:5000/api/v1
-```
+- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
+- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
 
-Useful runs:
-
-```bash
-flutter run --dart-define=API_BASE_URL=http://10.0.2.2:5000/api/v1
-flutter run --dart-define=API_BASE_URL=http://127.0.0.1:5000/api/v1
-flutter run --dart-define=APP_ENV=staging --dart-define=API_BASE_URL=https://staging-api.evercut.com/api/v1
-```
-
-Use `10.0.2.2` for Android emulator access to a backend running on the host machine. Use `127.0.0.1` for iOS simulator.
-
-## Auth Flow
-
-The app uses backend MSG91 OTP auth:
-
-1. Send OTP: `POST /auth/otp/send`
-2. Verify OTP: `POST /auth/otp/verify`
-3. Returning BARBER users receive and store access/refresh tokens.
-4. New users receive an onboarding token and complete merchant onboarding.
-5. Protected calls use `Authorization: Bearer <accessToken>`.
-6. A `401` response triggers one refresh-token retry.
-
-This app rejects non-BARBER sessions because it is the merchant client.
+For help getting started with Flutter development, view the
+[online documentation](https://docs.flutter.dev/), which offers tutorials,
+samples, guidance on mobile development, and a full API reference.

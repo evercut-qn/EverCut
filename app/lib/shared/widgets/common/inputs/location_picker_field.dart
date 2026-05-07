@@ -73,7 +73,7 @@ class _LocationPickerFieldState extends State<LocationPickerField> {
         ];
 
         final List<String?> data = rawData.map((String? element) {
-          if (element != null && element.isNotEmpty) {
+          if (element != null && element.isNotEmpty && !element.contains('null')) {
             return element;
           }
         }).toList();
@@ -91,16 +91,14 @@ class _LocationPickerFieldState extends State<LocationPickerField> {
           message: 'We couldn’t access your location. Please check your location permissions and try again.',
         );
       }
-    } finally {
-      if (mounted) {
-        FocusScope.of(context).unfocus();
-      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return CustomTextFormField(
+      autovalidateMode: AutovalidateMode.onUserInteraction,
+      canRequestFocus: false,
       controller: widget.controller,
       inputFormatters: [
         TextInputFormatter.withFunction((TextEditingValue oldValue, TextEditingValue newValue) {

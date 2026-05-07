@@ -130,7 +130,7 @@ class _CustomDropdownMenuState<T> extends State<CustomDropdownMenu<T>> {
         ),
       ),
       child: FormField<T>(
-        autovalidateMode: widget.autovalidateMode,
+        autovalidateMode: widget.autovalidateMode ?? AutovalidateMode.onUserInteraction,
         validator: widget.validator,
         builder: (FormFieldState<T> state) {
           return Column(

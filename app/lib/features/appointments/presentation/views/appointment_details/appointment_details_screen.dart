@@ -574,13 +574,13 @@ class AppointmentDetailsScreen extends StatelessWidget {
             Expanded(
               child: OutlinedButton(
                 onPressed: () {},
-                child: const Text('Cancel'),
+                child: const Text('Reject'),
               ),
             ),
             Expanded(
               child: FilledButton(
                 onPressed: () {},
-                child: const Text('Confirm'),
+                child: const Text('Accept'),
               ),
             ),
           ],

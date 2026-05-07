@@ -2,44 +2,14 @@
 
 import 'package:flutter/material.dart';
 
+import '../../../enums/weekday.dart';
 import '../../../extensions/context/app_colors_extension.dart';
 import '../../../extensions/context/device_metrics_extension.dart';
 import '../../../extensions/other/set_extension.dart';
 
-enum Weekday {
-  sunday,
-  monday,
-  tuesday,
-  wednesday,
-  thursday,
-  friday,
-  saturday,
-}
-
-extension _WeekdayExtension on Weekday {
-  String get label {
-    switch (this) {
-      case Weekday.sunday:
-        return 'Sunday';
-      case Weekday.monday:
-        return 'Monday';
-      case Weekday.tuesday:
-        return 'Tuesday';
-      case Weekday.wednesday:
-        return 'Wednesday';
-      case Weekday.thursday:
-        return 'Thursday';
-      case Weekday.friday:
-        return 'Friday';
-      case Weekday.saturday:
-        return 'Saturday';
-    }
-  }
-}
-
 class WeekdaySelector extends StatefulWidget {
-  final Set<Weekday> initialSelectedDays;
-  final ValueSetter<Set<Weekday>>? onSelectionChanged;
+  final Set<WeekdayEnum> initialSelectedDays;
+  final ValueSetter<Set<WeekdayEnum>>? onSelectionChanged;
 
   const WeekdaySelector({
     super.key,
@@ -52,7 +22,7 @@ class WeekdaySelector extends StatefulWidget {
 }
 
 class _WeekdaySelectorState extends State<WeekdaySelector> {
-  final Set<Weekday> _selectedDays = <Weekday>{};
+  final Set<WeekdayEnum> _selectedDays = <WeekdayEnum>{};
 
   @override
   void initState() {
@@ -60,11 +30,10 @@ class _WeekdaySelectorState extends State<WeekdaySelector> {
     _selectedDays.addAll(Set.from(widget.initialSelectedDays));
   }
 
-  void _toggleWeekday(Weekday weekday) {
+  void _toggleWeekday(WeekdayEnum weekday) {
     setState(() {
       _selectedDays.toggle(weekday);
     });
-
     widget.onSelectionChanged?.call(_selectedDays);
   }
 
@@ -73,18 +42,15 @@ class _WeekdaySelectorState extends State<WeekdaySelector> {
     return Wrap(
       runSpacing: context.scale(16),
       spacing: context.scale(16),
-      children: Weekday.values.map((Weekday weekday) {
+      children: WeekdayEnum.values.map((WeekdayEnum weekday) {
         final isSelected = _selectedDays.contains(weekday);
         return Material(
-          color: isSelected ? context.appColors.greenShade100 : Theme.of(context).inputDecorationTheme.fillColor,
+          borderRadius: BorderRadius.circular(context.scale(8)),
           clipBehavior: Clip.hardEdge,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(context.scale(8)),
-          ),
-          child: InkWell(
+          color: isSelected ? context.appColors.greenShade100 : context.appColors.backgroundShade125,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
             onTap: () => _toggleWeekday(weekday),
-            overlayColor: WidgetStateColor.transparent,
-            splashFactory: NoSplash.splashFactory,
             child: Padding(
               padding: EdgeInsets.symmetric(
                 horizontal: context.scale(16),
@@ -93,7 +59,7 @@ class _WeekdaySelectorState extends State<WeekdaySelector> {
               child: Text(
                 weekday.label,
                 style: TextStyle(
-                  color: isSelected ? Theme.of(context).scaffoldBackgroundColor : null,
+                  color: isSelected ? context.appColors.backgroundShade50 : context.appColors.neutralShade650,
                   fontSize: context.scale(14),
                 ),
               ),

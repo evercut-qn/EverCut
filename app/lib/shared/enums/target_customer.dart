@@ -4,56 +4,56 @@ import 'package:flutter/widgets.dart';
 
 import '../../core/theme/foundation/app_icons.dart';
 
-enum TargetCustomer {
+enum TargetCustomerEnum {
   men,
   women,
   unisex,
 }
 
-extension TargetCustomerExtension on TargetCustomer {
+extension TargetCustomerEnumExtension on TargetCustomerEnum {
   String get label {
     switch (this) {
-      case TargetCustomer.men:
+      case TargetCustomerEnum.men:
         return 'Men';
-      case TargetCustomer.women:
+      case TargetCustomerEnum.women:
         return 'Women';
-      case TargetCustomer.unisex:
+      case TargetCustomerEnum.unisex:
         return 'Unisex';
     }
   }
 
   IconData get icon {
     switch (this) {
-      case TargetCustomer.men:
+      case TargetCustomerEnum.men:
         return AppIcons.solidRoundedMan;
-      case TargetCustomer.women:
+      case TargetCustomerEnum.women:
         return AppIcons.solidRoundedWoman;
-      case TargetCustomer.unisex:
+      case TargetCustomerEnum.unisex:
         return AppIcons.solidRoundedManWoman;
     }
   }
 
   int get value {
     switch (this) {
-      case TargetCustomer.men:
+      case TargetCustomerEnum.men:
         return 0;
-      case TargetCustomer.women:
+      case TargetCustomerEnum.women:
         return 1;
-      case TargetCustomer.unisex:
+      case TargetCustomerEnum.unisex:
         return 2;
     }
   }
 
-  static TargetCustomer fromValue(int value) {
+  static TargetCustomerEnum fromValue(int value) {
     switch (value) {
       case 0:
-        return TargetCustomer.men;
+        return TargetCustomerEnum.men;
       case 1:
-        return TargetCustomer.women;
+        return TargetCustomerEnum.women;
       case 2:
-        return TargetCustomer.unisex;
+        return TargetCustomerEnum.unisex;
       default:
-        return TargetCustomer.men;
+        return TargetCustomerEnum.men;
     }
   }
 }

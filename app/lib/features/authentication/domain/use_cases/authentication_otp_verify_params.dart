@@ -2,12 +2,10 @@
 
 class AuthenticationOtpVerifyParams {
   final String phoneNumber;
-  final String verificationId;
   final String smsCode;
 
   const AuthenticationOtpVerifyParams(
     this.phoneNumber,
-    this.verificationId,
     this.smsCode,
   );
 }

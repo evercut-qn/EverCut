@@ -8,20 +8,28 @@ class DeviceMetrics {
   DeviceMetrics._();
 
   static const double _designWidth = 414.0;
+  static const Size _fallbackSize = Size(_designWidth, 896.0);
 
-  static late Size size;
-  static late EdgeInsets padding;
-
-  static late double _scaleFactor;
+  static Size _size = _fallbackSize;
+  static EdgeInsets _padding = EdgeInsets.zero;
+  static double _scaleFactor = 1.0;
 
   static void sync([FlutterView? view]) {
-    view ??= PlatformDispatcher.instance.views.first;
+    final Iterable<FlutterView> views = PlatformDispatcher.instance.views;
+    view ??= views.isNotEmpty ? views.first : null;
 
-    size = view.physicalSize / view.devicePixelRatio;
-    padding = EdgeInsets.fromViewPadding(view.padding, view.devicePixelRatio);
+    if (view != null && view.devicePixelRatio > 0) {
+      _padding = EdgeInsets.fromViewPadding(view.padding, view.devicePixelRatio);
 
-    _scaleFactor = size.width / _designWidth;
+      final Size logicalSize = view.physicalSize / view.devicePixelRatio;
+      if (logicalSize.width > 0 && logicalSize.height > 0) {
+        _size = logicalSize;
+        _scaleFactor = _size.width / _designWidth;
+      }
+    }
   }
 
+  static EdgeInsets get padding => _padding;
+  static Size get size => _size;
   static double scale(double value) => value * _scaleFactor;
 }

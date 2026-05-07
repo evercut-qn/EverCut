@@ -2,56 +2,56 @@
 
 import 'package:flutter/material.dart';
 
-enum Gender {
+enum GenderEnum {
   male,
   female,
   transgender,
 }
 
-extension GenderExtension on Gender {
+extension GenderEnumExtension on GenderEnum {
   String get label {
     switch (this) {
-      case Gender.male:
+      case GenderEnum.male:
         return 'Male';
-      case Gender.female:
+      case GenderEnum.female:
         return 'Female';
-      case Gender.transgender:
+      case GenderEnum.transgender:
         return 'Transgender';
     }
   }
 
   IconData get icon {
     switch (this) {
-      case Gender.male:
+      case GenderEnum.male:
         return Icons.male;
-      case Gender.female:
+      case GenderEnum.female:
         return Icons.female;
-      case Gender.transgender:
+      case GenderEnum.transgender:
         return Icons.transgender;
     }
   }
 
   int get value {
     switch (this) {
-      case Gender.male:
+      case GenderEnum.male:
         return 0;
-      case Gender.female:
+      case GenderEnum.female:
         return 1;
-      case Gender.transgender:
+      case GenderEnum.transgender:
         return 2;
     }
   }
 
-  static Gender fromValue(int value) {
+  static GenderEnum fromValue(int value) {
     switch (value) {
       case 0:
-        return Gender.male;
+        return GenderEnum.male;
       case 1:
-        return Gender.female;
+        return GenderEnum.female;
       case 2:
-        return Gender.transgender;
+        return GenderEnum.transgender;
       default:
-        return Gender.male;
+        return GenderEnum.male;
     }
   }
 }

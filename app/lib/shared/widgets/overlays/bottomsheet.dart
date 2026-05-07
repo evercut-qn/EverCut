@@ -72,19 +72,22 @@ class _CustomBottomsheet extends StatelessWidget {
                 borderRadius: BorderRadius.circular(context.scale(16)),
                 clipBehavior: Clip.hardEdge,
                 color: context.appColors.bottomsheetBackgroundColor,
-                child: Padding(
-                  padding: padding ?? EdgeInsets.all(context.scale(20)),
-                  child: () {
-                    if (scrollable) {
-                      return SingleChildScrollView(
-                        scrollDirection: Axis.vertical,
-                        child: child,
-                      );
-                    } else {
-                      return child;
-                    }
-                  }(),
-                ),
+                child: (() {
+                  if (scrollable) {
+                    return SingleChildScrollView(
+                      clipBehavior: Clip.hardEdge,
+                      padding: padding ?? EdgeInsets.all(context.scale(20)),
+                      physics: const ClampingScrollPhysics(),
+                      scrollDirection: Axis.vertical,
+                      child: child,
+                    );
+                  } else {
+                    return Padding(
+                      padding: padding ?? EdgeInsets.all(context.scale(20)),
+                      child: child,
+                    );
+                  }
+                }()),
               ),
             ),
           ],

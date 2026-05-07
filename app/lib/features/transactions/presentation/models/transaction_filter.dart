@@ -1,29 +1,38 @@
 // lib/features/transactions/presentation/models/transaction_filter.dart
 
+import 'package:equatable/equatable.dart';
+
 import '../../../../shared/models/sort_option.dart';
 import '../../../../shared/models/amount_range.dart';
 import '../../../../shared/models/date_range.dart';
 
-class TransactionFilter {
-  final AmountRange amountRange;
-  final DateRange dateRange;
-  final SortOption sortOption;
+class TransactionFilterModel extends Equatable {
+  final AmountRangeModel amountRange;
+  final DateRangeModel dateRange;
+  final SortOptionModel? sortOption;
 
-  const TransactionFilter({
+  const TransactionFilterModel({
     required this.amountRange,
     required this.dateRange,
-    required this.sortOption,
+    this.sortOption,
   });
 
-  TransactionFilter copyWith({
-    AmountRange? amountRange,
-    DateRange? dateRange,
-    SortOption? sortOption,
+  TransactionFilterModel copyWith({
+    AmountRangeModel? amountRange,
+    DateRangeModel? dateRange,
+    SortOptionModel? sortOption,
   }) {
-    return TransactionFilter(
+    return TransactionFilterModel(
       amountRange: amountRange ?? this.amountRange,
       dateRange: dateRange ?? this.dateRange,
       sortOption: sortOption ?? this.sortOption,
     );
   }
+
+  @override
+  List<Object?> get props => [
+    amountRange,
+    dateRange,
+    sortOption,
+  ];
 }

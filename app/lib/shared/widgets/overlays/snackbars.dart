@@ -86,7 +86,7 @@ class SnackBars {
                           style: TextStyle(
                             color: textAndIconColor,
                             fontSize: context.scale(16),
-                            fontWeight: FontWeight.bold,
+                            fontWeight: FontWeight.w700,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),

@@ -37,14 +37,15 @@ dependencies:
   equatable: ^2.0.8
   flutter_bloc: ^9.1.1
   flutter_markdown_plus: ^1.0.7
-  flutter_secure_storage: ^9.2.4
   flutter_svg: ^2.2.3
   geocoding: ^4.0.0
   geolocator: ^14.0.2
   get_it: ^9.2.0
   go_router: ^17.0.1
   http: ^1.6.0
+  http_parser: ^4.1.2
   image_picker: ^1.2.1
+  flutter_secure_storage: ^9.2.4
   intl: ^0.20.2
   shared_preferences: ^2.5.4
   shimmer: ^3.0.0
@@ -54,7 +55,6 @@ dependencies:
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
-  http_parser: ^4.1.2
 
 dev_dependencies:
   flutter_test:
@@ -153,6 +153,50 @@ flutter:
       - asset: assets/fonts/DMSans/BlackItalic.ttf
         style: italic
         weight: 900
+    - family: RobotoMono
+      fonts:
+        - asset: assets/fonts/RobotoMono/Thin.ttf
+          style: normal
+          weight: 100
+        - asset: assets/fonts/RobotoMono/ThinItalic.ttf
+          style: italic
+          weight: 100
+        - asset: assets/fonts/RobotoMono/ExtraLight.ttf
+          style: normal
+          weight: 200
+        - asset: assets/fonts/RobotoMono/ExtraLightItalic.ttf
+          style: italic
+          weight: 200
+        - asset: assets/fonts/RobotoMono/Light.ttf
+          style: normal
+          weight: 300
+        - asset: assets/fonts/RobotoMono/LightItalic.ttf
+          style: italic
+          weight: 300
+        - asset: assets/fonts/RobotoMono/Regular.ttf
+          style: normal
+          weight: 400
+        - asset: assets/fonts/RobotoMono/Italic.ttf
+          style: italic
+          weight: 400
+        - asset: assets/fonts/RobotoMono/Medium.ttf
+          style: normal
+          weight: 500
+        - asset: assets/fonts/RobotoMono/MediumItalic.ttf
+          style: italic
+          weight: 500
+        - asset: assets/fonts/RobotoMono/SemiBold.ttf
+          style: normal
+          weight: 600
+        - asset: assets/fonts/RobotoMono/SemiBoldItalic.ttf
+          style: italic
+          weight: 600
+        - asset: assets/fonts/RobotoMono/Bold.ttf
+          style: normal
+          weight: 700
+        - asset: assets/fonts/RobotoMono/BoldItalic.ttf
+          style: italic
+          weight: 700
     - family: HugeIconsSolidRounded
       fonts:
         - asset: assets/fonts/HugeIcons/Solid/Rounded.otf

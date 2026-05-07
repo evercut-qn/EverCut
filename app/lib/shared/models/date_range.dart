@@ -1,21 +1,26 @@
 // lib/shared/models/date_range.dart
 
-class DateRange {
+import 'package:equatable/equatable.dart';
+
+class DateRangeModel extends Equatable {
   final DateTime from;
   final DateTime to;
 
-  const DateRange({
+  const DateRangeModel({
     required this.from,
     required this.to,
   });
 
-  DateRange copyWith({
+  DateRangeModel copyWith({
     DateTime? from,
     DateTime? to,
   }) {
-    return DateRange(
+    return DateRangeModel(
       from: from ?? this.from,
       to: to ?? this.to,
     );
   }
+
+  @override
+  List<Object?> get props => [from, to];
 }

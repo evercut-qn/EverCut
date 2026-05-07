@@ -124,7 +124,7 @@ OutlinedButtonThemeData _outlinedButtonTheme({
 }) {
   return OutlinedButtonThemeData(
     style: ButtonStyle(
-      backgroundColor: const WidgetStatePropertyAll(Colors.transparent),
+      backgroundColor: WidgetStateColor.transparent,
       foregroundColor: WidgetStatePropertyAll(foregroundColor),
       overlayColor: WidgetStatePropertyAll(overlayColor),
       padding: WidgetStatePropertyAll(

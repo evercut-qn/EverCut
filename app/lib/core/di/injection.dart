@@ -7,7 +7,7 @@ import '../auth/auth_state_notifier.dart';
 import 'modules/authentication_module.dart';
 import 'modules/connectivity_module.dart';
 import 'modules/network_module.dart';
-import 'modules/merchant_onboarding_module.dart';
+import 'modules/onboarding_module.dart';
 import 'modules/router_module.dart';
 import 'modules/storage_module.dart';
 import 'modules/theme_module.dart';
@@ -23,7 +23,7 @@ Future<void> init() async {
   await sl.allReady();
   ThemeModule.register(sl);
   AuthenticationModule.register(sl);
-  MerchantOnboardingModule.register(sl);
+  OnboardingModule.register(sl);
   await sl<AuthStateNotifier>().restore();
   RouterModule.register(sl);
   await sl.allReady();

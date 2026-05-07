@@ -12,7 +12,7 @@ class SystemUi {
   static StreamSubscription<ThemeState>? _themeCubitStreamSubscription;
 
   static Future<void> init() async {
-    await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge, overlays: SystemUiOverlay.values);
     await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
 
     _themeCubitStreamSubscription = di.sl<ThemeCubit>().stream.listen((state) {

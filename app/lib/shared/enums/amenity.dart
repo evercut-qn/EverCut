@@ -4,7 +4,7 @@ import 'package:flutter/widgets.dart';
 
 import '../../core/theme/foundation/app_icons.dart';
 
-enum Amenity {
+enum AmenityEnum {
   airConditioning,
   waitingArea,
   drinkingWater,
@@ -14,82 +14,82 @@ enum Amenity {
   chargingPoints,
 }
 
-extension AmenityExtension on Amenity {
+extension AmenityEnumExtension on AmenityEnum {
   String get label {
     switch (this) {
-      case Amenity.airConditioning:
+      case AmenityEnum.airConditioning:
         return 'Air Conditioning';
-      case Amenity.waitingArea:
+      case AmenityEnum.waitingArea:
         return 'Waiting Area';
-      case Amenity.drinkingWater:
+      case AmenityEnum.drinkingWater:
         return 'Drinking Water';
-      case Amenity.washrooms:
+      case AmenityEnum.washrooms:
         return 'Washrooms';
-      case Amenity.parkingArea:
+      case AmenityEnum.parkingArea:
         return 'Parking Area';
-      case Amenity.wifi:
+      case AmenityEnum.wifi:
         return 'Wi-Fi';
-      case Amenity.chargingPoints:
+      case AmenityEnum.chargingPoints:
         return 'Charging Points';
     }
   }
 
   IconData get icon {
     switch (this) {
-      case Amenity.airConditioning:
+      case AmenityEnum.airConditioning:
         return AppIcons.solidRoundedSnow;
-      case Amenity.waitingArea:
+      case AmenityEnum.waitingArea:
         return AppIcons.solidRoundedChair04;
-      case Amenity.drinkingWater:
+      case AmenityEnum.drinkingWater:
         return AppIcons.solidRoundedSoftDrink02;
-      case Amenity.washrooms:
+      case AmenityEnum.washrooms:
         return AppIcons.solidRoundedToilet01;
-      case Amenity.parkingArea:
+      case AmenityEnum.parkingArea:
         return AppIcons.solidRoundedParkingAreaSquare;
-      case Amenity.wifi:
+      case AmenityEnum.wifi:
         return AppIcons.solidRoundedWifi01;
-      case Amenity.chargingPoints:
+      case AmenityEnum.chargingPoints:
         return AppIcons.solidRoundedBatteryCharging01;
     }
   }
 
   int get value {
     switch (this) {
-      case Amenity.airConditioning:
+      case AmenityEnum.airConditioning:
         return 0;
-      case Amenity.waitingArea:
+      case AmenityEnum.waitingArea:
         return 1;
-      case Amenity.drinkingWater:
+      case AmenityEnum.drinkingWater:
         return 2;
-      case Amenity.washrooms:
+      case AmenityEnum.washrooms:
         return 3;
-      case Amenity.parkingArea:
+      case AmenityEnum.parkingArea:
         return 4;
-      case Amenity.wifi:
+      case AmenityEnum.wifi:
         return 5;
-      case Amenity.chargingPoints:
+      case AmenityEnum.chargingPoints:
         return 6;
     }
   }
 
-  static Amenity fromValue(int value) {
+  static AmenityEnum fromValue(int value) {
     switch (value) {
       case 0:
-        return Amenity.airConditioning;
+        return AmenityEnum.airConditioning;
       case 1:
-        return Amenity.waitingArea;
+        return AmenityEnum.waitingArea;
       case 2:
-        return Amenity.drinkingWater;
+        return AmenityEnum.drinkingWater;
       case 3:
-        return Amenity.washrooms;
+        return AmenityEnum.washrooms;
       case 4:
-        return Amenity.parkingArea;
+        return AmenityEnum.parkingArea;
       case 5:
-        return Amenity.wifi;
+        return AmenityEnum.wifi;
       case 6:
-        return Amenity.chargingPoints;
+        return AmenityEnum.chargingPoints;
       default:
-        return Amenity.airConditioning;
+        return AmenityEnum.airConditioning;
     }
   }
 }

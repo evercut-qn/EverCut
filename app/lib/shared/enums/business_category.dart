@@ -4,65 +4,65 @@ import 'package:flutter/widgets.dart';
 
 import '../../core/theme/foundation/app_icons.dart';
 
-enum BusinessCategory {
+enum BusinessCategoryEnum {
   barberShop,
   hairSalon,
   beautySalon,
   doorstepService,
 }
 
-extension BusinessCategoryExtension on BusinessCategory {
+extension BusinessCategoryEnumExtension on BusinessCategoryEnum {
   String get label {
     switch (this) {
-      case BusinessCategory.barberShop:
+      case BusinessCategoryEnum.barberShop:
         return 'Barber Shop';
-      case BusinessCategory.hairSalon:
+      case BusinessCategoryEnum.hairSalon:
         return 'Hair Salon';
-      case BusinessCategory.beautySalon:
+      case BusinessCategoryEnum.beautySalon:
         return 'Beauty Salon';
-      case BusinessCategory.doorstepService:
+      case BusinessCategoryEnum.doorstepService:
         return 'Doorstep Service';
     }
   }
 
   IconData get icon {
     switch (this) {
-      case BusinessCategory.barberShop:
+      case BusinessCategoryEnum.barberShop:
         return AppIcons.solidRoundedChairBarber;
-      case BusinessCategory.hairSalon:
+      case BusinessCategoryEnum.hairSalon:
         return AppIcons.solidRoundedHairDryer;
-      case BusinessCategory.beautySalon:
+      case BusinessCategoryEnum.beautySalon:
         return AppIcons.solidRoundedThread;
-      case BusinessCategory.doorstepService:
+      case BusinessCategoryEnum.doorstepService:
         return AppIcons.solidRoundedDoor02;
     }
   }
 
   int get value {
     switch (this) {
-      case BusinessCategory.barberShop:
+      case BusinessCategoryEnum.barberShop:
         return 0;
-      case BusinessCategory.hairSalon:
+      case BusinessCategoryEnum.hairSalon:
         return 1;
-      case BusinessCategory.beautySalon:
+      case BusinessCategoryEnum.beautySalon:
         return 2;
-      case BusinessCategory.doorstepService:
+      case BusinessCategoryEnum.doorstepService:
         return 3;
     }
   }
 
-  static BusinessCategory fromValue(int value) {
+  static BusinessCategoryEnum fromValue(int value) {
     switch (value) {
       case 0:
-        return BusinessCategory.barberShop;
+        return BusinessCategoryEnum.barberShop;
       case 1:
-        return BusinessCategory.hairSalon;
+        return BusinessCategoryEnum.hairSalon;
       case 2:
-        return BusinessCategory.beautySalon;
+        return BusinessCategoryEnum.beautySalon;
       case 3:
-        return BusinessCategory.doorstepService;
+        return BusinessCategoryEnum.doorstepService;
       default:
-        return BusinessCategory.barberShop;
+        return BusinessCategoryEnum.barberShop;
     }
   }
 }

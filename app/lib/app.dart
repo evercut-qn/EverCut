@@ -21,8 +21,8 @@ class EvercutMerchant extends StatefulWidget {
 }
 
 class _EvercutMerchantState extends State<EvercutMerchant> with WidgetsBindingObserver {
-  final _goRouter = di.sl<GoRouter>();
-  final _themeCubit = di.sl<ThemeCubit>();
+  final GoRouter _goRouter = di.sl<GoRouter>();
+  final ThemeCubit _themeCubit = di.sl<ThemeCubit>();
 
   @override
   void initState() {
@@ -32,9 +32,18 @@ class _EvercutMerchantState extends State<EvercutMerchant> with WidgetsBindingOb
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    DeviceMetrics.sync(View.of(context));
+  }
+
+  @override
   void didChangeMetrics() {
     super.didChangeMetrics();
-    DeviceMetrics.sync(View.of(context));
+    if (mounted) {
+      DeviceMetrics.sync(View.of(context));
+      setState(() {});
+    }
   }
 
   @override
@@ -73,11 +82,11 @@ class _EvercutMerchantState extends State<EvercutMerchant> with WidgetsBindingOb
           return BlocListener<ConnectivityCubit, ConnectivityStatus>(
             listener: (BuildContext context, ConnectivityStatus connectivityStatus) {
               if (connectivityStatus != ConnectivityStatus.connected) {
-                if (_goRouter.state.path != RoutePaths.connectionNotFound) {
-                  _goRouter.push(RoutePaths.connectionNotFound);
+                if (_goRouter.state.path != RoutePaths.connectivity) {
+                  _goRouter.push(RoutePaths.connectivity);
                 }
               } else {
-                if (_goRouter.state.path == RoutePaths.connectionNotFound) {
+                if (_goRouter.state.path == RoutePaths.connectivity) {
                   _goRouter.pop();
                 }
               }

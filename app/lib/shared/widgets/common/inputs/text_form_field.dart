@@ -9,6 +9,7 @@ import '../../../extensions/context/device_metrics_extension.dart';
 class CustomTextFormField extends StatefulWidget {
   final Iterable<String>? autofillHints;
   final AutovalidateMode? autovalidateMode;
+  final bool canRequestFocus;
   final TextEditingController? controller;
   final bool? enabled;
   final int errorMaxLines;
@@ -37,6 +38,7 @@ class CustomTextFormField extends StatefulWidget {
     super.key,
     this.autofillHints,
     this.autovalidateMode,
+    this.canRequestFocus = true,
     this.controller,
     this.enabled,
     this.errorMaxLines = 1,
@@ -67,12 +69,12 @@ class CustomTextFormField extends StatefulWidget {
 }
 
 class _CustomTextFormFieldState extends State<CustomTextFormField> {
-  late bool _obscureText;
+  bool _obscureText = false;
 
   @override
   void initState() {
     super.initState();
-    _obscureText = widget.obscureText ?? false;
+    _obscureText = widget.obscureText ?? _obscureText;
   }
 
   Padding? get _prefixIcon {
@@ -124,6 +126,7 @@ class _CustomTextFormFieldState extends State<CustomTextFormField> {
     return TextFormField(
       autovalidateMode: widget.autovalidateMode,
       autofillHints: widget.autofillHints,
+      canRequestFocus: widget.canRequestFocus,
       controller: widget.controller,
       decoration: InputDecoration(
         filled: widget.filled,

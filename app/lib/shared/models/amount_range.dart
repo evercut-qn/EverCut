@@ -1,21 +1,26 @@
 // lib/shared/models/amount_range.dart
 
-class AmountRange {
+import 'package:equatable/equatable.dart';
+
+class AmountRangeModel extends Equatable {
   final double min;
   final double max;
 
-  const AmountRange({
+  const AmountRangeModel({
     required this.min,
     required this.max,
   });
 
-  AmountRange copyWith({
+  AmountRangeModel copyWith({
     double? min,
     double? max,
   }) {
-    return AmountRange(
+    return AmountRangeModel(
       min: min ?? this.min,
       max: max ?? this.max,
     );
   }
+
+  @override
+  List<Object?> get props => [min, max];
 }

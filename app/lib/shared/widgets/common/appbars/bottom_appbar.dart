@@ -16,12 +16,10 @@ class CustomBottomAppBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        border: Border(
-          top: BorderSide(
-            color: context.appColors.primaryDividerColor,
-          ),
+    return Material(
+      shape: Border(
+        top: BorderSide(
+          color: context.appColors.primaryDividerColor,
         ),
       ),
       child: BottomAppBar(
