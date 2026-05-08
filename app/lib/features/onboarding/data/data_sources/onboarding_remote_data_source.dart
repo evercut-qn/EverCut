@@ -6,6 +6,6 @@ abstract class OnboardingRemoteDataSource {
   Future<AuthSession> createBarberProfile({
     required String onboardingToken,
     required Map<String, dynamic> fields,
-    required List<XFile> photos,
+    required XFile photo,
   });
 }

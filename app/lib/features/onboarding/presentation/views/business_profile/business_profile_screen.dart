@@ -39,7 +39,7 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
   final TextEditingController _targetCustomersController = TextEditingController();
   final TextEditingController _shopLocationController = TextEditingController();
 
-  final List<XFile?> _selectedImages = List<XFile?>.filled(3, null);
+  XFile? _selectedImage;
   Position? _position;
   BusinessCategoryEnum? _selectedBusinessCategory;
   TargetCustomerEnum? _selectedTargetCustomer;
@@ -54,10 +54,10 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
         message: 'Please fill in all required fields before continuing to the next steps.',
       );
     } else {
-      if (_selectedImages.any((image) => image == null)) {
+      if (_selectedImage == null) {
         SnackBars.of(context).showWarningSnackBar(
-          title: 'Images Required',
-          message: 'Please select 3 shop images before proceeding with the next steps.',
+          title: 'Image Required',
+          message: 'Please select a shop image before proceeding with the next steps.',
         );
       } else {
         context.read<OnboardingCubit>().updateFields({
@@ -73,7 +73,7 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
             ],
           },
         });
-        context.read<OnboardingCubit>().updatePhotos(_selectedImages.whereType<XFile>().toList());
+        context.read<OnboardingCubit>().updatePhoto(_selectedImage!);
         context.read<OnboardingCubit>().nextPage();
       }
     }
@@ -235,166 +235,156 @@ class _BusinessProfileScreenState extends State<BusinessProfileScreen> {
                         title: 'Upload Shop Image',
                         description: 'Please upload a clear photo of your shop. This will be visible to all your customers.',
                       ),
-                      LayoutBuilder(
-                        builder: (BuildContext context, BoxConstraints constraints) {
-                          return Wrap(
-                            spacing: context.scale(12),
-                            runSpacing: context.scale(12),
-                            children: List<Widget>.generate(3, (int imageIndex) {
-                              return SizedBox(
-                                width: constraints.maxWidth * 0.5 - context.scale(8),
-                                child: AspectRatio(
-                                  aspectRatio: 1.25,
-                                  child: ImageSelector(
-                                    builder: (BuildContext context, XFile? selectedImage, VoidCallback onSelect, VoidCallback onRemove) {
-                                  if (selectedImage != null) {
-                                    return Stack(
-                                      children: [
-                                        Positioned.fill(
-                                          child: ClipRRect(
-                                            borderRadius: BorderRadius.circular(context.scale(8)),
-                                            clipBehavior: Clip.hardEdge,
-                                            child: Image(
-                                              image: FileImage(File(selectedImage.path)),
-                                              errorBuilder: (BuildContext context, Object error, StackTrace? stackTrace) {
-                                                setState(() => (_doesImageHaveError = true));
-                                                return Material(
-                                                  borderRadius: BorderRadius.circular(context.scale(8)),
-                                                  clipBehavior: Clip.hardEdge,
-                                                  color: Theme.of(context).inputDecorationTheme.fillColor,
-                                                  child: Padding(
-                                                    padding: EdgeInsets.all(context.scale(8)),
-                                                    child: CustomPaint(
-                                                      painter: DashedBorderPainter(
-                                                        borderRadius: context.scale(8),
-                                                        color: Theme.of(context).inputDecorationTheme.enabledBorder!.borderSide.color,
-                                                        dashPattern: [context.scale(5), context.scale(5)],
-                                                      ),
-                                                      child: InkWell(
-                                                        borderRadius: BorderRadius.circular(context.scale(8)),
-                                                        onTap: onSelect,
-                                                        overlayColor: WidgetStatePropertyAll(context.appColors.neutralShade150.withAlpha(127)),
-                                                        child: Padding(
-                                                          padding: EdgeInsets.all(context.scale(16)),
-                                                          child: Column(
-                                                            crossAxisAlignment: CrossAxisAlignment.center,
-                                                            mainAxisAlignment: MainAxisAlignment.center,
-                                                            spacing: context.scale(12),
-                                                            children: [
-                                                              Icon(
-                                                                AppIcons.solidRoundedAlert01,
-                                                                color: context.appColors.backgroundShade400,
-                                                                size: context.scale(20),
-                                                              ),
-                                                              Text(
-                                                                'Couldn\'t load image, tap to pick another.',
-                                                                textAlign: TextAlign.center,
-                                                                maxLines: 2,
-                                                                style: TextStyle(
-                                                                  color: context.appColors.backgroundShade600,
-                                                                  fontSize: context.scale(10.75),
-                                                                  overflow: TextOverflow.ellipsis,
-                                                                ),
-                                                              ),
-                                                            ],
-                                                          ),
-                                                        ),
-                                                      ),
-                                                    ),
+                      SizedBox(
+                        width: double.infinity,
+                        child: AspectRatio(
+                          aspectRatio: 1.6,
+                          child: ImageSelector(
+                            builder: (BuildContext context, XFile? selectedImage, VoidCallback onSelect, VoidCallback onRemove) {
+                              if (selectedImage != null) {
+                                return Stack(
+                                  children: [
+                                    Positioned.fill(
+                                      child: ClipRRect(
+                                        borderRadius: BorderRadius.circular(context.scale(8)),
+                                        clipBehavior: Clip.hardEdge,
+                                        child: Image(
+                                          image: FileImage(File(selectedImage.path)),
+                                          errorBuilder: (BuildContext context, Object error, StackTrace? stackTrace) {
+                                            setState(() => (_doesImageHaveError = true));
+                                            return Material(
+                                              borderRadius: BorderRadius.circular(context.scale(8)),
+                                              clipBehavior: Clip.hardEdge,
+                                              color: Theme.of(context).inputDecorationTheme.fillColor,
+                                              child: Padding(
+                                                padding: EdgeInsets.all(context.scale(8)),
+                                                child: CustomPaint(
+                                                  painter: DashedBorderPainter(
+                                                    borderRadius: context.scale(8),
+                                                    color: Theme.of(context).inputDecorationTheme.enabledBorder!.borderSide.color,
+                                                    dashPattern: [context.scale(5), context.scale(5)],
                                                   ),
-                                                );
-                                              },
-                                              fit: BoxFit.cover,
-                                              loadingBuilder: (BuildContext context, Widget child, ImageChunkEvent? loadingProgress) {
-                                                if (loadingProgress != null) {
-                                                  return Shimmer.fromColors(
-                                                    baseColor: context.appColors.backgroundShade75,
-                                                    highlightColor: context.appColors.backgroundShade150,
-                                                    child: ColoredBox(
-                                                      color: context.appColors.backgroundShade75,
-                                                    ),
-                                                  );
-                                                } else {
-                                                  return child;
-                                                }
-                                              },
-                                            ),
-                                          ),
-                                        ),
-                                        if (!_doesImageHaveError) ...[
-                                          Align(
-                                            alignment: Alignment.topRight,
-                                            child: Padding(
-                                              padding: EdgeInsets.only(
-                                                top: context.scale(6),
-                                                right: context.scale(6),
-                                              ),
-                                              child: Material(
-                                                color: context.appColors.redShade100.withAlpha(159),
-                                                clipBehavior: Clip.hardEdge,
-                                                shape: const CircleBorder(),
-                                                child: InkWell(
-                                                  onTap: onRemove,
-                                                  child: Padding(
-                                                    padding: EdgeInsets.all(context.scale(6)),
-                                                    child: Icon(
-                                                      AppIcons.solidRoundedMultiplicationSign,
-                                                      color: Colors.white.withAlpha(159),
-                                                      size: context.scale(12),
+                                                  child: InkWell(
+                                                    borderRadius: BorderRadius.circular(context.scale(8)),
+                                                    onTap: onSelect,
+                                                    overlayColor: WidgetStatePropertyAll(context.appColors.neutralShade150.withAlpha(127)),
+                                                    child: Padding(
+                                                      padding: EdgeInsets.all(context.scale(16)),
+                                                      child: Column(
+                                                        crossAxisAlignment: CrossAxisAlignment.center,
+                                                        mainAxisAlignment: MainAxisAlignment.center,
+                                                        spacing: context.scale(12),
+                                                        children: [
+                                                          Icon(
+                                                            AppIcons.solidRoundedAlert01,
+                                                            color: context.appColors.backgroundShade400,
+                                                            size: context.scale(20),
+                                                          ),
+                                                          Text(
+                                                            'Couldn\'t load image, tap to pick another.',
+                                                            textAlign: TextAlign.center,
+                                                            maxLines: 2,
+                                                            style: TextStyle(
+                                                              color: context.appColors.backgroundShade600,
+                                                              fontSize: context.scale(10.75),
+                                                              overflow: TextOverflow.ellipsis,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
                                                     ),
                                                   ),
                                                 ),
                                               ),
-                                            ),
+                                            );
+                                          },
+                                          fit: BoxFit.cover,
+                                          loadingBuilder: (BuildContext context, Widget child, ImageChunkEvent? loadingProgress) {
+                                            if (loadingProgress != null) {
+                                              return Shimmer.fromColors(
+                                                baseColor: context.appColors.backgroundShade75,
+                                                highlightColor: context.appColors.backgroundShade150,
+                                                child: ColoredBox(
+                                                  color: context.appColors.backgroundShade75,
+                                                ),
+                                              );
+                                            } else {
+                                              return child;
+                                            }
+                                          },
+                                        ),
+                                      ),
+                                    ),
+                                    if (!_doesImageHaveError) ...[
+                                      Align(
+                                        alignment: Alignment.topRight,
+                                        child: Padding(
+                                          padding: EdgeInsets.only(
+                                            top: context.scale(6),
+                                            right: context.scale(6),
                                           ),
-                                        ],
-                                      ],
-                                    );
-                                  } else {
-                                    return Material(
-                                      borderRadius: BorderRadius.circular(context.scale(8)),
-                                      clipBehavior: Clip.hardEdge,
-                                      color: Theme.of(context).inputDecorationTheme.fillColor,
-                                      child: Padding(
-                                        padding: EdgeInsets.all(context.scale(8)),
-                                        child: CustomPaint(
-                                          painter: DashedBorderPainter(
-                                            borderRadius: context.scale(8),
-                                            color: Theme.of(context).inputDecorationTheme.enabledBorder!.borderSide.color,
-                                            dashPattern: [context.scale(5), context.scale(5)],
-                                          ),
-                                          child: InkWell(
-                                            borderRadius: BorderRadius.circular(context.scale(8)),
-                                            onTap: onSelect,
-                                            overlayColor: WidgetStatePropertyAll(context.appColors.neutralShade150.withAlpha(127)),
-                                            child: Padding(
-                                              padding: EdgeInsets.all(context.scale(8)),
-                                              child: Center(
+                                          child: Material(
+                                            color: context.appColors.redShade100.withAlpha(159),
+                                            clipBehavior: Clip.hardEdge,
+                                            shape: const CircleBorder(),
+                                            child: InkWell(
+                                              onTap: onRemove,
+                                              child: Padding(
+                                                padding: EdgeInsets.all(context.scale(6)),
                                                 child: Icon(
-                                                  AppIcons.solidRoundedStoreAdd02,
-                                                  color: Theme.of(context).inputDecorationTheme.enabledBorder?.borderSide.color,
-                                                  size: context.scale(20),
+                                                  AppIcons.solidRoundedMultiplicationSign,
+                                                  color: Colors.white.withAlpha(159),
+                                                  size: context.scale(12),
                                                 ),
                                               ),
                                             ),
                                           ),
                                         ),
                                       ),
-                                    );
-                                  }
-                                },
-                                    onChange: (XFile? selectedImage) {
-                                      setState(() {
-                                        _doesImageHaveError = false;
-                                        _selectedImages[imageIndex] = selectedImage;
-                                      });
-                                    },
+                                    ],
+                                  ],
+                                );
+                              } else {
+                                return Material(
+                                  borderRadius: BorderRadius.circular(context.scale(8)),
+                                  clipBehavior: Clip.hardEdge,
+                                  color: Theme.of(context).inputDecorationTheme.fillColor,
+                                  child: Padding(
+                                    padding: EdgeInsets.all(context.scale(8)),
+                                    child: CustomPaint(
+                                      painter: DashedBorderPainter(
+                                        borderRadius: context.scale(8),
+                                        color: Theme.of(context).inputDecorationTheme.enabledBorder!.borderSide.color,
+                                        dashPattern: [context.scale(5), context.scale(5)],
+                                      ),
+                                      child: InkWell(
+                                        borderRadius: BorderRadius.circular(context.scale(8)),
+                                        onTap: onSelect,
+                                        overlayColor: WidgetStatePropertyAll(context.appColors.neutralShade150.withAlpha(127)),
+                                        child: Padding(
+                                          padding: EdgeInsets.all(context.scale(8)),
+                                          child: Center(
+                                            child: Icon(
+                                              AppIcons.solidRoundedStoreAdd02,
+                                              color: Theme.of(context).inputDecorationTheme.enabledBorder?.borderSide.color,
+                                              size: context.scale(20),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
                                   ),
-                                ),
-                              );
-                            }),
-                          );
-                        },
+                                );
+                              }
+                            },
+                            onChange: (XFile? selectedImage) {
+                              setState(() {
+                                _doesImageHaveError = false;
+                                _selectedImage = selectedImage;
+                              });
+                            },
+                          ),
+                        ),
                       ),
                     ],
                   ),

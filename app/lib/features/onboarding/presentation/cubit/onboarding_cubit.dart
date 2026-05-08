@@ -5,20 +5,20 @@ import 'package:image_picker/image_picker.dart';
 
 class OnboardingDraft {
   final Map<String, dynamic> fields;
-  final List<XFile> photos;
+  final XFile? photo;
 
   const OnboardingDraft({
     this.fields = const <String, dynamic>{},
-    this.photos = const <XFile>[],
+    this.photo,
   });
 
   OnboardingDraft copyWith({
     Map<String, dynamic>? fields,
-    List<XFile>? photos,
+    XFile? photo,
   }) {
     return OnboardingDraft(
       fields: fields ?? this.fields,
-      photos: photos ?? this.photos,
+      photo: photo ?? this.photo,
     );
   }
 }
@@ -36,8 +36,8 @@ class OnboardingCubit extends Cubit<int> {
     );
   }
 
-  void updatePhotos(List<XFile> photos) {
-    draft = draft.copyWith(photos: photos);
+  void updatePhoto(XFile photo) {
+    draft = draft.copyWith(photo: photo);
   }
 
   void nextPage() {

@@ -60,7 +60,7 @@ class _PayoutDetailsScreenState extends State<PayoutDetailsScreen> {
     try {
       await di.sl<OnboardingRepository>().completeOnboarding(
             fields: cubit.draft.fields,
-            photos: cubit.draft.photos,
+            photo: cubit.draft.photo!,
           );
       // AuthStateNotifier.markSessionChanged() triggers router redirect to dashboard
     } on NetworkException catch (error) {

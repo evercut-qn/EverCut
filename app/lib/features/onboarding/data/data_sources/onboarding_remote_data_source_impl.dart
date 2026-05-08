@@ -20,7 +20,7 @@ class OnboardingRemoteDataSourceImpl implements OnboardingRemoteDataSource {
   Future<AuthSession> createBarberProfile({
     required String onboardingToken,
     required Map<String, dynamic> fields,
-    required List<XFile> photos,
+    required XFile photo,
   }) async {
     final request = http.MultipartRequest(
       'POST',
@@ -33,18 +33,16 @@ class OnboardingRemoteDataSourceImpl implements OnboardingRemoteDataSource {
       request.fields[key] = value is String ? value : jsonEncode(value);
     });
 
-    for (final XFile photo in photos) {
-      final String mimeType = photo.mimeType ?? 'image/jpeg';
-      final MediaType mediaType = MediaType.parse(mimeType);
+    final String mimeType = photo.mimeType ?? 'image/jpeg';
+    final MediaType mediaType = MediaType.parse(mimeType);
 
-      request.files.add(
-        await http.MultipartFile.fromPath(
-          'photos', 
-          photo.path,
-          contentType: mediaType,
-        ),
-      );
-    }
+    request.files.add(
+      await http.MultipartFile.fromPath(
+        'photo',
+        photo.path,
+        contentType: mediaType,
+      ),
+    );
 
     final streamedResponse = await request.send().timeout(const Duration(seconds: 60));
     final response = await http.Response.fromStream(streamedResponse);

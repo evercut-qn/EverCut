@@ -21,7 +21,7 @@ class OnboardingRepositoryImpl implements OnboardingRepository {
   @override
   Future<AuthSession> completeOnboarding({
     required Map<String, dynamic> fields,
-    required List<XFile> photos,
+    required XFile photo,
   }) async {
     final String? onboardingToken = await sessionStore.readOnboardingToken();
     if (onboardingToken == null || onboardingToken.isEmpty) {
@@ -31,7 +31,7 @@ class OnboardingRepositoryImpl implements OnboardingRepository {
     final AuthSession session = await remoteDataSource.createBarberProfile(
       onboardingToken: onboardingToken,
       fields: fields,
-      photos: photos,
+      photo: photo,
     );
 
     if (!session.user.isBarber) {
