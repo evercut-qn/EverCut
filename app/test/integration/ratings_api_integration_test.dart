@@ -14,9 +14,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:merchant/core/auth/session_store.dart';
 import 'package:merchant/core/network/api_client.dart';
-import 'package:merchant/features/ratings/data/data_sources/remote/rating_remote_data_source_impl.dart';
-import 'package:merchant/features/ratings/data/repositories/rating_repository_impl.dart';
-import 'package:merchant/features/ratings/domain/repositories/rating_repository.dart';
+import 'package:merchant/features/dashboard/modules/ratings_and_reviews/data/data_sources/remote/rating_remote_data_source_impl.dart';
+import 'package:merchant/features/dashboard/modules/ratings_and_reviews/data/repositories/rating_repository_impl.dart';
+import 'package:merchant/features/dashboard/modules/ratings_and_reviews/domain/repositories/rating_repository.dart';
 
 void main() {
   group('Ratings API Integration Tests', () {

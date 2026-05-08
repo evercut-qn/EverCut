@@ -1,12 +1,12 @@
 // test/features/ratings/data/repositories/rating_repository_test.dart
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:merchant/features/ratings/data/data_sources/remote/rating_remote_data_source.dart';
-import 'package:merchant/features/ratings/data/models/rating_dto.dart';
-import 'package:merchant/features/ratings/data/models/rating_summary_dto.dart';
-import 'package:merchant/features/ratings/data/repositories/rating_repository_impl.dart';
-import 'package:merchant/features/ratings/domain/entities/rating.dart';
-import 'package:merchant/features/ratings/domain/entities/rating_summary.dart';
+import 'package:merchant/features/dashboard/modules/ratings_and_reviews/data/data_sources/remote/rating_remote_data_source.dart';
+import 'package:merchant/features/dashboard/modules/ratings_and_reviews/data/models/rating_dto.dart';
+import 'package:merchant/features/dashboard/modules/ratings_and_reviews/data/models/rating_summary_dto.dart';
+import 'package:merchant/features/dashboard/modules/ratings_and_reviews/data/repositories/rating_repository_impl.dart';
+import 'package:merchant/features/dashboard/modules/ratings_and_reviews/domain/entities/rating.dart';
+import 'package:merchant/features/dashboard/modules/ratings_and_reviews/domain/entities/rating_summary.dart';
 import 'package:merchant/shared/models/paginated_response.dart';
 import 'package:mockito/annotations.dart';
 import 'package:mockito/mockito.dart';

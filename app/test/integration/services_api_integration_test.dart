@@ -14,10 +14,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:merchant/core/auth/session_store.dart';
 import 'package:merchant/core/network/api_client.dart';
-import 'package:merchant/features/services/data/data_sources/remote/service_remote_data_source_impl.dart';
-import 'package:merchant/features/services/data/repositories/service_repository_impl.dart';
-import 'package:merchant/features/services/domain/entities/service.dart';
-import 'package:merchant/features/services/domain/repositories/service_repository.dart';
+import 'package:merchant/features/settings/modules/manage_services/data/data_sources/remote/service_remote_data_source_impl.dart';
+import 'package:merchant/features/settings/modules/manage_services/data/repositories/service_repository_impl.dart';
+import 'package:merchant/features/settings/modules/manage_services/domain/entities/service.dart';
+import 'package:merchant/features/settings/modules/manage_services/domain/repositories/service_repository.dart';
 
 void main() {
   group('Services API Integration Tests', () {

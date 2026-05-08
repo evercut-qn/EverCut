@@ -3,10 +3,10 @@
 import 'package:get_it/get_it.dart';
 
 import '../../network/api_client.dart';
-import '../../../features/ratings/data/data_sources/remote/rating_remote_data_source.dart';
-import '../../../features/ratings/data/data_sources/remote/rating_remote_data_source_impl.dart';
-import '../../../features/ratings/data/repositories/rating_repository_impl.dart';
-import '../../../features/ratings/domain/repositories/rating_repository.dart';
+import '../../../features/dashboard/modules/ratings_and_reviews/data/data_sources/remote/rating_remote_data_source.dart';
+import '../../../features/dashboard/modules/ratings_and_reviews/data/data_sources/remote/rating_remote_data_source_impl.dart';
+import '../../../features/dashboard/modules/ratings_and_reviews/data/repositories/rating_repository_impl.dart';
+import '../../../features/dashboard/modules/ratings_and_reviews/domain/repositories/rating_repository.dart';
 
 class RatingModule {
   static void register(GetIt sl) {
