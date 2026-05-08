@@ -17,7 +17,7 @@ The Flutter app was merchant-focused but had stubbed authentication and no produ
 - No secure access-token, refresh-token, or onboarding-token persistence existed.
 - No reusable API client existed for JSON envelopes, Bearer headers, timeout handling, or refresh-on-401.
 - Route startup did not restore or guard sessions.
-- The merchant onboarding UI collected one image while the backend requires exactly three onboarding photos.
+- The merchant onboarding UI and backend now both require exactly one shop photo (previously the backend required three).
 - Android lacked explicit internet permission and deep-link intent filters.
 - iOS lacked URL scheme registration.
 - Backend CORS config was inline and used wildcard origins outside production.

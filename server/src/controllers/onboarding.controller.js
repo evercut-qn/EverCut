@@ -27,15 +27,14 @@ export const createCustomerOnboarding = async (req, res) => {
 export const createBarberOnboarding = async (req, res) => {
     const { phoneNumber } = req.onboardingContext;
     const body = getValidatedRequestData(req, 'body');
-    const result = await onboardingService.createBarberOnboarding(phoneNumber, body, req.files);
-    const { user, shop, photos, tokens } = result;
+    const result = await onboardingService.createBarberOnboarding(phoneNumber, body, req.file);
+    const { user, shop, tokens } = result;
 
     return res.status(201).json(
         ApiResponse.success(
             {
                 user,
                 shop,
-                photos,
                 accessToken: tokens.accessToken,
                 refreshToken: tokens.refreshToken,
             },

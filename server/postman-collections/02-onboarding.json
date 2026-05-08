@@ -135,7 +135,7 @@
         "method": "POST",
         "header": [],
         "url": "{{base_url}}/{{api_prefix}}/onboarding/barbers",
-        "description": "Creates the barber shop for the OTP-verified barber test user. Shop schedule values can be sent in HH:MM or hh:mm AM/PM format and are normalized by the backend. The three shop image fields already point to the local sample file.",
+        "description": "Creates the barber shop for the OTP-verified barber test user. Shop schedule values can be sent in HH:MM or hh:mm AM/PM format and are normalized by the backend. The shop image field already points to the local sample file.",
         "body": {
           "mode": "formdata",
           "formdata": [
@@ -236,19 +236,9 @@
               "type": "text"
             },
             {
-              "key": "photos",
+              "key": "photo",
               "type": "file",
-              "description": "Attach shop image 1 of 3 manually in Postman"
-            },
-            {
-              "key": "photos",
-              "type": "file",
-              "description": "Attach shop image 2 of 3 manually in Postman"
-            },
-            {
-              "key": "photos",
-              "type": "file",
-              "description": "Attach shop image 3 of 3 manually in Postman"
+              "description": "Attach shop image manually in Postman"
             }
           ]
         },

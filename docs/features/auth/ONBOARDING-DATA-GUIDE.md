@@ -244,7 +244,7 @@ Content-Type: multipart/form-data
 #### **Images**
 | Field | Type | Format | Example | Notes |
 |-------|------|--------|---------|-------|
-| `photos` | File[] | Images | [img1.jpg, img2.jpg] | 1-3 images required |
+| `photo` | File | Image | shop.jpg | 1 image required |
 
 ### **Optional Fields**
 | Field | Type | Default | Example |
@@ -374,7 +374,7 @@ Future<Map<String, dynamic>> completeBarberOnboarding({
   required String bankName,
   required String upiId,
   required String pin,
-  required List<File> photos,
+  required File photo,
   String? bio,
   int? numberOfEmployees,
   int? yearsOfExperience,
@@ -435,13 +435,11 @@ Future<Map<String, dynamic>> completeBarberOnboarding({
     request.fields['yearsOfExperience'] = yearsOfExperience.toString();
   }
 
-  // Shop Images (1-3 images)
-  for (var i = 0; i < photos.length && i < 3; i++) {
-    request.files.add(await http.MultipartFile.fromPath(
-      'photos',
-      photos[i].path,
-    ));
-  }
+  // Shop Image
+  request.files.add(await http.MultipartFile.fromPath(
+    'photo',
+    photo.path,
+  ));
 
   // Send request
   final response = await request.send();
@@ -459,7 +457,6 @@ Future<Map<String, dynamic>> completeBarberOnboarding({
       'success': true,
       'user': data['user'],
       'shop': data['shop'],
-      'photos': data['photos'],
       'accessToken': data['accessToken'],
       'refreshToken': data['refreshToken'],
     };
@@ -525,14 +522,6 @@ Future<Map<String, dynamic>> completeBarberOnboarding({
       "numberOfEmployees": 1,
       "yearsOfExperience": 0
     },
-    "photos": [
-      {
-        "id": "507f1f77bcf86cd799439014",
-        "shopId": "507f1f77bcf86cd799439013",
-        "photoUrl": "https://res.cloudinary.com/...",
-        "photoType": "shop_interior"
-      }
-    ],
     "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
     "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
   }
@@ -566,7 +555,7 @@ Future<Map<String, dynamic>> completeBarberOnboarding({
 | **upiId** | ❌ No | ✅ Required | For payouts |
 | **pin** | ❌ No | ✅ Required | 4-digit security PIN |
 | **confirmPin** | ❌ No | ✅ Required | Must match pin |
-| **photos** | ❌ No | ✅ Required | 1-3 images |
+| **photo** | ❌ No | ✅ Required | 1 image |
 | **bio** | ❌ No | ⭕ Optional | Shop description |
 | **numberOfEmployees** | ❌ No | ⭕ Optional | Default: 1 |
 | **yearsOfExperience** | ❌ No | ⭕ Optional | Default: 0 |
@@ -595,7 +584,7 @@ Future<Map<String, dynamic>> completeBarberOnboarding({
 - PIN must be exactly 4 digits
 - `confirmPin` must match `pin`
 - UPI address is required for payouts
-- 1-3 shop images required
+- 1 shop image required
 - Optional fields have defaults: `numberOfEmployees: 1`, `yearsOfExperience: 0`, `bio: ""`
 
 ---
@@ -689,7 +678,7 @@ POST /api/v1/auth/otp/verify { "mobile": "9876543211", "otp": "123456" }
 # 2. Complete onboarding
 POST /api/v1/onboarding/barbers
 Authorization: Bearer {onboardingToken}
-# Include all required fields + 1-3 shop images
+# Include all required fields + 1 shop image
 
 # 3. Verify response
 # Should return 201 with accessToken + refreshToken
@@ -716,14 +705,14 @@ Authorization: Bearer {onboardingToken}
 - **Photo**: ✅ Required
 
 ### **Barber Onboarding**
-- **Fields**: 20+ required fields + 1-3 photos
+- **Fields**: 20+ required fields + 1 photo
 - **Phone**: ❌ Not sent (comes from token)
 - **Email**: ✅ Required
 - **Location**: ✅ Required (GeoJSON)
 - **Schedule**: ✅ Required (working days, hours, breaks)
 - **Payment**: ✅ Required (UPI, bank details)
 - **Security**: ✅ Required (4-digit PIN)
-- **Images**: ✅ Required (1-3 shop images)
+- **Images**: ✅ Required (1 shop image)
 
 ### **After Successful Onboarding**
 - ✅ User account created

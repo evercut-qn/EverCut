@@ -59,7 +59,7 @@
         "method": "GET",
         "header": [],
         "url": "{{base_url}}/{{api_prefix}}/photos",
-        "description": "Lists the current gallery and captures the first photo ID. Barber onboarding already creates three gallery photos."
+        "description": "Lists the current gallery and captures the first photo ID. Barber onboarding already creates one gallery photo."
       },
       "event": [
         {

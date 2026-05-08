@@ -83,14 +83,11 @@ export const uploadShopPhotos = multer({
     fileFilter: imageFilter,
 }).array('photos', config.upload.maxFiles);
 
-/** Barber onboarding shop images (requires 3 files) */
-export const uploadBarberOnboardingImages = multer({
+/** Barber onboarding shop image (requires 1 file) */
+export const uploadBarberOnboardingImage = multer({
     storage: makeStorage((req) => `evercut/shops/onboarding/${resolveActorKey(req)}`),
     limits: {
         fileSize: config.upload.maxFileSize,
-        files: 3,
     },
     fileFilter: imageFilter,
-}).fields([
-    { name: 'photos', maxCount: 3 },
-]);
+}).single('photo');

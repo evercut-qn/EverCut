@@ -447,11 +447,9 @@ const onboardingCollection = {
           textField('upiId', 'test.barber@upi'),
           textField('pin', '1234'),
           textField('confirmPin', '1234'),
-          fileField('photos', 'Attach shop image 1 of 3 manually in Postman'),
-          fileField('photos', 'Attach shop image 2 of 3 manually in Postman'),
-          fileField('photos', 'Attach shop image 3 of 3 manually in Postman'),
+          fileField('photo', 'Attach shop image manually in Postman'),
         ]),
-        description: 'Creates the barber shop for the OTP-verified barber test user. Shop schedule values can be sent in HH:MM or hh:mm AM/PM format and are normalized by the backend. The three shop image fields already point to the local sample file.',
+        description: 'Creates the barber shop for the OTP-verified barber test user. Shop schedule values can be sent in HH:MM or hh:mm AM/PM format and are normalized by the backend. The shop image field already points to the local sample file.',
         event: testEvent(
           "pm.test('status is 201 or 409', function () { pm.expect(pm.response.code).to.be.oneOf([201, 409]); });",
           "if (pm.response.code === 201) {",
@@ -1594,7 +1592,7 @@ const barberPhotosCollection = {
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/photos',
-        description: 'Lists the current gallery and captures the first photo ID. Barber onboarding already creates three gallery photos.',
+        description: 'Lists the current gallery and captures the first photo ID. Barber onboarding already creates one gallery photo.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           "const response = pm.response.json();",

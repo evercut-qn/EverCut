@@ -14,7 +14,6 @@ import { normalizeShopSchedule } from '../utils/shop-schedule.utils.js';
 import * as authService from './auth.service.js';
 import { hashPin, validatePinCreation } from './pin.service.js';
 import { serializeCustomerProfile } from '../serializers/customer.serializer.js';
-import { serializePhotos } from '../serializers/photo.serializer.js';
 import { serializeUser } from '../serializers/user.serializer.js';
 
 /**
@@ -110,12 +109,6 @@ const parseBreakTimes = (value) => {
     });
 };
 
-const extractShopImages = (files) => {
-    if (!files) return [];
-    if (Array.isArray(files)) return files;
-
-    return files.photos || [];
-};
 
 const normalizeBarberOnboardingInput = (authUser, shopData) => {
     const firstName = String(shopData.firstName || '').trim();
@@ -300,7 +293,7 @@ export const createCustomerOnboarding = async (phoneNumber, profileData, file) =
     };
 };
 
-export const createBarberOnboarding = async (phoneNumber, shopData, files) => {
+export const createBarberOnboarding = async (phoneNumber, shopData, file) => {
     const verifiedPhoneNumber = normalizeVerifiedPhoneNumber(phoneNumber);
     if (!verifiedPhoneNumber) {
         throw new BadRequestError('Verified phone number is required');
@@ -314,9 +307,8 @@ export const createBarberOnboarding = async (phoneNumber, shopData, files) => {
         phoneNumber: normalized.phoneNumber,
     });
 
-    const onboardingImages = extractShopImages(files);
-    if (onboardingImages.length !== 3) {
-        throw new BadRequestError('Please upload exactly 3 shop images for onboarding');
+    if (!file) {
+        throw new BadRequestError('Shop image is required');
     }
 
     const pinResult = validatePinCreation(normalized.pin, normalized.confirmPin);
@@ -326,9 +318,8 @@ export const createBarberOnboarding = async (phoneNumber, shopData, files) => {
 
     const pinHash = await hashPin(normalized.pin);
 
-    const coverImage = onboardingImages[0];
-    const coverUrl = coverImage.path;
-    const coverCloudinaryId = coverImage.public_id || coverImage.filename;
+    const coverUrl = file.path;
+    const coverCloudinaryId = file.public_id || file.filename;
 
     // Prepare payout config if bank details are provided
     const payoutConfig = {};
@@ -379,27 +370,22 @@ export const createBarberOnboarding = async (phoneNumber, shopData, files) => {
 
     const createdShop = await shopRepository.create(shopCreateData);
 
-    const photos = [];
-    for (const [index, file] of onboardingImages.entries()) {
-        const photo = await photoRepository.create({
-            shopId: createdShop._id,
-            photoUrl: file.path,
-            cloudinaryId: file.public_id || file.filename,
-            photoName: file.originalname || `onboarding-shop-image-${index + 1}`,
-            photoType: 'shop_interior',
-            description: 'Uploaded during onboarding',
-            fileSize: file.size,
-            mimeType: file.mimetype,
-        });
-        photos.push(photo);
-    }
+    const photo = await photoRepository.create({
+        shopId: createdShop._id,
+        photoUrl: file.path,
+        cloudinaryId: file.public_id || file.filename,
+        photoName: file.originalname || 'onboarding-shop-image',
+        photoType: 'shop_interior',
+        description: 'Uploaded during onboarding',
+        fileSize: file.size,
+        mimeType: file.mimetype,
+    });
 
     const tokens = await issueAuthenticationTokens(user);
 
     return {
         user: serializeUser(user),
-        shop: serializeBarberProfile(createdShop, user, { photos }),
-        photos: serializePhotos(photos),
+        shop: serializeBarberProfile(createdShop, user, { photos: [photo] }),
         tokens,
     };
 };
