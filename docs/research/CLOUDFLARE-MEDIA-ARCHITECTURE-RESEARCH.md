@@ -96,7 +96,7 @@ The following patterns commonly appear in early-stage media architectures and ar
 │                    Android & iOS — HTTP/2, TLS 1.3                      │
 │                                                                         │
 │  Upload State Machine    Playback Engine    Image Renderer              │
-│  (Multipart + Resume)    (BetterPlayer HLS) (CachedNetworkImage)        │
+│  (Multipart + Resume)    (media_kit HLS)   (CachedNetworkImage)         │
 └───────────┬──────────────────────────────────────────────┬──────────────┘
             │ API calls (JWT Bearer)                       │ Media requests (HMAC token)
             │                                              │
@@ -205,7 +205,7 @@ VIDEO PLAYBACK (GATED):
          → generate HMAC-SHA256 token { userId, videoId, exp: now+1h, iat }
          → return { token, expiresAt, hlsMasterUrl }
 ③ Flutter: construct URL: https://media.domain.com/v/{videoId}/master.m3u8?token={token}
-         BetterPlayer loads master playlist
+         media_kit Player opens master playlist URL
 ④ Request → Cloudflare CDN → cache HIT → serve immediately (0 R2 ops)
             cache MISS → Cloudflare Worker
 ⑤ Worker:
@@ -219,13 +219,13 @@ VIDEO PLAYBACK (GATED):
    h. Cache MISS → fetch from R2 (master.m3u8 or segment.ts)
    i. Set Cache-Control headers (playlists: max-age=300; segments: max-age=86400, immutable)
    j. Populate Cloudflare CDN cache with stripped cache key
-   k. Return response to BetterPlayer
-⑥ BetterPlayer: parse master.m3u8 → measure bandwidth → select rendition (720p or 480p)
+   k. Return response to media_kit Player
+⑥ media_kit: parse master.m3u8 → measure bandwidth → select rendition (720p or 480p)
    → fetch rendition playlist (.m3u8) → fetch segments (.ts) sequentially ahead of playhead
 ⑦ Segment requests hit CDN edge; after first viewer per PoP, all subsequent requests = cache hit
    Auth token validated at edge for every playlist request; segments served from CDN post-auth
 ⑧ At ~50 minutes (before 1h token expiry), Flutter silently calls /api/media/video/{id}/stream-token
-   → receives new token → BetterPlayer reinitializes with new URL (seamless to user)
+   → receives new token → player saves position, reopens URL with new token, seeks back (seamless)
 ```
 
 ---
@@ -393,7 +393,7 @@ videoSchema.index({ status: 1, createdAt: -1 });
 | Package | Purpose | Why This Choice |
 |---|---|---|
 | `dio` | HTTP client, upload, interceptors | Progress callbacks on PUT, interceptor for JWT refresh, multipart support |
-| `better_player` | HLS video playback | Native HLS ABR quality switching, configurable buffering, built-in caching |
+| `media_kit` + `media_kit_video` + `media_kit_libs_video` | HLS video playback | Actively maintained libmpv-based player; native HLS ABR, full buffering control, custom HTTP headers, builds cleanly on modern Flutter toolchains |
 | `cached_network_image` | Image loading with caching | Disk + memory cache, BlurHash placeholder support, retry on failure |
 | `flutter_image_compress` | Pre-upload JPEG compression | Reduces upload size and R2 storage cost before upload |
 | `image_picker` | Camera + gallery selection | Cross-platform media selection |
@@ -403,7 +403,7 @@ videoSchema.index({ status: 1, createdAt: -1 });
 | `blurhash` | BlurHash decoding | Decode stored BlurHash string to placeholder image |
 | `firebase_messaging` | Push notifications | Transcoding completion notifications |
 
-**On `better_player` vs `video_player`:** The official `video_player` package supports HLS on both platforms but lacks ABR quality selection visibility, buffering configuration, and built-in cache management. `better_player` wraps ExoPlayer (Android) and AVPlayer (iOS) with a production-grade control layer, adaptive quality reporting, and native HLS ABR — the correct choice for any application serving HLS content.
+**On `media_kit` vs `video_player`:** The official `video_player` package is maintained but delegates all HLS logic entirely to the platform layer (ExoPlayer on Android, AVPlayer on iOS), leaving no Dart-side control over buffering thresholds, ABR track selection, or cache configuration. `media_kit` wraps libmpv — a battle-tested, cross-platform media engine — exposing full buffering control, HLS ABR track visibility, custom HTTP header injection, and predictable build behaviour across Flutter versions. `better_player`, the former community recommendation, was abandoned and causes catastrophic build failures in modern Flutter environments; it must not be used.
 
 ### 4.2 Image Upload State Machine
 
@@ -479,33 +479,53 @@ class VideoUploadState {
 ### 4.4 Video Playback Architecture
 
 ```dart
-// BetterPlayer configuration for HLS playback
-BetterPlayerConfiguration(
-  autoPlay: false,
-  looping: false,
+// media_kit setup — call once in main() before runApp()
+void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  MediaKit.ensureInitialized();
+  runApp(const MyApp());
+}
+
+// Player + controller — scoped to the screen/widget lifecycle
+final player = Player(
+  configuration: PlayerConfiguration(
+    bufferSize: 32 * 1024 * 1024,  // 32MB buffer — covers ~10–15s at 720p HLS bitrate
+    logLevel: MPVLogLevel.warn,
+  ),
+);
+final controller = VideoController(player);
+
+// Open HLS master playlist — HMAC token in query string
+await player.open(
+  Media(
+    'https://media.domain.com/v/{videoId}/master.m3u8?token={token}',
+    // httpHeaders can inject additional headers if needed; HMAC token via query param is sufficient
+  ),
+);
+
+// Render widget
+Video(
+  controller: controller,
   fit: BoxFit.contain,
-  controlsConfiguration: BetterPlayerControlsConfiguration(
-    enableFullscreen: true,
-    enableSubtitles: false,
-    enableQualities: true,  // Show quality selector to user
-  ),
-  buffering: BetterPlayerBufferingConfiguration(
-    minBufferMs: 2000,       // Min 2s buffer before playback starts
-    maxBufferMs: 30000,      // Buffer up to 30s ahead
-    bufferForPlaybackMs: 1000,
-    bufferForPlaybackAfterRebufferMs: 2000,
-  ),
-  cacheConfiguration: BetterPlayerCacheConfiguration(
-    useCache: true,
-    maxCacheSize: 200 * 1024 * 1024,   // 200MB disk cache
-    maxCacheFileSize: 20 * 1024 * 1024, // 20MB per file
-  ),
+  controls: AdaptiveVideoControls,  // Material on Android, Cupertino on iOS
 )
+
+// Track playback position for token refresh + resume
+player.stream.position.listen((position) {
+  _lastKnownPosition = position;
+});
+
+// Dispose when done — essential to free libmpv resources
+@override
+void dispose() {
+  player.dispose();
+  super.dispose();
+}
 ```
 
-**Token refresh strategy:** Issue media tokens with a 1-hour TTL. At 50 minutes (10 minutes before expiry), silently call `POST /api/media/video/{id}/stream-token` in the background. Update BetterPlayer's data source URL with the new token. The player does not restart — only subsequent segment requests use the new token. This is invisible to the user.
+**Token refresh strategy:** Issue media tokens with a 1-hour TTL. At 50 minutes (10 minutes before expiry), the app silently calls `POST /api/media/video/{id}/stream-token`. Unlike `better_player`, `media_kit` does not support in-place URL hot-swapping — the correct refresh sequence is: (1) record `_lastKnownPosition` from the position stream; (2) call `player.open(Media(newUrlWithNewToken))`; (3) call `player.seek(_lastKnownPosition)` in the `player.stream.playing.first` callback; (4) call `player.play()`. The re-buffer window is typically under one second at the CDN edge cache hit rate this architecture targets, making the transition imperceptible to the user.
 
-**Pre-loading strategy:** When a video enters within 2 items of the viewport in a scroll list (e.g., a feed), pre-fetch the master playlist and first 2 segments in a background isolate. This eliminates startup latency when the user taps play.
+**Pre-loading strategy:** When a video enters within 2 items of the viewport in a scroll list (e.g., a feed), instantiate a `Player` in the background and call `player.open(Media(masterPlaylistUrl))` with `play: false`. This pre-buffers the first segments before the user taps play, eliminating startup latency perception.
 
 ### 4.5 Image Display Architecture
 
@@ -547,7 +567,7 @@ function buildMediaUrl(r2Key, options = {}) {
 | Network switches mid-upload (WiFi → 4G) | Current part fails; retry on new network | ConnectivityStream listener triggers upload resume |
 | Low memory during upload | Part ETags persisted to disk before OOM | Write to flutter_secure_storage after each part completes |
 | App crash during upload | Resume from last completed part on next open | Load state from flutter_secure_storage on app init; check for in-progress uploads |
-| Token expires while video is playing | Seamless token refresh at 50-min mark | Background silent refresh; BetterPlayer URL updated without restart |
+| Token expires while video is playing | Save position → reopen URL with new token → seek back | Background silent refresh; media_kit position saved before reopen, seek restores playback |
 | Presigned URL expires before upload starts | Re-request URL for same videoId | 403 detection → call `/api/media/video/part-url` endpoint |
 | Video enters background after first few segments | Buffer drains slowly on iOS (AVPlayer limits) | Set `AVAudioSession` to allow background audio; mitigates iOS background playback restrictions |
 
