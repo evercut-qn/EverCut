@@ -1,11 +1,11 @@
 import Joi from 'joi';
+import config from '../config/index.js';
 import {
     ALL_GENDERS,
     ALL_SERVICE_FOR,
     ALL_SHOP_AMENITIES,
     ALL_SHOP_CATEGORIES,
     DAYS_OF_WEEK,
-    SECURITY_PIN_LENGTH,
 } from '../utils/constants.js';
 import { normalizeShopSchedule } from '../utils/shop-schedule.utils.js';
 import { locationSchema } from './common.validator.js';
@@ -92,7 +92,7 @@ export const barberOnboardingSchema = Joi.object({
     ),
     breakTimes: breakTimesSchema,
     breakTimings: Joi.forbidden(),
-    pin: Joi.string().pattern(new RegExp(`^\\d{${SECURITY_PIN_LENGTH}}$`)).required(),
+    pin: Joi.string().pattern(new RegExp(`^\\d{${config.security.pinLength}}$`)).required(),
     confirmPin: Joi.string().required().valid(Joi.ref('pin')).messages({
         'any.only': 'confirmPin must match pin',
     }),

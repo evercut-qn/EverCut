@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 
+import config from '../config/index.js';
 import { ALL_PAYOUT_TRANSACTION_STATUSES, PAYOUT_MODES } from '../utils/constants.js';
 
 const payoutTransactionSchema = new mongoose.Schema(
@@ -86,7 +87,7 @@ const payoutTransactionSchema = new mongoose.Schema(
         },
         maxRetries: {
             type: Number,
-            default: 3,
+            default: config.payout.maxRetries,
         },
         lastRetryAt: {
             type: Date,

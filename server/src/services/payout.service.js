@@ -6,6 +6,7 @@ import userRepository from '../repositories/user.repository.js';
 import cashfreePayoutAdapter from '../adapters/cashfree/cashfree-payout.adapter.js';
 import notificationEvents from './notification-events.service.js';
 import logger from '../utils/logger.js';
+import config from '../config/index.js';
 import {
     BadRequestError,
     NotFoundError,
@@ -528,7 +529,7 @@ export const retryPayout = async (payoutId) => {
 };
 
 export const pollPendingPayouts = async () => {
-    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+    const tenMinutesAgo = new Date(Date.now() - config.payout.stuckThresholdMs);
     const stuckPayouts = await payoutRepository.findStuckPayouts(tenMinutesAgo);
 
     logger.info('[PayoutService] Polling stuck payouts', {

@@ -30,7 +30,7 @@ const makeStorage = (folderFn) =>
         params: (req, _file) => ({
             folder: folderFn(req),
             allowed_formats: config.upload.allowedImageFormats,
-            transformation: [{ width: 800, height: 800, crop: 'limit' }],
+            transformation: [config.upload.imageTransformations.profile],
         }),
     });
 
@@ -39,7 +39,7 @@ const coverStorage = new CloudinaryStorage({
     params: (req, _file) => ({
         folder: `evercut/shops/cover/${resolveActorKey(req)}`,
         allowed_formats: config.upload.allowedImageFormats,
-        transformation: [{ width: 1200, height: 600, crop: 'limit' }],
+        transformation: [config.upload.imageTransformations.cover],
     }),
 });
 

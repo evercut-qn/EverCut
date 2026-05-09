@@ -1,4 +1,5 @@
 import Joi from 'joi';
+import config from '../config/index.js';
 import {
     ALL_GENDERS,
     ALL_SERVICE_FOR,
@@ -6,7 +7,6 @@ import {
     ALL_SHOP_CATEGORIES,
     ALL_SERVICE_TYPES,
     DAYS_OF_WEEK,
-    SECURITY_PIN_LENGTH,
 } from '../utils/constants.js';
 import {
     normalizeBreakTimes as normalizeScheduleBreakTimes,
@@ -204,7 +204,7 @@ export const updateBusinessSchema = Joi.object({
 
 export const updatePinSchema = Joi.object({
     currentPin: Joi.string().required(),
-    newPin: Joi.string().pattern(new RegExp(`^\\d{${SECURITY_PIN_LENGTH}}$`)).required(),
+    newPin: Joi.string().pattern(new RegExp(`^\\d{${config.security.pinLength}}$`)).required(),
     confirmNewPin: Joi.string().required().valid(Joi.ref('newPin')).messages({
         'any.only': 'confirmNewPin must match newPin',
     }),

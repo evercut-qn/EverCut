@@ -1,6 +1,6 @@
 import Joi from 'joi';
-import { SECURITY_PIN_LENGTH } from '../utils/constants.js';
+import config from '../config/index.js';
 
 export const deleteBarberAccountSchema = Joi.object({
-    currentPin: Joi.string().pattern(new RegExp(`^\\d{${SECURITY_PIN_LENGTH}}$`)).required(),
+    currentPin: Joi.string().pattern(new RegExp(`^\\d{${config.security.pinLength}}$`)).required(),
 });

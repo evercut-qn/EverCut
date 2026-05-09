@@ -1,9 +1,9 @@
 import photoRepository from '../repositories/photo.repository.js';
 import shopRepository from '../repositories/shop.repository.js';
 import cloudinary from '../config/cloudinary.config.js';
+import config from '../config/index.js';
 import { NotFoundError, BadRequestError } from '../utils/api-error.js';
 import { buildPagination } from '../utils/pagination.utils.js';
-import { MAX_PHOTOS_PER_SHOP } from '../utils/constants.js';
 import { serializePhoto, serializePhotos } from '../serializers/photo.serializer.js';
 
 /**
@@ -17,8 +17,8 @@ export const uploadPhotos = async (ownerId, files, photoType = 'other', descript
     if (!files || files.length === 0) throw new BadRequestError('No files uploaded');
 
     const currentCount = await photoRepository.getActiveCountByShop(shop._id);
-    if (currentCount + files.length > MAX_PHOTOS_PER_SHOP) {
-        throw new BadRequestError(`Photo limit exceeded. Maximum ${MAX_PHOTOS_PER_SHOP} photos allowed.`);
+    if (currentCount + files.length > config.upload.maxPhotosPerShop) {
+        throw new BadRequestError(`Photo limit exceeded. Maximum ${config.upload.maxPhotosPerShop} photos allowed.`);
     }
 
     const uploaded = [];

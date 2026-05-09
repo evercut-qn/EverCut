@@ -1,5 +1,6 @@
 import Joi from 'joi';
 import mongoose from 'mongoose';
+import config from '../config/index.js';
 import { toTwentyFourHourTime } from '../utils/time.utils.js';
 
 /**
@@ -16,8 +17,8 @@ export const objectId = Joi.string().custom((value, helpers) => {
 
 // Pagination
 export const paginationSchema = Joi.object({
-    page: Joi.number().integer().min(1).default(1),
-    limit: Joi.number().integer().min(1).max(100).default(20),
+    page: Joi.number().integer().min(1).default(config.pagination.defaultPage),
+    limit: Joi.number().integer().min(1).max(config.pagination.maxLimit).default(config.pagination.defaultLimit),
 });
 
 // Date string (YYYY-MM-DD)

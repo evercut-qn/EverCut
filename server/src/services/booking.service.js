@@ -22,11 +22,7 @@ import {
 } from '../utils/time.utils.js';
 import { buildPagination } from '../utils/pagination.utils.js';
 import {
-    BOOKING_MILESTONE_TARGETS,
     BOOKING_STATUS,
-    BOOKING_LIMITS,
-    MAX_RESCHEDULE_COUNT,
-    CANCELLATION_WINDOW_HOURS,
     PAYMENT_STATUS,
     PAYOUT_STATUS,
     ROLES,
@@ -422,11 +418,11 @@ export const createBooking = async (userId, data) => {
     }
 
     // Validate date/time is in future and within booking window
-    if (!isValidBookingDateTime(date, normalizedTime, BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS)) {
+    if (!isValidBookingDateTime(date, normalizedTime, config.booking.maxAdvanceDays)) {
         if (!isBookingInFuture(date, normalizedTime)) {
             throw new BadRequestError('Cannot book in the past. Please select a future date and time.');
         }
-        throw new BadRequestError(`Bookings can only be made up to ${BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS} days in advance.`);
+        throw new BadRequestError(`Bookings can only be made up to ${config.booking.maxAdvanceDays} days in advance.`);
     }
 
     // Validate shop
@@ -444,9 +440,9 @@ export const createBooking = async (userId, data) => {
     }
 
     // Validate: Maximum services limit
-    if (serviceIds.length > BOOKING_LIMITS.MAX_SERVICES_PER_BOOKING) {
+    if (serviceIds.length > config.booking.maxServicesPerBooking) {
         throw new BadRequestError(
-            `Cannot select more than ${BOOKING_LIMITS.MAX_SERVICES_PER_BOOKING} services per booking`,
+            `Cannot select more than ${config.booking.maxServicesPerBooking} services per booking`,
         );
     }
 
@@ -471,9 +467,9 @@ export const createBooking = async (userId, data) => {
     assertBundleMinimum(services, totalAmount);
 
     // Validate: Maximum duration limit
-    if (durationMinutes > BOOKING_LIMITS.MAX_BOOKING_DURATION_MINUTES) {
+    if (durationMinutes > config.booking.maxDurationMinutes) {
         throw new BadRequestError(
-            `Total booking duration cannot exceed ${BOOKING_LIMITS.MAX_BOOKING_DURATION_MINUTES / 60} hours`,
+            `Total booking duration cannot exceed ${config.booking.maxDurationMinutes / 60} hours`,
         );
     }
 
@@ -607,8 +603,8 @@ const cancelBookingByCustomer = async (bookingId, userId) => {
     }
 
     // Check cancellation window
-    if (isWithinCancellationWindow(booking.date, booking.time, CANCELLATION_WINDOW_HOURS)) {
-        throw new BadRequestError(`Cancellation not allowed within ${CANCELLATION_WINDOW_HOURS} hours of appointment`);
+    if (isWithinCancellationWindow(booking.date, booking.time, config.booking.cancellationWindowHours)) {
+        throw new BadRequestError(`Cancellation not allowed within ${config.booking.cancellationWindowHours} hours of appointment`);
     }
 
     let cancellationNote = null;
@@ -675,11 +671,11 @@ const reorderBooking = async (userId, bookingId, newDate, newTime) => {
         throw new BadRequestError('Please choose a different date or time');
     }
 
-    if (!isValidBookingDateTime(newDate, normalizedNewTime, BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS)) {
+    if (!isValidBookingDateTime(newDate, normalizedNewTime, config.booking.maxAdvanceDays)) {
         if (!isBookingInFuture(newDate, normalizedNewTime)) {
             throw new BadRequestError('Cannot book for a past date/time');
         }
-        throw new BadRequestError(`Bookings can only be made up to ${BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS} days in advance.`);
+        throw new BadRequestError(`Bookings can only be made up to ${config.booking.maxAdvanceDays} days in advance.`);
     }
 
     const services = normalizeBookedServices(
@@ -692,9 +688,9 @@ const reorderBooking = async (userId, bookingId, newDate, newTime) => {
     const durationMinutes = sumServiceDurations(services);
     assertValidServiceDuration(durationMinutes);
     assertBundleMinimum(services, totalAmount);
-    if (durationMinutes > BOOKING_LIMITS.MAX_BOOKING_DURATION_MINUTES) {
+    if (durationMinutes > config.booking.maxDurationMinutes) {
         throw new BadRequestError(
-            `Total booking duration cannot exceed ${BOOKING_LIMITS.MAX_BOOKING_DURATION_MINUTES / 60} hours`,
+            `Total booking duration cannot exceed ${config.booking.maxDurationMinutes / 60} hours`,
         );
     }
 
@@ -848,11 +844,11 @@ export const updateBookingSchedule = async (bookingId, userId, { employeeId, dat
 
     assertBookingCanChangeBeforePayment(booking);
 
-    if (!isValidBookingDateTime(date, normalizedTime, BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS)) {
+    if (!isValidBookingDateTime(date, normalizedTime, config.booking.maxAdvanceDays)) {
         if (!isBookingInFuture(date, normalizedTime)) {
             throw new BadRequestError('Cannot update to a past date/time');
         }
-        throw new BadRequestError(`Bookings can only be made up to ${BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS} days in advance.`);
+        throw new BadRequestError(`Bookings can only be made up to ${config.booking.maxAdvanceDays} days in advance.`);
     }
 
     const oldDate = booking.date.toISOString().split('T')[0];
@@ -867,11 +863,11 @@ export const updateBookingSchedule = async (bookingId, userId, { employeeId, dat
         throw new BadRequestError('Appointment has already passed');
     }
 
-    if (isWithinCancellationWindow(booking.date, booking.time, CANCELLATION_WINDOW_HOURS)) {
-        throw new BadRequestError(`Booking updates are not allowed within ${CANCELLATION_WINDOW_HOURS} hours of appointment`);
+    if (isWithinCancellationWindow(booking.date, booking.time, config.booking.cancellationWindowHours)) {
+        throw new BadRequestError(`Booking updates are not allowed within ${config.booking.cancellationWindowHours} hours of appointment`);
     }
 
-    if ((booking.rescheduleCount || 0) >= MAX_RESCHEDULE_COUNT) {
+    if ((booking.rescheduleCount || 0) >= config.booking.maxRescheduleCount) {
         throw new BadRequestError('You can only reschedule once');
     }
 
@@ -978,8 +974,8 @@ export const getAvailableSlots = async (employeeId, date, serviceId) => {
     }
 
     // Check if date is within booking window
-    if (!isWithinBookingWindow(date, BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS, now)) {
-        throw new BadRequestError(`Availability can only be checked up to ${BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS} days in advance.`);
+    if (!isWithinBookingWindow(date, config.booking.maxAdvanceDays, now)) {
+        throw new BadRequestError(`Availability can only be checked up to ${config.booking.maxAdvanceDays} days in advance.`);
     }
 
     // Normalize serviceIds to array
@@ -1079,8 +1075,8 @@ export const getShopAvailability = async (shopId, date, serviceId) => {
     }
 
     // Check if date is within booking window
-    if (!isWithinBookingWindow(date, BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS, now)) {
-        throw new BadRequestError(`Availability can only be checked up to ${BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS} days in advance.`);
+    if (!isWithinBookingWindow(date, config.booking.maxAdvanceDays, now)) {
+        throw new BadRequestError(`Availability can only be checked up to ${config.booking.maxAdvanceDays} days in advance.`);
     }
 
     // Normalize serviceIds to array
@@ -1338,11 +1334,11 @@ const buildMilestoneAnalytics = async (ownerId, query = {}) => {
         endDate,
     );
 
-    const progressMax = BOOKING_MILESTONE_TARGETS[BOOKING_MILESTONE_TARGETS.length - 1] || 0;
+    const progressMax = config.booking.milestoneTargets[config.booking.milestoneTargets.length - 1] || 0;
     const progressValue = progressMax > 0
         ? Math.min(completedBookings, progressMax)
         : completedBookings;
-    const milestones = BOOKING_MILESTONE_TARGETS.map((targetBookings, index) => ({
+    const milestones = config.booking.milestoneTargets.map((targetBookings, index) => ({
         targetBookings,
         label: getTargetLabel(index),
         isCompleted: completedBookings >= targetBookings,
@@ -1519,15 +1515,14 @@ const cancelBookingByBarber = async (bookingId, ownerId) => {
 // ── System: Auto-Cancel Awaiting Bookings ────────────────────────────────
 
 export const autoCancelAwaitingBookings = async () => {
-    const CONFIRMATION_TIMEOUT_HOURS = 24;
-    const cutoffTime = new Date(Date.now() - CONFIRMATION_TIMEOUT_HOURS * 60 * 60 * 1000);
+    const cutoffTime = new Date(Date.now() - config.booking.confirmationTimeoutHours * 60 * 60 * 1000);
 
     logger.info('[BookingService] Starting auto-cancel job', {
         cutoffTime,
-        timeoutHours: CONFIRMATION_TIMEOUT_HOURS,
+        timeoutHours: config.booking.confirmationTimeoutHours,
     });
 
-    // Find bookings awaiting confirmation for more than 24 hours
+    // Find bookings awaiting confirmation for more than the configured timeout
     const expiredBookings = await bookingRepository.findAwaitingConfirmationExpired(cutoffTime, 100);
 
     if (expiredBookings.length === 0) {
@@ -1778,9 +1773,9 @@ const buildQueueAnalytics = async (ownerId) => {
         const timeDiff = bookingMinutes - currentMinutes;
 
         // Active: bookings happening now or in the past (not yet completed)
-        // Upcoming: bookings more than 30 minutes in the future
-        if (timeDiff <= 30) {
-            // Booking is now or in the past, or within 30 minutes in the future
+        // Upcoming: bookings more than the configured threshold minutes in the future
+        if (timeDiff <= config.booking.activeThresholdMinutes) {
+            // Booking is now or in the past, or within the threshold minutes in the future
             activeBookings.push(booking);
         } else {
             // Booking is more than 30 minutes in the future

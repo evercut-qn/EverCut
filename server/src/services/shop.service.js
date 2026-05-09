@@ -3,6 +3,7 @@ import customerRepository from '../repositories/customer.repository.js';
 import serviceRepository from '../repositories/service.repository.js';
 import photoRepository from '../repositories/photo.repository.js';
 import ratingRepository from '../repositories/rating.repository.js';
+import config from '../config/index.js';
 import { BadRequestError, NotFoundError } from '../utils/api-error.js';
 import { serializeBarberProfile, serializeBankDetails } from '../utils/barber-profile.utils.js';
 import { escapeRegex } from '../utils/regex.utils.js';
@@ -21,7 +22,6 @@ import {
     ALL_SHOP_AMENITIES,
     ALL_SHOP_CATEGORIES,
     DAYS_OF_WEEK,
-    NEARBY_DISTANCE_METERS,
 } from '../utils/constants.js';
 
 /**
@@ -511,7 +511,7 @@ export const getShops = async (query = {}) => {
 export const getNearbyShops = async (coordinates) => {
     return (await shopRepository.findNearby(
         coordinates,
-        NEARBY_DISTANCE_METERS,
+        config.shop.nearbyDistanceMeters,
         'shopName address coverUrl facilities',
     )).map(serializeShopSummary).filter(Boolean);
 };
@@ -519,7 +519,7 @@ export const getNearbyShops = async (coordinates) => {
 export const getNearbyServicesByGender = async (coordinates, gender, searchTerm) => {
     const nearbyShops = await shopRepository.findNearby(
         coordinates,
-        NEARBY_DISTANCE_METERS,
+        config.shop.nearbyDistanceMeters,
         'shopName address coverUrl',
     );
 

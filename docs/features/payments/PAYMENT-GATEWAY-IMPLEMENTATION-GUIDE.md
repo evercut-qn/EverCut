@@ -2076,12 +2076,12 @@ export const initiateRefund = async (bookingId, reason) => {
  * Poll pending payments that haven't received webhooks.
  */
 export const pollPendingPayments = async () => {
-    const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
-    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const staleCutoff = new Date(Date.now() - 30 * 60 * 1000);
+    const maxAgeCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
     const pendingPayments = await paymentRepository.findStalePayments(
-        thirtyMinutesAgo,
-        twentyFourHoursAgo,
+        staleCutoff,
+        maxAgeCutoff,
         config.payment.maxPollAttempts,
     );
 
@@ -2120,7 +2120,7 @@ export const pollPendingPayments = async () => {
         }
     }
 
-    const expiredCount = await paymentRepository.expireOldPendingPayments(twentyFourHoursAgo);
+    const expiredCount = await paymentRepository.expireOldPendingPayments(maxAgeCutoff);
     if (expiredCount > 0) {
         logger.info('[PaymentService] Expired old pending payments', { count: expiredCount });
     }

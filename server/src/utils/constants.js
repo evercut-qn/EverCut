@@ -30,8 +30,6 @@ export const BOOKING_STATUS = Object.freeze({
 
 export const ALL_BOOKING_STATUSES = Object.values(BOOKING_STATUS);
 
-export const BOOKING_MILESTONE_TARGETS = Object.freeze([500, 750, 1000]);
-
 // ---------------------------------------------------------------------------
 // Payment Statuses
 // ---------------------------------------------------------------------------
@@ -102,6 +100,11 @@ export const PAYMENT_GATEWAYS = Object.freeze({
     MANUAL: 'manual',
 });
 
+export const REFUND_TYPE = Object.freeze({
+    CANCELLATION: 'cancellation',
+    MANUAL: 'manual',
+});
+
 export const PAYOUT_MODES = Object.freeze({
     UPI: 'upi',
     IMPS: 'imps',
@@ -110,16 +113,6 @@ export const PAYOUT_MODES = Object.freeze({
     BANK: 'banktransfer',
 });
 
-
-// ---------------------------------------------------------------------------
-// Booking Limits
-// ---------------------------------------------------------------------------
-
-export const BOOKING_LIMITS = Object.freeze({
-    MAX_SERVICES_PER_BOOKING: 10,      // Maximum 10 services/bundles per booking
-    MAX_BOOKING_DURATION_MINUTES: 480, // Maximum 8 hours per booking
-    MAX_ADVANCE_BOOKING_DAYS: 7,       // Maximum 7 days in advance
-});
 
 // ---------------------------------------------------------------------------
 // Shop Categories
@@ -270,26 +263,6 @@ export const NOTIFICATION_EVENT = Object.freeze({
 export const ALL_NOTIFICATION_EVENTS = Object.values(NOTIFICATION_EVENT);
 
 // ---------------------------------------------------------------------------
-// Security
-// ---------------------------------------------------------------------------
-
-export const SECURITY_PIN_LENGTH = 4;
-
-// ---------------------------------------------------------------------------
-// OTP Rate Limiting
-// ---------------------------------------------------------------------------
-// Used by otp-rate-limiter.middleware.js.
-// OTP length and expiry are configured via msg91.config.js,
-// not duplicated here.
-
-export const OTP_RATE_LIMIT = Object.freeze({
-    windowMs: 15 * 60 * 1000,   // 15 minutes
-    maxSendPerPhone: 5,
-    maxSendPerIp: 10,
-    maxVerifyPerPhone: 10,
-});
-
-// ---------------------------------------------------------------------------
 // Token Types
 // ---------------------------------------------------------------------------
 
@@ -299,11 +272,3 @@ export const TOKEN_TYPE = Object.freeze({
     REFRESH: 'refresh',
 });
 
-// ---------------------------------------------------------------------------
-// Miscellaneous
-// ---------------------------------------------------------------------------
-
-export const MAX_RESCHEDULE_COUNT = 1;
-export const CANCELLATION_WINDOW_HOURS = 2;
-export const NEARBY_DISTANCE_METERS = 2000;
-export const MAX_PHOTOS_PER_SHOP = 10;

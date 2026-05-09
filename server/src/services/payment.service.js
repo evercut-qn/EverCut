@@ -20,6 +20,7 @@ import {
 import {
     BOOKING_STATUS,
     PAYMENT_GATEWAYS,
+    REFUND_TYPE,
     PAYMENT_STATUS,
     PAYMENT_TRANSACTION_STATUS,
     PHONEPE_WEBHOOK_EVENTS,
@@ -53,10 +54,6 @@ const generateMerchantOrderId = (bookingId) => {
     return `EC-${bookingId}-${Date.now()}-${random}`;
 };
 
-const REFUND_TYPE = Object.freeze({
-    CANCELLATION: 'cancellation',
-    MANUAL: 'manual',
-});
 
 const REFUND_MANUAL_MESSAGE = 'Refund could not be initiated. Please request a manual refund.';
 
@@ -1160,14 +1157,14 @@ export const initiateRefund = async (bookingId, reason, actor = null, isBarberCa
 
 export const pollPendingPayments = async () => {
     const now = Date.now();
-    const thirtyMinutesAgo = new Date(now - 30 * 60 * 1000);
-    const twentyFourHoursAgo = new Date(now - 24 * 60 * 60 * 1000);
+    const staleCutoff = new Date(now - config.payment.stalePaymentThresholdMs);
+    const maxAgeCutoff = new Date(now - config.payment.maxPaymentAgeMs);
     const expiresBefore = new Date(now);
     const fallbackCreatedBefore = new Date(now - config.payment.sessionExpirySeconds * 1000);
 
     const pendingPayments = await paymentRepository.findStalePayments(
-        thirtyMinutesAgo,
-        twentyFourHoursAgo,
+        staleCutoff,
+        maxAgeCutoff,
         config.payment.maxPollAttempts,
     );
 

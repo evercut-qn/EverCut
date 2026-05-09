@@ -4,7 +4,8 @@ import { authorize } from '../middleware/authorize.middleware.js';
 import { otpRateLimiter } from '../middleware/otp-rate-limiter.middleware.js';
 import { validate } from '../middleware/validate.middleware.js';
 import * as accountController from '../controllers/account.controller.js';
-import { OTP_RATE_LIMIT, ROLES } from '../utils/constants.js';
+import config from '../config/index.js';
+import { ROLES } from '../utils/constants.js';
 import { deleteBarberAccountSchema } from '../validators/account.validator.js';
 import {
     sendPhoneOtpSchema,
@@ -21,8 +22,8 @@ router.use(authenticate);
 router.post(
     '/phone/send-otp',
     otpRateLimiter({
-        windowMs: OTP_RATE_LIMIT.windowMs,
-        max: OTP_RATE_LIMIT.maxSendPerPhone,
+        windowMs: config.security.otpRateLimit.windowMs,
+        max: config.security.otpRateLimit.maxSendPerPhone,
         keyPrefix: 'phone-update-send',
         keySource: 'body.newMobile',
     }),
@@ -33,8 +34,8 @@ router.post(
 router.post(
     '/phone/verify-otp',
     otpRateLimiter({
-        windowMs: OTP_RATE_LIMIT.windowMs,
-        max: OTP_RATE_LIMIT.maxVerifyPerPhone,
+        windowMs: config.security.otpRateLimit.windowMs,
+        max: config.security.otpRateLimit.maxVerifyPerPhone,
         keyPrefix: 'phone-update-verify',
         keySource: 'body.newMobile',
     }),

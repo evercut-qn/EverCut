@@ -67,6 +67,7 @@ const config = Object.freeze({
   upload: Object.freeze({
     maxFileSize: 5 * 1024 * 1024, // 5 MB
     maxFiles: 10,
+    maxPhotosPerShop: 10,
     allowedImageFormats: ['jpg', 'jpeg', 'png', 'webp'],
     allowedMimeTypes: [
       'image/jpeg',
@@ -75,13 +76,25 @@ const config = Object.freeze({
       'image/gif',
       'image/webp',
     ],
+    imageTransformations: Object.freeze({
+      profile: { width: 800, height: 800, crop: 'limit' },
+      cover: { width: 1200, height: 600, crop: 'limit' },
+    }),
   }),
 
   /** Security / Rate Limiting */
   security: Object.freeze({
     bcryptSaltRounds: 10,
+    pinLength: 4,
     rateLimitWindowMs: 15 * 60 * 1000, // 15 minutes
     rateLimitMax: 100, // requests per window
+    otpRateLimit: Object.freeze({
+      windowMs: 15 * 60 * 1000,   // 15 minutes
+      maxSendPerPhone: 5,
+      maxSendPerIp: 10,
+      maxVerifyPerPhone: 10,
+      cleanupIntervalMs: 10 * 60 * 1000, // 10 minutes
+    }),
   }),
 
   /** MSG91 OTP */
@@ -138,7 +151,24 @@ const config = Object.freeze({
     payoutApiVersion: '2024-01-01',
   }),
 
-  /** Payment + Payout business rules */
+  /** Booking business rules */
+  booking: Object.freeze({
+    maxServicesPerBooking: 10,
+    maxDurationMinutes: 480,       // 8 hours
+    maxAdvanceDays: 7,
+    maxRescheduleCount: 1,
+    cancellationWindowHours: 2,
+    activeThresholdMinutes: 30,
+    confirmationTimeoutHours: 24,
+    milestoneTargets: [500, 750, 1000],
+  }),
+
+  /** Shop business rules */
+  shop: Object.freeze({
+    nearbyDistanceMeters: 2000,
+  }),
+
+  /** Payment business rules */
   payment: Object.freeze({
     platformFeeSingle: 3,
     platformFeeBundle: 10,
@@ -148,6 +178,8 @@ const config = Object.freeze({
     sessionExpirySeconds: 1200,
     maxPollAttempts: 10,
     pollIntervalBaseMs: 3000,
+    stalePaymentThresholdMs: 30 * 60 * 1000,     // 30 minutes
+    maxPaymentAgeMs: 24 * 60 * 60 * 1000,        // 24 hours
     payoutBatchCronTime: '0 23 * * *',
     payoutBatchTimezone: 'Asia/Kolkata',
     // Payment modes configuration (PhonePe V2 Schema)
@@ -155,6 +187,13 @@ const config = Object.freeze({
     // Empty array = all payment modes enabled
     // Examples: [{ type: 'UPI' }], [{ type: 'UPI' }, { type: 'CARD' }]
     paymentModes: [{ type: 'UPI' }],
+  }),
+
+  /** Payout business rules */
+  payout: Object.freeze({
+    maxRetries: 3,
+    pollIntervalMs: 10 * 60 * 1000,              // 10 minutes
+    stuckThresholdMs: 10 * 60 * 1000,             // 10 minutes
   }),
 });
 

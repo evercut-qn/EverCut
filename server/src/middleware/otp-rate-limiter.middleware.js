@@ -1,4 +1,5 @@
 import { TooManyRequestsError } from '../utils/api-error.js';
+import config from '../config/index.js';
 
 // Dev-friendly in-memory store. Replace with Redis-backed storage
 // before running multiple backend instances behind a load balancer.
@@ -14,7 +15,7 @@ const cleanupExpiredEntries = () => {
     }
 };
 
-const cleanupTimer = setInterval(cleanupExpiredEntries, 10 * 60 * 1000);
+const cleanupTimer = setInterval(cleanupExpiredEntries, config.security.otpRateLimit.cleanupIntervalMs);
 cleanupTimer.unref();
 
 const resolveKeyValue = (req, keySource) => {
