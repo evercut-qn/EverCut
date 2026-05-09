@@ -890,16 +890,16 @@ Customer pays cancellation fee. Covers platform costs and discourages frivolous 
 
 **Refund Calculation:**
 ```
-Service Amount: ₹300
-Platform Fee: ₹3
-Refund Fee: ₹7
-Total Paid: ₹303
+Service Amount: ₹299
+Platform Fee: ₹10
+Refund Fee: ₹15
+Total Paid: ₹309
 
 Refund = Service Amount - Refund Fee
-Refund = ₹300 - ₹7 = ₹293
+Refund = ₹299 - ₹15 = ₹284
 
-Customer Receives: ₹293
-Platform Keeps: ₹10 (₹3 platform fee + ₹7 refund fee)
+Customer Receives: ₹284
+Platform Keeps: ₹25 (₹10 platform fee + ₹15 refund fee)
 ```
 
 ### Rule 6: Full Refund on Auto-Cancel
@@ -1087,7 +1087,7 @@ Barber can only cancel PENDING (unpaid) bookings. After payment, only auto-cance
 
 ### Edge Case 5: Service Price Changed After Booking
 
-**Problem:** Booking created with service price ₹300, shop owner changes price to ₹400.
+**Problem:** Booking created with service price ₹299, shop owner changes price to ₹400.
 
 **Handling:**
 - Booking stores totalAmount at creation time

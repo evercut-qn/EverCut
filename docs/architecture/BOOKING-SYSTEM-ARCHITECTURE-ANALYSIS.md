@@ -50,7 +50,7 @@ Customer Request (POST /bookings)
   ├─ 5. isWithinShopHours(time, openTime, closeTime)  ← checks START time only
   ├─ 6. Fetch services, sum durations, sum prices
   ├─ 7. assertValidServiceDuration (> 0)
-  ├─ 8. assertBundleMinimum (≥ ₹300 for bundles)
+  ├─ 8. assertBundleMinimum (≥ ₹299 for bundles), assertSingleMinimum (≥ ₹69 for single)
   ├─ 9. Max duration check (≤ 480 min)
   ├─10. buildSlotLockTimes(time, duration) → e.g. ["10:00","10:30","11:00"]
   ├─11. employeeRepository.claimSlots(empId, date, slotLockTimes)  ← ATOMIC

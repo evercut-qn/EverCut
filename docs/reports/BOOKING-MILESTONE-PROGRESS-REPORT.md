@@ -144,7 +144,8 @@ Added booking-domain milestone logic in `booking.service.js`:
 
 ## 5. Files Modified
 
-- `server/src/utils/constants.js`
+- `server/src/config/index.js` (milestone targets moved here as `config.booking.milestoneTargets`)
+- `server/src/utils/constants.js` (`BOOKING_MILESTONE_TARGETS` removed — now in config)
 - `server/src/repositories/booking.repository.js`
 - `server/src/validators/booking.validator.js`
 - `server/src/controllers/barber/barber-booking.controller.js`

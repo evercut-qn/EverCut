@@ -206,15 +206,12 @@ export const ROLES = Object.freeze({
 export const ALL_ROLES = Object.values(ROLES);
 
 // ── OTP Rate Limiting ──────────────────────────────────────────────
-// Used by otp-rate-limiter.middleware.js.
-// OTP length and expiry are configured via msg91.config.js,
-// not duplicated here.
-export const OTP_RATE_LIMIT = Object.freeze({
-    windowMs: 15 * 60 * 1000,   // 15 minutes
-    maxSendPerPhone: 5,
-    maxSendPerIp: 10,
-    maxVerifyPerPhone: 10,
-});
+// OTP rate limits are now centralized in config/index.js under
+// config.security.otpRateLimit — do NOT duplicate here.
+//   config.security.otpRateLimit.windowMs          = 15 * 60 * 1000
+//   config.security.otpRateLimit.maxSendPerPhone    = 5
+//   config.security.otpRateLimit.maxSendPerIp        = 10
+//   config.security.otpRateLimit.maxVerifyPerPhone   = 10
 
 // ── Token Types ──────────────────────────────────────────────────────────────
 export const TOKEN_TYPE = Object.freeze({
@@ -776,27 +773,27 @@ import {
     sendOtpSchema, verifyOtpSchema, resendOtpSchema, refreshTokenSchema,
 } from '../validators/auth.validator.js';
 import * as authController from '../controllers/auth.controller.js';
-import { OTP_RATE_LIMIT } from '../utils/constants.js';
+import config from '../config/index.js';
 
 const router = Router();
 
 // ── OTP Endpoints (Public) ──────────────────────────────────────────
 
 router.post('/otp/send',
-    otpRateLimiter({ windowMs: OTP_RATE_LIMIT.windowMs, max: OTP_RATE_LIMIT.maxSendPerIp, keyPrefix: 'otp-send-ip', keySource: 'ip' }),
-    otpRateLimiter({ windowMs: OTP_RATE_LIMIT.windowMs, max: OTP_RATE_LIMIT.maxSendPerPhone, keyPrefix: 'otp-send-phone', keySource: 'body.mobile' }),
+    otpRateLimiter({ windowMs: config.security.otpRateLimit.windowMs, max: config.security.otpRateLimit.maxSendPerIp, keyPrefix: 'otp-send-ip', keySource: 'ip' }),
+    otpRateLimiter({ windowMs: config.security.otpRateLimit.windowMs, max: config.security.otpRateLimit.maxSendPerPhone, keyPrefix: 'otp-send-phone', keySource: 'body.mobile' }),
     validate(sendOtpSchema, 'body'),
     authController.sendOtp,
 );
 
 router.post('/otp/verify',
-    otpRateLimiter({ windowMs: OTP_RATE_LIMIT.windowMs, max: OTP_RATE_LIMIT.maxVerifyPerPhone, keyPrefix: 'otp-verify', keySource: 'body.mobile' }),
+    otpRateLimiter({ windowMs: config.security.otpRateLimit.windowMs, max: config.security.otpRateLimit.maxVerifyPerPhone, keyPrefix: 'otp-verify', keySource: 'body.mobile' }),
     validate(verifyOtpSchema, 'body'),
     authController.verifyOtp,
 );
 
 router.post('/otp/resend',
-    otpRateLimiter({ windowMs: OTP_RATE_LIMIT.windowMs, max: OTP_RATE_LIMIT.maxSendPerPhone, keyPrefix: 'otp-resend', keySource: 'body.mobile' }),
+    otpRateLimiter({ windowMs: config.security.otpRateLimit.windowMs, max: config.security.otpRateLimit.maxSendPerPhone, keyPrefix: 'otp-resend', keySource: 'body.mobile' }),
     validate(resendOtpSchema, 'body'),
     authController.resendOtp,
 );
@@ -1543,7 +1540,7 @@ server/
     │   ├── otp.service.js                   ← NEW
     │   └── sms-provider.service.js          ← NEW
     ├── utils/
-    │   ├── constants.js                     ← ADD: OTP_RATE_LIMIT, TOKEN_TYPE constants
+    │   ├── constants.js                     ← ADD: TOKEN_TYPE constants (OTP_RATE_LIMIT now in config/index.js)
     │   └── logger.js                        ← UPDATE: rename "Firebase private keys" comment
     └── validators/
         ├── auth.validator.js                ← REWRITE: OTP + token schemas

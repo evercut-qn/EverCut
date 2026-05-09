@@ -312,7 +312,8 @@ payment: Object.freeze({
     platformFeeBundle: 10,            // ₹10 platform fee for bundle
     refundFeeSingle: 7,               // ₹7 refund processing fee (single)
     refundFeeBundle: 15,              // ₹15 refund processing fee (bundle)
-    minBundleServiceAmount: 300,      // ₹300 minimum service amount for bundles
+    minBundleServiceAmount: 299,      // ₹299 minimum service amount for bundles
+    minSingleServiceAmount: 69,       // ₹69 minimum service amount for single services
     sessionExpirySeconds: 1200,       // 20 minutes
     maxPollAttempts: 10,
     pollIntervalBaseMs: 3000,         // 3 seconds, doubles each attempt
@@ -757,25 +758,14 @@ export const PAYOUT_MODES = Object.freeze({
     RTGS: 'RTGS',
 });
 
-// ─── Fixed Platform Fees (in rupees) — per Payment-Payout-Logic.md ───
-
-export const PLATFORM_FEES = Object.freeze({
-    SINGLE_SERVICE: 3,   // ₹3 fixed fee for single service
-    BUNDLE: 10,          // ₹10 fixed fee for bundle of services
-});
-
-// ─── Fixed Refund Fees (in rupees) — per Payment-Payout-Logic.md ───
-
-export const REFUND_FEES = Object.freeze({
-    SINGLE_SERVICE: 7,   // ₹7 refund processing fee
-    BUNDLE: 15,          // ₹15 refund processing fee
-});
-
-// ─── Bundle Pricing Rules ───
-
-export const BUNDLE_RULES = Object.freeze({
-    MIN_SERVICE_AMOUNT: 300,  // Minimum total service amount for bundles (₹300)
-});
+// ─── Platform & Refund Fees — centralized in config/index.js ───
+// All fee and bundle-rule values are defined in config.payment:
+//   config.payment.platformFeeSingle  = 3   (₹3 fixed fee for single service)
+//   config.payment.platformFeeBundle  = 10  (₹10 fixed fee for bundle)
+//   config.payment.refundFeeSingle    = 7   (₹7 refund processing fee)
+//   config.payment.refundFeeBundle    = 15  (₹15 refund processing fee)
+//   config.payment.minBundleServiceAmount = 300 (₹300 minimum for bundles)
+// Do NOT re-create PLATFORM_FEES / REFUND_FEES / BUNDLE_RULES in constants.js.
 ```
 
 ---
@@ -1699,6 +1689,9 @@ export const initiatePayment = async (userId, bookingId) => {
     // 5. Validate bundle minimum
     if (settlement.isBundle && (settlement.serviceAmount / 100) < config.payment.minBundleServiceAmount) {
         throw new BadRequestError(`Bundle service amount must be at least ₹${config.payment.minBundleServiceAmount}`);
+    }
+    if (!settlement.isBundle && (settlement.serviceAmount / 100) < config.payment.minSingleServiceAmount) {
+        throw new BadRequestError(`Single service amount must be at least ₹${config.payment.minSingleServiceAmount}`);
     }
 
     // 6. Generate unique merchant order ID
@@ -3400,7 +3393,7 @@ Current Flow:
   4. Return booking
 
 New Flow (with payment & end-of-day batch payout):
-  1. Validate booking data (enforce ₹300 minimum for bundles)
+  1. Validate booking data (enforce ₹299 minimum for bundles, ₹69 minimum for single services)
   2. Check slot availability
   3. Create booking (status: pending, paymentStatus: pending, payoutStatus: not_initiated)
   4. Return booking with paymentRequired: true

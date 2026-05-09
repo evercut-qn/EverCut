@@ -761,7 +761,7 @@ EverCut uses a **fixed platform fee** model (NOT a percentage-based commission).
 
 | Component | Amount | Notes |
 |---|---|---|
-| Service Amount (total of all services) | ₹309 *(example, must be ≥ ₹300)* | Sum of all services in bundle |
+| Service Amount (total of all services) | ₹309 *(example, must be ≥ ₹299)* | Sum of all services in bundle |
 | Platform Fee | **₹10** (fixed) | Added on top of service amount |
 | **Total Paid by Customer** | **₹319** | `serviceAmount + platformFee` |
 | Barber Payout | ₹309 | Exact service amount |
@@ -770,7 +770,8 @@ EverCut uses a **fixed platform fee** model (NOT a percentage-based commission).
 
 #### Pricing Rules
 
-- **Minimum bundle service amount:** ₹300 (enforced by platform)
+- **Minimum bundle service amount:** ₹299 (enforced by platform)
+- **Minimum single service amount:** ₹69 (enforced by platform)
 - **Platform fee:** ₹3 for single service, ₹10 for bundle
 - **Barber always receives 100% of the service amount** — platform fee and payout charges are borne by the platform
 - **Cashfree charges (₹6 + 18% GST = ₹7.08 for UPI ≤₹1,000)** are deducted from the platform's Cashfree wallet, separate from the barber's payout
@@ -1624,7 +1625,7 @@ stateDiagram-v2
 | **Booking cancelled after payout initiated** | If payout PENDING: attempt cancel; if SUCCESS: manual recovery |
 | **Payment collected via PhonePe, Cashfree wallet empty** | Payout queued; admin alerted to fund Cashfree wallet |
 | **Both webhooks arrive simultaneously** | Process independently; use database transactions for booking status |
-| **Refund requested for bundle below ₹300** | Should not occur — ₹300 minimum is enforced at booking creation. If it does, process refund with bundle fee schedule. |
+| **Refund requested for bundle below ₹299** | Should not occur — ₹299 minimum is enforced at booking creation. If it does, process refund with bundle fee schedule. |
 
 ### 19.4 Timeout Strategy
 

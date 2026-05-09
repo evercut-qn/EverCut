@@ -119,17 +119,20 @@ const getMaxAdvanceDays = (shopCategory) => {
 
 ## Changes Made
 
-### 1. Constants Updated
+### 1. Config Updated
 
-**File:** `server/src/utils/constants.js`
+**File:** `server/src/config/index.js` (booking limits moved from `constants.js` to `config.booking`)
 
 ```javascript
-export const BOOKING_LIMITS = Object.freeze({
-    MAX_SERVICES_PER_BOOKING: 10,      // Maximum 10 services/bundles per booking
-    MAX_BOOKING_DURATION_MINUTES: 480, // Maximum 8 hours per booking
-    MAX_ADVANCE_BOOKING_DAYS: 7,       // Maximum 7 days in advance (NEW)
-});
+booking: Object.freeze({
+    maxServicesPerBooking: 10,       // Maximum 10 services/bundles per booking
+    maxDurationMinutes: 480,         // Maximum 8 hours per booking
+    maxAdvanceDays: 7,               // Maximum 7 days in advance
+    // ... other booking config values
+}),
 ```
+
+> **Note:** `BOOKING_LIMITS` has been removed from `constants.js`. All booking limits are now in `config.booking.*`.
 
 ---
 
@@ -193,11 +196,11 @@ if (!isBookingInFuture(date, normalizedTime)) {
 }
 
 // After
-if (!isValidBookingDateTime(date, normalizedTime, BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS)) {
+if (!isValidBookingDateTime(date, normalizedTime, config.booking.maxAdvanceDays)) {
     if (!isBookingInFuture(date, normalizedTime)) {
         throw new BadRequestError('Cannot book in the past. Please select a future date and time.');
     }
-    throw new BadRequestError(`Bookings can only be made up to ${BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS} days in advance.`);
+    throw new BadRequestError(`Bookings can only be made up to ${config.booking.maxAdvanceDays} days in advance.`);
 }
 ```
 
@@ -209,11 +212,11 @@ if (!isBookingInFuture(newDate, normalizedNewTime)) {
 }
 
 // After
-if (!isValidBookingDateTime(newDate, normalizedNewTime, BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS)) {
+if (!isValidBookingDateTime(newDate, normalizedNewTime, config.booking.maxAdvanceDays)) {
     if (!isBookingInFuture(newDate, normalizedNewTime)) {
         throw new BadRequestError('Cannot reschedule to a past date/time');
     }
-    throw new BadRequestError(`Bookings can only be made up to ${BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS} days in advance.`);
+    throw new BadRequestError(`Bookings can only be made up to ${config.booking.maxAdvanceDays} days in advance.`);
 }
 ```
 
@@ -225,11 +228,11 @@ if (!isBookingInFuture(newDate, normalizedNewTime)) {
 }
 
 // After
-if (!isValidBookingDateTime(newDate, normalizedNewTime, BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS)) {
+if (!isValidBookingDateTime(newDate, normalizedNewTime, config.booking.maxAdvanceDays)) {
     if (!isBookingInFuture(newDate, normalizedNewTime)) {
         throw new BadRequestError('Cannot book for a past date/time');
     }
-    throw new BadRequestError(`Bookings can only be made up to ${BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS} days in advance.`);
+    throw new BadRequestError(`Bookings can only be made up to ${config.booking.maxAdvanceDays} days in advance.`);
 }
 ```
 
@@ -241,35 +244,35 @@ if (!isBookingInFuture(date, normalizedTime)) {
 }
 
 // After
-if (!isValidBookingDateTime(date, normalizedTime, BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS)) {
+if (!isValidBookingDateTime(date, normalizedTime, config.booking.maxAdvanceDays)) {
     if (!isBookingInFuture(date, normalizedTime)) {
         throw new BadRequestError('Cannot update to a past date/time');
     }
-    throw new BadRequestError(`Bookings can only be made up to ${BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS} days in advance.`);
+    throw new BadRequestError(`Bookings can only be made up to ${config.booking.maxAdvanceDays} days in advance.`);
 }
 ```
 
 #### `getAvailableSlots()` - Employee Availability
 ```javascript
 // Added validation
-if (!isWithinBookingWindow(date, BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS, now)) {
-    throw new BadRequestError(`Availability can only be checked up to ${BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS} days in advance.`);
+if (!isWithinBookingWindow(date, config.booking.maxAdvanceDays, now)) {
+    throw new BadRequestError(`Availability can only be checked up to ${config.booking.maxAdvanceDays} days in advance.`);
 }
 ```
 
 #### `getShopAvailability()` - Shop Availability
 ```javascript
 // Added validation
-if (!isWithinBookingWindow(date, BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS, now)) {
-    throw new BadRequestError(`Availability can only be checked up to ${BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS} days in advance.`);
+if (!isWithinBookingWindow(date, config.booking.maxAdvanceDays, now)) {
+    throw new BadRequestError(`Availability can only be checked up to ${config.booking.maxAdvanceDays} days in advance.`);
 }
 ```
 
 #### `getEmployeeCalendar()` - Employee Calendar
 ```javascript
 // Added validation
-if (!isWithinBookingWindow(date, BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS, now)) {
-    throw new BadRequestError(`Calendar can only be viewed up to ${BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS} days in advance.`);
+if (!isWithinBookingWindow(date, config.booking.maxAdvanceDays, now)) {
+    throw new BadRequestError(`Calendar can only be viewed up to ${config.booking.maxAdvanceDays} days in advance.`);
 }
 ```
 
@@ -472,14 +475,14 @@ GET /api/v1/employees/emp123/availability?date=2026-05-10&serviceId=service1
 To modify the booking window, update the constant:
 
 ```javascript
-// In server/src/utils/constants.js
-export const BOOKING_LIMITS = Object.freeze({
-    MAX_ADVANCE_BOOKING_DAYS: 14,  // Change to 14 days
-    // ... other limits
-});
+// In server/src/config/index.js
+booking: Object.freeze({
+    maxAdvanceDays: 14,  // Change to 14 days
+    // ... other booking config values
+}),
 ```
 
-**Note:** No other code changes needed - all functions use this constant.
+**Note:** No other code changes needed - all functions use `config.booking.maxAdvanceDays`.
 
 ---
 
@@ -570,7 +573,7 @@ The 7-day booking window restriction has been successfully implemented across al
 
 **Implementation Date:** April 29, 2026  
 **Booking Window:** Today to +7 days  
-**Configuration:** `BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS = 7`
+**Configuration:** `config.booking.maxAdvanceDays = 7`
 
 ---
 

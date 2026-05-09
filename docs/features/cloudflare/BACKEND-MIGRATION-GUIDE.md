@@ -95,7 +95,7 @@ CURRENT FLOW (all media types):
 | **Serializer** | `serializers/core.serializer.js` | Strips cloudinaryId from responses | **MODIFY** |
 | **Validator** | `validators/photo.validator.js` | Photo upload/filter validation | **DELETE** (absorbed into media) |
 | **Utils** | `utils/upload-cleanup.utils.js` | Cleanup uploaded assets on validation failure | **DELETE** |
-| **Utils** | `utils/constants.js` | PHOTO_TYPE enum, MAX_PHOTOS_PER_SHOP | **MODIFY** |
+| **Utils** | `utils/constants.js` | PHOTO_TYPE enum | **MODIFY** |
 
 ### 1.3 Upload Entry Points
 
@@ -202,7 +202,7 @@ The `photo.*` module (7 files, ~282 lines) contains **zero domain logic** unique
 | `photoType` (shop_interior, work_sample, etc.) | `metadata.category` |
 | `description` | `metadata.description` |
 | `photoName` | `metadata.originalName` |
-| `MAX_PHOTOS_PER_SHOP = 10` | `MEDIA_LIMITS.MAX_GALLERY_PER_SHOP = 10` |
+| `config.upload.maxPhotosPerShop = 10` | `config.upload.maxGalleryPerShop = 10` |
 | `isActive` soft-delete | `status: 'deleted'` |
 | `fileSize`, `mimeType` | `actualSize`, `contentType` |
 
@@ -821,7 +821,7 @@ The `photo.model.js` file is deleted entirely. All its functionality is absorbed
 // ── REMOVE ───────────────────────────────────────────
 // export const PHOTO_TYPE = Object.freeze({ ... });
 // export const ALL_PHOTO_TYPES = Object.values(PHOTO_TYPE);
-// export const MAX_PHOTOS_PER_SHOP = 10;
+// MAX_PHOTOS_PER_SHOP has been moved to config.upload.maxPhotosPerShop
 
 // ── ADD ──────────────────────────────────────────────
 
@@ -892,7 +892,7 @@ export const ALL_GALLERY_CATEGORIES = Object.values(GALLERY_CATEGORY);
 export const MEDIA_LIMITS = Object.freeze({
     MAX_IMAGE_SIZE: 10 * 1024 * 1024,          // 10 MB
     MAX_VIDEO_SIZE: 500 * 1024 * 1024,         // 500 MB
-    MAX_GALLERY_PER_SHOP: 10,                  // replaces MAX_PHOTOS_PER_SHOP
+    MAX_GALLERY_PER_SHOP: 10,                  // replaces config.upload.maxPhotosPerShop
     PRESIGNED_URL_TTL: 15 * 60,                // 15 minutes (seconds)
     MULTIPART_PART_SIZE: 50 * 1024 * 1024,     // 50 MB per part
     MAX_MULTIPART_PARTS: 100,

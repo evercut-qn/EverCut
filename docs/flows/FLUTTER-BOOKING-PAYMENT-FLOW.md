@@ -81,7 +81,7 @@ Based on backend analysis, common issues in booking flows include:
 3. Service Selection
    ├─ User selects services (single/multiple)
    ├─ Calculate total duration locally
-   ├─ Validate against BOOKING_LIMITS
+   ├─ Validate against config.booking limits
    └─ Navigate to booking page
 ```
 

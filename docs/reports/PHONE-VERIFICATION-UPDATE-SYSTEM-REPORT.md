@@ -255,7 +255,7 @@ server/src/
     ├── api-response.js                [REUSED] - Standard response format
     ├── api-error.js                   [REUSED] - Error classes
     ├── logger.js                      [REUSED] - Logging with phone masking
-    └── constants.js                   [REUSED] - OTP_RATE_LIMIT constants
+    └── constants.js                   [REUSED] - TOKEN_TYPE constants (OTP_RATE_LIMIT moved to config/index.js)
 ```
 
 ---
