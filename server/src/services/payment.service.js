@@ -19,12 +19,10 @@ import {
 } from '../utils/api-error.js';
 import {
     BOOKING_STATUS,
-    BUNDLE_RULES,
     PAYMENT_GATEWAYS,
     PAYMENT_STATUS,
     PAYMENT_TRANSACTION_STATUS,
     PHONEPE_WEBHOOK_EVENTS,
-    REFUND_FEES,
     ROLES,
     SERVICE_TYPE,
 } from '../utils/constants.js';
@@ -82,7 +80,7 @@ const generateMerchantRefundId = ({ merchantOrderId, bookingId }) => {
 };
 
 const getRefundFeeInPaisa = (payment) => (
-    payment.settlement?.isBundle ? REFUND_FEES.BUNDLE : REFUND_FEES.SINGLE_SERVICE
+    payment.settlement?.isBundle ? config.payment.refundFeeBundle : config.payment.refundFeeSingle
 ) * 100;
 
 const toPositivePaisa = (value) => {
@@ -269,8 +267,8 @@ const calculateSettlement = async (booking) => {
         || services.some((service) => service.serviceType === SERVICE_TYPE.BUNDLED);
     const serviceAmountInRupees = Number(booking.totalAmount || sumServiceAmounts(services) || 0);
 
-    if (isBundle && serviceAmountInRupees < BUNDLE_RULES.MIN_SERVICE_AMOUNT) {
-        throw new BadRequestError(`Bundle service amount must be at least ₹${BUNDLE_RULES.MIN_SERVICE_AMOUNT}`);
+    if (isBundle && serviceAmountInRupees < config.payment.minBundleServiceAmount) {
+        throw new BadRequestError(`Bundle service amount must be at least ₹${config.payment.minBundleServiceAmount}`);
     }
 
     const platformFeeInRupees = isBundle

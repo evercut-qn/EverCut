@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 
+import config from '../config/index.js';
 import bookingRepository from '../repositories/booking.repository.js';
 import employeeRepository from '../repositories/employee.repository.js';
 import serviceRepository from '../repositories/service.repository.js';
@@ -24,7 +25,6 @@ import {
     BOOKING_MILESTONE_TARGETS,
     BOOKING_STATUS,
     BOOKING_LIMITS,
-    BUNDLE_RULES,
     MAX_RESCHEDULE_COUNT,
     CANCELLATION_WINDOW_HOURS,
     PAYMENT_STATUS,
@@ -180,9 +180,9 @@ const isBundleSelection = (services = []) => (
 );
 const assertBundleMinimum = (services = [], totalAmount = 0) => {
     if (!isBundleSelection(services)) return;
-    if (totalAmount >= BUNDLE_RULES.MIN_SERVICE_AMOUNT) return;
+    if (totalAmount >= config.payment.minBundleServiceAmount) return;
 
-    throw new BadRequestError(`Bundle service amount must be at least ₹${BUNDLE_RULES.MIN_SERVICE_AMOUNT}`);
+    throw new BadRequestError(`Bundle service amount must be at least ₹${config.payment.minBundleServiceAmount}`);
 };
 const assertShopAcceptsDate = (shop, date) => {
     if (!shop.isOpen) throw new BadRequestError('Shop is currently closed');
@@ -358,7 +358,7 @@ const buildBookingDetailsPayload = async (booking) => {
 
     // Calculate platform fee
     const isBundled = isBundleSelection(services);
-    const platformFee = isBundled ? 10 : 3;
+    const platformFee = isBundled ? config.payment.platformFeeBundle : config.payment.platformFeeSingle;
 
     return serializeBookingDetails({
         bookingId: booking._id,
