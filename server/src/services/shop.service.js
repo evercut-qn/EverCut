@@ -468,9 +468,30 @@ export const removeFavoriteShop = async (userId, shopId) => {
     };
 };
 
+export const searchShops = async (searchTerm) => {
+    return serviceCatalogService.searchShops(searchTerm);
+};
+
+export const getShopServices = async (shopId, queryFilters = {}) => {
+    await assertShopExists(shopId);
+
+    const filters = {};
+    if (queryFilters.serviceType) filters.serviceType = queryFilters.serviceType;
+    if (queryFilters.serviceFor) filters.serviceFor = queryFilters.serviceFor;
+    if (queryFilters.query) {
+        filters.serviceName = { $regex: new RegExp(escapeRegex(queryFilters.query), 'i') };
+    }
+
+    const total = await serviceRepository.countByShopId(shopId, filters);
+    const { skip, limit, pagination } = buildPagination(queryFilters, total);
+
+    const items = serializeServices(await serviceRepository.findByShopId(shopId, filters, { skip, limit }));
+    return { items, pagination };
+};
+
 export const getShops = async (query = {}) => {
     if (query.query) {
-        return serviceCatalogService.searchShops(query.query);
+        return searchShops(query.query);
     }
 
     if (query.category) {

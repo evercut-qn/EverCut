@@ -163,3 +163,14 @@ export const getShopAvailability = async (req, res, next) => {
         next(err);
     }
 };
+
+export const getShopServices = async (req, res, next) => {
+    try {
+        const { id } = getValidatedRequestData(req, 'params');
+        const query = getValidatedRequestData(req, 'query');
+        const result = await shopService.getShopServices(id, query);
+        return res.status(200).json(ApiResponse.paginated(result.items, result.pagination, 'Shop services fetched'));
+    } catch (err) {
+        next(err);
+    }
+};

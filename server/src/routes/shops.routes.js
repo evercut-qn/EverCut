@@ -20,6 +20,7 @@ import {
     updatePinSchema,
     updatePayoutDetailsSchema,
     favoritePatchSchema as shopFavoritePatchSchema,
+    shopServicesQuerySchema,
 } from '../validators/shop.validator.js';
 
 const router = Router();
@@ -32,6 +33,7 @@ const router = Router();
 router.get('/', validate(shopListQuerySchema, 'query'), shopController.getShops);
 router.get('/services', validate(servicesByGenderQuerySchema, 'query'), shopController.getNearbyServices);
 router.get('/:id', validate(shopIdParamSchema, 'params'), shopController.getShopById);
+router.get('/:id/services', validate(shopIdParamSchema, 'params'), validate(shopServicesQuerySchema, 'query'), shopController.getShopServices);
 router.get('/:id/employees', validate(shopIdParamSchema, 'params'), shopController.getShopEmployees);
 router.get('/:id/ratings', validate(shopIdParamSchema, 'params'), validate(paginationSchema, 'query'), ratingController.getShopRatings);
 router.get('/:id/ratings/analytics', validate(shopIdParamSchema, 'params'), ratingController.getShopRatingSummary);

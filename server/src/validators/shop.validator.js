@@ -4,6 +4,7 @@ import {
     ALL_SERVICE_FOR,
     ALL_SHOP_AMENITIES,
     ALL_SHOP_CATEGORIES,
+    ALL_SERVICE_TYPES,
     DAYS_OF_WEEK,
     SECURITY_PIN_LENGTH,
 } from '../utils/constants.js';
@@ -12,7 +13,7 @@ import {
     normalizeScheduleTime,
     normalizeShopSchedule,
 } from '../utils/shop-schedule.utils.js';
-import { objectId } from './common.validator.js';
+import { objectId, paginationSchema } from './common.validator.js';
 
 const coordinatesPattern = /^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/;
 
@@ -246,6 +247,12 @@ export const servicesByGenderQuerySchema = Joi.object({
 export const searchServicesQuerySchema = Joi.object({
     query: Joi.string().trim().min(1).max(100).required(),
     gender: Joi.string().valid(...ALL_SERVICE_FOR),
+});
+
+export const shopServicesQuerySchema = paginationSchema.keys({
+    query: Joi.string().trim().max(100).allow(''),
+    serviceType: Joi.string().valid(...ALL_SERVICE_TYPES),
+    serviceFor: Joi.string().valid(...ALL_SERVICE_FOR),
 });
 
 export const shopAvailabilityQuerySchema = Joi.object({
