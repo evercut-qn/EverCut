@@ -180,6 +180,13 @@ const assertBundleMinimum = (services = [], totalAmount = 0) => {
 
     throw new BadRequestError(`Bundle service amount must be at least ₹${config.payment.minBundleServiceAmount}`);
 };
+const assertSingleMinimum = (services = [], totalAmount = 0) => {
+    if (isBundleSelection(services)) return;
+    if (services.length === 0) return;
+    if (totalAmount >= config.payment.minSingleServiceAmount) return;
+
+    throw new BadRequestError(`Single service amount must be at least ₹${config.payment.minSingleServiceAmount}`);
+};
 const assertShopAcceptsDate = (shop, date) => {
     if (!shop.isOpen) throw new BadRequestError('Shop is currently closed');
 
@@ -465,6 +472,7 @@ export const createBooking = async (userId, data) => {
     const durationMinutes = sumServiceDurations(services);
     assertValidServiceDuration(durationMinutes);
     assertBundleMinimum(services, totalAmount);
+    assertSingleMinimum(services, totalAmount);
 
     // Validate: Maximum duration limit
     if (durationMinutes > config.booking.maxDurationMinutes) {
@@ -688,6 +696,7 @@ const reorderBooking = async (userId, bookingId, newDate, newTime) => {
     const durationMinutes = sumServiceDurations(services);
     assertValidServiceDuration(durationMinutes);
     assertBundleMinimum(services, totalAmount);
+    assertSingleMinimum(services, totalAmount);
     if (durationMinutes > config.booking.maxDurationMinutes) {
         throw new BadRequestError(
             `Total booking duration cannot exceed ${config.booking.maxDurationMinutes / 60} hours`,

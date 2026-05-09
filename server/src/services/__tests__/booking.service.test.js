@@ -755,7 +755,51 @@ test('createBooking rejects bundle bookings below the documented minimum service
             date: getInWindowBookingDate(),
             time: '10:00 AM',
         }),
-        /at least ₹300/,
+        /at least ₹299/,
+    );
+});
+
+test('createBooking rejects single service bookings below the documented minimum service amount', async (t) => {
+    t.mock.method(customerRepository, 'findByUserId', async () => ({ _id: 'customer-1' }));
+
+    t.mock.method(shopRepository, 'findByIdWithFields', async () => ({
+        _id: 'shop-1',
+        isOpen: true,
+        openTime: '09:00',
+        closeTime: '21:00',
+        availableDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
+    }));
+
+    t.mock.method(serviceRepository, 'findByIds', async () => ([
+        {
+            _id: 'single-1',
+            shopId: 'shop-1',
+            finalPrice: 50,
+            actualPrice: 50,
+            offerPrice: 0,
+            serviceType: 'single',
+            duration: 30,
+        },
+    ]));
+
+    t.mock.method(employeeRepository, 'claimSlot', async () => ({
+        _id: 'employee-1',
+    }));
+
+    t.mock.method(bookingRepository, 'create', async (payload) => ({
+        _id: 'booking-3',
+        ...payload,
+    }));
+
+    await assert.rejects(
+        bookingService.createBooking('user-1', {
+            shopId: 'shop-1',
+            employeeId: 'employee-1',
+            serviceIds: ['single-1'],
+            date: getInWindowBookingDate(),
+            time: '10:00 AM',
+        }),
+        /at least ₹69/,
     );
 });
 

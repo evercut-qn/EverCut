@@ -268,6 +268,10 @@ const calculateSettlement = async (booking) => {
         throw new BadRequestError(`Bundle service amount must be at least ₹${config.payment.minBundleServiceAmount}`);
     }
 
+    if (!isBundle && serviceAmountInRupees < config.payment.minSingleServiceAmount) {
+        throw new BadRequestError(`Single service amount must be at least ₹${config.payment.minSingleServiceAmount}`);
+    }
+
     const platformFeeInRupees = isBundle
         ? config.payment.platformFeeBundle
         : config.payment.platformFeeSingle;

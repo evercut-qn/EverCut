@@ -858,3 +858,32 @@ test('pollPendingPayments releases held booking slots when checkout sessions exp
     });
     assert.ok(bookingUpdates[0].updates.cancelledAt instanceof Date);
 });
+
+test('initiatePayment rejects single service bookings below the minimum service amount', async (t) => {
+    t.mock.method(customerRepository, 'findByUserId', async () => ({ _id: 'customer-1' }));
+    t.mock.method(bookingRepository, 'findById', async () => ({
+        _id: 'booking-single-low',
+        customerId: 'customer-1',
+        shopId: 'shop-1',
+        serviceIds: ['single-1'],
+        totalAmount: 50,
+        status: 'pending',
+        paymentStatus: 'pending',
+    }));
+    t.mock.method(paymentRepository, 'findPendingByBookingId', async () => null);
+    t.mock.method(serviceRepository, 'findByIds', async () => ([
+        {
+            _id: 'single-1',
+            serviceType: 'single',
+            finalPrice: 50,
+            totalPrice: null,
+            actualPrice: 50,
+            offerPrice: 0,
+        },
+    ]));
+
+    await assert.rejects(
+        paymentService.initiatePayment('user-1', 'booking-single-low'),
+        /at least ₹69/,
+    );
+});
