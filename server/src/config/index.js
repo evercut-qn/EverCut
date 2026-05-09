@@ -138,6 +138,7 @@ const config = Object.freeze({
     baseUrl: optionalEnv('PHONEPE_ENV', 'SANDBOX') === 'PRODUCTION'
       ? 'https://api.phonepe.com/apis/pg'
       : 'https://api-preprod.phonepe.com/apis/pg-sandbox',
+    tokenRefreshBufferMs: 5 * 60 * 1000,  // 5 minutes before expiry
   }),
 
   /** Cashfree Payouts */
@@ -161,6 +162,7 @@ const config = Object.freeze({
     activeThresholdMinutes: 30,
     confirmationTimeoutHours: 24,
     milestoneTargets: [500, 750, 1000],
+    autoCancelPollIntervalMs: 15 * 60 * 1000,  // 15 minutes
   }),
 
   /** Shop business rules */
@@ -180,6 +182,7 @@ const config = Object.freeze({
     pollIntervalBaseMs: 3000,
     stalePaymentThresholdMs: 30 * 60 * 1000,     // 30 minutes
     maxPaymentAgeMs: 24 * 60 * 60 * 1000,        // 24 hours
+    pollIntervalMs: 5 * 60 * 1000,               // 5 minutes
     payoutBatchCronTime: '0 23 * * *',
     payoutBatchTimezone: 'Asia/Kolkata',
     // Payment modes configuration (PhonePe V2 Schema)
@@ -194,6 +197,11 @@ const config = Object.freeze({
     maxRetries: 3,
     pollIntervalMs: 10 * 60 * 1000,              // 10 minutes
     stuckThresholdMs: 10 * 60 * 1000,             // 10 minutes
+  }),
+
+  /** Slot cleanup job */
+  slotCleanup: Object.freeze({
+    intervalMs: 6 * 60 * 60 * 1000,              // 6 hours
   }),
 });
 
