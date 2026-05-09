@@ -1,104 +1,144 @@
 // lib/features/authentication/data/data_sources/remote/authentication_remote_data_source_impl.dart
-import '../../../../../core/auth/auth_session.dart';
+
+import 'dart:convert';
+
+import 'package:http/http.dart' as http;
+
+import '../../../../../core/constants/api/api_config.dart';
 import '../../../../../core/constants/api/api_endpoints.dart';
-import '../../../../../core/errors/network_exception.dart';
-import '../../../../../core/network/api_client.dart';
+import '../../../../../core/errors/api/api_exception.dart';
+import '../../../../../shared/models/api/api_response_model.dart';
+import '../../models/request/otp/authentication_otp_resend_request_model.dart';
+import '../../models/request/otp/authentication_otp_send_request_model.dart';
+import '../../models/request/otp/authentication_otp_verify_request_model.dart';
+import '../../models/request/session/authentication_session_logout_request_model.dart';
+import '../../models/request/session/authentication_session_refresh_request_model.dart';
+import '../../models/response/otp/authentication_otp_verify_response_model.dart';
+import '../../models/response/session/authentication_session_refresh_response_model.dart';
 
 import 'authentication_remote_data_source.dart';
 
 class AuthenticationRemoteDataSourceImpl implements AuthenticationRemoteDataSource {
-  final ApiClient apiClient;
+  final http.Client client;
 
-  const AuthenticationRemoteDataSourceImpl(this.apiClient);
-
-  @override
-  Future<void> sendOtp(String phoneNumber) async {
-    await apiClient.post<Map<String, dynamic>>(
-      AuthenticationEndpoints.otpSend,
-      authenticated: false,
-      body: {'mobile': _mobileForBackend(phoneNumber)},
-      parseData: _map,
-    );
-  }
+  const AuthenticationRemoteDataSourceImpl(this.client);
 
   @override
-  Future<void> resendOtp(String phoneNumber) async {
-    await apiClient.post<Map<String, dynamic>>(
-      AuthenticationEndpoints.otpResend,
-      authenticated: false,
-      body: {
-        'mobile': _mobileForBackend(phoneNumber),
-        'retryType': 'text',
-      },
-      parseData: _map,
-    );
-  }
+  Future<void> sendOtp(AuthenticationOtpSendRequestModel params) async {
+    try {
+      final http.Response response = await client.post(
+        Uri.http(ApiConfig.baseUrl, AuthenticationEndpoints.sendOtp),
+        body: jsonEncode(params.toJson()),
+        headers: {'Content-Type': 'application/json'},
+      );
 
-  @override
-  Future<OtpVerifyRemoteResult> verifyOtp({
-    required String phoneNumber,
-    required String otp,
-  }) async {
-    final response = await apiClient.post<Map<String, dynamic>>(
-      AuthenticationEndpoints.otpVerify,
-      authenticated: false,
-      body: {
-        'mobile': _mobileForBackend(phoneNumber),
-        'otp': otp,
-      },
-      parseData: _map,
-    );
+      // if (response.statusCode < 200 || response.statusCode >= 300) {
+      //   throw ApiException('Request failed with status code ${response.statusCode}');
+      // }
 
-    final data = response.data;
-    if (data['isNewUser'] == true) {
-      final String token = (data['onboardingToken'] ?? '').toString();
-      if (token.isEmpty) {
-        throw const NetworkException('Onboarding token missing from authentication response');
+      final Map<String, dynamic> json = jsonDecode(response.body);
+      final ApiResponseModel<void> apiResponse = ApiResponseModel<void>.fromJson(json, null);
+
+      if (!apiResponse.success) {
+        throw ApiException(apiResponse.message);
       }
-      return OtpVerifyRemoteResult.newUser(token);
+    } catch (_) {
+      rethrow;
     }
-
-    final session = AuthSession.fromJson(data);
-    if (!session.user.isBarber) {
-      throw const ForbiddenException('This app is only available for merchant accounts.');
-    }
-
-    return OtpVerifyRemoteResult.existingUser(session);
   }
 
   @override
-  Future<({String accessToken, String refreshToken})> refreshToken(String refreshToken) async {
-    final response = await apiClient.post<Map<String, dynamic>>(
-      AuthenticationEndpoints.tokenRefresh,
-      authenticated: false,
-      body: {'refreshToken': refreshToken},
-      parseData: _map,
-    );
+  Future<void> resendOtp(AuthenticationOtpResendRequestModel params) async {
+    try {
+      final http.Response response = await client.post(
+        Uri.http(ApiConfig.baseUrl, AuthenticationEndpoints.resendOtp),
+        body: jsonEncode(params.toJson()),
+        headers: {'Content-Type': 'application/json'},
+      );
 
-    return (
-      accessToken: (response.data['accessToken'] ?? '').toString(),
-      refreshToken: (response.data['refreshToken'] ?? '').toString(),
-    );
+      final Map<String, dynamic> json = jsonDecode(response.body);
+      final ApiResponseModel<void> apiResponse = ApiResponseModel<void>.fromJson(json, null);
+
+      if (!apiResponse.success) {
+        throw ApiException(apiResponse.message);
+      }
+    } catch (_) {
+      rethrow;
+    }
   }
 
   @override
-  Future<void> logout() async {
-    await apiClient.post<Map<String, dynamic>>(
-      AuthenticationEndpoints.logout,
-      parseData: _map,
-    );
-  }
+  Future<AuthenticationOtpVerifyResponseModel> verifyOtp(AuthenticationOtpVerifyRequestModel params) async {
+    try {
+      final http.Response response = await client.post(
+        Uri.http(ApiConfig.baseUrl, AuthenticationEndpoints.verifyOtp),
+        body: jsonEncode(params.toJson()),
+        headers: {'Content-Type': 'application/json'},
+      );
 
-  String _mobileForBackend(String phoneNumber) {
-    final digits = phoneNumber.replaceAll(RegExp(r'\D'), '');
-    if (digits.length == 12 && digits.startsWith('91')) {
-      return digits.substring(2);
+      final Map<String, dynamic> json = jsonDecode(response.body);
+      final ApiResponseModel<Map<String, dynamic>> apiResponse = ApiResponseModel<Map<String, dynamic>>.fromJson(json, (data) {
+        return data as Map<String, dynamic>;
+      });
+
+      if (!apiResponse.success) {
+        throw ApiException(apiResponse.message);
+      } else {
+        if (apiResponse.data == null) {
+          throw ApiException('No data returned');
+        } else {
+          return AuthenticationOtpVerifyResponseModel.fromJson(apiResponse.data!);
+        }
+      }
+    } catch (_) {
+      rethrow;
     }
-    return digits;
   }
 
-  Map<String, dynamic> _map(Object? value) {
-    if (value == null) return <String, dynamic>{};
-    return Map<String, dynamic>.from(value as Map);
+  @override
+  Future<AuthenticationSessionRefreshResponseModel> refreshSession(AuthenticationSessionRefreshRequestModel params) async {
+    try {
+      final http.Response response = await client.post(
+        Uri.http(ApiConfig.baseUrl, AuthenticationEndpoints.refreshSession),
+        body: jsonEncode(params.toJson()),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      final Map<String, dynamic> json = jsonDecode(response.body);
+      final ApiResponseModel<Map<String, dynamic>> apiResponse = ApiResponseModel<Map<String, dynamic>>.fromJson(json, (data) {
+        return data as Map<String, dynamic>;
+      });
+
+      if (!apiResponse.success) {
+        throw ApiException(apiResponse.message);
+      } else {
+        if (apiResponse.data == null) {
+          throw ApiException('No data returned');
+        } else {
+          return AuthenticationSessionRefreshResponseModel.fromJson(apiResponse.data!);
+        }
+      }
+    } catch (_) {
+      rethrow;
+    }
+  }
+
+  @override
+  Future<void> logout(AuthenticationSessionLogoutRequestModel params) async {
+    try {
+      final http.Response response = await client.post(
+        Uri.http(ApiConfig.baseUrl, AuthenticationEndpoints.logout),
+        headers: {'Authorization': 'Bearer ${params.accessToken}'},
+      );
+
+      final Map<String, dynamic> json = jsonDecode(response.body);
+      final ApiResponseModel<void> apiResponse = ApiResponseModel<void>.fromJson(json, null);
+
+      if (!apiResponse.success) {
+        throw ApiException(apiResponse.message);
+      }
+    } catch (_) {
+      rethrow;
+    }
   }
 }

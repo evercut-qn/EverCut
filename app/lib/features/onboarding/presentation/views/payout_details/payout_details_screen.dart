@@ -3,20 +3,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 
-import '../../../../../core/auth/auth_state_notifier.dart';
+import '../../../../../core/constants/navigation/route_paths.dart';
 import '../../../../../core/constants/regex/allowed_characters_regex.dart';
 import '../../../../../core/constants/regex/basic_regex.dart';
-import '../../../../../core/di/injection.dart' as di;
-import '../../../../../core/errors/network_exception.dart';
 import '../../../../../core/theme/foundation/app_icons.dart';
 import '../../../../../shared/extensions/context/app_colors_extension.dart';
 import '../../../../../shared/extensions/context/device_metrics_extension.dart';
 import '../../../../../shared/widgets/common/appbars/bottom_appbar.dart';
 import '../../../../../shared/widgets/common/inputs/text_form_field.dart';
 import '../../../../../shared/widgets/other/bank_picker_field/bank_picker_field.dart';
-import '../../../../../shared/widgets/overlays/snackbars.dart';
-import '../../../domain/repositories/onboarding_repository.dart';
 import '../../cubit/onboarding_cubit.dart';
 
 class PayoutDetailsScreen extends StatefulWidget {
@@ -33,57 +30,12 @@ class _PayoutDetailsScreenState extends State<PayoutDetailsScreen> {
   final TextEditingController _accountNumberController = TextEditingController();
   final TextEditingController _ifscCodeController = TextEditingController();
 
-  bool _submitting = false;
-
-  void _onBackButtonPressed() => context.read<OnboardingCubit>().previousPage();
+  void _onBackButtonPressed() => context.read<OnboardingCubit>().previousStep();
   void _onCompleteButtonPressed() {
     if (!_formKey.currentState!.validate()) {
-      SnackBars.of(context).showWarningSnackBar(
-        title: 'Incomplete Information',
-        message: 'Please fill in all required fields before continuing.',
-      );
+      return;
     } else {
-      _completeOnboarding();
-    }
-  }
-
-  Future<void> _completeOnboarding() async {
-    setState(() => _submitting = true);
-    final cubit = context.read<OnboardingCubit>();
-    cubit.updateFields({
-      'accountHolderName': _accountHolderNameController.text.trim(),
-      'bankName': _bankNameController.text.trim(),
-      'accountNumber': _accountNumberController.text.trim(),
-      'ifscCode': _ifscCodeController.text.trim().toUpperCase(),
-    });
-
-    try {
-      await di.sl<OnboardingRepository>().completeOnboarding(
-            fields: cubit.draft.fields,
-            photo: cubit.draft.photo!,
-          );
-      // AuthStateNotifier.markSessionChanged() triggers router redirect to dashboard
-    } on NetworkException catch (error) {
-      if (mounted) {
-        SnackBars.of(context).showErrorSnackBar(
-          title: 'Onboarding Failed',
-          message: error.toString(),
-        );
-        if (error.statusCode == 401) {
-          di.sl<AuthStateNotifier>().clear();
-        }
-      }
-    } catch (error) {
-      if (mounted) {
-        SnackBars.of(context).showErrorSnackBar(
-          title: 'Onboarding Failed',
-          message: error.toString(),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _submitting = false);
-      }
+      context.go(RoutePaths.dashboard);
     }
   }
 
@@ -137,7 +89,6 @@ class _PayoutDetailsScreenState extends State<PayoutDetailsScreen> {
                       },
                     ),
                     BankPickerField(
-                      autovalidateMode: AutovalidateMode.disabled,
                       controller: _bankNameController,
                       labelText: 'Bank Name',
                       textCapitalization: TextCapitalization.words,
@@ -228,7 +179,7 @@ class _PayoutDetailsScreenState extends State<PayoutDetailsScreen> {
             ),
             Expanded(
               child: FilledButton(
-                onPressed: _submitting ? null : _onCompleteButtonPressed,
+                onPressed: _onCompleteButtonPressed,
                 child: const Text('Complete'),
               ),
             ),

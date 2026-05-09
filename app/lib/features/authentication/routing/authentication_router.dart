@@ -7,8 +7,8 @@ import 'package:go_router/go_router.dart';
 import '../../../core/constants/navigation/route_paths.dart';
 import '../../../core/constants/navigation/route_segments.dart';
 import '../../../core/di/injection.dart' as di;
-import '../presentation/bloc/authentication_bloc.dart';
-import '../presentation/cubit/otp_resend_cubit.dart';
+import '../presentation/bloc/authentication_otp/authentication_otp_bloc.dart';
+import '../presentation/cubit/authentication_otp_resend/authentication_otp_resend_cubit.dart';
 import '../presentation/views/otp_verification/otp_verification_screen.dart';
 import '../presentation/views/phone_entry/phone_entry_screen.dart';
 
@@ -16,7 +16,7 @@ class AuthenticationRouter {
   static ShellRoute config(GlobalKey<NavigatorState>? parentNavigatorKey) => ShellRoute(
     builder: (BuildContext context, GoRouterState state, Widget child) {
       return BlocProvider(
-        create: (BuildContext context) => di.sl<AuthenticationBloc>(),
+        create: (BuildContext context) => di.sl<AuthenticationOtpBloc>(),
         child: child,
       );
     },
@@ -45,7 +45,7 @@ class AuthenticationRouter {
                   final phoneNumber = (state.extra as Map<String, String>)['phoneNumber']!;
                   return CupertinoPage(
                     child: BlocProvider(
-                      create: (BuildContext context) => OtpResendCubit(),
+                      create: (BuildContext context) => di.sl<AuthenticationOtpResendCubit>(),
                       child: OtpVerificationScreen(phoneNumber),
                     ),
                   );

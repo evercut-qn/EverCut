@@ -28,13 +28,8 @@ class _AmenitiesScreenState extends State<AmenitiesScreen> {
     });
   }
 
-  void _onBackButtonPressed() => context.read<OnboardingCubit>().previousPage();
-  void _onNextButtonPressed() {
-    context.read<OnboardingCubit>().updateFields({
-      'amenities': _selectedAmenities.map((amenity) => amenity.label).toList(),
-    });
-    context.read<OnboardingCubit>().nextPage();
-  }
+  void _onBackButtonPressed() => context.read<OnboardingCubit>().previousStep();
+  void _onNextButtonPressed() => context.read<OnboardingCubit>().nextStep();
 
   @override
   Widget build(BuildContext context) {

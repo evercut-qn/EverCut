@@ -7,6 +7,7 @@ import '../../../core/constants/navigation/route_paths.dart';
 import '../../../core/constants/navigation/route_segments.dart';
 import '../modules/analytics/presentation/views/analytics_screen.dart';
 import '../modules/gallery/presentation/views/gallery_screen.dart';
+import '../modules/manage_services/presentation/views/manage_services_screen.dart';
 import '../modules/notifications/presentation/views/notifications_screen.dart';
 import '../modules/ratings_and_reviews/presentation/views/ratings_and_reviews_screen.dart';
 import '../modules/rewards/presentation/views/rewards_screen.dart';
@@ -27,6 +28,15 @@ class DashboardRouter {
         pageBuilder: (BuildContext context, GoRouterState state) {
           return CupertinoPage(
             child: const NotificationsScreen(),
+          );
+        },
+        parentNavigatorKey: parentNavigatorKey,
+      ),
+      GoRoute(
+        path: RouteSegments.manageServices,
+        pageBuilder: (BuildContext context, GoRouterState state) {
+          return CupertinoPage(
+            child: const ManageServicesScreen(),
           );
         },
         parentNavigatorKey: parentNavigatorKey,

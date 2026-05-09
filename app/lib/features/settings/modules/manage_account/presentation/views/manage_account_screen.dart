@@ -1,4 +1,4 @@
-// lib/features/settings/presentation/views/manage_account/manage_account_screen.dart
+// lib/features/settings/modules/manage_account/presentation/views/manage_account_screen.dart
 
 import 'package:flutter/material.dart';
 
@@ -8,50 +8,12 @@ import '../../../../../../shared/extensions/context/app_colors_extension.dart';
 import '../../../../../../shared/extensions/context/device_metrics_extension.dart';
 import '../../../../../../shared/extensions/context/go_router_extension.dart';
 import '../../../../../../shared/widgets/common/section/section_header.dart';
-import '../../../../../../shared/widgets/overlays/bottomsheet.dart';
-import '../../../../presentation/models/settings_tile.dart';
+import '../../../../presentation/widgets/settings_section.dart';
+import '../widgets/profile_avatar.dart';
+import '../widgets/profile_info_tile.dart';
 
-class ManageAccountScreen extends StatefulWidget {
+class ManageAccountScreen extends StatelessWidget {
   const ManageAccountScreen({super.key});
-
-  @override
-  State<ManageAccountScreen> createState() => _ManageAccountScreenState();
-}
-
-class _ManageAccountScreenState extends State<ManageAccountScreen> {
-  final Set<SettingsTile> _accountActions = <SettingsTile>{};
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-
-    if (_accountActions.isEmpty) {
-      _accountActions.addAll(<SettingsTile>{
-        SettingsTile(
-          icon: AppIcons.solidRoundedUserEdit01,
-          title: 'Edit Profile',
-          onTap: () => context.pushNested(RouteSegments.editProfile),
-        ),
-        SettingsTile(
-          icon: AppIcons.solidRoundedCall,
-          title: 'Update Phone Number',
-          onTap: () => context.pushNested(RouteSegments.updatePhoneNumber),
-        ),
-        SettingsTile(
-          icon: AppIcons.solidRoundedGlobe02,
-          title: 'Sign-Out Everywhere',
-          onTap: () {},
-          showArrow: false,
-        ),
-        SettingsTile(
-          color: context.appColors.redShade200,
-          icon: AppIcons.solidRoundedDelete02,
-          title: 'Delete Account',
-          onTap: () => context.pushNested(RouteSegments.deleteAccount),
-        ),
-      });
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -66,41 +28,7 @@ class _ManageAccountScreenState extends State<ManageAccountScreen> {
                 child: Column(
                   spacing: context.scale(24),
                   children: [
-                    Padding(
-                      padding: EdgeInsets.all(context.scale(16)),
-                      child: GestureDetector(
-                        onTap: () => showCustomBottomsheet(
-                          context: context,
-                          builder: (BuildContext context) => ProfileImageActionsBottomsheet(),
-                          padding: EdgeInsets.zero,
-                        ),
-                        child: Stack(
-                          children: [
-                            CircleAvatar(
-                              backgroundColor: context.appColors.backgroundShade100,
-                              radius: context.scale(40),
-                            ),
-                            Positioned(
-                              bottom: 0,
-                              right: 0,
-                              child: Material(
-                                color: context.appColors.scaffoldBackgroundColor,
-                                clipBehavior: Clip.hardEdge,
-                                shape: const CircleBorder(),
-                                child: Padding(
-                                  padding: EdgeInsets.all(context.scale(8)),
-                                  child: Icon(
-                                    AppIcons.solidRoundedSettings01,
-                                    color: context.appColors.neutralShade650,
-                                    size: context.scale(16),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
+                    const ProfileAvatarWidget(),
                     Material(
                       clipBehavior: Clip.hardEdge,
                       color: context.appColors.backgroundShade75,
@@ -113,70 +41,25 @@ class _ManageAccountScreenState extends State<ManageAccountScreen> {
                         child: Column(
                           spacing: context.scale(16),
                           children: [
-                            Row(
-                              spacing: context.scale(16),
-                              children: [
-                                Icon(
-                                  AppIcons.solidRoundedUser,
-                                  color: context.appColors.neutralShade650,
-                                  size: context.scale(18),
-                                ),
-                                Text(
-                                  'John Doe',
-                                  maxLines: 1,
-                                  style: TextStyle(
-                                    color: context.appColors.neutralShade650,
-                                    fontSize: context.scale(14),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
+                            ProfileInfoTileWidget(
+                              icon: AppIcons.solidRoundedUser,
+                              text: 'John Doe',
                             ),
                             Divider(
                               color: context.appColors.backgroundShade200,
                               height: 1.0,
                             ),
-                            Row(
-                              spacing: context.scale(16),
-                              children: [
-                                Icon(
-                                  AppIcons.solidRoundedMail01,
-                                  color: context.appColors.neutralShade650,
-                                  size: context.scale(18),
-                                ),
-                                Text(
-                                  'john.doe@example.com',
-                                  maxLines: 1,
-                                  style: TextStyle(
-                                    color: context.appColors.neutralShade650,
-                                    fontSize: context.scale(14),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
+                            ProfileInfoTileWidget(
+                              icon: AppIcons.solidRoundedMail01,
+                              text: 'john.doe@example.com',
                             ),
                             Divider(
                               color: context.appColors.backgroundShade200,
                               height: 1.0,
                             ),
-                            Row(
-                              spacing: context.scale(16),
-                              children: [
-                                Icon(
-                                  AppIcons.solidRoundedCall,
-                                  color: context.appColors.neutralShade650,
-                                  size: context.scale(18),
-                                ),
-                                Text(
-                                  '+91 98765 43210',
-                                  maxLines: 1,
-                                  style: TextStyle(
-                                    color: context.appColors.neutralShade650,
-                                    fontSize: context.scale(14),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
+                            ProfileInfoTileWidget(
+                              icon: AppIcons.solidRoundedCall,
+                              text: 'john.doe@example.com',
                             ),
                             Divider(
                               color: context.appColors.backgroundShade200,
@@ -187,24 +70,9 @@ class _ManageAccountScreenState extends State<ManageAccountScreen> {
                                 spacing: context.scale(16),
                                 children: [
                                   Expanded(
-                                    child: Row(
-                                      spacing: context.scale(16),
-                                      children: [
-                                        Icon(
-                                          AppIcons.solidRoundedCalendar02,
-                                          color: context.appColors.neutralShade650,
-                                          size: context.scale(18),
-                                        ),
-                                        Text(
-                                          '01 January 2026',
-                                          maxLines: 1,
-                                          style: TextStyle(
-                                            color: context.appColors.neutralShade650,
-                                            fontSize: context.scale(14),
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                      ],
+                                    child: ProfileInfoTileWidget(
+                                      icon: AppIcons.solidRoundedCalendar02,
+                                      text: '01 January 2026',
                                     ),
                                   ),
                                   VerticalDivider(
@@ -212,24 +80,9 @@ class _ManageAccountScreenState extends State<ManageAccountScreen> {
                                     width: 1.0,
                                   ),
                                   Expanded(
-                                    child: Row(
-                                      spacing: context.scale(16),
-                                      children: [
-                                        Icon(
-                                          AppIcons.solidRoundedUserAccount,
-                                          color: context.appColors.neutralShade650,
-                                          size: context.scale(18),
-                                        ),
-                                        Text(
-                                          'Female',
-                                          maxLines: 1,
-                                          style: TextStyle(
-                                            color: context.appColors.neutralShade650,
-                                            fontSize: context.scale(14),
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                      ],
+                                    child: ProfileInfoTileWidget(
+                                      icon: AppIcons.solidRoundedUserAccount,
+                                      text: 'Female',
                                     ),
                                   ),
                                 ],
@@ -242,190 +95,68 @@ class _ManageAccountScreenState extends State<ManageAccountScreen> {
                   ],
                 ),
               ),
-              const Divider(height: 1.0),
-              Column(
-                children: [
-                  Padding(
-                    padding: EdgeInsets.all(context.scale(24)).copyWith(bottom: context.scale(8)),
-                    child: const SectionHeader(
-                      title: 'Account Actions',
-                      description: 'Update personal details, enhance account security, or request permanent account deletion.',
+              Divider(
+                color: context.appColors.backgroundShade200,
+                height: 1.0,
+              ),
+              Padding(
+                padding: EdgeInsets.all(context.scale(8)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  spacing: context.scale(8),
+                  children: [
+                    Padding(
+                      padding: EdgeInsets.all(context.scale(16)).copyWith(bottom: 0),
+                      child: const SectionHeader(
+                        title: 'Account Actions',
+                        description: 'Update personal details, enhance account security, or request permanent account deletion.',
+                      ),
                     ),
-                  ),
-                  Padding(
-                    padding: EdgeInsets.all(context.scale(8)).copyWith(top: 0),
-                    child: Column(
-                      spacing: context.scale(2),
-                      children: _accountActions.toList().asMap().entries.map((entry) {
-                        return Theme(
-                          data: Theme.of(context).copyWith(
-                            highlightColor: Colors.transparent,
-                            splashColor: Colors.transparent,
-                            splashFactory: NoSplash.splashFactory,
+                    Theme(
+                      data: Theme.of(context).copyWith(
+                        highlightColor: Colors.transparent,
+                        splashColor: Colors.transparent,
+                        splashFactory: NoSplash.splashFactory,
+                      ),
+                      child: Column(
+                        spacing: context.scale(2),
+                        children: [
+                          SettingsTileWidget(
+                            icon: AppIcons.solidRoundedUserEdit01,
+                            onTap: () => context.pushNested(RouteSegments.editProfile),
+                            tileColor: Colors.transparent,
+                            title: 'Edit Profile',
                           ),
-                          child: ListTile(
-                            contentPadding: EdgeInsets.all(context.scale(16)),
-                            horizontalTitleGap: context.scale(16),
-                            leading: Icon(
-                              entry.value.icon,
-                              color: entry.value.color ?? context.appColors.neutralShade650,
-                              size: context.scale(20),
-                            ),
-                            minLeadingWidth: 0,
-                            minTileHeight: 0,
-                            minVerticalPadding: 0,
-                            onTap: entry.value.onTap,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(
-                                context.scale(6),
-                              ),
-                            ),
-                            title: Text(
-                              entry.value.title,
-                              style: TextStyle(
-                                color: entry.value.color ?? context.appColors.neutralShade650,
-                                fontSize: context.scale(14),
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            trailing: () {
-                              if (entry.value.showArrow) {
-                                return Icon(
-                                  AppIcons.strokeStandardArrowRight01,
-                                  color: entry.value.color ?? context.appColors.neutralShade650,
-                                  size: context.scale(20),
-                                );
-                              } else {
-                                return null;
-                              }
-                            }(),
+                          SettingsTileWidget(
+                            icon: AppIcons.solidRoundedCall,
+                            onTap: () => context.pushNested(RouteSegments.updatePhoneNumber),
+                            tileColor: Colors.transparent,
+                            title: 'Update Phone Number',
                           ),
-                        );
-                      }).toList(),
+                          SettingsTileWidget(
+                            icon: AppIcons.solidRoundedGlobe02,
+                            onTap: () {},
+                            showArrow: false,
+                            tileColor: Colors.transparent,
+                            title: 'Sign-Out Everywhere',
+                          ),
+                          SettingsTileWidget(
+                            color: context.appColors.redShade100,
+                            icon: AppIcons.solidRoundedDelete02,
+                            onTap: () => context.pushNested(RouteSegments.deleteAccount),
+                            tileColor: Colors.transparent,
+                            title: 'Delete Account',
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ],
           ),
         ),
       ),
-    );
-  }
-}
-
-class ProfileImageActionsBottomsheet extends StatefulWidget {
-  const ProfileImageActionsBottomsheet({super.key});
-
-  @override
-  State<ProfileImageActionsBottomsheet> createState() => _ProfileImageActionsBottomsheetState();
-}
-
-class _ProfileImageActionsBottomsheetState extends State<ProfileImageActionsBottomsheet> {
-  final Set<SettingsTile> _manageProfileActions = <SettingsTile>{};
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-
-    if (_manageProfileActions.isEmpty) {
-      _manageProfileActions.addAll(<SettingsTile>{
-        SettingsTile(
-          icon: AppIcons.solidRoundedImageUpload,
-          title: 'Add or Change Photo',
-          onTap: () {},
-          showArrow: false,
-        ),
-        SettingsTile(
-          color: context.appColors.redShade200,
-          icon: AppIcons.solidRoundedDelete02,
-          title: 'Remove Photo',
-          onTap: () {},
-          showArrow: false,
-        ),
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Padding(
-          padding: EdgeInsets.all(context.scale(20)).copyWith(bottom: context.scale(8)),
-          child: const SectionHeader(
-            title: 'Manage Profile Picture',
-            description: 'Select a new profile photo or remove the existing picture from your account.',
-          ),
-        ),
-        Padding(
-          padding: EdgeInsets.all(context.scale(4)).copyWith(bottom: context.scale(12)),
-          child: Column(
-            spacing: context.scale(2),
-            children: _manageProfileActions.toList().asMap().entries.expand((entry) {
-              final List<Widget> widgets = [
-                Theme(
-                  data: Theme.of(context).copyWith(
-                    highlightColor: Colors.transparent,
-                    splashColor: Colors.transparent,
-                    splashFactory: NoSplash.splashFactory,
-                  ),
-                  child: ListTile(
-                    contentPadding: EdgeInsets.all(context.scale(16)),
-                    horizontalTitleGap: context.scale(16),
-                    leading: Icon(
-                      entry.value.icon,
-                      color: entry.value.color ?? context.appColors.neutralShade650,
-                      size: context.scale(20),
-                    ),
-                    minLeadingWidth: 0,
-                    minTileHeight: 0,
-                    minVerticalPadding: 0,
-                    onTap: entry.value.onTap,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(
-                        context.scale(6),
-                      ),
-                    ),
-                    title: Text(
-                      entry.value.title,
-                      style: TextStyle(
-                        color: entry.value.color ?? context.appColors.neutralShade650,
-                        fontSize: context.scale(14),
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    trailing: () {
-                      if (entry.value.showArrow) {
-                        return Icon(
-                          AppIcons.strokeStandardArrowRight01,
-                          color: entry.value.color ?? context.appColors.neutralShade650,
-                          size: context.scale(20),
-                        );
-                      } else {
-                        return null;
-                      }
-                    }(),
-                  ),
-                ),
-              ];
-
-              if (entry.key != _manageProfileActions.length - 1) {
-                widgets.add(
-                  Divider(
-                    color: context.appColors.secondaryDividerColor,
-                    endIndent: context.scale(16),
-                    height: 1.0,
-                    indent: context.scale(52),
-                  ),
-                );
-              }
-
-              return widgets;
-            }).toList(),
-          ),
-        ),
-      ],
     );
   }
 }

@@ -25,6 +25,7 @@ class RouteSegments {
   static const settings = 'settings';
 
   // dashboard
+  static const manageServices = 'manage_services';
   static const rewards = 'rewards';
   static const team = 'team';
   static const gallery = 'gallery';
@@ -44,6 +45,7 @@ class RouteSegments {
   static const manageAccount = 'manage_account';
   static const businessProfile = 'business_profile';
   static const appearance = 'appearance';
+  static const contactUs = 'contact_us';
   static const termsOfService = 'terms_of_service';
   static const privacyPolicy = 'privacy_policy';
 
@@ -54,11 +56,9 @@ class RouteSegments {
 
   // settings/business_profile
   static const editBusinessProfile = 'edit_business_profile';
-  static const bankAccountDetails = 'bank_account_details';
-  static const employeeManagement = 'employee_management';
-  static const manageServices = 'manage_services';
-  static const amenities = 'amenities';
-  static const availabilities = 'availabilities';
+  static const updateBankDetails = 'update_bank_details';
+  static const editAmenities = 'edit_amenities';
+  static const manageAvailability = 'manage_availability';
 
   // common
   static const notifications = 'notifications';

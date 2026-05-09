@@ -2,9 +2,9 @@
 
 import 'package:equatable/equatable.dart';
 
-import '../../../../shared/models/sort_option.dart';
-import '../../../../shared/models/amount_range.dart';
-import '../../../../shared/models/date_range.dart';
+import '../../../../shared/models/ui/sort_option.dart';
+import '../../../../shared/models/ranges/amount_range.dart';
+import '../../../../shared/models/ranges/date_range.dart';
 
 class TransactionFilterModel extends Equatable {
   final AmountRangeModel amountRange;

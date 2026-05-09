@@ -8,7 +8,7 @@ import '../../../../../core/theme/foundation/app_icons.dart';
 import '../../../../../shared/enums/weekday.dart';
 import '../../../../../shared/extensions/context/app_colors_extension.dart';
 import '../../../../../shared/extensions/context/device_metrics_extension.dart';
-import '../../../../../shared/models/break_time.dart';
+import '../../../../../shared/models/scheduling/break_time.dart';
 import '../../../../../shared/widgets/common/appbars/bottom_appbar.dart';
 import '../../../../../shared/widgets/common/inputs/time_picker_field.dart';
 import '../../../../../shared/widgets/other/weekday_selector/weekday_selector.dart';
@@ -68,7 +68,7 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
     }
   }
 
-  void _onBackButtonPressed() => context.read<OnboardingCubit>().previousPage();
+  void _onBackButtonPressed() => context.read<OnboardingCubit>().previousStep();
   void _onNextButtonPressed() {
     if (_selectedDays.isEmpty) {
       SnackBars.of(context).showWarningSnackBar(
@@ -77,37 +77,11 @@ class _AvailabilityScreenState extends State<AvailabilityScreen> {
       );
     } else {
       if (!_formKey.currentState!.validate()) {
-        SnackBars.of(context).showWarningSnackBar(
-          title: 'Working Hours Required',
-          message: 'Please make sure to set both opening and closing times for your shop.',
-        );
+        return;
       } else {
-        context.read<OnboardingCubit>().updateFields({
-          'workingDays': _selectedDays.map((d) => d.label).toList(),
-          'openTime': _toTwentyFourHourTime(_shopOpenTimeController.text),
-          'closeTime': _toTwentyFourHourTime(_shopCloseTimeController.text),
-          'breakTimes': _breakTimings
-              .map((breakTime) => {
-                    'start': _toTwentyFourHourTime(breakTime.startsAt),
-                    'end': _toTwentyFourHourTime(breakTime.endsAt),
-                  })
-              .toList(),
-        });
-        context.read<OnboardingCubit>().nextPage();
+        context.read<OnboardingCubit>().nextStep();
       }
     }
-  }
-
-  String _toTwentyFourHourTime(String value) {
-    final RegExp match = RegExp(r'^(\d{1,2}):(\d{2})\s*(AM|PM)$', caseSensitive: false);
-    final RegExpMatch? result = match.firstMatch(value.trim());
-    if (result == null) return value;
-    int hour = int.parse(result.group(1)!);
-    final String minute = result.group(2)!;
-    final String meridiem = result.group(3)!.toUpperCase();
-    if (meridiem == 'PM' && hour != 12) hour += 12;
-    if (meridiem == 'AM' && hour == 12) hour = 0;
-    return '${hour.toString().padLeft(2, '0')}:$minute';
   }
 
   @override

@@ -28,6 +28,7 @@ class RoutePaths {
 
   // dashboard
   static const dashboardNotifications = '/$dashboard/${RouteSegments.notifications}';
+  static const manageServices = '$dashboard/${RouteSegments.manageServices}';
   static const rewards = '/$dashboard/${RouteSegments.rewards}';
   static const team = '/$dashboard/${RouteSegments.team}';
   static const gallery = '/$dashboard/${RouteSegments.gallery}';
@@ -48,6 +49,7 @@ class RoutePaths {
   static const businessProfile = '$settings/${RouteSegments.businessProfile}';
   static const appearance = '$settings/${RouteSegments.appearance}';
   static const notifications = '$settings/${RouteSegments.notifications}';
+  static const contactUs = '$settings/${RouteSegments.contactUs}';
   static const termsOfService = '$settings/${RouteSegments.termsOfService}';
   static const privacyPolicy = '$settings/${RouteSegments.privacyPolicy}';
 
@@ -58,9 +60,7 @@ class RoutePaths {
 
   // settings/business_profile
   static const editBusinessProfile = '$businessProfile/${RouteSegments.editBusinessProfile}';
-  static const bankAccountDetails = '$businessProfile/${RouteSegments.bankAccountDetails}';
-  static const employeeManagement = '$businessProfile/${RouteSegments.employeeManagement}';
-  static const manageServices = '$businessProfile/${RouteSegments.manageServices}';
-  static const amenities = '$businessProfile/${RouteSegments.amenities}';
-  static const availabilities = '$businessProfile/${RouteSegments.availabilities}';
+  static const updateBankDetails = '$businessProfile/${RouteSegments.updateBankDetails}';
+  static const editAmenities = '$businessProfile/${RouteSegments.editAmenities}';
+  static const manageAvailability = '$businessProfile/${RouteSegments.manageAvailability}';
 }

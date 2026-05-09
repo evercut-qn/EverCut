@@ -1,33 +1,39 @@
 // lib/core/constants/api/api_endpoints.dart
 
-class AuthenticationEndpoints {
-  static const String otpSend = '/auth/otp/send';
-  static const String otpVerify = '/auth/otp/verify';
-  static const String otpResend = '/auth/otp/resend';
-  static const String tokenRefresh = '/auth/token/refresh';
-  static const String logout = '/auth/logout';
-}
+import 'api_config.dart';
 
-class OnboardingEndpoints {
-  static const String barbers = '/onboarding/barbers';
+class AuthenticationEndpoints {
+  // base api path
+  static const String basePath = '${ApiConfig.globalPrefix}/${ApiConfig.apiVersion}';
+
+  // root
+  static const String authentication = '$basePath/auth';
+
+  // authentication
+  static const String otp = '$authentication/otp';
+  static const String session = '$authentication/token';
+  static const String logout = '$authentication/logout';
+
+  // otp
+  static const String sendOtp = '$otp/send';
+  static const String resendOtp = '$otp/resend';
+  static const String verifyOtp = '$otp/verify';
+
+  // session
+  static const String refreshSession = '$session/refresh';
 }
 
 class ShopEndpoints {
-  static const String me = '/shops/me';
-}
+  // base api path
+  static const String basePath = '${ApiConfig.globalPrefix}/${ApiConfig.apiVersion}';
 
-class RatingEndpoints {
-  static const String ratings = '/ratings';
-  static const String summary = '/ratings/analytics';
-  
-  static String shopRatings(String shopId) => '/shops/$shopId/ratings';
-  static String shopRatingSummary(String shopId) => '/shops/$shopId/ratings/analytics';
-  static String ratingReply(String ratingId) => '/ratings/$ratingId/reply';
-  static String deleteRating(String ratingId) => '/ratings/$ratingId';
-}
+  // root
+  static const String shops = '$basePath/shops';
 
-class ServiceEndpoints {
-  static const String services = '/services';
-  
-  static String serviceById(String serviceId) => '/services/$serviceId';
+  // shop operations
+  static const String me = '$shops/me';
+  static const String payoutDetails = '$me/payout-details';
+  static const String mediaPicture = '$me/media/picture';
+  static const String mediaCover = '$me/media/cover';
+  static const String security = '$me/security';
 }

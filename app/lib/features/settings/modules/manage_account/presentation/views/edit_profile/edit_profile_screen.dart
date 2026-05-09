@@ -1,4 +1,4 @@
-// lib/features/settings/presentation/views/manage_account/edit_profile/edit_profile_screen.dart
+// lib/features/settings/modules/manage_account/presentation/views/edit_profile/edit_profile_screen.dart
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';

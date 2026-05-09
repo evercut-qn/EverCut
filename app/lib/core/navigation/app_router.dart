@@ -12,42 +12,16 @@ import '../../features/settings/routing/settings_router.dart';
 import '../../features/subscription/routing/subscription_router.dart';
 import '../../features/transactions/routing/transactions_router.dart';
 import '../../shared/widgets/common/appbars/bottom_navigation_bar.dart';
-import '../auth/auth_state_notifier.dart';
 import '../connectivity/routing/connectivity_router.dart';
 import '../constants/navigation/route_paths.dart';
-import '../di/injection.dart' as di;
 import '../theme/foundation/app_icons.dart';
 
 class AppRouter {
   static final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
   static final List<String> _mainRoutes = const <String>[RoutePaths.dashboard, RoutePaths.appointments, RoutePaths.subscription, RoutePaths.transactions, RoutePaths.settings];
-
   static final GoRouter config = GoRouter(
-    initialLocation: RoutePaths.authentication,
+    initialLocation: RoutePaths.dashboard,
     navigatorKey: _rootNavigatorKey,
-    refreshListenable: di.sl<AuthStateNotifier>(),
-    redirect: (BuildContext context, GoRouterState state) {
-      final authState = di.sl<AuthStateNotifier>().state;
-      final String location = state.uri.path;
-      final bool isAuthRoute = location.startsWith(RoutePaths.authentication);
-      final bool isOnboardingRoute = location.startsWith(RoutePaths.onboarding);
-      final bool isConnectivityRoute = location.startsWith(RoutePaths.connectivity);
-      final bool isExtrasRoute = location.startsWith(RoutePaths.extras);
-
-      if (isConnectivityRoute || isExtrasRoute) return null;
-
-      switch (authState.status) {
-        case AppAuthStatus.unknown:
-          return isAuthRoute ? null : RoutePaths.authentication;
-        case AppAuthStatus.unauthenticated:
-          return isAuthRoute ? null : RoutePaths.authentication;
-        case AppAuthStatus.onboarding:
-          return isOnboardingRoute ? null : RoutePaths.onboarding;
-        case AppAuthStatus.authenticated:
-          if (isAuthRoute || isOnboardingRoute) return RoutePaths.dashboard;
-          return null;
-      }
-    },
     routes: [
       ExtrasRouter.config(_rootNavigatorKey),
       ConnectivityRouter.config(_rootNavigatorKey),
@@ -108,4 +82,3 @@ class AppRouter {
     ],
   );
 }
-

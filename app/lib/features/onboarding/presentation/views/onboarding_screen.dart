@@ -2,8 +2,8 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:merchant/shared/extensions/context/app_colors_extension.dart';
 
+import '../../../../shared/extensions/context/app_colors_extension.dart';
 import '../cubit/onboarding_cubit.dart';
 import '../widgets/onboarding_appbar.dart';
 
@@ -38,24 +38,24 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           create: (BuildContext context) => OnboardingCubit(),
           child: Column(
             children: [
-              BlocConsumer<OnboardingCubit, int>(
-                buildWhen: (int previousPageIndex, currentPageIndex) {
-                  return previousPageIndex != currentPageIndex;
+              BlocConsumer<OnboardingCubit, OnboardingState>(
+                buildWhen: (OnboardingState previous, OnboardingState current) {
+                  return previous.currentStep != current.currentStep;
                 },
-                builder: (BuildContext context, int currentPageIndex) {
+                builder: (BuildContext context, OnboardingState state) {
                   return OnboardingAppBarWidget(
-                    currentIndex: currentPageIndex,
+                    currentIndex: state.currentStep,
                     indicatorLength: 5,
-                    titleText: _routeNames[currentPageIndex],
+                    titleText: _routeNames[state.currentStep],
                   );
                 },
-                listenWhen: (int previousPageIndex, currentPageIndex) {
-                  return previousPageIndex != currentPageIndex;
+                listenWhen: (OnboardingState previous, OnboardingState current) {
+                  return previous.currentStep != current.currentStep;
                 },
-                listener: (BuildContext context, int currentPageIndex) {
-                  if (_pageController.hasClients && _pageController.page?.round() != currentPageIndex) {
+                listener: (BuildContext context, OnboardingState state) {
+                  if (_pageController.hasClients && _pageController.page?.round() != state.currentStep) {
                     _pageController.animateToPage(
-                      currentPageIndex,
+                      state.currentStep,
                       duration: const Duration(milliseconds: 300),
                       curve: Curves.easeInOut,
                     );

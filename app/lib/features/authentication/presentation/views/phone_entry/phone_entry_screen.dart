@@ -17,10 +17,10 @@ import '../../../../../shared/widgets/other/loaders/shimmer_container.dart';
 import '../../../../../shared/widgets/other/phone_text_field/phone_text_field.dart';
 import '../../../../../shared/widgets/overlays/bottomsheet.dart';
 import '../../../../../shared/widgets/overlays/snackbars.dart';
-import '../../../domain/use_cases/authentication_otp_send_params.dart';
-import '../../bloc/authentication_bloc.dart';
-import '../../widgets/privacy_policy_dialog.dart';
-import '../../widgets/terms_of_service_dialog.dart';
+import '../../../domain/use_cases/otp/params/authentication_otp_send_params.dart';
+import '../../bloc/authentication_otp/authentication_otp_bloc.dart';
+import '../../widgets/privacy_policy_bottomsheet.dart';
+import '../../widgets/terms_of_service_bottomsheet.dart';
 
 class PhoneEntryScreen extends StatefulWidget {
   const PhoneEntryScreen({super.key});
@@ -37,10 +37,10 @@ class _PhoneEntryScreenState extends State<PhoneEntryScreen> {
     if (!_formKey.currentState!.validate()) {
       return;
     } else {
-      di.sl<AuthenticationBloc>().add(
-        AuthenticationOtpSend(
-          AuthenticationOtpSendParams(
-            _phoneNumberController.e164PhoneNumber,
+      di.sl<AuthenticationOtpBloc>().add(
+        AuthenticationOtpSendRequested(
+          params: AuthenticationOtpSendParams(
+            phoneNumber: _phoneNumberController.e164PhoneNumber.replaceAll('+91', ''),
           ),
         ),
       );
@@ -48,12 +48,12 @@ class _PhoneEntryScreenState extends State<PhoneEntryScreen> {
   }
 
   void _onTermsOfServiceTextTap() => showCustomBottomsheet(
-    builder: (BuildContext context) => TermsOfServiceDialogWidget(),
+    builder: (BuildContext context) => TermsOfServiceBottomsheetWidget(),
     context: context,
   );
 
   void _onPrivacyPolicyTextTap() => showCustomBottomsheet(
-    builder: (BuildContext context) => PrivacyPolicyDialogWidget(),
+    builder: (BuildContext context) => PrivacyPolicyBottomsheetWidget(),
     context: context,
   );
 
@@ -145,11 +145,11 @@ class _PhoneEntryScreenState extends State<PhoneEntryScreen> {
                               showCountrySelection: false,
                             ),
                           ),
-                          BlocConsumer<AuthenticationBloc, AuthenticationState>(
-                            buildWhen: (AuthenticationState previous, AuthenticationState current) {
+                          BlocConsumer<AuthenticationOtpBloc, AuthenticationOtpState>(
+                            buildWhen: (AuthenticationOtpState previous, AuthenticationOtpState current) {
                               return current is AuthenticationOtpSending || previous is AuthenticationOtpSending;
                             },
-                            builder: (BuildContext context, AuthenticationState state) {
+                            builder: (BuildContext context, AuthenticationOtpState state) {
                               final bool isLoading = state is AuthenticationOtpSending;
                               return Opacity(
                                 opacity: !isLoading ? 1.0 : 0.5,
@@ -159,10 +159,10 @@ class _PhoneEntryScreenState extends State<PhoneEntryScreen> {
                                 ),
                               );
                             },
-                            listenWhen: (AuthenticationState previous, AuthenticationState current) {
-                              return current is AuthenticationOtpSent || current is AuthenticationFailure;
+                            listenWhen: (AuthenticationOtpState previous, AuthenticationOtpState current) {
+                              return current is AuthenticationOtpSent || current is AuthenticationOtpFailure;
                             },
-                            listener: (BuildContext context, AuthenticationState state) {
+                            listener: (BuildContext context, AuthenticationOtpState state) {
                               if (state is AuthenticationOtpSent) {
                                 context.pushNested(
                                   RouteSegments.otpVerification,
@@ -170,7 +170,7 @@ class _PhoneEntryScreenState extends State<PhoneEntryScreen> {
                                     'phoneNumber': _phoneNumberController.e164PhoneNumber,
                                   },
                                 );
-                              } else if (state is AuthenticationFailure) {
+                              } else if (state is AuthenticationOtpFailure) {
                                 SnackBars.of(context).showErrorSnackBar(
                                   title: 'Couldn’t continue',
                                   message: state.message,

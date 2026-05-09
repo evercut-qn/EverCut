@@ -1,3 +1,5 @@
+// lib/features/onboarding/presentation/views/personal_information/personal_information_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -12,7 +14,6 @@ import '../../../../../shared/widgets/common/appbars/bottom_appbar.dart';
 import '../../../../../shared/widgets/common/inputs/date_picker_field.dart';
 import '../../../../../shared/widgets/common/inputs/dropdown_menu.dart';
 import '../../../../../shared/widgets/common/inputs/text_form_field.dart';
-import '../../../../../shared/widgets/overlays/snackbars.dart';
 import '../../cubit/onboarding_cubit.dart';
 
 class PersonalInformationScreen extends StatefulWidget {
@@ -30,26 +31,12 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
   final TextEditingController _dateOfBirthController = TextEditingController();
   final TextEditingController _genderController = TextEditingController();
   final DateTime _currentDate = DateTime.now();
-  GenderEnum? _selectedGender;
 
   void _onNextButtonPressed() {
     if (!_formKey.currentState!.validate()) {
-      SnackBars.of(context).showWarningSnackBar(
-        title: 'Incomplete Information',
-        message: 'Please fill in all required fields before continuing to the next steps.',
-      );
+      return;
     } else {
-      final DateTime dateOfBirth = DateFormat('dd MMMM yyyy').parse(_dateOfBirthController.text);
-      context.read<OnboardingCubit>().updateFields({
-        'firstName': _firstNameController.text.trim(),
-        'lastName': _lastNameController.text.trim(),
-        'email': _emailAddressController.text.trim().toLowerCase(),
-        'gender': (_selectedGender ?? GenderEnum.male).label == 'Transgender'
-            ? 'Other'
-            : (_selectedGender ?? GenderEnum.male).label,
-        'dateOfBirth': dateOfBirth.toIso8601String(),
-      });
-      context.read<OnboardingCubit>().nextPage();
+      context.read<OnboardingCubit>().nextStep();
     }
   }
 
@@ -209,11 +196,6 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
                     }).toList(),
                     labelText: 'Gender',
                     leadingIcon: AppIcons.solidRoundedUserAccount,
-                    onSelected: (int? value) {
-                      if (value != null) {
-                        _selectedGender = GenderEnumExtension.fromValue(value);
-                      }
-                    },
                     validator: (int? value) {
                       if (value == null || value.isNaN || value.isNegative) {
                         return 'Please select your gender.';

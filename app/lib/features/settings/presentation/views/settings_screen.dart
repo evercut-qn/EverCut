@@ -95,7 +95,7 @@ class SettingsScreen extends StatelessWidget {
                           ),
                           SettingsTileWidget(
                             icon: AppIcons.solidRoundedOffice,
-                            onTap: () {}, // => context.pushNested(RouteSegments.businessProfile),
+                            onTap: () => context.pushNested(RouteSegments.businessProfile),
                             title: 'Business Profile',
                           ),
                           SettingsTileWidget(
@@ -117,7 +117,7 @@ class SettingsScreen extends StatelessWidget {
                           SettingsTileWidget(
                             icon: AppIcons.solidRoundedCustomerSupport,
                             isFirst: true,
-                            onTap: () {},
+                            onTap: () => context.pushNested(RouteSegments.contactUs),
                             title: 'Contact Us',
                           ),
                           SettingsTileWidget(

@@ -1,4 +1,4 @@
-// lib/features/settings/presentation/views/manage_account/delete_account/delete_account_screen.dart
+// lib/features/settings/modules/manage_account/presentation/views/delete_account/delete_account_screen.dart
 
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';

@@ -1,4 +1,4 @@
-// lib/features/settings/presentation/views/manage_account/update_phone_number/update_phone_number_screen.dart
+// lib/features/settings/modules/manage_account/presentation/views/update_phone_number/update_phone_number_screen.dart
 
 import 'package:flutter/material.dart';
 

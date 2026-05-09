@@ -1,14 +1,15 @@
 // lib/features/authentication/data/data_sources/local/authentication_local_data_source.dart
-import '../../../../../core/auth/auth_session.dart';
 
-abstract class AuthenticationLocalDataSource {
-  Future<AuthSession?> readSession();
-  Future<void> saveSession(AuthSession session);
+abstract interface class AuthenticationLocalDataSource {
+  Future<bool> hasActiveSession();
+  Future<void> saveAccessToken(String accessToken);
+  Future<void> saveRefreshToken(String refreshToken);
   Future<void> saveOnboardingToken(String onboardingToken);
-  Future<String?> readRefreshToken();
-  Future<void> saveTokenPair({
-    required String accessToken,
-    required String refreshToken,
-  });
+  Future<String?> getAccessToken();
+  Future<String?> getRefreshToken();
+  Future<String?> getOnboardingToken();
+  Future<void> clearAccessToken();
+  Future<void> clearRefreshToken();
+  Future<void> clearOnboardingToken();
   Future<void> clearSession();
 }

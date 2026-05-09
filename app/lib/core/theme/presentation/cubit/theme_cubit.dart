@@ -16,7 +16,7 @@ class ThemeCubit extends Cubit<ThemeState> {
   ThemeCubit(
     this.getThemeMode,
     this.updateThemeMode,
-  ) : super(ThemeState.defaultState(getThemeMode()));
+  ) : super(ThemeState.initial(getThemeMode()));
 
   Future<void> changeThemeMode(ThemeMode mode) async {
     try {

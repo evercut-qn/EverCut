@@ -2,7 +2,7 @@
 
 import 'package:flutter/material.dart';
 
-import '../models/circular_interval_list.dart';
+import '../models/collections/circular_interval_list.dart';
 
 class DashedBorderPainter extends CustomPainter {
   final Color color;

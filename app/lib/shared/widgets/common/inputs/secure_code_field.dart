@@ -16,7 +16,7 @@ class _SecureCodeFieldState {
     required this.currentFocusedIndex,
   });
 
-  factory _SecureCodeFieldState.defaultState() {
+  factory _SecureCodeFieldState.initial() {
     return _SecureCodeFieldState(
       value: <String>[],
       currentFocusedIndex: -1,
@@ -36,7 +36,7 @@ class _SecureCodeFieldState {
 
 class SecureCodeFieldController {
   final int length;
-  final ValueNotifier<_SecureCodeFieldState> _stateNotifier = ValueNotifier<_SecureCodeFieldState>(_SecureCodeFieldState.defaultState());
+  final ValueNotifier<_SecureCodeFieldState> _stateNotifier = ValueNotifier<_SecureCodeFieldState>(_SecureCodeFieldState.initial());
   final FocusNode _focusNode = FocusNode();
   final TextEditingController _controller = TextEditingController();
 

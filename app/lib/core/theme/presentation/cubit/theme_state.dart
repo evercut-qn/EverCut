@@ -13,7 +13,7 @@ class ThemeState extends Equatable {
 
   bool get isDarkMode => brightness == Brightness.dark;
 
-  factory ThemeState.defaultState([ThemeMode mode = ThemeMode.system]) {
+  factory ThemeState.initial([ThemeMode mode = ThemeMode.system]) {
     return ThemeState(
       brightness: WidgetsBinding.instance.platformDispatcher.platformBrightness,
       mode: mode,

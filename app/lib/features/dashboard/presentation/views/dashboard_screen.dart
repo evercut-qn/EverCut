@@ -123,10 +123,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                                   ),
                                                   Text(
                                                     'Open Shop',
+                                                    maxLines: 1,
                                                     style: TextStyle(
                                                       color: context.appColors.greenShade100,
                                                       fontSize: context.scale(12),
                                                       fontWeight: FontWeight.w600,
+                                                      overflow: TextOverflow.ellipsis,
                                                     ),
                                                   ),
                                                 ],
@@ -145,7 +147,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                           ),
                                           child: InkWell(
                                             highlightColor: Colors.white.withAlpha(31),
-                                            onTap: () {},
+                                            onTap: () => context.pushNested(RouteSegments.manageServices),
                                             splashColor: Colors.white.withAlpha(47),
                                             child: Padding(
                                               padding: EdgeInsets.all(context.scale(12)),
@@ -154,16 +156,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                                 spacing: context.scale(8),
                                                 children: [
                                                   Icon(
-                                                    AppIcons.solidRoundedPlusSign,
+                                                    AppIcons.solidRoundedTag01,
                                                     color: Colors.white.withAlpha(207),
                                                     size: context.scale(18),
                                                   ),
                                                   Text(
-                                                    'Add Service',
+                                                    'Manage Services',
+                                                    maxLines: 1,
                                                     style: TextStyle(
                                                       color: Colors.white.withAlpha(207),
                                                       fontSize: context.scale(12),
                                                       fontWeight: FontWeight.w600,
+                                                      overflow: TextOverflow.ellipsis,
                                                     ),
                                                   ),
                                                 ],

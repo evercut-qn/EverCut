@@ -2,6 +2,9 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../../../../core/constants/navigation/route_paths.dart';
 import '../../../../../core/di/injection.dart' as di;
 import '../../../../../shared/extensions/context/app_colors_extension.dart';
 import '../../../../../shared/extensions/context/device_metrics_extension.dart';
@@ -10,9 +13,9 @@ import '../../../../../shared/widgets/common/appbars/bottom_appbar.dart';
 import '../../../../../shared/widgets/common/inputs/secure_code_field.dart';
 import '../../../../../shared/widgets/other/phone_text_field/phone_text_field.dart';
 import '../../../../../shared/widgets/overlays/snackbars.dart';
-import '../../../domain/use_cases/authentication_otp_verify_params.dart';
-import '../../bloc/authentication_bloc.dart';
-import '../../cubit/otp_resend_cubit.dart';
+import '../../../domain/use_cases/otp/params/authentication_otp_verify_params.dart';
+import '../../bloc/authentication_otp/authentication_otp_bloc.dart';
+import '../../cubit/authentication_otp_resend/authentication_otp_resend_cubit.dart';
 
 class OtpVerificationScreen extends StatefulWidget {
   final String phoneNumber;
@@ -35,14 +38,14 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<OtpResendCubit>().init(0, DateTime.now());
-      context.read<OtpResendCubit>().startTimer();
+      context.read<AuthenticationOtpResendCubit>().init(resendAttempts: 0, lastAttemptTime: DateTime.now());
+      context.read<AuthenticationOtpResendCubit>().startCooldown();
     });
   }
 
   Future<void> _onResendTextTap() async {
     if (mounted) {
-      context.read<OtpResendCubit>().startTimer();
+      context.read<AuthenticationOtpResendCubit>().startCooldown();
     }
   }
 
@@ -50,11 +53,11 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
     if (!_formKey.currentState!.validate()) {
       return;
     } else {
-      di.sl<AuthenticationBloc>().add(
-        AuthenticationOtpVerify(
-          AuthenticationOtpVerifyParams(
-            _phoneNumberController.e164PhoneNumber,
-            _otpFieldController.value.trim(),
+      di.sl<AuthenticationOtpBloc>().add(
+        AuthenticationOtpVerifyRequested(
+          params: AuthenticationOtpVerifyParams(
+            phoneNumber: widget.phoneNumber.replaceAll('+91', ''),
+            smsCode: _otpFieldController.value.trim(),
           ),
         ),
       );
@@ -131,8 +134,8 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                       height: 1.45,
                     ),
                   ),
-                  BlocBuilder<OtpResendCubit, OtpResendState>(
-                    builder: (BuildContext context, OtpResendState state) {
+                  BlocBuilder<AuthenticationOtpResendCubit, AuthenticationOtpResendState>(
+                    builder: (BuildContext context, AuthenticationOtpResendState state) {
                       if (state.locked) {
                         return Text(
                           'Locked',
@@ -179,11 +182,11 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
         child: Row(
           children: <Expanded>[
             Expanded(
-              child: BlocConsumer<AuthenticationBloc, AuthenticationState>(
-                buildWhen: (AuthenticationState previous, AuthenticationState current) {
+              child: BlocConsumer<AuthenticationOtpBloc, AuthenticationOtpState>(
+                buildWhen: (AuthenticationOtpState previous, AuthenticationOtpState current) {
                   return current is AuthenticationOtpVerifying || previous is AuthenticationOtpVerifying;
                 },
-                builder: (BuildContext context, AuthenticationState state) {
+                builder: (BuildContext context, AuthenticationOtpState state) {
                   final bool isLoading = state is AuthenticationOtpVerifying;
                   return Opacity(
                     opacity: !isLoading ? 1.0 : 0.5,
@@ -193,20 +196,13 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
                     ),
                   );
                 },
-                listenWhen: (AuthenticationState previous, AuthenticationState current) {
-                  return current is AuthenticationOtpVerified ||
-                      current is AuthenticationSuccess ||
-                      current is AuthenticationOnboardingRequired ||
-                      current is AuthenticationFailure;
+                listenWhen: (AuthenticationOtpState previous, AuthenticationOtpState current) {
+                  return current is AuthenticationOtpVerified || current is AuthenticationOtpFailure;
                 },
-                listener: (BuildContext context, AuthenticationState state) {
+                listener: (BuildContext context, AuthenticationOtpState state) {
                   if (state is AuthenticationOtpVerified) {
-                    // Authentication verified — router redirect will handle navigation
-                  } else if (state is AuthenticationSuccess) {
-                    // Existing user — AuthStateNotifier.markSessionChanged() triggers router redirect
-                  } else if (state is AuthenticationOnboardingRequired) {
-                    // New user — AuthStateNotifier.saveOnboardingToken() triggers router redirect to onboarding
-                  } else if (state is AuthenticationFailure) {
+                    context.go(RoutePaths.onboarding);
+                  } else if (state is AuthenticationOtpFailure) {
                     SnackBars.of(context).showErrorSnackBar(
                       title: 'Verification failed',
                       message: state.message,

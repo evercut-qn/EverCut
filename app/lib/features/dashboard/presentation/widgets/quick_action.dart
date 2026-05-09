@@ -52,10 +52,12 @@ class QuickActionWidget extends StatelessWidget {
               Expanded(
                 child: Text(
                   label,
+                  maxLines: 1,
                   style: TextStyle(
                     color: context.appColors.neutralShade850,
                     fontSize: context.scale(12.75),
                     fontWeight: FontWeight.w700,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ),

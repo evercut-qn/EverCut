@@ -9,6 +9,7 @@ class SettingsTileWidget extends StatelessWidget {
   final bool isLast;
   final VoidCallback onTap;
   final bool showArrow;
+  final Color? tileColor;
   final String title;
 
   const SettingsTileWidget({
@@ -17,9 +18,10 @@ class SettingsTileWidget extends StatelessWidget {
     required this.icon,
     this.isFirst = false,
     this.isLast = false,
-    required this.title,
     required this.onTap,
     this.showArrow = true,
+    this.tileColor,
+    required this.title,
   });
 
   @override
@@ -59,7 +61,7 @@ class SettingsTileWidget extends StatelessWidget {
           );
         }
       }()),
-      tileColor: context.appColors.backgroundShade100,
+      tileColor: tileColor ?? context.appColors.backgroundShade100,
       title: Text(
         title,
         style: TextStyle(
