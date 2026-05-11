@@ -127,8 +127,7 @@ MSG91_OTP_TEMPLATE_ID=your_otp_template_id
 # ── JWT (Custom Token Auth) ─────────────────────────────────────────
 JWT_ACCESS_SECRET=your_access_token_secret_min_64_chars_random
 JWT_REFRESH_SECRET=your_refresh_token_secret_min_64_chars_different
-JWT_ACCESS_EXPIRY=15m
-JWT_REFRESH_EXPIRY=180d
+JWT_ONBOARDING_SECRET=your_onboarding_token_secret_min_64_chars_different
 ```
 
 ### 2.2 Update `config/index.js`
@@ -151,8 +150,10 @@ msg91: Object.freeze({
 jwt: Object.freeze({
     accessSecret: requireEnv('JWT_ACCESS_SECRET'),
     refreshSecret: requireEnv('JWT_REFRESH_SECRET'),
-    accessExpiry: optionalEnv('JWT_ACCESS_EXPIRY', '15m'),
-    refreshExpiry: optionalEnv('JWT_REFRESH_EXPIRY', '180d'),
+    onboardingSecret: requireEnv('JWT_ONBOARDING_SECRET'),
+    accessExpiry: '15m',
+    refreshExpiry: '180d',
+    onboardingExpiry: '24h',
 }),
 ```
 
@@ -436,22 +437,17 @@ import logger from '../utils/logger.js';
 
 // ── Token generation ──────────────────────────────────────────────────
 
-/** Generate a short-lived onboarding token. */
-export const generateOnboardingToken = (phoneNumber) => {
-    // Note: intentionally signed with accessSecret (same secret as access tokens).
-    // A third env variable is avoided; the `type: TOKEN_TYPE.ONBOARDING` claim is
-    // the enforced differentiation. Both `authenticate` and `authenticateOnboarding`
-    // verify the type claim after signature validation, so onboarding tokens are
-    // rejected on standard access routes and vice-versa.
-    return jwt.sign(
-        {
-            sub: phoneNumber,
-            type: TOKEN_TYPE.ONBOARDING,
-        },
-        config.jwt.accessSecret,
-        { expiresIn: '30m' }
-    );
-};
+/** Generate a short-lived onboarding token (signed with dedicated onboarding secret). */
+export const generateOnboardingToken = (phoneNumber) => jwt.sign(
+    {
+        sub: phoneNumber,
+        type: TOKEN_TYPE.ONBOARDING,
+        iss: JWT_ISS,
+        aud: JWT_AUD,
+    },
+    config.jwt.onboardingSecret,
+    { expiresIn: config.jwt.onboardingExpiry },
+);
 
 /** Generate a pair of access + refresh tokens. */
 export const generateTokenPair = (userId, roleType) => {
@@ -474,25 +470,75 @@ export const generateTokenPair = (userId, roleType) => {
     return { accessToken, refreshToken };
 };
 
-/** Verify a bearer token signed with the access secret. */
-export const verifyBearerToken = (token) => {
+/** Verify an access token signed with the access secret. */
+export const verifyAccessToken = (token) => {
     try {
-        return jwt.verify(token, config.jwt.accessSecret);
-    } catch {
-        throw new UnauthorizedError('Invalid or expired token');
+        const decoded = jwt.verify(token, config.jwt.accessSecret, {
+            issuer: JWT_ISS,
+            audience: JWT_AUD,
+        });
+        if (decoded.type !== TOKEN_TYPE.ACCESS) {
+            throw new UnauthorizedError('Standard account access token required');
+        }
+        return decoded;
+    } catch (err) {
+        if (err instanceof UnauthorizedError) throw err;
+        if (err instanceof jwt.TokenExpiredError) {
+            throw new UnauthorizedError('Access token has expired. Please refresh your session.');
+        }
+        if (err instanceof jwt.JsonWebTokenError) {
+            logger.warn('Tampered access token detected', { message: err.message });
+            throw new UnauthorizedError('Invalid access token.');
+        }
+        throw err;
+    }
+};
+
+/** Verify an onboarding token. */
+export const verifyOnboardingToken = (token) => {
+    try {
+        const decoded = jwt.verify(token, config.jwt.onboardingSecret, {
+            issuer: JWT_ISS,
+            audience: JWT_AUD,
+        });
+        if (decoded.type !== TOKEN_TYPE.ONBOARDING) {
+            throw new UnauthorizedError('Onboarding token required');
+        }
+        return decoded;
+    } catch (err) {
+        if (err instanceof UnauthorizedError) throw err;
+        if (err instanceof jwt.TokenExpiredError) {
+            throw new UnauthorizedError('Onboarding token has expired. Please verify your OTP again.');
+        }
+        if (err instanceof jwt.JsonWebTokenError) {
+            logger.warn('Tampered onboarding token detected', { message: err.message });
+            throw new UnauthorizedError('Invalid onboarding token.');
+        }
+        throw err;
     }
 };
 
 /** Verify a refresh token and return decoded payload. */
 export const verifyRefreshToken = (token) => {
     try {
-        const decoded = jwt.verify(token, config.jwt.refreshSecret);
+        const decoded = jwt.verify(token, config.jwt.refreshSecret, {
+            issuer: JWT_ISS,
+            audience: JWT_AUD,
+        });
         if (decoded.type !== TOKEN_TYPE.REFRESH) {
             throw new UnauthorizedError('Invalid token type');
         }
         return decoded;
-    } catch {
-        throw new UnauthorizedError('Invalid or expired refresh token');
+    } catch (err) {
+        if (err instanceof UnauthorizedError) throw err;
+        if (err instanceof jwt.TokenExpiredError) {
+            throw new UnauthorizedError('Refresh token has expired. Please sign in again.');
+        }
+        if (err instanceof jwt.JsonWebTokenError) {
+            logger.warn('Tampered refresh token detected', { message: err.message });
+            throw new UnauthorizedError('Invalid refresh token.');
+        }
+        throw err;
     }
 };
 
@@ -890,11 +936,7 @@ const loadActiveUser = async (userId) => {
 export const authenticate = async (req, _res, next) => {
     try {
         const token = extractBearerToken(req, 'No token provided');
-        const decoded = authService.verifyBearerToken(token);
-
-        if (decoded.type !== TOKEN_TYPE.ACCESS) {
-            throw new UnauthorizedError('Standard account access token required');
-        }
+        const decoded = authService.verifyAccessToken(token);
 
         const user = await loadActiveUser(decoded.sub);
 
@@ -917,11 +959,8 @@ export const authenticate = async (req, _res, next) => {
 export const authenticateOnboarding = async (req, _res, next) => {
     try {
         const token = extractBearerToken(req, 'No token provided');
-        const decoded = authService.verifyBearerToken(token);
-
-        if (decoded.type !== TOKEN_TYPE.ONBOARDING) {
-            throw new UnauthorizedError('Onboarding token required');
-        }
+        const decoded = authService.verifyOnboardingToken(token);
+        // verifyOnboardingToken already enforces type: TOKEN_TYPE.ONBOARDING internally
 
         req.onboardingContext = {
             phoneNumber: decoded.sub,
@@ -951,7 +990,7 @@ export default authenticate;
 | **Storage (Server)** | SHA-256 hash in User model | Never store raw refresh tokens |
 | **Rotation** | Every refresh issues new pair | Detects token theft via hash mismatch |
 | **Revocation** | Set `refreshTokenHash` to null | Immediate logout / sign-out-everywhere |
-| **Onboarding Tokens** | 30 minutes | Used only for onboarding endpoints; signed with access secret (type claim enforces differentiation) |
+| **Onboarding Tokens** | 24 hours | Used only for onboarding endpoints; signed with dedicated secret |
 
 > **Token Payload — `role` field:** Standard access tokens reflect the persisted user's current `roleType` at issuance time. Brand-new users do not receive a pseudo-user role; they receive an `onboardingToken` that carries only the verified phone number needed to finish onboarding.
 
