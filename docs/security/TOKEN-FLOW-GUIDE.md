@@ -73,7 +73,7 @@ user.model.js
 | `exp` | `iat + 900` (15 min) | Expiry |
 
 **Secret:** `JWT_ACCESS_SECRET`  
-**Default TTL:** 15 minutes (`JWT_ACCESS_EXPIRY=15m`)
+**TTL:** 15 minutes — defined as `config.jwt.accessExpiry` in `src/config/index.js`
 
 ### 2.2 Refresh Token
 
@@ -87,7 +87,7 @@ user.model.js
 | `exp` | `iat + 15552000` (180 days) |
 
 **Secret:** `JWT_REFRESH_SECRET` (different from access secret)  
-**Default TTL:** 180 days (`JWT_REFRESH_EXPIRY=180d`)  
+**TTL:** 180 days — defined as `config.jwt.refreshExpiry` in `src/config/index.js`  
 **Stored:** SHA-256 hash only in `user.refreshTokenHash` (raw token never persisted)
 
 ### 2.3 Onboarding Token
@@ -101,6 +101,7 @@ user.model.js
 | `exp` | `iat + 86400` (24 hours) |
 
 **Secret:** `JWT_ONBOARDING_SECRET` — **distinct from access and refresh secrets**  
+**TTL:** 24 hours — defined as `config.jwt.onboardingExpiry` in `src/config/index.js`  
 **Purpose:** Short-lived credential issued after OTP verification to a new (unregistered) phone number. Grants access only to `POST /onboarding/customers` and `POST /onboarding/barbers`.
 
 > ⚠️ The onboarding token uses a **separate signing secret**. It cannot be used as an access token and vice versa — the secrets and the `type` claim both enforce this.
@@ -455,7 +456,7 @@ if (response.statusCode == 401) {
 // After OTP verify returns isNewUser: true
 if (data['isNewUser'] == true) {
   final onboardingToken = data['onboardingToken'];
-  final expiresIn = data['onboardingExpiresIn']; // 86400 seconds
+  final expiresIn = data['onboardingExpiresIn']; // seconds, driven by config.jwt.onboardingExpiry (default: 86400)
   await storage.write(key: 'onboarding_token', value: onboardingToken);
   navigateTo('/onboarding');
 }
@@ -473,14 +474,17 @@ headers: { 'Authorization': 'Bearer $onboardingToken' }
 | `JWT_ACCESS_SECRET` | ✅ | Signs access tokens. Min 64 random chars. |
 | `JWT_REFRESH_SECRET` | ✅ | Signs refresh tokens. **Different** from access secret. |
 | `JWT_ONBOARDING_SECRET` | ✅ | Signs onboarding tokens. **Different** from both above. |
-| `JWT_ACCESS_EXPIRY` | Optional | Default `15m`. Format: `Ns`, `Nm`, `Nh`, `Nd`. |
-| `JWT_REFRESH_EXPIRY` | Optional | Default `180d`. |
 
-> **Generate secrets:**
+> **Token TTLs are not environment variables.**  
+> Access (`15m`), refresh (`180d`), and onboarding (`24h`) expiry values are code-level constants in `src/config/index.js` — intentionally not env-overridable. A TTL change is a security decision that must go through code review and a controlled deploy.
+
+> **Generate secrets with the dedicated script:**
 > ```bash
-> node -e "console.log(require('crypto').randomBytes(64).toString('base64url'))"
+> node scripts/generate-token-secrets.mjs               # print .env block
+> node scripts/generate-token-secrets.mjs --write       # write directly into .env
+> node scripts/generate-token-secrets.mjs --check       # audit existing values
 > ```
-> Run this three times — once per secret. Never reuse across environments.
+> Run from the `server/` directory. Never reuse secrets across environments.
 
 ---
 
@@ -489,6 +493,7 @@ headers: { 'Authorization': 'Bearer $onboardingToken' }
 | Property | Implementation |
 |---|---|
 | Separate secrets per token type | ✅ Access / Refresh / Onboarding use 3 different keys |
+| Centralized TTL constants | ✅ All expiries in `config.jwt.*` — no env override, no desync risk |
 | Token type claim enforcement | ✅ `decoded.type` checked in every guard |
 | Issuer + Audience enforcement | ✅ `iss: evercut-api`, `aud: evercut-mobile` verified on all tokens |
 | Refresh token hashing | ✅ SHA-256 stored, raw token never persisted |

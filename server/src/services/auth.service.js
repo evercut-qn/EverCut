@@ -78,7 +78,7 @@ export const generateOnboardingToken = (phoneNumber) => jwt.sign(
         aud: JWT_AUD,
     },
     config.jwt.onboardingSecret,
-    { expiresIn: '24h' },
+    { expiresIn: config.jwt.onboardingExpiry },
 );
 
 /** Verify an onboarding token and return decoded payload. */
@@ -233,7 +233,7 @@ export const resolveOtpSession = async (phoneNumber) => {
     return {
         isNewUser: true,
         onboardingToken,
-        onboardingExpiresIn: 86400, // 24h in seconds
+        onboardingExpiresIn: parseExpiryToSeconds(config.jwt.onboardingExpiry),
     };
 };
 
