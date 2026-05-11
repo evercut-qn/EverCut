@@ -1,7 +1,6 @@
 import * as authService from '../services/auth.service.js';
 import userRepository from '../repositories/user.repository.js';
 import { AppError, ConflictError, UnauthorizedError } from '../utils/api-error.js';
-import { TOKEN_TYPE } from '../utils/constants.js';
 import logger from '../utils/logger.js';
 
 const extractBearerToken = (req, missingMessage) => {
@@ -32,10 +31,6 @@ export const authenticate = async (req, _res, next) => {
         const token = extractBearerToken(req, 'No token provided');
         const decoded = authService.verifyAccessToken(token);
 
-        if (decoded.type !== TOKEN_TYPE.ACCESS) {
-            throw new UnauthorizedError('Standard account access token required');
-        }
-
         const user = await loadActiveUser(decoded.sub);
 
         req.user = {
@@ -61,10 +56,6 @@ export const authenticateOnboarding = async (req, _res, next) => {
     try {
         const token = extractBearerToken(req, 'No token provided');
         const decoded = authService.verifyOnboardingToken(token);
-
-        if (decoded.type !== TOKEN_TYPE.ONBOARDING) {
-            throw new UnauthorizedError('Onboarding token required');
-        }
 
         const existingUser = await userRepository.findByPhone(decoded.sub);
         if (existingUser) {

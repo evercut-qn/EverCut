@@ -147,10 +147,14 @@ export const generateTokenPair = (userId, roleType) => {
 /** Verify an access token signed with the access secret. */
 export const verifyAccessToken = (token) => {
     try {
-        return jwt.verify(token, config.jwt.accessSecret, {
+        const decoded = jwt.verify(token, config.jwt.accessSecret, {
             issuer: JWT_ISS,
             audience: JWT_AUD,
         });
+        if (decoded.type !== TOKEN_TYPE.ACCESS) {
+            throw new UnauthorizedError('Standard account access token required');
+        }
+        return decoded;
     } catch (err) {
         if (err instanceof UnauthorizedError) throw err;
         if (err instanceof jwt.TokenExpiredError) {
