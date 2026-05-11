@@ -35,7 +35,7 @@ Express Routes
       │
       ├── otpRateLimiter (IP + phone-based in-memory window)
       ├── validate (Joi schema)
-      ├── authenticate (verifyBearerToken → access token guard)
+      ├── authenticate (verifyAccessToken → access token guard)
       ├── authenticateOnboarding (verifyOnboardingToken → onboarding guard)
       └── authorize(...roles) (role-based access)
       │
@@ -44,7 +44,7 @@ auth.service.js
       │
       ├── generateTokenPair()       → signed with accessSecret + refreshSecret
       ├── generateOnboardingToken() → signed with onboardingSecret (separate key)
-      ├── verifyBearerToken()       → enforces iss, aud, differentiates expiry vs tamper
+      ├── verifyAccessToken()       → enforces iss, aud, differentiates expiry vs tamper
       ├── verifyRefreshToken()      → same, uses refreshSecret
       ├── verifyOnboardingToken()   → same, uses onboardingSecret
       ├── hashToken()               → SHA-256 of raw refresh token
@@ -285,7 +285,7 @@ Server:
 File: src/middleware/authenticate.middleware.js
 
 1. Extract Bearer token from Authorization header
-2. verifyBearerToken(token)
+2. verifyAccessToken(token)
      ├── jwt.verify(token, accessSecret, { issuer, audience })
      ├── TokenExpiredError → 401 "Access token has expired. Please refresh your session."
      └── JsonWebTokenError → 401 "Invalid access token." + logger.warn (tamper alert)

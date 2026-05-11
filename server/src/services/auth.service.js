@@ -144,8 +144,8 @@ export const generateTokenPair = (userId, roleType) => {
     };
 };
 
-/** Verify a bearer token signed with the access secret. */
-export const verifyBearerToken = (token) => {
+/** Verify an access token signed with the access secret. */
+export const verifyAccessToken = (token) => {
     try {
         return jwt.verify(token, config.jwt.accessSecret, {
             issuer: JWT_ISS,

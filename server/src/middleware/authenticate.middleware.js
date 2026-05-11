@@ -30,7 +30,7 @@ const loadActiveUser = async (userId) => {
 export const authenticate = async (req, _res, next) => {
     try {
         const token = extractBearerToken(req, 'No token provided');
-        const decoded = authService.verifyBearerToken(token);
+        const decoded = authService.verifyAccessToken(token);
 
         if (decoded.type !== TOKEN_TYPE.ACCESS) {
             throw new UnauthorizedError('Standard account access token required');
