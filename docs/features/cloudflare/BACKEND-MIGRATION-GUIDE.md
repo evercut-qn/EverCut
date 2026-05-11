@@ -1,4 +1,3 @@
-﻿
 # EverCut — Backend Migration & Implementation Guide
 ## Cloudinary → Cloudflare R2 Unified Media Architecture
 
@@ -202,7 +201,7 @@ The `photo.*` module (7 files, ~282 lines) contains **zero domain logic** unique
 | `photoType` (shop_interior, work_sample, etc.) | `metadata.category` |
 | `description` | `metadata.description` |
 | `photoName` | `metadata.originalName` |
-| `config.upload.maxPhotosPerShop = 10` | `config.upload.maxGalleryPerShop = 10` |
+| `config.upload.maxPhotosPerShop = 10` | `config.media.maxGalleryPerShop` in `config/index.js` |
 | `isActive` soft-delete | `status: 'deleted'` |
 | `fileSize`, `mimeType` | `actualSize`, `contentType` |
 
@@ -362,7 +361,7 @@ server/src/
 │
 ├── utils/
 │   ├── upload-cleanup.utils.js          ← DELETE (replaced by media-cleanup.service)
-│   └── constants.js                     ← MODIFY: Add media constants, remove PHOTO_TYPE
+│   └── constants.js                     ← MODIFY: Add media enums, remove PHOTO_TYPE
 │
 └── jobs/
     └── media-cleanup.cron.js            ← NEW: Orphan media cleanup cron
@@ -813,15 +812,20 @@ The `photo.model.js` file is deleted entirely. All its functionality is absorbed
 +        },
 ```
 
-### 6.4 Constants Updates
+### 6.4 Constants & Config Updates
+
+The media migration affects both `utils/constants.js` (enums — immutable system truths) and `config/index.js` (business rules — mutable limits, thresholds, and allowlists).
+
+#### 6.4.1 Constants Updates (`utils/constants.js`)
+
+Constants hold **only enum-like values that never change per environment or product decision.** A media type will always be `'image'` or `'video'`; a status will always be one of a fixed set of strings. These are true constants.
 
 ```javascript
-// utils/constants.js — REMOVE existing photo constants, ADD media constants
+// utils/constants.js — REMOVE existing photo constants, ADD media enums
 
 // ── REMOVE ───────────────────────────────────────────
 // export const PHOTO_TYPE = Object.freeze({ ... });
 // export const ALL_PHOTO_TYPES = Object.values(PHOTO_TYPE);
-// MAX_PHOTOS_PER_SHOP has been moved to config.upload.maxPhotosPerShop
 
 // ── ADD ──────────────────────────────────────────────
 
@@ -887,41 +891,6 @@ export const GALLERY_CATEGORY = Object.freeze({
 export const ALL_GALLERY_CATEGORIES = Object.values(GALLERY_CATEGORY);
 
 // ---------------------------------------------------------------------------
-// Media Limits
-// ---------------------------------------------------------------------------
-export const MEDIA_LIMITS = Object.freeze({
-    MAX_IMAGE_SIZE: 10 * 1024 * 1024,          // 10 MB
-    MAX_VIDEO_SIZE: 500 * 1024 * 1024,         // 500 MB
-    MAX_GALLERY_PER_SHOP: 10,                  // replaces config.upload.maxPhotosPerShop
-    PRESIGNED_URL_TTL: 15 * 60,                // 15 minutes (seconds)
-    MULTIPART_PART_SIZE: 50 * 1024 * 1024,     // 50 MB per part
-    MAX_MULTIPART_PARTS: 100,
-    PENDING_UPLOAD_TTL_HOURS: 24,              // Auto-delete unconfirmed uploads
-});
-
-// ---------------------------------------------------------------------------
-// Allowed MIME Types
-// ---------------------------------------------------------------------------
-export const ALLOWED_IMAGE_MIMES = Object.freeze([
-    'image/jpeg',
-    'image/png',
-    'image/webp',
-    'image/gif',
-]);
-
-export const ALLOWED_VIDEO_MIMES = Object.freeze([
-    'video/mp4',
-    'video/quicktime',
-    'video/x-msvideo',
-    'video/webm',
-]);
-
-export const ALLOWED_MEDIA_MIMES = Object.freeze([
-    ...ALLOWED_IMAGE_MIMES,
-    ...ALLOWED_VIDEO_MIMES,
-]);
-
-// ---------------------------------------------------------------------------
 // Content Type → Extension Mapping
 // ---------------------------------------------------------------------------
 export const MIME_TO_EXTENSION = Object.freeze({
@@ -936,9 +905,85 @@ export const MIME_TO_EXTENSION = Object.freeze({
 });
 ```
 
+#### 6.4.2 Config Updates (`config/index.js`)
+
+Upload size limits, MIME allowlists, gallery caps, and presigned URL TTLs are **configurations** — mutable business levers that can change with product requirements (e.g., raising the image size limit from 10 MB to 15 MB, or expanding allowed MIME types). They belong in `config/index.js` alongside other business rule blocks (`booking`, `payment`, `shop`).
+
+```javascript
+// config/index.js — ADD media configuration block (replaces pruned upload block)
+
+  /** Media business rules */
+  media: Object.freeze({
+    maxImageSize: 10 * 1024 * 1024,          // 10 MB
+    maxVideoSize: 500 * 1024 * 1024,         // 500 MB
+    maxGalleryPerShop: 10,                   // replaces config.upload.maxPhotosPerShop
+    maxFiles: 10,                            // max items per multi-upload request
+    presignedUrlTtl: 15 * 60,               // 15 minutes (seconds)
+    multipartPartSize: 50 * 1024 * 1024,     // 50 MB per part
+    maxMultipartParts: 100,
+    pendingUploadTtlHours: 24,               // Auto-delete unconfirmed uploads
+    allowedImageMimes: [
+      'image/jpeg',
+      'image/png',
+      'image/webp',
+      'image/gif',
+    ],
+    allowedVideoMimes: [
+      'video/mp4',
+      'video/quicktime',
+      'video/x-msvideo',
+      'video/webm',
+    ],
+  }),
+```
+
 
 
 ## 7. Implementation Guide — R2 Configuration
+
+### 7.0 Config Architecture Overview
+
+Before adding the R2 block, understand the patterns already established in `config/index.js`. Every new config section must follow these conventions.
+
+#### Env-var helper functions
+
+Three helpers defined at the top of `config/index.js` control how environment variables are loaded:
+
+| Helper | Behaviour | Used for |
+|--------|-----------|---------|
+| `requireEnv(key)` | Throws at startup if the variable is absent — always, in every environment | `MONGODB_URI`, Firebase creds, JWT secrets, MSG91 keys, **all R2 vars** |
+| `optionalEnv(key, fallback)` | Returns the fallback when the variable is absent | `PORT`, `NODE_ENV`, timeout values, non-critical knobs |
+| `providerEnv(key, fallback)` | Uses the fallback in development; throws in production if absent | PhonePe, Cashfree payment-gateway credentials |
+
+All six R2 environment variables (`CF_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `CDN_BASE_URL`, `MEDIA_TOKEN_SECRET`) are loaded via `requireEnv`. A missing variable fails the process at startup — never silently in a live request.
+
+#### Object.freeze pattern
+
+Every config block is frozen at two levels:
+
+```javascript
+const config = Object.freeze({
+    r2: Object.freeze({
+        accountId: requireEnv('CF_ACCOUNT_ID'),
+        // ...
+    }),
+});
+```
+
+Inner `Object.freeze` prevents mutation of the block itself. The outer `Object.freeze` prevents adding or removing blocks. Never spread config blocks into mutable objects.
+
+#### Centralized business-rule config
+
+`config/index.js` also holds non-credential, non-environment-variable business rule blocks — mutable levers that can change with product decisions or per-environment tuning (e.g. different timeouts for staging vs production). These include `booking`, `payment`, `payout`, `shop`, `media`, `slotCleanup`, `security`, and payment-gateway blocks. Do not confuse these with `utils/constants.js`:
+
+| Lives in | Rule of thumb |
+|----------|--------------|
+| `config/index.js` | Values that can change per environment, per product decision, or are derived from env vars (timeouts, thresholds, credentials, URLs, **upload size limits, MIME allowlists, gallery caps**) |
+| `utils/constants.js` | Values that never change: enum-like strings (statuses, roles, types), entity type names, content-type-to-extension mappings |
+
+Upload size limits (`config.media.maxImageSize`), MIME allowlists (`config.media.allowedImageMimes`), gallery caps (`config.media.maxGalleryPerShop`), and presigned URL TTLs (`config.media.presignedUrlTtl`) are **configurations** — they live in the `media` block of `config/index.js` because they are mutable business levers that product requirements can change at any time.
+
+---
 
 ### 7.1 R2 Client Setup
 
@@ -962,23 +1007,117 @@ export default r2Client;
 ### 7.2 Config Module Update
 
 ```diff
-// config/index.js — REMOVE cloudinary block, ADD r2 block
+// config/index.js — full set of changes
 
--cloudinary: Object.freeze({
--    cloudName: requireEnv('CLOUDINARY_CLOUD_NAME'),
--    apiKey: requireEnv('CLOUDINARY_API_KEY'),
--    apiSecret: requireEnv('CLOUDINARY_API_SECRET'),
--}),
+// ── 1. Remove cloudinary block, add r2 block ──────────────────────────────
 
-+r2: Object.freeze({
-+    accountId: requireEnv('CF_ACCOUNT_ID'),
-+    accessKeyId: requireEnv('R2_ACCESS_KEY_ID'),
-+    secretAccessKey: requireEnv('R2_SECRET_ACCESS_KEY'),
-+    bucket: requireEnv('R2_BUCKET'),
-+    cdnBaseUrl: requireEnv('CDN_BASE_URL'),
-+    mediaTokenSecret: requireEnv('MEDIA_TOKEN_SECRET'),
-+}),
+-    cloudinary: Object.freeze({
+-        cloudName: requireEnv('CLOUDINARY_CLOUD_NAME'),
+-        apiKey: requireEnv('CLOUDINARY_API_KEY'),
+-        apiSecret: requireEnv('CLOUDINARY_API_SECRET'),
+-    }),
+
++    r2: Object.freeze({
++        accountId: requireEnv('CF_ACCOUNT_ID'),
++        accessKeyId: requireEnv('R2_ACCESS_KEY_ID'),
++        secretAccessKey: requireEnv('R2_SECRET_ACCESS_KEY'),
++        bucket: requireEnv('R2_BUCKET'),
++        cdnBaseUrl: requireEnv('CDN_BASE_URL'),
++        mediaTokenSecret: requireEnv('MEDIA_TOKEN_SECRET'),
++    }),
+
+// ── 2. Replace the upload block with the media block ──────────────────────
+//    Cloudinary-specific fields (allowedImageFormats, imageTransformations)
+//    are removed. Upload limits, MIME allowlists, gallery caps, and presigned
+//    URL TTLs are business configurations — they stay here in config.
+
+-    upload: Object.freeze({
+-        maxFileSize: 5 * 1024 * 1024,
+-        maxFiles: 10,
+-        maxPhotosPerShop: 10,
+-        allowedImageFormats: ['jpg', 'jpeg', 'png', 'webp'],
+-        allowedMimeTypes: [
+-            'image/jpeg',
+-            'image/jpg',
+-            'image/png',
+-            'image/gif',
+-            'image/webp',
+-        ],
+-        imageTransformations: Object.freeze({
+-            profile: { width: 800, height: 800, crop: 'limit' },
+-            cover: { width: 1200, height: 600, crop: 'limit' },
+-        }),
+-    }),
+
++    media: Object.freeze({
++        maxImageSize: 10 * 1024 * 1024,          // 10 MB
++        maxVideoSize: 500 * 1024 * 1024,         // 500 MB
++        maxGalleryPerShop: 10,                   // replaces maxPhotosPerShop
++        maxFiles: 10,                            // max items per multi-upload request
++        presignedUrlTtl: 15 * 60,               // 15 minutes (seconds)
++        multipartPartSize: 50 * 1024 * 1024,     // 50 MB per part
++        maxMultipartParts: 100,
++        pendingUploadTtlHours: 24,               // Auto-delete unconfirmed uploads
++        allowedImageMimes: [
++            'image/jpeg',
++            'image/png',
++            'image/webp',
++            'image/gif',
++        ],
++        allowedVideoMimes: [
++            'video/mp4',
++            'video/quicktime',
++            'video/x-msvideo',
++            'video/webm',
++        ],
++    }),
 ```
+
+> **Why replace `config.upload` with `config.media`?**
+>
+> `maxFileSize` was a Multer hard-cap applied at the middleware layer. Multer is deleted. The equivalent cap for presigned uploads is `config.media.maxImageSize` (10 MB) enforced in `media.service.requestUploadUrl()`. `allowedImageFormats` was a Cloudinary SDK option (format names, not MIME types). `allowedMimeTypes` is now `config.media.allowedImageMimes`. `imageTransformations` was Cloudinary crop-at-upload; R2 stores originals and CDN serves variants on-the-fly. All limits and allowlists remain in `config` because they are mutable business rules, not immutable constants.
+
+### 7.3 Supporting Config File Ecosystem
+
+`config/index.js` is the single source of truth for all values. The other files in `server/src/config/` are thin adapters — they import from `index.js` and produce an initialized SDK client or a structured options object. **`cors.config.js` is the one exception — it reads `ALLOWED_ORIGINS` and `NODE_ENV` from `process.env` directly** because CORS resolution is environment-aware and must run before `config` is fully consumed by the Express middleware.
+
+| File | Status | What it exports |
+|------|--------|----------------|
+| `config/r2.config.js` | **NEW** | `r2Client` — an initialized `S3Client` pointed at the R2 endpoint via `config.r2.*` |
+| `config/cloudinary.config.js` | **DELETE** | _(replaced by r2.config.js)_ |
+| `config/cors.config.js` | Stable — no changes | `createCorsOptions()` and `resolveAllowedOrigins(env)` |
+| `config/database.config.js` | Stable — no changes | Default export `connectDB()`, named export `disconnectDB()` |
+| `config/firebase.config.js` | Stable — no changes | Singleton Firebase Admin instance |
+| `config/msg91.config.js` | Stable — no changes | Frozen MSG91 config with computed endpoint URLs |
+
+**Key design points in the stable files (for reference):**
+
+`cors.config.js` — environment-aware origins:
+```javascript
+// resolveAllowedOrigins reads ALLOWED_ORIGINS in production/staging;
+// falls back to localhost defaults in development.
+// Consumed as: app.use(cors(createCorsOptions()))
+export const resolveAllowedOrigins = (env = process.env.NODE_ENV || 'development') => { ... };
+export const createCorsOptions = () => { ... };
+```
+
+`database.config.js` — security hardening + graceful shutdown:
+```javascript
+// mongoose.sanitizeFilter prevents $gt/$ne query-injection on all queries,
+// including those that don't go through express-mongo-sanitize (cron jobs, queues).
+mongoose.set('sanitizeFilter', true);
+
+// Named export for graceful shutdown hooks:
+export const disconnectDB = async () => { ... };
+```
+
+`firebase.config.js` — singleton guard:
+```javascript
+// Prevents double-initialization when modules are hot-reloaded in dev.
+if (admin.apps.length > 0) return admin;
+```
+
+These files are unaffected by the R2 migration and require no changes.
 
 ---
 
@@ -1142,7 +1281,7 @@ export default new StorageProvider();
 
 ```javascript
 // services/media/media-validation.service.js — NEW FILE
-import { ALLOWED_IMAGE_MIMES, ALLOWED_VIDEO_MIMES, MEDIA_LIMITS } from '../../utils/constants.js';
+import config from '../../config/index.js';
 
 /**
  * Magic byte signatures for file type verification.
@@ -1161,7 +1300,7 @@ const MAGIC_SIGNATURES = Object.freeze({
  * Validate content type against allowlist for the given media type.
  */
 export const validateContentType = (contentType, mediaType) => {
-    const allowlist = mediaType === 'video' ? ALLOWED_VIDEO_MIMES : ALLOWED_IMAGE_MIMES;
+    const allowlist = mediaType === 'video' ? config.media.allowedVideoMimes : config.media.allowedImageMimes;
     return allowlist.includes(contentType);
 };
 
@@ -1169,7 +1308,7 @@ export const validateContentType = (contentType, mediaType) => {
  * Validate file size against limits for the given media type.
  */
 export const validateFileSize = (sizeBytes, mediaType) => {
-    const limit = mediaType === 'video' ? MEDIA_LIMITS.MAX_VIDEO_SIZE : MEDIA_LIMITS.MAX_IMAGE_SIZE;
+    const limit = mediaType === 'video' ? config.media.maxVideoSize : config.media.maxImageSize;
     return sizeBytes > 0 && sizeBytes <= limit;
 };
 
@@ -1273,7 +1412,6 @@ import { buildPagination } from '../../utils/pagination.utils.js';
 import config from '../../config/index.js';
 import { BadRequestError, NotFoundError } from '../../utils/api-error.js';
 import {
-    MEDIA_LIMITS,
     MEDIA_STATUS,
     MEDIA_TYPE,
     MIME_TO_EXTENSION,
@@ -1320,8 +1458,8 @@ export const requestUploadUrl = async (userId, { contentType, sizeBytes, purpose
     }
     if (!validateFileSize(sizeBytes, mediaType)) {
         const limitMB = (mediaType === 'video'
-            ? MEDIA_LIMITS.MAX_VIDEO_SIZE
-            : MEDIA_LIMITS.MAX_IMAGE_SIZE) / (1024 * 1024);
+            ? config.media.maxVideoSize
+            : config.media.maxImageSize) / (1024 * 1024);
         throw new BadRequestError(`File size exceeds ${limitMB} MB limit`);
     }
 
@@ -1334,7 +1472,7 @@ export const requestUploadUrl = async (userId, { contentType, sizeBytes, purpose
         r2Key,
         contentType,
         sizeBytes,
-        MEDIA_LIMITS.PRESIGNED_URL_TTL,
+        config.media.presignedUrlTtl,
     );
 
     await Media.create({
@@ -1349,7 +1487,7 @@ export const requestUploadUrl = async (userId, { contentType, sizeBytes, purpose
         declaredSize: sizeBytes,
         entityId: entityId || null,
         entityType: null,
-        uploadExpiresAt: new Date(Date.now() + MEDIA_LIMITS.PENDING_UPLOAD_TTL_HOURS * 3600_000),
+        uploadExpiresAt: new Date(Date.now() + config.media.pendingUploadTtlHours * 3600_000),
     });
 
     logger.info('Presigned upload URL issued', {
@@ -1473,9 +1611,9 @@ export const attachGalleryMedia = async (ownerId, mediaIds, category = 'other', 
     }
 
     const currentCount = await Media.countByEntity(shop._id, 'Shop', { purpose: 'gallery' });
-    if (currentCount + mediaIds.length > MEDIA_LIMITS.MAX_GALLERY_PER_SHOP) {
+    if (currentCount + mediaIds.length > config.media.maxGalleryPerShop) {
         throw new BadRequestError(
-            `Gallery limit exceeded. Maximum ${MEDIA_LIMITS.MAX_GALLERY_PER_SHOP} items allowed.`,
+            `Gallery limit exceeded. Maximum ${config.media.maxGalleryPerShop} items allowed.`,
         );
     }
 
@@ -1796,22 +1934,22 @@ export default router;
 ```javascript
 // validators/media.validator.js — NEW (replaces photo.validator.js)
 import Joi from 'joi';
+import config from '../config/index.js';
 import {
     ALL_MEDIA_PURPOSES,
     ALL_GALLERY_CATEGORIES,
-    ALLOWED_MEDIA_MIMES,
 } from '../utils/constants.js';
 import { paginationSchema } from './common.validator.js';
 
 export const uploadUrlSchema = Joi.object({
     contentType: Joi.string()
-        .valid(...ALLOWED_MEDIA_MIMES)
+        .valid(...config.media.allowedImageMimes, ...config.media.allowedVideoMimes)
         .required()
         .messages({ 'any.only': 'Unsupported content type' }),
     sizeBytes: Joi.number()
         .integer()
         .positive()
-        .max(500 * 1024 * 1024)
+        .max(config.media.maxVideoSize)
         .required(),
     purpose: Joi.string()
         .valid(...ALL_MEDIA_PURPOSES)
@@ -2522,6 +2660,7 @@ photoUrl: r2KeyToUrl(plain.photoR2Key) ?? plain.photoUrl ?? null,
 // services/media/media-cleanup.service.js — NEW FILE
 import Media from '../../models/media.model.js';
 import storageProvider from './storage-provider.service.js';
+import config from '../../config/index.js';
 import logger from '../../utils/logger.js';
 import { MEDIA_STATUS } from '../../utils/constants.js';
 
@@ -2531,7 +2670,7 @@ import { MEDIA_STATUS } from '../../utils/constants.js';
  * MongoDB TTL index also handles record deletion, but this ensures R2 cleanup.
  */
 export const cleanupOrphanedUploads = async () => {
-    const cutoff = new Date(Date.now() - 24 * 3600_000);
+    const cutoff = new Date(Date.now() - config.media.pendingUploadTtlHours * 3600_000);
 
     const orphans = await Media.find({
         status: MEDIA_STATUS.PENDING,
@@ -2638,6 +2777,9 @@ CDN_BASE_URL=https://media.evercut.com
 MEDIA_TOKEN_SECRET=generate_64_char_random_hex_string
 ```
 
+> **Loading contract:** All six R2 variables are consumed via `requireEnv()` in `config/index.js`. A missing variable throws synchronously at module load time — the process exits before accepting any HTTP connections. There is no silent fallback. This matches the loading pattern already used for `MONGODB_URI`, `JWT_ACCESS_SECRET`, and all Firebase credentials.
+
+
 ### 17.2 .env.example Update
 
 ```diff
@@ -2739,8 +2881,8 @@ MEDIA_TOKEN_SECRET=generate_64_char_random_hex_string
 
 | File | Change Summary |
 |------|---------------|
-| `config/index.js` | Remove cloudinary config, add r2 config |
-| `utils/constants.js` | Remove PHOTO_TYPE, add media constants |
+| `config/index.js` | Remove `cloudinary` block; replace `upload` block with `media` block containing size limits, MIME allowlists, gallery cap, presigned URL TTL, and multipart settings; add `r2` block loaded via `requireEnv` |
+| `utils/constants.js` | Remove `PHOTO_TYPE` + `ALL_PHOTO_TYPES`; add `MEDIA_TYPE`, `MEDIA_STATUS`, `MEDIA_PURPOSE`, `MEDIA_ENTITY_TYPE`, `GALLERY_CATEGORY`, `MIME_TO_EXTENSION` with their `ALL_*` array exports (enums only — limits and MIME allowlists stay in `config.media`) |
 | `services/employee.service.js` | Remove Cloudinary, use mediaService |
 | `services/user.service.js` | Remove Cloudinary, use mediaService |
 | `services/account.service.js` | Remove updateBarberProfilePicture (moved to media) |
@@ -2968,4 +3110,3 @@ The point of no return is **Phase 5** (Cloudinary dependency removal + photo.* d
 ---
 
 *End of Backend Migration Guide — Version 2.0*
-
