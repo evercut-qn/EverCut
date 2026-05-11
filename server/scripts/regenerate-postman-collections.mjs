@@ -211,10 +211,14 @@ const authenticationCollection = {
           "  pm.environment.set('customer_onboarding_token', data.onboardingToken);",
           "  pm.environment.unset('customer_access_token');",
           "  pm.environment.unset('customer_refresh_token');",
+          "  pm.test('onboarding token has expiresIn of 86400s', function () { pm.expect(data.onboardingExpiresIn).to.equal(86400); });",
           "} else {",
           "  pm.environment.unset('customer_onboarding_token');",
           "  if (data.accessToken) pm.environment.set('customer_access_token', data.accessToken);",
           "  if (data.refreshToken) pm.environment.set('customer_refresh_token', data.refreshToken);",
+          "  pm.test('tokenType is Bearer', function () { pm.expect(data.tokenType).to.equal('Bearer'); });",
+          "  pm.test('expiresIn is a positive number', function () { pm.expect(data.expiresIn).to.be.a('number').and.to.be.above(0); });",
+          "  pm.test('refreshExpiresIn is a positive number', function () { pm.expect(data.refreshExpiresIn).to.be.a('number').and.to.be.above(0); });",
           "}",
           "pm.collectionVariables.set('last_session_role', 'CUSTOMER');",
           "pm.collectionVariables.set('last_session_is_new_user', String(Boolean(data.isNewUser)));"
@@ -250,10 +254,14 @@ const authenticationCollection = {
           "  pm.environment.set('barber_onboarding_token', data.onboardingToken);",
           "  pm.environment.unset('barber_access_token');",
           "  pm.environment.unset('barber_refresh_token');",
+          "  pm.test('onboarding token has expiresIn of 86400s', function () { pm.expect(data.onboardingExpiresIn).to.equal(86400); });",
           "} else {",
           "  pm.environment.unset('barber_onboarding_token');",
           "  if (data.accessToken) pm.environment.set('barber_access_token', data.accessToken);",
           "  if (data.refreshToken) pm.environment.set('barber_refresh_token', data.refreshToken);",
+          "  pm.test('tokenType is Bearer', function () { pm.expect(data.tokenType).to.equal('Bearer'); });",
+          "  pm.test('expiresIn is a positive number', function () { pm.expect(data.expiresIn).to.be.a('number').and.to.be.above(0); });",
+          "  pm.test('refreshExpiresIn is a positive number', function () { pm.expect(data.refreshExpiresIn).to.be.a('number').and.to.be.above(0); });",
           "}",
           "pm.collectionVariables.set('last_session_role', 'BARBER');",
           "pm.collectionVariables.set('last_session_is_new_user', String(Boolean(data.isNewUser)));"
@@ -274,7 +282,10 @@ const authenticationCollection = {
           "const response = pm.response.json();",
           "const data = response.data || {};",
           "if (data.accessToken) pm.environment.set('customer_access_token', data.accessToken);",
-          "if (data.refreshToken) pm.environment.set('customer_refresh_token', data.refreshToken);"
+          "if (data.refreshToken) pm.environment.set('customer_refresh_token', data.refreshToken);",
+          "pm.test('tokenType is Bearer', function () { pm.expect(data.tokenType).to.equal('Bearer'); });",
+          "pm.test('expiresIn is a positive number', function () { pm.expect(data.expiresIn).to.be.a('number').and.to.be.above(0); });",
+          "pm.test('refreshExpiresIn is a positive number', function () { pm.expect(data.refreshExpiresIn).to.be.a('number').and.to.be.above(0); });"
         ),
       }),
     },
@@ -292,7 +303,10 @@ const authenticationCollection = {
           "const response = pm.response.json();",
           "const data = response.data || {};",
           "if (data.accessToken) pm.environment.set('barber_access_token', data.accessToken);",
-          "if (data.refreshToken) pm.environment.set('barber_refresh_token', data.refreshToken);"
+          "if (data.refreshToken) pm.environment.set('barber_refresh_token', data.refreshToken);",
+          "pm.test('tokenType is Bearer', function () { pm.expect(data.tokenType).to.equal('Bearer'); });",
+          "pm.test('expiresIn is a positive number', function () { pm.expect(data.expiresIn).to.be.a('number').and.to.be.above(0); });",
+          "pm.test('refreshExpiresIn is a positive number', function () { pm.expect(data.refreshExpiresIn).to.be.a('number').and.to.be.above(0); });"
         ),
       }),
     },
@@ -417,6 +431,9 @@ const onboardingCollection = {
           "  if (data.accessToken) pm.environment.set('customer_access_token', data.accessToken);",
           "  if (data.refreshToken) pm.environment.set('customer_refresh_token', data.refreshToken);",
           "  pm.environment.unset('customer_onboarding_token');",
+          "  pm.test('tokenType is Bearer', function () { pm.expect(data.tokenType).to.equal('Bearer'); });",
+          "  pm.test('expiresIn is a positive number', function () { pm.expect(data.expiresIn).to.be.a('number').and.to.be.above(0); });",
+          "  pm.test('refreshExpiresIn is a positive number', function () { pm.expect(data.refreshExpiresIn).to.be.a('number').and.to.be.above(0); });",
           "}"
         ),
       }),
@@ -460,6 +477,9 @@ const onboardingCollection = {
           "  if (data.refreshToken) pm.environment.set('barber_refresh_token', data.refreshToken);",
           "  pm.environment.unset('barber_onboarding_token');",
           "  pm.globals.set('shared_barber_pin', '1234');",
+          "  pm.test('tokenType is Bearer', function () { pm.expect(data.tokenType).to.equal('Bearer'); });",
+          "  pm.test('expiresIn is a positive number', function () { pm.expect(data.expiresIn).to.be.a('number').and.to.be.above(0); });",
+          "  pm.test('refreshExpiresIn is a positive number', function () { pm.expect(data.refreshExpiresIn).to.be.a('number').and.to.be.above(0); });",
           "}"
         ),
       }),

@@ -10,18 +10,23 @@ const buildSessionPayload = (session) => {
             data: {
                 isNewUser: true,
                 onboardingToken: session.onboardingToken,
+                onboardingExpiresIn: session.onboardingExpiresIn,
             },
         };
     }
 
+    const { tokens } = session;
     return {
         message: 'Login successful',
         data: {
             isNewUser: false,
+            tokenType: tokens.tokenType,
+            accessToken: tokens.accessToken,
+            expiresIn: tokens.expiresIn,
+            refreshToken: tokens.refreshToken,
+            refreshExpiresIn: tokens.refreshExpiresIn,
             user: session.user,
             profile: session.profile,
-            accessToken: session.tokens.accessToken,
-            refreshToken: session.tokens.refreshToken,
         },
     };
 };

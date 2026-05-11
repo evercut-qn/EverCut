@@ -123,6 +123,9 @@
               "  if (data.accessToken) pm.environment.set('customer_access_token', data.accessToken);",
               "  if (data.refreshToken) pm.environment.set('customer_refresh_token', data.refreshToken);",
               "  pm.environment.unset('customer_onboarding_token');",
+              "  pm.test('tokenType is Bearer', function () { pm.expect(data.tokenType).to.equal('Bearer'); });",
+              "  pm.test('expiresIn is a positive number', function () { pm.expect(data.expiresIn).to.be.a('number').and.to.be.above(0); });",
+              "  pm.test('refreshExpiresIn is a positive number', function () { pm.expect(data.refreshExpiresIn).to.be.a('number').and.to.be.above(0); });",
               "}"
             ]
           }
@@ -282,6 +285,9 @@
               "  if (data.refreshToken) pm.environment.set('barber_refresh_token', data.refreshToken);",
               "  pm.environment.unset('barber_onboarding_token');",
               "  pm.globals.set('shared_barber_pin', '1234');",
+              "  pm.test('tokenType is Bearer', function () { pm.expect(data.tokenType).to.equal('Bearer'); });",
+              "  pm.test('expiresIn is a positive number', function () { pm.expect(data.expiresIn).to.be.a('number').and.to.be.above(0); });",
+              "  pm.test('refreshExpiresIn is a positive number', function () { pm.expect(data.refreshExpiresIn).to.be.a('number').and.to.be.above(0); });",
               "}"
             ]
           }

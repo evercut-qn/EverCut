@@ -16,8 +16,11 @@ export const createCustomerOnboarding = async (req, res) => {
             {
                 user,
                 profile,
+                tokenType: tokens.tokenType,
                 accessToken: tokens.accessToken,
+                expiresIn: tokens.expiresIn,
                 refreshToken: tokens.refreshToken,
+                refreshExpiresIn: tokens.refreshExpiresIn,
             },
             'Customer created',
         ),
@@ -35,8 +38,11 @@ export const createBarberOnboarding = async (req, res) => {
             {
                 user,
                 shop,
+                tokenType: tokens.tokenType,
                 accessToken: tokens.accessToken,
+                expiresIn: tokens.expiresIn,
                 refreshToken: tokens.refreshToken,
+                refreshExpiresIn: tokens.refreshExpiresIn,
             },
             'Barber profile created',
         ),

@@ -85,6 +85,58 @@ node scripts/regenerate-postman-collections.mjs
 
 ---
 
+## `generate-token-secrets.mjs`
+
+Generates cryptographically secure JWT secrets for EverCut's three token types (access, refresh, onboarding) using Node.js's built-in `crypto.randomBytes()`. Zero external dependencies.
+
+**Security properties:**
+- **Source:** OS-level CSPRNG (`crypto.randomBytes()`)
+- **Default length:** 64 bytes = 512 bits (exceeds HS256 and HS512 requirements)
+- **Encoding:** base64url — URL-safe, no `+` / `=` characters
+- **Independence:** Each secret is generated from a separate entropy draw
+
+**Usage:**
+
+```bash
+# Print ready-to-paste .env block (default)
+node scripts/generate-token-secrets.mjs
+
+# Print shell export statements
+node scripts/generate-token-secrets.mjs --format=export
+
+# Pipe-friendly: one secret per line
+node scripts/generate-token-secrets.mjs --format=raw
+
+# JSON object
+node scripts/generate-token-secrets.mjs --format=json
+
+# Generate 768-bit secrets (96 bytes)
+node scripts/generate-token-secrets.mjs --bytes=96
+
+# Audit existing .env secrets for strength and uniqueness
+node scripts/generate-token-secrets.mjs --check
+
+# Generate and write directly into .env (overwrites existing secrets)
+node scripts/generate-token-secrets.mjs --write
+
+# Help
+node scripts/generate-token-secrets.mjs --help
+```
+
+**`--check` output — what it validates:**
+
+| Check | Outcome |
+|---|---|
+| Key present in `.env` | ✔ / ⚠ missing |
+| Not a placeholder (`replace_with…`) | ✔ / ⚠ placeholder |
+| Entropy ≥ 256 bits | ✔ strong / ⚠ weak |
+| All three values are unique | ✔ / ✖ violation |
+
+**After rotation:** Any active JWT tokens signed with the old secret are immediately invalidated — users must re-authenticate. Plan rotations accordingly.
+
+---
+
+
 ## `seed-barber-rating-mock-data.js`
 
 Seeds a self-contained set of mock data into MongoDB for testing the barber rating routes.

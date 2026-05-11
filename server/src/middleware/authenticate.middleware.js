@@ -60,7 +60,7 @@ export const authenticate = async (req, _res, next) => {
 export const authenticateOnboarding = async (req, _res, next) => {
     try {
         const token = extractBearerToken(req, 'No token provided');
-        const decoded = authService.verifyBearerToken(token);
+        const decoded = authService.verifyOnboardingToken(token);
 
         if (decoded.type !== TOKEN_TYPE.ONBOARDING) {
             throw new UnauthorizedError('Onboarding token required');

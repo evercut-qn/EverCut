@@ -112,6 +112,7 @@ const config = Object.freeze({
   jwt: Object.freeze({
     accessSecret: requireEnv('JWT_ACCESS_SECRET'),
     refreshSecret: requireEnv('JWT_REFRESH_SECRET'),
+    onboardingSecret: requireEnv('JWT_ONBOARDING_SECRET'),
     accessExpiry: optionalEnv('JWT_ACCESS_EXPIRY', '15m'),
     refreshExpiry: optionalEnv('JWT_REFRESH_EXPIRY', '180d'),
   }),
