@@ -294,18 +294,22 @@
       "name": "6. Update Profile Picture",
       "request": {
         "method": "PATCH",
-        "header": [],
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
         "url": "{{base_url}}/{{api_prefix}}/shops/me/media/picture",
-        "description": "Uploads or replaces the owner profile picture.",
+        "description": "Replaces the owner profile picture with a confirmed R2 media object.",
         "body": {
-          "mode": "formdata",
-          "formdata": [
-            {
-              "key": "photo",
-              "type": "file",
-              "description": "Attach profile picture file manually in Postman"
+          "mode": "raw",
+          "raw": "{\n  \"mediaId\": \"{{shared_media_id}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
             }
-          ]
+          }
         }
       },
       "event": [
@@ -338,18 +342,22 @@
       "name": "7. Update Cover Image",
       "request": {
         "method": "PATCH",
-        "header": [],
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
         "url": "{{base_url}}/{{api_prefix}}/shops/me/media/cover",
-        "description": "Uploads or replaces the shop cover image.",
+        "description": "Replaces the shop cover image with a confirmed R2 media object.",
         "body": {
-          "mode": "formdata",
-          "formdata": [
-            {
-              "key": "cover",
-              "type": "file",
-              "description": "Attach cover image file manually in Postman"
+          "mode": "raw",
+          "raw": "{\n  \"mediaId\": \"{{shared_media_id}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
             }
-          ]
+          }
         }
       },
       "event": [

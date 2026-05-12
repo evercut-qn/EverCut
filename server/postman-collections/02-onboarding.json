@@ -32,59 +32,22 @@
       "name": "1. Complete Customer Profile",
       "request": {
         "method": "POST",
-        "header": [],
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
         "url": "{{base_url}}/{{api_prefix}}/onboarding/customers",
-        "description": "Creates the customer for the OTP-verified customer test user. A rerun returns 409 because onboarding only succeeds once per account.",
+        "description": "Creates the customer for the OTP-verified customer test user using a confirmed R2 mediaId. Run the media upload flow first if shared_media_id is empty. A rerun returns 409 because onboarding only succeeds once per account.",
         "body": {
-          "mode": "formdata",
-          "formdata": [
-            {
-              "key": "firstName",
-              "value": "Test",
-              "type": "text"
-            },
-            {
-              "key": "lastName",
-              "value": "Customer",
-              "type": "text"
-            },
-            {
-              "key": "phoneNumber",
-              "value": "9876543210",
-              "type": "text"
-            },
-            {
-              "key": "email",
-              "value": "test.customer@example.com",
-              "type": "text"
-            },
-            {
-              "key": "gender",
-              "value": "Male",
-              "type": "text"
-            },
-            {
-              "key": "dateOfBirth",
-              "value": "1994-06-15",
-              "type": "text"
-            },
-            {
-              "key": "address",
-              "value": "Church Street, Bengaluru",
-              "type": "text"
-            },
-            {
-              "key": "location",
-              "value": "{\"type\":\"Point\",\"coordinates\":[77.5946,12.9716]}",
-              "type": "text",
-              "description": "GeoJSON point near the barber test shop"
-            },
-            {
-              "key": "photo",
-              "type": "file",
-              "description": "Attach customer photo file manually in Postman"
+          "mode": "raw",
+          "raw": "{\n  \"firstName\": \"Test\",\n  \"lastName\": \"Customer\",\n  \"email\": \"test.customer@example.com\",\n  \"gender\": \"Male\",\n  \"dateOfBirth\": \"1994-06-15\",\n  \"address\": \"Church Street, Bengaluru\",\n  \"location\": {\"type\":\"Point\",\"coordinates\":[77.5946,12.9716]},\n  \"photoMediaId\": \"{{shared_media_id}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
             }
-          ]
+          }
         },
         "auth": {
           "type": "bearer",
@@ -136,114 +99,22 @@
       "name": "2. Complete Barber Profile",
       "request": {
         "method": "POST",
-        "header": [],
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
         "url": "{{base_url}}/{{api_prefix}}/onboarding/barbers",
-        "description": "Creates the barber shop for the OTP-verified barber test user. Shop schedule values can be sent in HH:MM or hh:mm AM/PM format and are normalized by the backend. The shop image field already points to the local sample file.",
+        "description": "Creates the barber shop for the OTP-verified barber test user using a confirmed R2 mediaId. Shop schedule values can be sent in HH:MM or hh:mm AM/PM format and are normalized by the backend.",
         "body": {
-          "mode": "formdata",
-          "formdata": [
-            {
-              "key": "firstName",
-              "value": "Test",
-              "type": "text"
-            },
-            {
-              "key": "lastName",
-              "value": "Barber",
-              "type": "text"
-            },
-            {
-              "key": "email",
-              "value": "test.barber@example.com",
-              "type": "text"
-            },
-            {
-              "key": "dateOfBirth",
-              "value": "1991-01-12",
-              "type": "text"
-            },
-            {
-              "key": "gender",
-              "value": "Male",
-              "type": "text"
-            },
-            {
-              "key": "shopName",
-              "value": "Postman Test Barber Studio",
-              "type": "text"
-            },
-            {
-              "key": "category",
-              "value": "Barber",
-              "type": "text"
-            },
-            {
-              "key": "targetCustomers",
-              "value": "male",
-              "type": "text"
-            },
-            {
-              "key": "address",
-              "value": "MG Road, Bengaluru",
-              "type": "text"
-            },
-            {
-              "key": "location",
-              "value": "{\"type\":\"Point\",\"coordinates\":[77.5946,12.9716]}",
-              "type": "text",
-              "description": "Matches the customer discovery coordinates"
-            },
-            {
-              "key": "amenities",
-              "value": "[\"Air Conditioning\",\"Waiting Area\",\"Drinking Water\",\"Washrooms\",\"Parking Area\",\"Wi-Fi\",\"Charging Points\"]",
-              "type": "text"
-            },
-            {
-              "key": "workingDays",
-              "value": "[\"Monday\",\"Tuesday\",\"Wednesday\",\"Thursday\",\"Friday\",\"Saturday\"]",
-              "type": "text"
-            },
-            {
-              "key": "workingHours",
-              "value": "{\"openTime\":\"09:00\",\"closeTime\":\"20:00\"}",
-              "type": "text"
-            },
-            {
-              "key": "breakTimes",
-              "value": "[{\"start\":\"13:00\",\"end\":\"14:00\"}]",
-              "type": "text"
-            },
-            {
-              "key": "accountHolderName",
-              "value": "Test Barber",
-              "type": "text"
-            },
-            {
-              "key": "bankName",
-              "value": "HDFC Bank",
-              "type": "text"
-            },
-            {
-              "key": "upiId",
-              "value": "test.barber@upi",
-              "type": "text"
-            },
-            {
-              "key": "pin",
-              "value": "1234",
-              "type": "text"
-            },
-            {
-              "key": "confirmPin",
-              "value": "1234",
-              "type": "text"
-            },
-            {
-              "key": "photo",
-              "type": "file",
-              "description": "Attach shop image manually in Postman"
+          "mode": "raw",
+          "raw": "{\n  \"firstName\": \"Test\",\n  \"lastName\": \"Barber\",\n  \"email\": \"test.barber@example.com\",\n  \"dateOfBirth\": \"1991-01-12\",\n  \"gender\": \"Male\",\n  \"shopName\": \"Postman Test Barber Studio\",\n  \"category\": \"Barber\",\n  \"targetCustomers\": \"male\",\n  \"address\": \"MG Road, Bengaluru\",\n  \"location\": {\"type\":\"Point\",\"coordinates\":[77.5946,12.9716]},\n  \"amenities\": [\"Air Conditioning\",\"Waiting Area\",\"Drinking Water\",\"Washrooms\",\"Parking Area\",\"Wi-Fi\",\"Charging Points\"],\n  \"workingDays\": [\"Monday\",\"Tuesday\",\"Wednesday\",\"Thursday\",\"Friday\",\"Saturday\"],\n  \"workingHours\": {\"openTime\":\"09:00\",\"closeTime\":\"20:00\"},\n  \"breakTimes\": [{\"start\":\"13:00\",\"end\":\"14:00\"}],\n  \"accountHolderName\": \"Test Barber\",\n  \"bankName\": \"HDFC Bank\",\n  \"upiId\": \"test.barber@upi\",\n  \"pin\": \"1234\",\n  \"confirmPin\": \"1234\",\n  \"photoMediaId\": \"{{shared_media_id}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
             }
-          ]
+          }
         },
         "auth": {
           "type": "bearer",

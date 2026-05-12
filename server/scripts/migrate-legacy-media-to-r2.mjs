@@ -73,6 +73,23 @@ const sanitizePart = (value, fallback) => {
     return sanitized || fallback;
 };
 
+const folderForPurpose = (purpose, contentType) => {
+    if (contentType.startsWith('video/')) return 'videos/raw';
+
+    const folders = {
+        [MEDIA_PURPOSE.AVATAR]: 'images/avatars',
+        [MEDIA_PURPOSE.PROFILE]: 'images/profiles',
+        [MEDIA_PURPOSE.COVER]: 'images/covers',
+        [MEDIA_PURPOSE.GALLERY]: 'images/gallery',
+        [MEDIA_PURPOSE.EMPLOYEE]: 'images/employees',
+        [MEDIA_PURPOSE.ONBOARDING]: 'images/onboarding',
+        [MEDIA_PURPOSE.SERVICE]: 'images/services',
+        [MEDIA_PURPOSE.VIDEO_THUMBNAIL]: 'thumbnails/videos',
+    };
+
+    return folders[purpose] || 'images/misc';
+};
+
 const isProbablyUrl = (value) => /^https?:\/\//i.test(String(value || ''));
 
 const fetchWithRetry = async (url, attempts = 3) => {
@@ -174,8 +191,7 @@ const migrateOne = async ({
     const downloaded = await fetchWithRetry(url);
     const extension = extensionFrom(downloaded.contentType, url);
     const r2Key = [
-        downloaded.contentType.startsWith('video/') ? 'videos' : 'images',
-        sanitizePart(purpose, 'media'),
+        folderForPurpose(purpose, downloaded.contentType),
         sanitizePart(ownerId, 'unknown-owner'),
         `${sanitizePart(sourceId, 'legacy')}.${extension}`,
     ].join('/');

@@ -91,38 +91,22 @@
       "name": "2. Update Profile",
       "request": {
         "method": "PATCH",
-        "header": [],
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
         "url": "{{base_url}}/{{api_prefix}}/customers/me",
-        "description": "Updates the customer data and reuses the sample image as an optional replacement photo. NOTE: Email updates must use PATCH /account/email endpoint.",
+        "description": "Updates customer data. To replace the profile photo, include a confirmed R2 photoMediaId from the media upload flow. NOTE: Email updates must use PATCH /account/email endpoint.",
         "body": {
-          "mode": "formdata",
-          "formdata": [
-            {
-              "key": "firstName",
-              "value": "Test",
-              "type": "text"
-            },
-            {
-              "key": "lastName",
-              "value": "Customer",
-              "type": "text"
-            },
-            {
-              "key": "address",
-              "value": "Church Street, Bengaluru, India",
-              "type": "text"
-            },
-            {
-              "key": "location",
-              "value": "{\"type\":\"Point\",\"coordinates\":[77.5946,12.9716]}",
-              "type": "text"
-            },
-            {
-              "key": "photo",
-              "type": "file",
-              "description": "Attach replacement photo file manually in Postman (optional)"
+          "mode": "raw",
+          "raw": "{\n  \"firstName\": \"Test\",\n  \"lastName\": \"Customer\",\n  \"address\": \"Church Street, Bengaluru, India\",\n  \"location\": {\"type\":\"Point\",\"coordinates\":[77.5946,12.9716]},\n  \"photoMediaId\": \"{{shared_media_id}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
             }
-          ]
+          }
         }
       },
       "event": [

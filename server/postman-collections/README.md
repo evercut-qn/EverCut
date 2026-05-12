@@ -32,17 +32,17 @@ All collections now assume the backend returns the same JSON envelope for both s
 | `05-customer-shop-discovery.json` | EverCut - Customer Shop Discovery | Shop discovery, availability, favorites, and keyword search |
 | `06-customer-ratings.json` | EverCut - Customer Ratings | Submit a rating and read shop rating data |
 | `07-barber-profile-shop.json` | EverCut - Barber Profile & Shop | Shop management: current profile, payout details, open state, media, security, and account actions |
-| `08-barber-employees.json` | EverCut - Barber Employees | Employee CRUD with optional photo upload and 24-hour employee schedule examples |
+| `08-barber-employees.json` | EverCut - Barber Employees | Employee CRUD with optional R2 photo media IDs and 24-hour employee schedule examples |
 | `09-barber-services.json` | EverCut - Barber Services | Service catalogue CRUD (single and bundled services) |
 | `10-barber-bookings.json` | EverCut - Barber Bookings | Booking administration: list filters, analytics, status update, cancellation |
-| `11-barber-photos.json` | EverCut - Barber Photos | Shop gallery: upload, list, analytics, delete |
+| `11-barber-media.json` | EverCut - Barber Media | R2 media workflow: presign, direct upload, confirm, gallery attach, analytics, delete |
 | `12-barber-earnings.json` | EverCut - Barber Earnings | Earnings summary (requires completed bookings for non-zero values) |
 | `13-barber-ratings.json` | EverCut - Barber Ratings | Rating listing, analytics, reply management, and rating removal |
 | `14-operational-analytics.json` | EverCut - Operational Analytics | Booking, employee, and earnings analytics through resource-owned endpoints |
 | `15-payments-payouts.json` | EverCut - Payments & Payouts | Native PhonePe SDK payment initiation/verification/status/refunds and Cashfree payout retry |
 | `16-notifications.json` | EverCut - Notifications | FCM token management, notification history, summary, and read-state updates |
 | `EverCut.postman_environment.json` | — | Active environment with OTP/JWT variables for local testing |
-| `assets/sample-upload.png` | — | Sample image pre-wired into file-upload requests |
+| `assets/sample-upload.png` | — | Sample image for direct R2 PUT requests |
 
 ---
 
@@ -169,15 +169,18 @@ Employee `workingHours.start` and `workingHours.end` remain `HH:MM` 24-hour valu
 | 7 | PATCH | `/api/v1/bookings/{{booking_id_status}}` | Update booking status |
 | 8 | PATCH | `/api/v1/bookings/{{booking_id_delete}}` | Cancel a paid booking *(Terminal)* |
 
-### `11-barber-photos.json`
+### `11-barber-media.json`
 
 | # | Method | Endpoint | Description |
 |---|---|---|---|
-| 1 | GET | `/api/v1/photos` | List gallery photos - captures photo ID |
-| 2 | POST | `/api/v1/photos` | Upload photos |
-| 3 | GET | `/api/v1/photos/analytics` | Get photo analytics |
-| 4 | GET | `/api/v1/photos/{{photo_id}}` | Get photo by ID |
-| 5 | DELETE | `/api/v1/photos/{{photo_id}}` | Delete photo *(Terminal)* |
+| 1 | POST | `/api/v1/media/upload-url` | Request a presigned R2 upload URL |
+| 2 | PUT | `{{media_upload_url}}` | Upload binary directly to R2 with `No Auth` and the returned `Content-Type` header |
+| 3 | POST | `/api/v1/media/confirm` | Confirm and validate the upload |
+| 4 | POST | `/api/v1/media/gallery` | Attach confirmed media to gallery |
+| 5 | GET | `/api/v1/media/gallery` | List gallery media |
+| 6 | GET | `/api/v1/media/gallery/stats` | Get gallery analytics |
+| 7 | GET | `/api/v1/media/{{media_id}}` | Get media by ID |
+| 8 | DELETE | `/api/v1/media/{{media_id}}` | Delete media *(Terminal)* |
 
 ### `12-barber-earnings.json`
 
@@ -320,7 +323,7 @@ Collections capture and share the following Postman globals automatically:
 | `shared_employee_id` | `08-barber-employees.json` requests 1 and 2 | Customer bookings |
 | `shared_service_id` | `09-barber-services.json` requests 1 and 2 | Customer bookings |
 | `shared_booking_id` | `04-customer-bookings.json` requests 1 and 3 | Booking detail requests |
-| `shared_photo_id` | `11-barber-photos.json` requests 1 and 2 | Photo detail and delete |
+| `shared_media_id` | `11-barber-media.json` requests 1 and 5 | Media attachment, detail, and delete |
 | `shared_barber_pin` | `07-barber-profile-shop.json` request 8 | Future PIN-gated requests |
 
 ---

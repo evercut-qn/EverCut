@@ -46,19 +46,6 @@ const request = ({ method, url, description, headers = [], body, auth, event }) 
 };
 
 const jsonBody = (raw) => ({ mode: 'raw', raw, options: { raw: { language: 'json' } } });
-const formDataBody = (formdata) => ({ mode: 'formdata', formdata });
-
-const fileField = (key, description) => {
-  const field = { key, type: 'file' };
-  if (description) field.description = description;
-  return field;
-};
-
-const textField = (key, value, description) => {
-  const field = { key, value, type: 'text' };
-  if (description) field.description = description;
-  return field;
-};
 
 const standardEnvelopeAssertions = [
   "pm.test('response uses the standard envelope', function () {",
@@ -78,6 +65,7 @@ const standardEnvelopeAssertions = [
 ];
 
 const testEvent = (...exec) => [{ listen: 'test', script: { type: 'text/javascript', exec: [...standardEnvelopeAssertions, ...exec] } }];
+const rawTestEvent = (...exec) => [{ listen: 'test', script: { type: 'text/javascript', exec } }];
 const preRequestEvent = (...exec) => [{ listen: 'prerequest', script: { type: 'text/javascript', exec } }];
 const mergedEvents = (preRequestExec, testExec) => [
   { listen: 'prerequest', script: { type: 'text/javascript', exec: preRequestExec } },
@@ -412,18 +400,9 @@ const onboardingCollection = {
         method: 'POST',
         url: '{{base_url}}/{{api_prefix}}/onboarding/customers',
         auth: bearerAuth('customer_onboarding_token'),
-        body: formDataBody([
-          textField('firstName', 'Test'),
-          textField('lastName', 'Customer'),
-          textField('phoneNumber', '9876543210'),
-          textField('email', 'test.customer@example.com'),
-          textField('gender', 'Male'),
-          textField('dateOfBirth', '1994-06-15'),
-          textField('address', customerLocationText),
-          textField('location', customerLocationGeoJson, 'GeoJSON point near the barber test shop'),
-          fileField('photo', 'Attach customer photo file manually in Postman'),
-        ]),
-        description: 'Creates the customer for the OTP-verified customer test user. A rerun returns 409 because onboarding only succeeds once per account.',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "firstName": "Test",\n  "lastName": "Customer",\n  "email": "test.customer@example.com",\n  "gender": "Male",\n  "dateOfBirth": "1994-06-15",\n  "address": "${customerLocationText}",\n  "location": ${customerLocationGeoJson},\n  "photoMediaId": "{{shared_media_id}}"\n}`),
+        description: 'Creates the customer for the OTP-verified customer test user using a confirmed R2 mediaId. Run the media upload flow first if shared_media_id is empty. A rerun returns 409 because onboarding only succeeds once per account.',
         event: testEvent(
           "pm.test('status is 201 or 409', function () { pm.expect(pm.response.code).to.be.oneOf([201, 409]); });",
           "if (pm.response.code === 201) {",
@@ -444,29 +423,9 @@ const onboardingCollection = {
         method: 'POST',
         url: '{{base_url}}/{{api_prefix}}/onboarding/barbers',
         auth: bearerAuth('barber_onboarding_token'),
-        body: formDataBody([
-          textField('firstName', 'Test'),
-          textField('lastName', 'Barber'),
-          textField('email', 'test.barber@example.com'),
-          textField('dateOfBirth', '1991-01-12'),
-          textField('gender', 'Male'),
-          textField('shopName', 'Postman Test Barber Studio'),
-          textField('category', 'Barber'),
-          textField('targetCustomers', 'male'),
-          textField('address', barberLocationText),
-          textField('location', barberLocationGeoJson, 'Matches the customer discovery coordinates'),
-          textField('amenities', '["Air Conditioning","Waiting Area","Drinking Water","Washrooms","Parking Area","Wi-Fi","Charging Points"]'),
-          textField('workingDays', '["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"]'),
-          textField('workingHours', '{"openTime":"09:00","closeTime":"20:00"}'),
-          textField('breakTimes', '[{"start":"13:00","end":"14:00"}]'),
-          textField('accountHolderName', 'Test Barber'),
-          textField('bankName', 'HDFC Bank'),
-          textField('upiId', 'test.barber@upi'),
-          textField('pin', '1234'),
-          textField('confirmPin', '1234'),
-          fileField('photo', 'Attach shop image manually in Postman'),
-        ]),
-        description: 'Creates the barber shop for the OTP-verified barber test user. Shop schedule values can be sent in HH:MM or hh:mm AM/PM format and are normalized by the backend. The shop image field already points to the local sample file.',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "firstName": "Test",\n  "lastName": "Barber",\n  "email": "test.barber@example.com",\n  "dateOfBirth": "1991-01-12",\n  "gender": "Male",\n  "shopName": "Postman Test Barber Studio",\n  "category": "Barber",\n  "targetCustomers": "male",\n  "address": "${barberLocationText}",\n  "location": ${barberLocationGeoJson},\n  "amenities": ["Air Conditioning","Waiting Area","Drinking Water","Washrooms","Parking Area","Wi-Fi","Charging Points"],\n  "workingDays": ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"],\n  "workingHours": {"openTime":"09:00","closeTime":"20:00"},\n  "breakTimes": [{"start":"13:00","end":"14:00"}],\n  "accountHolderName": "Test Barber",\n  "bankName": "HDFC Bank",\n  "upiId": "test.barber@upi",\n  "pin": "1234",\n  "confirmPin": "1234",\n  "photoMediaId": "{{shared_media_id}}"\n}`),
+        description: 'Creates the barber shop for the OTP-verified barber test user using a confirmed R2 mediaId. Shop schedule values can be sent in HH:MM or hh:mm AM/PM format and are normalized by the backend.',
         event: testEvent(
           "pm.test('status is 201 or 409', function () { pm.expect(pm.response.code).to.be.oneOf([201, 409]); });",
           "if (pm.response.code === 201) {",
@@ -517,14 +476,9 @@ const customerCollection = {
       ...request({
         method: 'PATCH',
         url: '{{base_url}}/{{api_prefix}}/customers/me',
-        description: 'Updates the customer data and reuses the sample image as an optional replacement photo. NOTE: Email updates must use PATCH /account/email endpoint.',
-        body: formDataBody([
-          textField('firstName', 'Test'),
-          textField('lastName', 'Customer'),
-          textField('address', `${customerLocationText}, India`),
-          textField('location', customerLocationGeoJson),
-          fileField('photo', 'Attach replacement photo file manually in Postman (optional)'),
-        ]),
+        description: 'Updates customer data. To replace the profile photo, include a confirmed R2 photoMediaId from the media upload flow. NOTE: Email updates must use PATCH /account/email endpoint.',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "firstName": "Test",\n  "lastName": "Customer",\n  "address": "${customerLocationText}, India",\n  "location": ${customerLocationGeoJson},\n  "photoMediaId": "{{shared_media_id}}"\n}`),
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
     },
@@ -1088,8 +1042,9 @@ const barberProfileCollection = {
       ...request({
         method: 'PATCH',
         url: '{{base_url}}/{{api_prefix}}/shops/me/media/picture',
-        body: formDataBody([fileField('photo', 'Attach profile picture file manually in Postman')]),
-        description: 'Uploads or replaces the owner profile picture.',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "mediaId": "{{shared_media_id}}"\n}`),
+        description: 'Replaces the owner profile picture with a confirmed R2 media object.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
     },
@@ -1098,8 +1053,9 @@ const barberProfileCollection = {
       ...request({
         method: 'PATCH',
         url: '{{base_url}}/{{api_prefix}}/shops/me/media/cover',
-        body: formDataBody([fileField('cover', 'Attach cover image file manually in Postman')]),
-        description: 'Uploads or replaces the shop cover image.',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "mediaId": "{{shared_media_id}}"\n}`),
+        description: 'Replaces the shop cover image with a confirmed R2 media object.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
     },
@@ -1212,16 +1168,9 @@ const barberEmployeesCollection = {
       ...request({
         method: 'POST',
         url: '{{base_url}}/{{api_prefix}}/employees',
-        body: formDataBody([
-          textField('firstName', 'Postman'),
-          textField('lastName', 'Automation'),
-          textField('phoneNumber', '{{employee_phone}}'),
-          textField('gender', 'Female'),
-          textField('dateOfBirth', '1995-05-15'),
-          textField('workingHours', '{"start":"09:00","end":"18:00"}'),
-          fileField('photo', 'Attach employee photo file manually in Postman (optional)'),
-        ]),
-        description: 'Creates a new employee with a generated phone number so the request stays rerunnable. Employee working hours remain HH:MM 24-hour values even when the shop was originally created with AM/PM schedule input.',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "firstName": "Postman",\n  "lastName": "Automation",\n  "phoneNumber": "{{employee_phone}}",\n  "gender": "Female",\n  "dateOfBirth": "1995-05-15",\n  "workingHours": {"start":"09:00","end":"18:00"},\n  "photoMediaId": "{{shared_media_id}}"\n}`),
+        description: 'Creates a new employee with a generated phone number and an optional confirmed R2 mediaId. Employee working hours remain HH:MM 24-hour values even when the shop was originally created with AM/PM schedule input.',
         event: mergedEvents(
           [
             "const suffix = Date.now().toString().slice(-7);",
@@ -1241,13 +1190,8 @@ const barberEmployeesCollection = {
       ...request({
         method: 'PATCH',
         url: '{{base_url}}/{{api_prefix}}/employees/{{employee_id}}',
-        body: formDataBody([
-          textField('firstName', 'Postman'),
-          textField('lastName', 'Automation Updated'),
-          textField('workingHours', '{"start":"10:00","end":"19:00"}'),
-          textField('blockedDates', '[]'),
-          fileField('photo', 'Attach employee photo file manually in Postman (optional)'),
-        ]),
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "firstName": "Postman",\n  "lastName": "Automation Updated",\n  "workingHours": {"start":"10:00","end":"19:00"},\n  "blockedDates": [],\n  "photoMediaId": "{{shared_media_id}}"\n}`),
         description: 'Updates the captured employee with only fields that the validator supports.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -1591,93 +1535,128 @@ const barberBookingsCollection = {
   ],
 };
 
-const barberPhotosCollection = {
+const barberMediaCollection = {
   info: {
-    name: 'EverCut - Barber Photos',
-    description: 'Shop gallery management collection with ID capture and a prewired local sample upload file.',
+    name: 'EverCut - Barber Media',
+    description: 'Cloudflare R2 media workflow: presign, direct upload, confirm, attach to gallery, read, stats, and delete.',
     schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
   },
   auth: bearerAuth('barber_access_token'),
   event: collectionPreRequest({
-    syncPairs: [['shared_photo_id', 'photo_id']],
+    syncPairs: [['shared_media_id', 'media_id']],
   }),
   variable: [
     ...baseVariables(
-      textVariable('photo_id', ''),
+      textVariable('media_id', ''),
+      textVariable('media_upload_url', ''),
+      textVariable('media_upload_content_type', 'image/png'),
+      textVariable('media_upload_content_length', '406926'),
     ),
   ],
   item: [
     {
-      name: '1. Get All Photos And Capture Existing ID',
-      ...request({
-        method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/photos',
-        description: 'Lists the current gallery and captures the first photo ID. Barber onboarding already creates one gallery photo.',
-        event: testEvent(
-          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
-          "const response = pm.response.json();",
-          "const photos = Array.isArray(response.data) ? response.data : [];",
-          "const firstPhoto = photos[0];",
-          "if (firstPhoto && firstPhoto.id) {",
-          "  const photoId = firstPhoto.id;",
-          "  pm.collectionVariables.set('photo_id', photoId);",
-          "  pm.globals.set('shared_photo_id', photoId);",
-          "}"
-        ),
-      }),
-    },
-    {
-      name: '2. Upload Photos',
+      name: '1. Request Upload URL',
       ...request({
         method: 'POST',
-        url: '{{base_url}}/{{api_prefix}}/photos',
-        body: formDataBody([
-          fileField('photos', 'Attach photo file manually in Postman'),
-          textField('photoType', 'shop_interior'),
-          textField('description', 'Uploaded from the automated Postman photo collection'),
-        ]),
-        description: 'Uploads one gallery image using the local sample file and captures the new photo ID.',
+        url: '{{base_url}}/{{api_prefix}}/media/upload-url',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "contentType": "{{media_upload_content_type}}",\n  "sizeBytes": {{media_upload_content_length}},\n  "purpose": "gallery",\n  "entityId": "{{shared_shop_id}}",\n  "originalName": "sample-upload.png"\n}`),
+        description: 'Creates a pending Media record and returns a presigned R2 PUT URL plus the exact client headers required by R2. Keep sizeBytes equal to the binary file size used in the direct PUT.',
         event: testEvent(
           "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
           "const response = pm.response.json();",
-          "const photos = Array.isArray(response.data) ? response.data : [];",
-          "const firstPhoto = photos[0];",
-          "if (firstPhoto && firstPhoto.id) {",
-          "  const photoId = firstPhoto.id;",
-          "  pm.collectionVariables.set('photo_id', photoId);",
-          "  pm.globals.set('shared_photo_id', photoId);",
-          "}"
+          "const data = response.data || {};",
+          "if (data.mediaId) { pm.collectionVariables.set('media_id', data.mediaId); pm.globals.set('shared_media_id', data.mediaId); }",
+          "if (data.uploadUrl) pm.collectionVariables.set('media_upload_url', data.uploadUrl);",
+          "const headers = data.requiredHeaders || {};",
+          "pm.collectionVariables.set('media_upload_content_type', headers['Content-Type'] || headers['content-type'] || 'image/png');",
+          "pm.test('upload URL includes SigV4 date', function () { pm.expect(data.uploadUrl).to.include('X-Amz-Date='); });",
+          "pm.test('upload headers do not include Authorization or x-amz-content-sha256', function () { pm.expect(headers).to.not.have.property('Authorization'); pm.expect(headers).to.not.have.property('x-amz-content-sha256'); });"
         ),
       }),
     },
     {
-      name: '3. Get Photo Stats',
+      name: '2. Direct PUT To R2',
       ...request({
-        method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/photos/analytics',
-        description: 'Returns photo counts and storage totals.',
+        method: 'PUT',
+        url: '{{media_upload_url}}',
+        auth: { type: 'noauth' },
+        headers: [
+          { key: 'Content-Type', value: '{{media_upload_content_type}}' },
+        ],
+        body: { mode: 'file', file: { src: 'assets/sample-upload.png' } },
+        description: 'Uploads the binary file directly to Cloudflare R2 using the presigned URL. This request is sent to R2, not the EverCut API. Keep Authorization set to No Auth and preserve the full query string in media_upload_url.',
+        event: rawTestEvent(
+          "pm.test('status is 200 or 201', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+          "pm.test('request does not send Authorization to R2', function () { pm.expect(pm.request.headers.has('Authorization')).to.equal(false); });"
+        ),
+      }),
+    },
+    {
+      name: '3. Confirm Upload',
+      ...request({
+        method: 'POST',
+        url: '{{base_url}}/{{api_prefix}}/media/confirm',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "mediaId": "{{media_id}}"\n}`),
+        description: 'Verifies the uploaded object in R2, checks content metadata, and marks the Media record ready.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
     },
     {
-      name: '4. Get Photo By ID',
+      name: '4. Attach To Gallery',
       ...request({
-        method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/photos/{{photo_id}}',
-        description: 'Reads the currently captured photo record.',
-        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
+        method: 'POST',
+        url: '{{base_url}}/{{api_prefix}}/media/gallery',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "mediaIds": ["{{media_id}}"],\n  "category": "shop_interior",\n  "description": "Uploaded from the R2 media workflow"\n}`),
+        description: 'Attaches a confirmed media object to the authenticated barber shop gallery.',
+        event: testEvent("pm.test('status is 201', function () { pm.response.to.have.status(201); });"),
       }),
     },
     {
-      name: '5. Delete Photo (Terminal)',
+      name: '5. Get Gallery And Capture Existing ID',
       ...request({
-        method: 'DELETE',
-        url: '{{base_url}}/{{api_prefix}}/photos/{{photo_id}}',
-        description: 'Deletes the captured photo from both MongoDB and Cloudinary. Run this last if later requests still need the shared photo ID.',
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/media/gallery',
+        description: 'Lists the current gallery and captures the first media ID.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
-          "pm.collectionVariables.unset('photo_id');",
-          "pm.globals.unset('shared_photo_id');"
+          "const response = pm.response.json();",
+          "const media = Array.isArray(response.data) ? response.data : [];",
+          "const firstMedia = media[0];",
+          "if (firstMedia && firstMedia.id) { pm.collectionVariables.set('media_id', firstMedia.id); pm.globals.set('shared_media_id', firstMedia.id); }"
+        ),
+      }),
+    },
+    {
+      name: '6. Get Gallery Stats',
+      ...request({
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/media/gallery/stats',
+        description: 'Returns gallery media counts and storage totals.',
+        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
+      }),
+    },
+    {
+      name: '7. Get Media By ID',
+      ...request({
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/media/{{media_id}}',
+        description: 'Reads the currently captured media record.',
+        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
+      }),
+    },
+    {
+      name: '8. Delete Media (Terminal)',
+      ...request({
+        method: 'DELETE',
+        url: '{{base_url}}/{{api_prefix}}/media/{{media_id}}',
+        description: 'Soft-deletes the captured Media record and requests R2 object deletion. Run this last if later requests still need the shared media ID.',
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          "pm.collectionVariables.unset('media_id');",
+          "pm.globals.unset('shared_media_id');"
         ),
       }),
     },
@@ -2287,7 +2266,7 @@ writeCollection('07-barber-profile-shop.json', barberProfileCollection);
 writeCollection('08-barber-employees.json', barberEmployeesCollection);
 writeCollection('09-barber-services.json', barberServicesCollection);
 writeCollection('10-barber-bookings.json', barberBookingsCollection);
-writeCollection('11-barber-photos.json', barberPhotosCollection);
+writeCollection('11-barber-media.json', barberMediaCollection);
 writeCollection('12-barber-earnings.json', barberEarningsCollection);
 writeCollection('13-barber-ratings.json', barberRatingsCollection);
 writeCollection('14-operational-analytics.json', analyticsCollection);
