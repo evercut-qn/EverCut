@@ -1,5 +1,3 @@
-﻿
-
 # EverCut — Infrastructure Setup Guide
 ## Cloudflare R2 + CDN + Worker Provisioning
 
@@ -30,7 +28,8 @@
 ### 1.1 Prerequisites
 
 - Cloudflare account (free tier is sufficient to start)
-- Custom domain added to Cloudflare (for CDN delivery)
+- `evercut.in` added to Cloudflare DNS and active if using custom media domains
+- GoDaddy/Hostinger nameservers updated to Cloudflare nameservers if `evercut.in` is registered there
 - `wrangler` CLI installed: `npm install -g wrangler`
 
 ### 1.2 Initial Setup
@@ -52,9 +51,6 @@ wrangler whoami
 ```bash
 # Development bucket
 wrangler r2 bucket create evercut-media-dev
-
-# Staging bucket
-wrangler r2 bucket create evercut-media-staging
 
 # Production bucket
 wrangler r2 bucket create evercut-media-prod
@@ -117,21 +113,45 @@ R2_BUCKET=evercut-media-dev
 
 ## 4. Custom Domain & DNS
 
-### 4.1 Media Subdomain
+### 4.1 Recommended Media Subdomains
+
+Use separate media subdomains per environment:
 
 ```
-media.evercut.com → Cloudflare Worker (handles auth + R2 proxy)
+media-dev.evercut.in -> evercut-media-worker-dev -> evercut-media-dev
+media.evercut.in     -> evercut-media-worker     -> evercut-media-prod
 ```
 
-### 4.2 DNS Configuration
+Do not use `media.evercut.in` for both dev and prod. Separate hostnames keep cache, signed URLs, CORS behavior, logs, and bucket access isolated.
 
-In Cloudflare DNS dashboard:
+### 4.2 GoDaddy/Hostinger DNS Requirement
 
-| Type | Name | Target | Proxy |
-|------|------|--------|-------|
-| `CNAME` | `media` | Worker route target | ☁️ Proxied (orange cloud) |
+The domain can remain registered at GoDaddy or Hostinger, but Cloudflare must be authoritative DNS before Worker custom domains can be attached.
 
-### 4.3 SSL/TLS
+Steps:
+
+1. Add `evercut.in` to Cloudflare under **Websites**.
+2. Let Cloudflare import existing DNS records.
+3. Copy the two Cloudflare nameservers.
+4. In GoDaddy/Hostinger domain settings, replace existing nameservers with the Cloudflare nameservers.
+5. Wait until Cloudflare marks `evercut.in` as active.
+6. Add Worker custom domains:
+   - `media-dev.evercut.in` on `evercut-media-worker-dev`
+   - `media.evercut.in` on `evercut-media-worker`
+
+### 4.3 Worker Custom Domains
+
+In Cloudflare Dashboard:
+
+1. Open **Workers & Pages**.
+2. Open the Worker.
+3. Go to **Settings** -> **Domains & Routes**.
+4. Select **Add** -> **Custom Domain**.
+5. Add the environment hostname.
+
+Cloudflare creates the DNS record and certificate for the Worker custom domain. Do not manually point these names at R2.
+
+### 4.4 SSL/TLS
 
 - Mode: **Full (Strict)**
 - Always Use HTTPS: **Enabled**
@@ -166,21 +186,19 @@ bucket_name = "evercut-media-prod"
 binding = "TOKEN_BLACKLIST"
 id = "<your-kv-namespace-id>"
 
-# Route configuration
+# Custom domain route. Enable only after evercut.in is active in Cloudflare.
 [[routes]]
-pattern = "media.evercut.com/*"
-zone_name = "evercut.com"
-
-# Environment-specific overrides
-[env.staging]
-[[env.staging.r2_buckets]]
-binding = "MEDIA_BUCKET"
-bucket_name = "evercut-media-staging"
+pattern = "media.evercut.in"
+custom_domain = true
 
 [env.dev]
 [[env.dev.r2_buckets]]
 binding = "MEDIA_BUCKET"
 bucket_name = "evercut-media-dev"
+
+[[env.dev.routes]]
+pattern = "media-dev.evercut.in"
+custom_domain = true
 ```
 
 ### 5.3 Worker Implementation (Edge Auth)
@@ -349,8 +367,8 @@ wrangler secret put MEDIA_TOKEN_SECRET_PREV
 # Deploy to production
 wrangler deploy
 
-# Deploy to staging
-wrangler deploy --env staging
+# Deploy to development
+wrangler deploy --env dev
 ```
 
 ---
@@ -393,7 +411,7 @@ R2 bucket CORS (set via API):
 {
     "CORSRules": [
         {
-            "AllowedOrigins": ["https://evercut.com", "https://*.evercut.com"],
+            "AllowedOrigins": ["https://evercut.in", "https://*.evercut.in"],
             "AllowedMethods": ["PUT", "GET", "HEAD"],
             "AllowedHeaders": ["Content-Type", "Content-Length"],
             "ExposeHeaders": ["ETag"],
@@ -410,7 +428,7 @@ R2 bucket CORS (set via API):
 ## 9. Security Checklist
 
 - [ ] All R2 buckets private — `r2.dev` subdomain disabled
-- [ ] Separate API tokens per environment (dev/staging/prod)
+- [ ] Separate API tokens per environment (dev/prod)
 - [ ] Separate API tokens per service (backend/worker/migration)
 - [ ] `MEDIA_TOKEN_SECRET` is 256-bit random (32 bytes hex)
 - [ ] `MEDIA_TOKEN_SECRET` matches between backend and Worker
@@ -463,4 +481,3 @@ R2 bucket CORS (set via API):
 ---
 
 *End of Infrastructure Setup Guide*
-

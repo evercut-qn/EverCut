@@ -2448,12 +2448,12 @@ import { r2KeyToUrl } from '../services/media/media-url.service.js';
 
 // Replace direct field access:
 //   coverUrl: plain.coverUrl
-// With URL construction from R2 key + backward-compat fallback:
-//   coverUrl: r2KeyToUrl(plain.coverR2Key) ?? plain.coverUrl ?? null,
-//   ownerPhotoUrl: r2KeyToUrl(plain.ownerPhotoR2Key) ?? plain.ownerPhotoUrl ?? null,
+// With URL construction from R2 key:
+//   coverUrl: r2KeyToUrl(plain.coverR2Key),
+//   ownerPhotoUrl: r2KeyToUrl(plain.ownerPhotoR2Key),
 ```
 
-The `?? plain.coverUrl` fallback ensures backward compatibility during migration when some records still have old Cloudinary URLs before the data migration script runs.
+After the cutover finalizer runs, serializers must not read retired URL fields. Records without R2 keys return `null` for the media URL.
 
 ### 14.3 Employee Serializer Updates
 
@@ -2464,14 +2464,14 @@ import { r2KeyToUrl } from '../services/media/media-url.service.js';
 // Replace:
 //   photoUrl: plain.photoUrl
 // With:
-//   photoUrl: r2KeyToUrl(plain.photoR2Key) ?? plain.photoUrl ?? null,
+//   photoUrl: r2KeyToUrl(plain.photoR2Key),
 ```
 
 ### 14.4 Customer Serializer Updates
 
 Same pattern:
 ```javascript
-photoUrl: r2KeyToUrl(plain.photoR2Key) ?? plain.photoUrl ?? null,
+photoUrl: r2KeyToUrl(plain.photoR2Key),
 ```
 
 ### 14.5 Barber Profile Utils Updates
@@ -2769,7 +2769,7 @@ CF_ACCOUNT_ID=your_cloudflare_account_id
 R2_ACCESS_KEY_ID=your_r2_access_key_id
 R2_SECRET_ACCESS_KEY=your_r2_secret_access_key
 R2_BUCKET=evercut-media-dev
-CDN_BASE_URL=https://media.evercut.com
+CDN_BASE_URL=https://media.evercut.in
 
 # HMAC secret for media token signing (256-bit random)
 # Generate with: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
@@ -2797,7 +2797,7 @@ MEDIA_TOKEN_SECRET=generate_64_char_random_hex_string
 +R2_ACCESS_KEY_ID=your_r2_access_key_id
 +R2_SECRET_ACCESS_KEY=your_r2_secret_access_key
 +R2_BUCKET=evercut-media-dev
-+CDN_BASE_URL=https://media.evercut.com
++CDN_BASE_URL=https://media.evercut.in
 +MEDIA_TOKEN_SECRET=generate_with_openssl_rand_hex_32
 ```
 
@@ -2965,14 +2965,13 @@ const migratePhotos = async () => {
 // Follow the same pattern: download → upload to R2 → update model field.
 ```
 
-### 18.4 Backward Compatibility
+### 18.4 Final Cutover Compatibility
 
-During migration, serializers output URLs using this priority:
-1. If `r2Key` / `coverR2Key` / `photoR2Key` exists → construct CDN URL
-2. If R2 key is null but old URL field exists → return Cloudinary URL
-3. If both null → return null
+After migration finalization, serializers output URLs using this priority:
+1. If `r2Key` / `coverR2Key` / `photoR2Key` exists, construct a signed CDN URL.
+2. If the R2 key is null, return null.
 
-This allows gradual migration without breaking existing clients.
+Run `scripts/finalize-r2-media-cutover.mjs --write` only after `scripts/migrate-legacy-media-to-r2.mjs --write` reports no unmigrated references.
 
 ---
 

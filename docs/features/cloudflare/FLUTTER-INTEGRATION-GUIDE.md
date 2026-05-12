@@ -1,5 +1,3 @@
-﻿
-
 # EverCut — Flutter Integration Guide
 ## Presigned Upload Flow + Media Playback
 
@@ -543,10 +541,10 @@ StreamBuilder<double>(
 ### 8.2 Image Display from CDN URL
 
 ```dart
-// API responses now return CDN URLs instead of Cloudinary URLs.
+// API responses return signed CDN URLs generated from R2 keys.
 // No client-side change needed for display — just use the URL:
 Image.network(
-  shopData['coverUrl'],  // CDN URL: https://media.evercut.com/images/covers/...
+  shopData['coverUrl'],  // CDN URL: https://media.evercut.in/images/covers/...
   fit: BoxFit.cover,
   loadingBuilder: (context, child, progress) {
     if (progress == null) return child;
@@ -571,8 +569,8 @@ Image.network(
 // Each gallery item now has:
 // {
 //   "id": "uuid",
-//   "url": "https://media.evercut.com/images/gallery/...",
-//   "photoUrl": "https://media.evercut.com/images/gallery/...",  ← backward compat
+//   "url": "https://media.evercut.in/images/gallery/...",
+//   "photoUrl": "https://media.evercut.in/images/gallery/...",
 //   "category": "work_sample",
 //   "description": "...",
 //   "createdAt": "..."
@@ -593,7 +591,7 @@ final videoController = VideoController(player);
 
 // Play HLS stream from CDN
 await player.open(Media(
-  'https://media.evercut.com/videos/hls/{videoId}/master.m3u8?token={mediaToken}',
+  'https://media.evercut.in/videos/hls/{videoId}/master.m3u8?token={mediaToken}',
 ));
 ```
 
