@@ -82,7 +82,7 @@ Override per platform/environment:
 ```bash
 flutter run --dart-define=APP_ENV=development --dart-define=API_BASE_URL=http://10.0.2.2:5000/api/v1
 flutter run --dart-define=API_BASE_URL=http://127.0.0.1:5000/api/v1
-flutter run --dart-define=APP_ENV=staging --dart-define=API_BASE_URL=https://staging-api.evercut.com/api/v1
+flutter run --dart-define=APP_ENV=staging --dart-define=API_BASE_URL=https://staging-api.evercut.in/api/v1
 ```
 
 Native Flutter HTTP calls do not require CORS. Browser/web clients still use backend `ALLOWED_ORIGINS`.

@@ -102,16 +102,19 @@ Content-Type: application/json
 ```http
 PUT /api/v1/customers/me
 Authorization: Bearer {accessToken}
-Content-Type: multipart/form-data
+Content-Type: application/json
 
-firstName: Test
-lastName: Customer
-address: Church Street, Bengaluru
-location: {"type":"Point","coordinates":[77.5946,12.9716]}
-photo: [file]
+{
+  "firstName": "Test",
+  "lastName": "Customer",
+  "address": "Church Street, Bengaluru",
+  "location": {"type":"Point","coordinates":[77.5946,12.9716]},
+  "photoMediaId": "01HXMEDIAEXAMPLE"
+}
 ```
 
 **Removed**: `email` field (use `/account/email` instead)
+**Media**: upload and confirm the image through `/media/upload-url` and `/media/confirm` first, then pass the confirmed `photoMediaId`.
 
 ### Barber Profile Update
 ```http

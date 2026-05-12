@@ -60,7 +60,7 @@ Authorization: Bearer <jwt_token>
       "phoneNumber": "+919876543210",
       "gender": "Male",
       "dateOfBirth": "1990-05-15T00:00:00.000Z",
-      "photoUrl": "https://res.cloudinary.com/...",
+      "photoUrl": "https://media.evercut.in/images/employee/...",
       "workingHours": {
         "start": "09:00",
         "end": "18:00"
@@ -144,7 +144,7 @@ Authorization: Bearer <jwt_token>
 | `phoneNumber` | String | Contact phone number |
 | `gender` | String | Gender (Male/Female/Other) |
 | `dateOfBirth` | Date | Date of birth |
-| `photoUrl` | String | Profile photo URL (Cloudinary) |
+| `photoUrl` | String | Signed CDN URL generated from the employee R2 media key |
 | `workingHours` | Object | Working hours (start/end times) |
 | `blockedDates` | Array | List of blocked dates |
 | `isActive` | Boolean | Whether employee is active/available |

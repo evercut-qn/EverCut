@@ -2075,7 +2075,7 @@ if (barberToken) { pm.collectionVariables.set('barber_access_token', barberToken
 | `08-barber-employees.json` | `barber_access_token` |
 | `09-barber-services.json` | `barber_access_token` |
 | `10-barber-bookings.json` | `barber_access_token` |
-| `11-barber-photos.json` | `barber_access_token` |
+| `11-barber-media.json` | `barber_access_token` |
 | `12-barber-earnings.json` | `barber_access_token` |
 | `13-barber-ratings.json` | `barber_access_token` |
 
@@ -2229,7 +2229,7 @@ postman-collections/
 ├── 08-barber-employees.json         ← UPDATE: use barber_access_token
 ├── 09-barber-services.json          ← UPDATE: use barber_access_token
 ├── 10-barber-bookings.json          ← UPDATE: use barber_access_token
-├── 11-barber-photos.json            ← UPDATE: use barber_access_token
+├── 11-barber-media.json             ← UPDATE: use barber_access_token
 ├── 12-barber-earnings.json          ← UPDATE: use barber_access_token
 ├── 13-barber-ratings.json           ← UPDATE: use barber_access_token
 ├── EverCut.postman_environment.json ← REWRITE: OTP + JWT variables only
