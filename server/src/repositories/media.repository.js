@@ -1,5 +1,6 @@
 import Media from '../models/media.model.js';
 import { MEDIA_STATUS } from '../utils/constants.js';
+import { trustQueryOperators } from '../utils/mongoose-query.utils.js';
 
 class MediaRepository {
     async create(data) {
@@ -11,7 +12,7 @@ class MediaRepository {
     }
 
     async findByIdAndUser(id, userId, extraFilter = {}) {
-        return Media.findOne({ _id: id, userId, ...extraFilter });
+        return Media.findOne(trustQueryOperators({ _id: id, userId, ...extraFilter }));
     }
 
     async findReadyByIdAndUser(id, userId) {
@@ -19,12 +20,12 @@ class MediaRepository {
     }
 
     async findByEntity(entityId, entityType, extraFilter = {}, options = {}) {
-        const filter = {
+        const filter = trustQueryOperators({
             entityId,
             entityType,
             status: MEDIA_STATUS.READY,
             ...extraFilter,
-        };
+        });
         const query = Media.find(filter).sort({ createdAt: -1 });
 
         if (options.skip !== undefined) query.skip(options.skip);
@@ -33,12 +34,12 @@ class MediaRepository {
     }
 
     async countByEntity(entityId, entityType, extraFilter = {}) {
-        return Media.countDocuments({
+        return Media.countDocuments(trustQueryOperators({
             entityId,
             entityType,
             status: MEDIA_STATUS.READY,
             ...extraFilter,
-        });
+        }));
     }
 
     async updateById(id, update, options = {}) {
@@ -55,7 +56,7 @@ class MediaRepository {
 
     async softDeleteByIdAndUser(id, userId) {
         return Media.findOneAndUpdate(
-            { _id: id, userId, status: { $ne: MEDIA_STATUS.DELETED } },
+            trustQueryOperators({ _id: id, userId, status: { $ne: MEDIA_STATUS.DELETED } }),
             { $set: { status: MEDIA_STATUS.DELETED } },
             { returnDocument: 'after' },
         );
@@ -92,10 +93,10 @@ class MediaRepository {
     }
 
     async findExpiredPending(cutoffDate, limit = 100) {
-        return Media.find({
+        return Media.find(trustQueryOperators({
             status: MEDIA_STATUS.PENDING,
             createdAt: { $lt: cutoffDate },
-        }).limit(limit);
+        })).limit(limit);
     }
 
     async deleteById(id) {
