@@ -36,11 +36,7 @@ const employeeSchema = new mongoose.Schema(
             type: Date,
             required: true,
         },
-        photoUrl: {
-            type: String,
-            default: null,
-        },
-        cloudinaryId: {
+        photoR2Key: {
             type: String,
             default: null,
         },

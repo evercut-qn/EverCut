@@ -9,4 +9,5 @@ export const updateCustomerSchema = Joi.object({
     dateOfBirth: Joi.date(),
     address: Joi.string().trim(),
     location: Joi.alternatives().try(locationSchema, Joi.string()),
+    photoMediaId: Joi.string(),
 }).min(1);

@@ -1,7 +1,6 @@
 import shopRepository from '../repositories/shop.repository.js';
 import customerRepository from '../repositories/customer.repository.js';
 import serviceRepository from '../repositories/service.repository.js';
-import photoRepository from '../repositories/photo.repository.js';
 import ratingRepository from '../repositories/rating.repository.js';
 import config from '../config/index.js';
 import { BadRequestError, NotFoundError } from '../utils/api-error.js';
@@ -12,9 +11,9 @@ import { buildPagination } from '../utils/pagination.utils.js';
 import { normalizeServicePricing } from '../utils/service-pricing.utils.js';
 import { normalizeShopSchedule } from '../utils/shop-schedule.utils.js';
 import notificationEvents from './notification-events.service.js';
+import * as mediaService from './media/media.service.js';
 import * as serviceCatalogService from './service-catalog.service.js';
 import { serializeEmployee } from '../serializers/employee.serializer.js';
-import { serializePhotos } from '../serializers/photo.serializer.js';
 import { serializeServices } from '../serializers/service.serializer.js';
 import { serializeShopProfile, serializeShopSummary } from '../serializers/shop.serializer.js';
 import {
@@ -40,7 +39,7 @@ export const getShopByOwner = async (ownerId, userContext) => {
     const shop = await shopRepository.findByOwnerId(ownerId);
     if (!shop) throw new NotFoundError('Shop profile');
 
-    const photos = await photoRepository.findByShopId(shop._id, {});
+    const photos = await mediaService.getGalleryByShopId(shop._id);
     return serializeBarberProfile(shop, userContext, { photos });
 };
 
@@ -310,7 +309,7 @@ export const updateBusinessInfo = async (ownerId, body, userContext) => {
     if (Object.keys(updateData).length > 0) {
         updated = await shopRepository.updateByOwnerId(ownerId, updateData);
     }
-    const photos = await photoRepository.findByShopId(updated._id, {});
+    const photos = await mediaService.getGalleryByShopId(updated._id);
     await notificationEvents.notifyAccountUpdated({
         userId: ownerId,
         updateType: 'shop_profile',
@@ -397,7 +396,7 @@ export const getShopInfoForCustomer = async (shopId) => {
             'bundled',
             'serviceName bundledServices totalDuration totalPrice finalPrice actualPrice offerPrice imageUrl serviceFor serviceType',
         ),
-        photoRepository.findByShopId(shopId, {}),
+        mediaService.getGalleryByShopId(shopId),
         ratingRepository.getShopSummary(shopId),
     ]);
 
@@ -410,7 +409,7 @@ export const getShopInfoForCustomer = async (shopId) => {
             single: serializeServices(singleServices.map(normalizeServicePricing)),
             bundled: serializeServices(bundledServices.map(normalizeServicePricing)),
         },
-        photos: serializePhotos(photos),
+        photos,
         ratings: { ...ratingSummary, details: formattedRatings },
     };
 };
@@ -497,7 +496,7 @@ export const getShops = async (query = {}) => {
     if (query.category) {
         return (await shopRepository.findByCategory(
             query.category,
-            'shopName location coverUrl address',
+            'shopName location coverR2Key address',
         )).map(serializeShopSummary).filter(Boolean);
     }
 
@@ -512,7 +511,7 @@ export const getNearbyShops = async (coordinates) => {
     return (await shopRepository.findNearby(
         coordinates,
         config.shop.nearbyDistanceMeters,
-        'shopName address coverUrl facilities',
+        'shopName address coverR2Key facilities',
     )).map(serializeShopSummary).filter(Boolean);
 };
 
@@ -520,7 +519,7 @@ export const getNearbyServicesByGender = async (coordinates, gender, searchTerm)
     const nearbyShops = await shopRepository.findNearby(
         coordinates,
         config.shop.nearbyDistanceMeters,
-        'shopName address coverUrl',
+        'shopName address coverR2Key',
     );
 
     if (!nearbyShops.length) return { shops: [], services: [] };

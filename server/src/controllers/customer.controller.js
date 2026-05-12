@@ -14,7 +14,7 @@ export const getMe = async (req, res, next) => {
 export const updateMe = async (req, res, next) => {
     try {
         const body = getValidatedRequestData(req, 'body');
-        const updated = await userService.updateProfile(req.user._id, body, req.file);
+        const updated = await userService.updateProfile(req.user._id, body);
         return res.status(200).json(ApiResponse.success(updated, 'Profile updated'));
     } catch (err) {
         next(err);

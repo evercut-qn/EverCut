@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import cloudinary from '../../config/cloudinary.config.js';
 import bookingRepository from '../../repositories/booking.repository.js';
 import employeeRepository from '../../repositories/employee.repository.js';
+import mediaRepository from '../../repositories/media.repository.js';
 import shopRepository from '../../repositories/shop.repository.js';
+import storageProvider from '../media/storage-provider.service.js';
 import notificationEvents from '../notification-events.service.js';
 import * as employeeService from '../employee.service.js';
 
@@ -13,7 +14,7 @@ test('deleteEmployee blocks unresolved bookings for that employee', async (t) =>
     t.mock.method(employeeRepository, 'findById', async () => ({
         _id: 'employee-1',
         shopId: 'shop-1',
-        cloudinaryId: 'employee-photo-1',
+        photoR2Key: 'images/employees/shop-1/employee-photo-1.jpg',
     }));
     t.mock.method(bookingRepository, 'hasActiveBookingsForEmployee', async () => true);
 
@@ -47,10 +48,14 @@ test('addEmployee cleans up uploaded photo when a duplicate write slips past the
         throw error;
     });
 
-    let destroyedPublicId = null;
-    t.mock.method(cloudinary.uploader, 'destroy', async (publicId) => {
-        destroyedPublicId = publicId;
-        return { result: 'ok' };
+    t.mock.method(mediaRepository, 'findReadyByIdAndUser', async () => ({
+        _id: 'media-1',
+        r2Key: 'images/employees/shop-1/employee-photo-1.jpg',
+    }));
+
+    let deletedR2Key = null;
+    t.mock.method(storageProvider, 'deleteObject', async (r2Key) => {
+        deletedR2Key = r2Key;
     });
 
     await assert.rejects(
@@ -63,10 +68,7 @@ test('addEmployee cleans up uploaded photo when a duplicate write slips past the
                 gender: 'Male',
                 dateOfBirth: '1994-04-12',
                 workingHours: { start: '09:00', end: '18:00' },
-            },
-            {
-                path: 'https://example.com/photo.jpg',
-                public_id: 'employee-photo-1',
+                photoMediaId: 'media-1',
             },
         ),
         {
@@ -75,7 +77,7 @@ test('addEmployee cleans up uploaded photo when a duplicate write slips past the
         },
     );
 
-    assert.equal(destroyedPublicId, 'employee-photo-1');
+    assert.equal(deletedR2Key, 'images/employees/shop-1/employee-photo-1.jpg');
 });
 
 test('addEmployee accepts 24-hour employee hours when legacy shop hours are stored in AM/PM format', async (t) => {

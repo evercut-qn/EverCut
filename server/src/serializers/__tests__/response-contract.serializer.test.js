@@ -10,7 +10,7 @@ import { serializeEmployee } from '../employee.serializer.js';
 import { serializeNotification, serializeFcmTokenRegistration } from '../notification.serializer.js';
 import { serializePayment, serializePaymentInitiation, serializePaymentStatus } from '../payment.serializer.js';
 import { serializePayout } from '../payout.serializer.js';
-import { serializePhoto } from '../photo.serializer.js';
+import { serializeMedia } from '../media.serializer.js';
 import { serializeRating } from '../rating.serializer.js';
 import { serializeService } from '../service.serializer.js';
 import { serializeBarberProfile, serializeShopProfile, serializeShopSummary } from '../shop.serializer.js';
@@ -29,7 +29,7 @@ const ownIdAliasByResource = {
     paymentInitiation: ['paymentId'],
     paymentStatus: ['paymentId'],
     payout: ['payoutId'],
-    photo: ['photoId'],
+    media: ['mediaId'],
     rating: ['ratingId'],
     service: ['serviceId'],
     shopProfile: ['shopId'],
@@ -59,8 +59,8 @@ test('resource serializers expose only id for each resource own identity', () =>
         upiId: 'asha@upi',
         accountHolderName: 'Asha Rao',
         bankName: 'Ever Bank',
-        coverUrl: 'https://cdn.example/cover.jpg',
-        ownerPhotoUrl: 'https://cdn.example/owner.jpg',
+        coverR2Key: 'images/covers/shop-1/cover.jpg',
+        ownerPhotoR2Key: 'images/profiles/shop-1/owner.jpg',
     };
 
     const samples = {
@@ -74,7 +74,15 @@ test('resource serializers expose only id for each resource own identity', () =>
         paymentInitiation: serializePaymentInitiation({ payment: { _id: id, merchantOrderId: 'EC-1', amount: 100, amountInRupees: 1 }, bookingId: id }),
         paymentStatus: serializePaymentStatus({ payment: { _id: id, bookingId: id, merchantOrderId: 'EC-1', status: 'initiated' } }),
         payout: serializePayout({ _id: id }),
-        photo: serializePhoto({ _id: id, photoUrl: 'https://cdn.example/photo.jpg' }),
+        media: serializeMedia({
+            _id: id,
+            type: 'image',
+            status: 'ready',
+            purpose: 'gallery',
+            r2Key: 'images/gallery/shop-1/photo.jpg',
+            contentType: 'image/jpeg',
+            declaredSize: 128,
+        }),
         rating: serializeRating({ _id: id, rating: 5 }),
         service: serializeService({ _id: id, serviceName: 'Haircut', serviceType: 'single', duration: 30 }),
         shopProfile: serializeShopProfile(shop, { privateView: true }),
@@ -119,6 +127,32 @@ test('serializers do not duplicate populated relation ids beside relation object
     assert.equal('bookingId' in payment, false);
     assert.equal('customerId' in payment, false);
     assert.equal('shopId' in payment, false);
+});
+
+test('serializers do not fall back to retired legacy media URL fields', () => {
+    const id = '507f1f77bcf86cd799439011';
+
+    assert.equal(
+        serializeShopSummary({ _id: id, shopName: 'Legacy Shop', coverUrl: 'https://legacy.example/cover.jpg' }).coverUrl,
+        null,
+    );
+    assert.equal(
+        serializeShopProfile({
+            _id: id,
+            shopName: 'Legacy Shop',
+            ownerPhotoUrl: 'https://legacy.example/owner.jpg',
+            coverUrl: 'https://legacy.example/cover.jpg',
+        }, { privateView: true }).coverUrl,
+        null,
+    );
+    assert.equal(
+        serializeEmployee({ _id: id, firstName: 'Dev', lastName: 'Patel', photoUrl: 'https://legacy.example/employee.jpg' }).photoUrl,
+        null,
+    );
+    assert.equal(
+        serializeCustomerProfile({ _id: id, firstName: 'Mina', lastName: 'Shah', photoUrl: 'https://legacy.example/customer.jpg' }).photoUrl,
+        null,
+    );
 });
 
 test('booking serializer adds employee availability for the booking date without exposing blockedDates', () => {

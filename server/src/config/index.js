@@ -56,30 +56,38 @@ const config = Object.freeze({
     privateKey: requireEnv('FIREBASE_PRIVATE_KEY').replace(/\\n/g, '\n'),
   }),
 
-  /** Cloudinary */
-  cloudinary: Object.freeze({
-    cloudName: requireEnv('CLOUDINARY_CLOUD_NAME'),
-    apiKey: requireEnv('CLOUDINARY_API_KEY'),
-    apiSecret: requireEnv('CLOUDINARY_API_SECRET'),
+  /** Cloudflare R2 */
+  r2: Object.freeze({
+    accountId: requireEnv('CF_ACCOUNT_ID'),
+    accessKeyId: requireEnv('R2_ACCESS_KEY_ID'),
+    secretAccessKey: requireEnv('R2_SECRET_ACCESS_KEY'),
+    bucket: requireEnv('R2_BUCKET'),
+    cdnBaseUrl: requireEnv('CDN_BASE_URL'),
+    mediaTokenSecret: requireEnv('MEDIA_TOKEN_SECRET'),
   }),
 
-  /** Upload limits */
-  upload: Object.freeze({
-    maxFileSize: 5 * 1024 * 1024, // 5 MB
+  /** Media business rules */
+  media: Object.freeze({
+    maxImageSize: 10 * 1024 * 1024,
+    maxVideoSize: 500 * 1024 * 1024,
+    maxGalleryPerShop: 10,
     maxFiles: 10,
-    maxPhotosPerShop: 10,
-    allowedImageFormats: ['jpg', 'jpeg', 'png', 'webp'],
-    allowedMimeTypes: [
+    presignedUrlTtl: 15 * 60,
+    signedUrlTtl: 60 * 60,
+    multipartPartSize: 50 * 1024 * 1024,
+    maxMultipartParts: 100,
+    pendingUploadTtlHours: 24,
+    allowedImageMimes: [
       'image/jpeg',
-      'image/jpg',
       'image/png',
-      'image/gif',
       'image/webp',
     ],
-    imageTransformations: Object.freeze({
-      profile: { width: 800, height: 800, crop: 'limit' },
-      cover: { width: 1200, height: 600, crop: 'limit' },
-    }),
+    allowedVideoMimes: [
+      'video/mp4',
+      'video/quicktime',
+      'video/x-msvideo',
+      'video/webm',
+    ],
   }),
 
   /** Security / Rate Limiting */

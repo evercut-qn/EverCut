@@ -168,19 +168,11 @@ const shopSchema = new mongoose.Schema(
                 _id: false,
             },
         ],
-        coverUrl: {
+        coverR2Key: {
             type: String,
             default: null,
         },
-        coverCloudinaryId: {
-            type: String,
-            default: null,
-        },
-        ownerPhotoUrl: {
-            type: String,
-            default: null,
-        },
-        ownerPhotoCloudinaryId: {
+        ownerPhotoR2Key: {
             type: String,
             default: null,
         },

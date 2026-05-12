@@ -2,7 +2,8 @@ import { sanitizeForResponse, toPlainObject } from './core.serializer.js';
 import { serializeCustomerSummary } from './customer.serializer.js';
 
 export const serializeRating = (rating) => {
-    const plain = sanitizeForResponse(toPlainObject(rating));
+    const raw = toPlainObject(rating);
+    const plain = sanitizeForResponse(raw);
     if (!plain) return null;
 
     return {
@@ -10,7 +11,7 @@ export const serializeRating = (rating) => {
         shopId: plain.shopId?.id || plain.shopId || null,
         rating: plain.rating,
         review: plain.review || '',
-        user: serializeCustomerSummary(plain.customerId) || {
+        user: serializeCustomerSummary(raw.customerId) || {
             firstName: 'Unknown',
             lastName: '',
             photoUrl: null,

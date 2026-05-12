@@ -181,19 +181,69 @@ export const SERVICE_FOR = Object.freeze({
 export const ALL_SERVICE_FOR = Object.values(SERVICE_FOR);
 
 // ---------------------------------------------------------------------------
-// Photo Types
+// Media
 // ---------------------------------------------------------------------------
 
-export const PHOTO_TYPE = Object.freeze({
+export const MEDIA_TYPE = Object.freeze({
+    IMAGE: 'image',
+    VIDEO: 'video',
+});
+
+export const ALL_MEDIA_TYPES = Object.values(MEDIA_TYPE);
+
+export const MEDIA_STATUS = Object.freeze({
+    PENDING: 'pending',
+    READY: 'ready',
+    PROCESSING: 'processing',
+    FAILED: 'failed',
+    DELETED: 'deleted',
+});
+
+export const ALL_MEDIA_STATUSES = Object.values(MEDIA_STATUS);
+
+export const MEDIA_PURPOSE = Object.freeze({
+    AVATAR: 'avatar',
+    PROFILE: 'profile',
+    COVER: 'cover',
+    GALLERY: 'gallery',
+    EMPLOYEE: 'employee',
+    ONBOARDING: 'onboarding',
+    SERVICE: 'service',
+    VIDEO_RAW: 'video_raw',
+    VIDEO_THUMBNAIL: 'video_thumbnail',
+});
+
+export const ALL_MEDIA_PURPOSES = Object.values(MEDIA_PURPOSE);
+
+export const MEDIA_ENTITY_TYPE = Object.freeze({
+    SHOP: 'Shop',
+    EMPLOYEE: 'Employee',
+    CUSTOMER: 'Customer',
+    SERVICE: 'Service',
+});
+
+export const ALL_MEDIA_ENTITY_TYPES = [...Object.values(MEDIA_ENTITY_TYPE), null];
+
+export const GALLERY_CATEGORY = Object.freeze({
     SHOP_INTERIOR: 'shop_interior',
     SHOP_EXTERIOR: 'shop_exterior',
     WORK_SAMPLE: 'work_sample',
-    TEAM_PHOTO: 'team_photo',
-    CERTIFICATE: 'certificate',
+    BEFORE_AFTER: 'before_after',
+    TEAM: 'team',
     OTHER: 'other',
 });
 
-export const ALL_PHOTO_TYPES = Object.values(PHOTO_TYPE);
+export const ALL_GALLERY_CATEGORIES = Object.values(GALLERY_CATEGORY);
+
+export const MIME_TO_EXTENSION = Object.freeze({
+    'image/jpeg': 'jpg',
+    'image/png': 'png',
+    'image/webp': 'webp',
+    'video/mp4': 'mp4',
+    'video/quicktime': 'mov',
+    'video/x-msvideo': 'avi',
+    'video/webm': 'webm',
+});
 
 // ---------------------------------------------------------------------------
 // Gender
@@ -271,4 +321,3 @@ export const TOKEN_TYPE = Object.freeze({
     ACCESS: 'access',
     REFRESH: 'refresh',
 });
-

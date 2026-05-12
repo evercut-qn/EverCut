@@ -2,7 +2,6 @@ import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import config from '../config/index.js';
 import customerRepository from '../repositories/customer.repository.js';
-import photoRepository from '../repositories/photo.repository.js';
 import shopRepository from '../repositories/shop.repository.js';
 import userRepository from '../repositories/user.repository.js';
 import { UnauthorizedError } from '../utils/api-error.js';
@@ -11,6 +10,7 @@ import { ROLES, TOKEN_TYPE } from '../utils/constants.js';
 import logger, { maskPhoneNumber } from '../utils/logger.js';
 import { serializeCustomerProfile } from '../serializers/customer.serializer.js';
 import { serializeUser } from '../serializers/user.serializer.js';
+import * as mediaService from './media/media.service.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -62,7 +62,7 @@ const loadUserProfile = async (user) => {
         const shop = await shopRepository.findByOwnerId(user._id);
         if (!shop) return null;
 
-        const photos = await photoRepository.findByShopId(shop._id, {});
+        const photos = await mediaService.getGalleryByShopId(shop._id);
         return serializeBarberProfile(shop, user, { photos });
     }
 

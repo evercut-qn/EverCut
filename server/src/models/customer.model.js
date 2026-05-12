@@ -41,11 +41,7 @@ const customerSchema = new mongoose.Schema(
             required: true,
             trim: true,
         },
-        photoUrl: {
-            type: String,
-            default: null,
-        },
-        cloudinaryId: {
+        photoR2Key: {
             type: String,
             default: null,
         },

@@ -7,13 +7,17 @@ const ensureRequiredEnv = () => {
         FIREBASE_PROJECT_ID: 'evercut-test',
         FIREBASE_CLIENT_EMAIL: 'firebase@example.com',
         FIREBASE_PRIVATE_KEY: '-----BEGIN PRIVATE KEY-----\\nabc\\n-----END PRIVATE KEY-----',
-        CLOUDINARY_CLOUD_NAME: 'evercut',
-        CLOUDINARY_API_KEY: 'cloudinary-key',
-        CLOUDINARY_API_SECRET: 'cloudinary-secret',
+        CF_ACCOUNT_ID: 'test-account',
+        R2_ACCESS_KEY_ID: 'test-access-key',
+        R2_SECRET_ACCESS_KEY: 'test-secret-key',
+        R2_BUCKET: 'evercut-media-test',
+        CDN_BASE_URL: 'https://media.evercut.test',
+        MEDIA_TOKEN_SECRET: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
         MSG91_AUTH_KEY: 'msg91-auth',
         MSG91_OTP_TEMPLATE_ID: 'msg91-template',
         JWT_ACCESS_SECRET: 'access-secret',
         JWT_REFRESH_SECRET: 'refresh-secret',
+        JWT_ONBOARDING_SECRET: 'onboarding-secret',
         PHONEPE_CLIENT_ID: 'phonepe-client',
         PHONEPE_CLIENT_SECRET: 'phonepe-secret',
         PHONEPE_CLIENT_VERSION: '1',
@@ -32,7 +36,7 @@ const ensureRequiredEnv = () => {
 ensureRequiredEnv();
 
 const customerRepository = (await import('../../repositories/customer.repository.js')).default;
-const photoRepository = (await import('../../repositories/photo.repository.js')).default;
+const mediaRepository = (await import('../../repositories/media.repository.js')).default;
 const shopRepository = (await import('../../repositories/shop.repository.js')).default;
 const notificationEvents = (await import('../notification-events.service.js')).default;
 const shopService = await import('../shop.service.js');
@@ -114,7 +118,7 @@ test('updateBusinessInfo persists desired open state and emits a shop-status not
         closeTime: '18:00',
         breakTimes: [],
     }));
-    t.mock.method(photoRepository, 'findByShopId', async () => []);
+    t.mock.method(mediaRepository, 'findByEntity', async () => []);
 
     let updateArgs = null;
     t.mock.method(shopRepository, 'updateByOwnerId', async (ownerId, updateData) => {

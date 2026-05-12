@@ -8,7 +8,7 @@ import { getValidatedRequestData } from '../utils/request-validation.utils.js';
 export const createCustomerOnboarding = async (req, res) => {
     const { phoneNumber } = req.onboardingContext;
     const body = getValidatedRequestData(req, 'body');
-    const result = await onboardingService.createCustomerOnboarding(phoneNumber, body, req.file);
+    const result = await onboardingService.createCustomerOnboarding(phoneNumber, body);
     const { user, profile, tokens } = result;
 
     return res.status(201).json(
@@ -30,7 +30,7 @@ export const createCustomerOnboarding = async (req, res) => {
 export const createBarberOnboarding = async (req, res) => {
     const { phoneNumber } = req.onboardingContext;
     const body = getValidatedRequestData(req, 'body');
-    const result = await onboardingService.createBarberOnboarding(phoneNumber, body, req.file);
+    const result = await onboardingService.createBarberOnboarding(phoneNumber, body);
     const { user, shop, tokens } = result;
 
     return res.status(201).json(

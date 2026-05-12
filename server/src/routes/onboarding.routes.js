@@ -1,9 +1,5 @@
 import { Router } from 'express';
 import { authenticateOnboarding } from '../middleware/authenticate.middleware.js';
-import {
-    uploadBarberOnboardingImage,
-    uploadCustomerPhoto,
-} from '../middleware/upload.middleware.js';
 import { validate } from '../middleware/validate.middleware.js';
 import {
     customerOnboardingSchema,
@@ -24,7 +20,6 @@ const router = Router();
 router.post(
     '/customers',
     authenticateOnboarding,
-    uploadCustomerPhoto,
     validate(customerOnboardingSchema, 'body'),
     onboardingController.createCustomerOnboarding,
 );
@@ -36,7 +31,6 @@ router.post(
 router.post(
     '/barbers',
     authenticateOnboarding,
-    uploadBarberOnboardingImage,
     validate(barberOnboardingSchema, 'body'),
     onboardingController.createBarberOnboarding,
 );

@@ -111,7 +111,7 @@ test('booking query schemas preserve pagination fields', () => {
     });
 });
 
-test('employee creation schema accepts multipart string fields', () => {
+test('employee creation schema accepts JSON string fields from API clients', () => {
     const employee = addEmployeeSchema.validate({
         firstName: 'Alex',
         lastName: 'Stylist',

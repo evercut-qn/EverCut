@@ -1,12 +1,12 @@
 import serviceRepository from '../repositories/service.repository.js';
 import shopRepository from '../repositories/shop.repository.js';
-import cloudinary from '../config/cloudinary.config.js';
 import { BadRequestError, NotFoundError, ConflictError } from '../utils/api-error.js';
 import { escapeRegex } from '../utils/regex.utils.js';
 import { buildPagination } from '../utils/pagination.utils.js';
 import { calculateDiscountedPrice, normalizeServicePricing } from '../utils/service-pricing.utils.js';
 import { serializeService, serializeServices } from '../serializers/service.serializer.js';
 import { serializeShopSummary } from '../serializers/shop.serializer.js';
+import { buildMediaUrl } from './media/media-url.service.js';
 
 /**
  * Service-catalog service - manages the salon services (haircut, etc.)
@@ -40,15 +40,8 @@ const buildServiceFilters = (queryFilters = {}) => {
 
 const resolveServiceImage = async (serviceName, serviceType) => {
     const formattedName = serviceName.toLowerCase().replace(/\s+/g, '');
-    const folderPath = serviceType === 'bundled' ? 'evercut/bundled' : 'evercut/single';
-    const publicId = `${folderPath}/${formattedName}`;
-
-    try {
-        const resource = await cloudinary.api.resource(publicId);
-        return resource.secure_url;
-    } catch {
-        return cloudinary.url('evercut/default/service.jpg', { secure: true, resource_type: 'image' });
-    }
+    const folderPath = serviceType === 'bundled' ? 'images/services/bundled' : 'images/services/single';
+    return buildMediaUrl(`${folderPath}/${formattedName}.jpg`) || buildMediaUrl('images/services/default/service.jpg');
 };
 
 const buildServicePayload = (data, existingService = null) => {
@@ -192,7 +185,7 @@ export const searchServices = async (query, gender) => {
 };
 
 export const searchShops = async (query) => {
-    return (await shopRepository.searchByName(query, 'shopName address location category coverUrl'))
+    return (await shopRepository.searchByName(query, 'shopName address location category coverR2Key'))
         .map(serializeShopSummary)
         .filter(Boolean);
 };

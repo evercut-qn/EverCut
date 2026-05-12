@@ -143,6 +143,7 @@ export const addEmployeeSchema = Joi.object({
     dateOfBirth: Joi.date().max('now').required(),
     workingHours: workingHoursSchema,
     blockedDates: blockedDatesSchema.default([]),
+    photoMediaId: Joi.string(),
 });
 
 export const updateEmployeeSchema = Joi.object({
@@ -154,6 +155,7 @@ export const updateEmployeeSchema = Joi.object({
     workingHours: workingHoursSchema,
     blockedDates: blockedDatesSchema,
     isActive: Joi.boolean(),
+    photoMediaId: Joi.string(),
 });
 
 export const employeeIdParamSchema = Joi.object({

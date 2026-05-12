@@ -42,6 +42,7 @@ export const customerOnboardingSchema = Joi.object({
     dateOfBirth: Joi.date().required(),
     address: Joi.string().trim().required(),
     location: Joi.alternatives().try(locationSchema, Joi.string()).required(),
+    photoMediaId: Joi.string().required(),
 });
 
 export const barberOnboardingSchema = Joi.object({
@@ -92,6 +93,7 @@ export const barberOnboardingSchema = Joi.object({
     ),
     breakTimes: breakTimesSchema,
     breakTimings: Joi.forbidden(),
+    photoMediaId: Joi.string().required(),
     pin: Joi.string().pattern(new RegExp(`^\\d{${config.security.pinLength}}$`)).required(),
     confirmPin: Joi.string().required().valid(Joi.ref('pin')).messages({
         'any.only': 'confirmPin must match pin',

@@ -38,6 +38,7 @@ import {
     serializeBookingCreation,
     serializeBookingDetails,
 } from '../serializers/booking.serializer.js';
+import { buildMediaUrl } from './media/media-url.service.js';
 
 /**
  * Booking service — all booking business logic.
@@ -199,7 +200,7 @@ const assertShopAcceptsDate = (shop, date) => {
 const loadEmployeeForScheduling = async (employeeId, shopId) => {
     const employee = await employeeRepository.findByIdLean(
         employeeId,
-        'firstName lastName photoUrl shopId workingHours blockedDates isActive deletedAt',
+        'firstName lastName photoR2Key shopId workingHours blockedDates isActive deletedAt',
     );
     if (!employee) throw new NotFoundError('Employee');
     if (!employee.isActive || employee.deletedAt) throw new BadRequestError('Employee is not active');
@@ -1175,7 +1176,7 @@ export const getShopAvailability = async (shopId, date, serviceId) => {
             employeeAvailability.push({
                 employeeId: employee._id,
                 employeeName: `${employee.firstName} ${employee.lastName}`,
-                photoUrl: employee.photoUrl,
+                photoUrl: buildMediaUrl(employee.photoR2Key),
                 availableSlots,
                 totalAvailable: availableSlots.length,
             });

@@ -18,14 +18,14 @@ test('parseAllowedOrigins trims comma-separated origins and drops blanks', async
     const { parseAllowedOrigins } = await loadConfig();
 
     assert.deepEqual(
-        parseAllowedOrigins(' https://app.evercut.com, ,https://admin.evercut.com '),
-        ['https://app.evercut.com', 'https://admin.evercut.com'],
+        parseAllowedOrigins(' https://app.evercut.in, ,https://admin.evercut.in '),
+        ['https://app.evercut.in', 'https://admin.evercut.in'],
     );
 });
 
 test('createCorsOptions allows native mobile requests without Origin header', async () => {
     process.env.NODE_ENV = 'production';
-    process.env.ALLOWED_ORIGINS = 'https://merchant.evercut.com';
+    process.env.ALLOWED_ORIGINS = 'https://merchant.evercut.in';
     const { createCorsOptions } = await loadConfig();
 
     const options = createCorsOptions();
@@ -45,7 +45,7 @@ test('createCorsOptions allows native mobile requests without Origin header', as
 
 test('createCorsOptions rejects unknown browser origins in production', async () => {
     process.env.NODE_ENV = 'production';
-    process.env.ALLOWED_ORIGINS = 'https://merchant.evercut.com';
+    process.env.ALLOWED_ORIGINS = 'https://merchant.evercut.in';
     const { createCorsOptions } = await loadConfig();
 
     const options = createCorsOptions();
@@ -64,13 +64,13 @@ test('createCorsOptions rejects unknown browser origins in production', async ()
 
 test('createCorsOptions allows configured production origins', async () => {
     process.env.NODE_ENV = 'production';
-    process.env.ALLOWED_ORIGINS = 'https://merchant.evercut.com';
+    process.env.ALLOWED_ORIGINS = 'https://merchant.evercut.in';
     const { createCorsOptions } = await loadConfig();
 
     const options = createCorsOptions();
 
     await new Promise((resolve, reject) => {
-        options.origin('https://merchant.evercut.com', (error, allowed) => {
+        options.origin('https://merchant.evercut.in', (error, allowed) => {
             try {
                 assert.equal(error, null);
                 assert.equal(allowed, true);

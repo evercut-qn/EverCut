@@ -87,7 +87,7 @@ test('employeeRepository.claimSlots atomically rejects any occupied slot marker'
     ]);
     assert.equal(capturedFilter.shopId, 'shop-1');
     assert.deepEqual(capturedOptions, { returnDocument: 'after' });
-    assert.equal(capturedSelect, 'firstName lastName photoUrl');
+    assert.equal(capturedSelect, 'firstName lastName photoR2Key');
 });
 
 test('employeeRepository.claimTimeRange atomically rejects overlapping exact ranges', async (t) => {
@@ -143,7 +143,7 @@ test('employeeRepository.claimTimeRange atomically rejects overlapping exact ran
     ]);
     assert.equal(capturedFilter.shopId, 'shop-1');
     assert.deepEqual(capturedOptions, { returnDocument: 'after', runValidators: true });
-    assert.equal(capturedSelect, 'firstName lastName photoUrl workingHours');
+    assert.equal(capturedSelect, 'firstName lastName photoR2Key workingHours');
 });
 
 test('paymentRepository.findPendingByBookingId preserves its internal $in operator under sanitizeFilter', async (t) => {

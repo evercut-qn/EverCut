@@ -1,5 +1,4 @@
 import customerRepository from '../repositories/customer.repository.js';
-import photoRepository from '../repositories/photo.repository.js';
 import shopRepository from '../repositories/shop.repository.js';
 import userRepository from '../repositories/user.repository.js';
 import { serializeBarberProfile } from '../utils/barber-profile.utils.js';
@@ -7,6 +6,8 @@ import {
     ALL_SERVICE_FOR,
     ALL_SHOP_AMENITIES,
     DAYS_OF_WEEK,
+    MEDIA_ENTITY_TYPE,
+    MEDIA_PURPOSE,
     ROLES,
 } from '../utils/constants.js';
 import { BadRequestError, ConflictError } from '../utils/api-error.js';
@@ -15,6 +16,7 @@ import * as authService from './auth.service.js';
 import { hashPin, validatePinCreation } from './pin.service.js';
 import { serializeCustomerProfile } from '../serializers/customer.serializer.js';
 import { serializeUser } from '../serializers/user.serializer.js';
+import * as mediaService from './media/media.service.js';
 
 /**
  * Onboarding service - handles first-time user and barber profile creation.
@@ -251,14 +253,12 @@ const ensureUniqueUserIdentity = async ({ email, phoneNumber }) => {
     }
 };
 
-export const createCustomerOnboarding = async (phoneNumber, profileData, file) => {
+export const createCustomerOnboarding = async (phoneNumber, profileData) => {
     const verifiedPhoneNumber = normalizeVerifiedPhoneNumber(phoneNumber);
     if (!verifiedPhoneNumber) {
         throw new BadRequestError('Verified phone number is required');
     }
-    if (!file) {
-        throw new BadRequestError('Profile photo is required');
-    }
+    const media = await mediaService.resolveReadyMediaById(profileData.photoMediaId);
 
     await ensureUniqueUserIdentity({
         email: profileData.email,
@@ -280,9 +280,10 @@ export const createCustomerOnboarding = async (phoneNumber, profileData, file) =
         dateOfBirth: profileData.dateOfBirth,
         address: profileData.address,
         location,
-        photoUrl: file.path,
-        cloudinaryId: file.filename || file.public_id,
+        photoR2Key: media.r2Key,
     });
+
+    await mediaService.linkMediaToEntity(profileData.photoMediaId, profile._id, MEDIA_ENTITY_TYPE.CUSTOMER, MEDIA_PURPOSE.AVATAR);
 
     const tokens = await issueAuthenticationTokens(user);
 
@@ -293,7 +294,7 @@ export const createCustomerOnboarding = async (phoneNumber, profileData, file) =
     };
 };
 
-export const createBarberOnboarding = async (phoneNumber, shopData, file) => {
+export const createBarberOnboarding = async (phoneNumber, shopData) => {
     const verifiedPhoneNumber = normalizeVerifiedPhoneNumber(phoneNumber);
     if (!verifiedPhoneNumber) {
         throw new BadRequestError('Verified phone number is required');
@@ -307,9 +308,7 @@ export const createBarberOnboarding = async (phoneNumber, shopData, file) => {
         phoneNumber: normalized.phoneNumber,
     });
 
-    if (!file) {
-        throw new BadRequestError('Shop image is required');
-    }
+    const media = await mediaService.resolveReadyMediaById(shopData.photoMediaId);
 
     const pinResult = validatePinCreation(normalized.pin, normalized.confirmPin);
     if (!pinResult.isValid) {
@@ -317,9 +316,6 @@ export const createBarberOnboarding = async (phoneNumber, shopData, file) => {
     }
 
     const pinHash = await hashPin(normalized.pin);
-
-    const coverUrl = file.path;
-    const coverCloudinaryId = file.public_id || file.filename;
 
     // Prepare payout config if bank details are provided
     const payoutConfig = {};
@@ -358,8 +354,7 @@ export const createBarberOnboarding = async (phoneNumber, shopData, file) => {
         openTime: normalized.openTime,
         closeTime: normalized.closeTime,
         breakTimes: normalized.breakTimes,
-        coverUrl,
-        coverCloudinaryId,
+        coverR2Key: media.r2Key,
         pinHash,
     };
 
@@ -369,23 +364,14 @@ export const createBarberOnboarding = async (phoneNumber, shopData, file) => {
     }
 
     const createdShop = await shopRepository.create(shopCreateData);
-
-    const photo = await photoRepository.create({
-        shopId: createdShop._id,
-        photoUrl: file.path,
-        cloudinaryId: file.public_id || file.filename,
-        photoName: file.originalname || 'onboarding-shop-image',
-        photoType: 'shop_interior',
-        description: 'Uploaded during onboarding',
-        fileSize: file.size,
-        mimeType: file.mimetype,
-    });
+    await mediaService.linkMediaToEntity(shopData.photoMediaId, createdShop._id, MEDIA_ENTITY_TYPE.SHOP, MEDIA_PURPOSE.GALLERY);
+    const photos = await mediaService.getGalleryByShopId(createdShop._id);
 
     const tokens = await issueAuthenticationTokens(user);
 
     return {
         user: serializeUser(user),
-        shop: serializeBarberProfile(createdShop, user, { photos: [photo] }),
+        shop: serializeBarberProfile(createdShop, user, { photos }),
         tokens,
     };
 };

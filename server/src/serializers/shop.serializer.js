@@ -1,6 +1,7 @@
 import { sanitizeForResponse, toPlainObject } from './core.serializer.js';
-import { serializePhotos } from './photo.serializer.js';
+import { serializeMediaList } from './media.serializer.js';
 import { serializeUser } from './user.serializer.js';
+import { buildMediaUrl } from '../services/media/media-url.service.js';
 
 const compact = (value) => Object.fromEntries(
     Object.entries(value).filter(([, nestedValue]) => nestedValue !== undefined),
@@ -28,7 +29,7 @@ const toWorkingHours = (plain = {}) => ({
     closeTime: plain.closeTime ?? null,
 });
 
-const serializeOwner = (plain = {}, userContext = null, privateView = false) => {
+const serializeOwner = (plain = {}, raw = {}, userContext = null, privateView = false) => {
     const user = userContext ? serializeUser(userContext) : {};
 
     return compact({
@@ -39,7 +40,7 @@ const serializeOwner = (plain = {}, userContext = null, privateView = false) => 
         dateOfBirth: privateView ? (plain.ownerDateOfBirth ?? null) : undefined,
         email: privateView ? (user?.email ?? null) : undefined,
         phoneNumber: privateView ? (user?.phoneNumber ?? null) : undefined,
-        photoUrl: plain.ownerPhotoUrl ?? null,
+        photoUrl: buildMediaUrl(raw.ownerPhotoR2Key),
     });
 };
 
@@ -67,7 +68,8 @@ export const serializeBankDetails = (shop) => {
 };
 
 export const serializeShopSummary = (shop) => {
-    const plain = sanitizeForResponse(toPlainObject(shop));
+    const raw = toPlainObject(shop);
+    const plain = sanitizeForResponse(raw);
     if (!plain) return null;
 
     return compact({
@@ -77,7 +79,7 @@ export const serializeShopSummary = (shop) => {
         location: plain.location ?? null,
         category: plain.category ?? null,
         targetCustomers: plain.targetCustomers ?? null,
-        coverUrl: plain.coverUrl ?? null,
+        coverUrl: buildMediaUrl(raw.coverR2Key),
         amenities: plain.facilities ?? [],
         isOpen: plain.isOpen,
         workingDays: plain.availableDays,
@@ -86,10 +88,11 @@ export const serializeShopSummary = (shop) => {
 };
 
 export const serializeShopProfile = (shop, options = {}) => {
-    const plain = sanitizeForResponse(toPlainObject(shop));
+    const raw = toPlainObject(shop);
+    const plain = sanitizeForResponse(raw);
     if (!plain) return null;
 
-    const owner = serializeOwner(plain, options.userContext, options.privateView);
+    const owner = serializeOwner(plain, raw, options.userContext, options.privateView);
 
     return compact({
         id: plain.id,
@@ -107,13 +110,13 @@ export const serializeShopProfile = (shop, options = {}) => {
         workingDays: plain.availableDays ?? [],
         workingHours: toWorkingHours(plain),
         breakTimes: toBreakTimes(plain.breakTimes),
-        coverUrl: plain.coverUrl ?? null,
+        coverUrl: buildMediaUrl(raw.coverR2Key),
         isOpen: plain.isOpen ?? true,
         missedConfirmations: {
             count: plain.missedConfirmationCount || 0,
             lastMissedAt: plain.lastMissedConfirmationAt || null,
         },
-        photos: options.photos ? serializePhotos(options.photos) : undefined,
+        photos: options.photos ? serializeMediaList(options.photos) : undefined,
         createdAt: plain.createdAt,
         updatedAt: plain.updatedAt,
     });

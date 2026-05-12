@@ -1,7 +1,6 @@
 import shopRepository from '../repositories/shop.repository.js';
-import * as accountService from '../services/account.service.js';
 import * as bookingService from '../services/booking.service.js';
-import * as photoService from '../services/photo.service.js';
+import * as mediaService from '../services/media/media.service.js';
 import * as pinService from '../services/pin.service.js';
 import * as shopService from '../services/shop.service.js';
 import { BadRequestError, NotFoundError } from '../utils/api-error.js';
@@ -70,7 +69,8 @@ export const updateMyPin = async (req, res, next) => {
 
 export const updateMyCover = async (req, res, next) => {
     try {
-        const result = await photoService.updateShopCover(req.user._id, req.file);
+        const { mediaId } = getValidatedRequestData(req, 'body');
+        const result = await mediaService.updateShopCover(req.user._id, mediaId);
         return res.status(200).json(ApiResponse.success(result, 'Cover image updated'));
     } catch (err) {
         next(err);
@@ -79,7 +79,8 @@ export const updateMyCover = async (req, res, next) => {
 
 export const updateMyPicture = async (req, res, next) => {
     try {
-        const result = await accountService.updateBarberProfilePicture(req.user._id, req.file);
+        const { mediaId } = getValidatedRequestData(req, 'body');
+        const result = await mediaService.updateBarberProfilePicture(req.user._id, mediaId);
         return res.status(200).json(ApiResponse.success(result, 'Profile picture updated'));
     } catch (err) {
         next(err);

@@ -5,6 +5,7 @@ import bookingRepository from '../../repositories/booking.repository.js';
 import customerRepository from '../../repositories/customer.repository.js';
 import ratingRepository from '../../repositories/rating.repository.js';
 import shopRepository from '../../repositories/shop.repository.js';
+import { buildMediaUrl } from '../media/media-url.service.js';
 import * as ratingService from '../rating.service.js';
 
 test('addRating translates duplicate-key writes and normalizes blank reviews', async (t) => {
@@ -104,7 +105,7 @@ test('upsertReplyToRating creates a first reply and notifies the customer', asyn
             customerId: {
                 firstName: 'Ava',
                 lastName: 'Customer',
-                photoUrl: 'https://example.com/customer.jpg',
+                photoR2Key: 'images/avatar/customer-1/profile.jpg',
             },
             reply: {
                 text: replyText,
@@ -155,7 +156,7 @@ test('upsertReplyToRating updates an existing reply without sending a duplicate 
             customerId: {
                 firstName: 'Ava',
                 lastName: 'Customer',
-                photoUrl: 'https://example.com/customer.jpg',
+                photoR2Key: 'images/avatar/customer-1/profile.jpg',
                 userId: { email: 'should-not-leak@example.com' },
             },
             reply: {
@@ -183,7 +184,7 @@ test('upsertReplyToRating updates an existing reply without sending a duplicate 
     assert.deepEqual(result.user, {
         firstName: 'Ava',
         lastName: 'Customer',
-        photoUrl: 'https://example.com/customer.jpg',
+        photoUrl: buildMediaUrl('images/avatar/customer-1/profile.jpg'),
     });
     assert.equal('email' in result.user, false);
     assert.deepEqual(result.reply, {

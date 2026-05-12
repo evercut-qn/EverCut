@@ -20,6 +20,7 @@ const buildValidPayload = () => ({
     workingDays: ['Monday', 'Tuesday', 'Wednesday'],
     workingHours: '{"openTime":"09:00 AM","closeTime":"08:00 PM"}',
     breakTimes: '[{"start":"01:00 PM","end":"02:00 PM"}]',
+    photoMediaId: 'media-1',
     pin: '1234',
     confirmPin: '1234',
 });

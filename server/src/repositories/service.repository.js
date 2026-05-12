@@ -64,7 +64,7 @@ class ServiceRepository {
             ...filters,
         }));
         if (selectFields) query.select(selectFields);
-        return query.populate('shopId', 'shopName address location category coverUrl').lean();
+        return query.populate('shopId', 'shopName address location category coverR2Key').lean();
     }
 
     async findByGender(gender, selectFields) {

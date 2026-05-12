@@ -10,7 +10,7 @@ const ACTIVE_BOOKING_STATUSES = [
 
 const EMPLOYEE_POPULATE = {
     path: 'employeeId',
-    select: 'firstName lastName photoUrl blockedDates',
+    select: 'firstName lastName photoR2Key blockedDates',
     options: { includeDeleted: true },
 };
 
@@ -50,7 +50,7 @@ class BookingRepository {
 
     async findByIdPopulated(id) {
         return Booking.findById(id)
-            .populate('shopId', 'shopName coverUrl address openTime closeTime')
+            .populate('shopId', 'shopName coverR2Key address openTime closeTime')
             .populate(EMPLOYEE_POPULATE)
             .populate({
                 path: 'customerId',
@@ -86,7 +86,7 @@ class BookingRepository {
         const query = Booking.find(trustQueryOperators({ customerId, ...filters }))
             .populate('serviceIds')
             .populate(EMPLOYEE_POPULATE)
-            .populate('shopId', 'shopName address coverUrl')
+            .populate('shopId', 'shopName address coverR2Key')
             .sort({ date: -1 });
 
         if (options.skip !== undefined) query.skip(options.skip);
@@ -101,7 +101,7 @@ class BookingRepository {
         }))
             .populate('serviceIds')
             .populate(EMPLOYEE_POPULATE)
-            .populate('shopId', 'shopName address coverUrl')
+            .populate('shopId', 'shopName address coverR2Key')
             .sort({ date: 1 });
 
         if (options.skip !== undefined) query.skip(options.skip);
@@ -120,7 +120,7 @@ class BookingRepository {
         }))
             .populate('serviceIds')
             .populate(EMPLOYEE_POPULATE)
-            .populate('shopId', 'shopName address coverUrl')
+            .populate('shopId', 'shopName address coverR2Key')
             .sort({ date: -1 });
 
         if (options.skip !== undefined) query.skip(options.skip);
