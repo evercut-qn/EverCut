@@ -40,8 +40,8 @@
 ```
 CURRENT FLOW (all media types):
 ┌───────────┐     multipart/form-data     ┌──────────────┐     Cloudinary SDK     ┌───────────────┐
-│  Flutter   │ ──────────────────────────► │  Node.js API │ ─────────────────────► │  Cloudinary   │
-│   Client   │                             │  (Express)   │                        │  (CDN + Store) │
+│  Flutter  │ ──────────────────────────► │  Node.js API │ ─────────────────────► │  Cloudinary   │
+│   Client  │                             │  (Express)   │                        │  (CDN + Store)│
 └───────────┘                             └──────┬───────┘                        └──────┬────────┘
                                                  │                                       │
                                                  │ Store URL + publicId                  │ Returns:
@@ -265,24 +265,24 @@ Keeping both modules creates confusion ("do I import photo.service or media.serv
 
 ```
 TARGET FLOW (Image Upload):
-┌───────────┐  POST /api/v1/media/upload-url  ┌──────────────┐
+┌────────────┐  POST /api/v1/media/upload-url  ┌──────────────┐
 │  Flutter   │ ──────────────────────────────► │  Node.js API │
 │   Client   │                                 │  (Express)   │
 │            │  ◄─── { uploadUrl, mediaId }    │              │
 │            │                                 │  - Validate  │
-│            │  PUT {presigned_url}             │  - Gen UUID  │
+│            │  PUT {presigned_url}            │  - Gen UUID  │
 │            │ ──────────────────────────────► │  - Gen URL   │──► R2 (direct)
 │            │                                 │              │
 │            │  POST /api/v1/media/confirm     │              │
 │            │ ──────────────────────────────► │  - HeadObject│
 │            │  ◄─── { cdnUrl, mediaId }       │  - Validate  │
-└───────────┘                                 │  - Update DB │
-                                              └──────────────┘
+└────────────┘                                 │  - Update DB │
+                                               └──────────────┘
 ```
 
 ```
 TARGET FLOW (Video Upload — Multipart):
-┌───────────┐  POST /api/v1/media/video/initiate  ┌──────────────┐
+┌────────────┐  POST /api/v1/media/video/initiate  ┌──────────────┐
 │  Flutter   │ ──────────────────────────────────► │  Node.js API │
 │            │  ◄─── { videoId, uploadId, parts }  │              │
 │            │                                     │              │
@@ -292,7 +292,7 @@ TARGET FLOW (Video Upload — Multipart):
 │            │  POST /api/v1/media/video/complete  │              │
 │            │ ──────────────────────────────────► │  - Complete  │
 │            │  ◄─── { videoId, status }           │  - Enqueue   │
-└───────────┘                                     └──────────────┘
+└────────────┘                                     └──────────────┘
 ```
 
 ### 4.3 Module Architecture
