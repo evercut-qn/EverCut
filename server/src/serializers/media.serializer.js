@@ -17,7 +17,6 @@ export const serializeMedia = (media) => {
         status: plain.status,
         purpose: plain.purpose,
         url,
-        photoUrl: plain.purpose === 'gallery' ? url : undefined,
         contentType: plain.contentType,
         fileSize: plain.actualSize || plain.declaredSize,
         category: plain.metadata?.category ?? null,

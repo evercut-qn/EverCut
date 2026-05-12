@@ -13,24 +13,32 @@ import r2Client from '../../config/r2.config.js';
 import config from '../../config/index.js';
 import logger from '../../utils/logger.js';
 
+const PRESIGNED_UPLOAD_SIGNABLE_HEADERS = new Set(['content-type']);
+
+export const buildPresignedPutHeaders = (contentType) => ({
+    'Content-Type': contentType,
+});
+
 class StorageProvider {
     constructor(client = r2Client, bucket = config.r2.bucket) {
         this.client = client;
         this.bucket = bucket;
     }
 
-    async generateUploadUrl({ key, contentType, contentLength, expiresIn = config.media.presignedUrlTtl }) {
+    async generateUploadUrl({ key, contentType, expiresIn = config.media.presignedUrlTtl }) {
         const command = new PutObjectCommand({
             Bucket: this.bucket,
             Key: key,
             ContentType: contentType,
-            ContentLength: contentLength,
         });
-        return getSignedUrl(this.client, command, { expiresIn });
+        return getSignedUrl(this.client, command, {
+            expiresIn,
+            signableHeaders: PRESIGNED_UPLOAD_SIGNABLE_HEADERS,
+        });
     }
 
-    async generatePresignedPutUrl(key, contentType, contentLength, expiresIn = config.media.presignedUrlTtl) {
-        const url = await this.generateUploadUrl({ key, contentType, contentLength, expiresIn });
+    async generatePresignedPutUrl(key, contentType, expiresIn = config.media.presignedUrlTtl) {
+        const url = await this.generateUploadUrl({ key, contentType, expiresIn });
         return {
             url,
             expiresAt: new Date(Date.now() + expiresIn * 1000).toISOString(),

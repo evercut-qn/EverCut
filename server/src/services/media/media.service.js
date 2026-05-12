@@ -13,7 +13,7 @@ import {
 } from '../../utils/constants.js';
 import { serializeMedia, serializeMediaList } from '../../serializers/media.serializer.js';
 import logger from '../../utils/logger.js';
-import storageProvider from './storage-provider.service.js';
+import storageProvider, { buildPresignedPutHeaders } from './storage-provider.service.js';
 import { buildMediaUrl } from './media-url.service.js';
 import { validateContentType, validateFileSize, validateMagicBytes } from './media-validation.service.js';
 
@@ -54,10 +54,10 @@ export const requestUploadUrl = async (userId, { contentType, sizeBytes, purpose
     const extension = MIME_TO_EXTENSION[contentType] || 'bin';
     const contextId = entityId || ownerKey;
     const r2Key = buildR2Key(purpose, contextId, mediaId, extension);
+    const requiredHeaders = buildPresignedPutHeaders(contentType);
     const uploadUrl = await storageProvider.generateUploadUrl({
         key: r2Key,
         contentType,
-        contentLength: sizeBytes,
         expiresIn: config.media.presignedUrlTtl,
     });
     const expiresAt = new Date(Date.now() + config.media.presignedUrlTtl * 1000).toISOString();
@@ -91,6 +91,7 @@ export const requestUploadUrl = async (userId, { contentType, sizeBytes, purpose
     return {
         mediaId: created._id.toString(),
         uploadUrl,
+        requiredHeaders,
         r2Key,
         expiresAt,
     };

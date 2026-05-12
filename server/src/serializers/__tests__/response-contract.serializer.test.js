@@ -93,6 +93,9 @@ test('resource serializers expose only id for each resource own identity', () =>
     for (const [resourceName, payload] of Object.entries(samples)) {
         assertNoOwnIdAliases(resourceName, payload);
     }
+
+    assert.equal('photoUrl' in samples.media, false);
+    assert.match(samples.media.url, /^https:\/\/.+\/images\/gallery\/shop-1\/photo\.jpg\?exp=/);
 });
 
 test('serializers do not duplicate populated relation ids beside relation objects', () => {

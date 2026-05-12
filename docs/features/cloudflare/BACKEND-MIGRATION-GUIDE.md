@@ -456,21 +456,21 @@ Backend:
   6. Create Media record (status: 'pending', r2Key, userId)
   7. Generate presigned PUT URL with:
      - ContentType locked to declared type
-     - ContentLength locked to declared size
+     - Content-Length is not signed because browser clients cannot set it manually
+     - X-Amz-Content-Sha256 and X-Amz-Date remain in the query string
      - Expiry: 15 minutes
-  8. Return { mediaId, uploadUrl, r2Key, expiresAt }
+  8. Return { mediaId, uploadUrl, requiredHeaders, r2Key, expiresAt }
 
 Step 2: DIRECT UPLOAD TO R2
 ───────────────────────────
 Flutter → PUT {uploadUrl}
 Headers: Content-Type: image/jpeg
-         Content-Length: 245760
 Body: <raw binary bytes>
 
 R2 validates:
   - Signature matches (presigned URL)
   - Content-Type matches declared type
-  - Content-Length matches declared size
+  - Required signed headers are present
   - Not expired
 
 Step 3: CONFIRM UPLOAD
@@ -1150,17 +1150,19 @@ class StorageProvider {
 
     /**
      * Generate a presigned PUT URL for direct client upload.
-     * ContentType and ContentLength are locked into the signature.
+     * ContentType is locked into the signature. Size is validated after upload.
      */
-    async generatePresignedPutUrl(key, contentType, contentLength, expiresIn = 900) {
+    async generatePresignedPutUrl(key, contentType, expiresIn = 900) {
         const command = new PutObjectCommand({
             Bucket: this.bucket,
             Key: key,
             ContentType: contentType,
-            ContentLength: contentLength,
         });
 
-        const url = await getSignedUrl(this.client, command, { expiresIn });
+        const url = await getSignedUrl(this.client, command, {
+            expiresIn,
+            signableHeaders: new Set(['content-type']),
+        });
         return { url, expiresAt: new Date(Date.now() + expiresIn * 1000).toISOString() };
     }
 
@@ -1467,11 +1469,11 @@ export const requestUploadUrl = async (userId, { contentType, sizeBytes, purpose
     const extension = MIME_TO_EXTENSION[contentType] || 'bin';
     const contextId = entityId || userId.toString();
     const r2Key = buildR2Key(purpose, contextId, mediaId, extension);
+    const requiredHeaders = buildPresignedPutHeaders(contentType);
 
     const { url: uploadUrl, expiresAt } = await storageProvider.generatePresignedPutUrl(
         r2Key,
         contentType,
-        sizeBytes,
         config.media.presignedUrlTtl,
     );
 
@@ -1498,7 +1500,7 @@ export const requestUploadUrl = async (userId, { contentType, sizeBytes, purpose
         sizeBytes,
     });
 
-    return { mediaId, uploadUrl, r2Key, expiresAt };
+    return { mediaId, uploadUrl, requiredHeaders, r2Key, expiresAt };
 };
 
 /**
@@ -2105,7 +2107,7 @@ const compact = (obj) => Object.fromEntries(
 
 /**
  * Serialize a single media item for API response.
- * This replaces serializePhoto — the output contract is backward-compatible.
+ * Generic media resources expose one canonical URL field: `url`.
  */
 export const serializeMedia = (media) => {
     const plain = sanitizeForResponse(toPlainObject(media));
@@ -2118,8 +2120,6 @@ export const serializeMedia = (media) => {
         purpose: plain.purpose,
         // URL construction — the ONLY place URLs are built from R2 keys
         url: r2KeyToUrl(plain.r2Key),
-        // Backward compat: emit photoUrl for clients still expecting photo shape
-        photoUrl: plain.purpose === 'gallery' ? r2KeyToUrl(plain.r2Key) : undefined,
         contentType: plain.contentType,
         fileSize: plain.actualSize || plain.declaredSize,
         // Domain metadata (replaces photoType, description, photoName)
@@ -3047,6 +3047,7 @@ Content-Type: application/json
 // Assert: 201, body.data.uploadUrl exists, body.data.mediaId exists
 // Save: pm.collectionVariables.set("mediaId", body.data.mediaId)
 // Save: pm.collectionVariables.set("uploadUrl", body.data.uploadUrl)
+// Save: pm.collectionVariables.set("uploadHeaders", body.data.requiredHeaders)
 
 // Step 2: Upload directly to R2
 PUT {{uploadUrl}}

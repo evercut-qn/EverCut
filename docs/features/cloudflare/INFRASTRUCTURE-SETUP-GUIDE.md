@@ -413,7 +413,7 @@ R2 bucket CORS (set via API):
         {
             "AllowedOrigins": ["https://evercut.in", "https://*.evercut.in"],
             "AllowedMethods": ["PUT", "GET", "HEAD"],
-            "AllowedHeaders": ["Content-Type", "Content-Length"],
+            "AllowedHeaders": ["Content-Type"],
             "ExposeHeaders": ["ETag"],
             "MaxAgeSeconds": 3600
         }
@@ -434,7 +434,7 @@ R2 bucket CORS (set via API):
 - [ ] `MEDIA_TOKEN_SECRET` matches between backend and Worker
 - [ ] Worker secrets set via `wrangler secret put` — never in wrangler.toml
 - [ ] CORS restricted to app domain in production
-- [ ] Presigned URLs enforce Content-Type and Content-Length
+- [ ] Presigned URLs enforce Content-Type; backend confirm validates final object size
 - [ ] R2 API keys rotated every 90 days
 - [ ] Workers Paid plan activated before production launch
 - [ ] Token blacklist checked on every Worker request

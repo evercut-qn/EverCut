@@ -157,6 +157,9 @@ class MediaUploadService {
 
     final uploadUrl = urlResponse.data['data']['uploadUrl'] as String;
     final mediaId = urlResponse.data['data']['mediaId'] as String;
+    final requiredHeaders = Map<String, dynamic>.from(
+      urlResponse.data['data']['requiredHeaders'] as Map,
+    ).map((key, value) => MapEntry(key, value.toString()));
 
     // 3. Upload directly to R2 via presigned PUT
     final fileBytes = await file.readAsBytes();
@@ -164,10 +167,7 @@ class MediaUploadService {
       uploadUrl,
       data: Stream.fromIterable([fileBytes]),
       options: Options(
-        headers: {
-          'Content-Type': mimeType,
-          'Content-Length': fileSize,
-        },
+        headers: requiredHeaders,
       ),
       onSendProgress: onProgress,
     );
@@ -396,7 +396,6 @@ class VideoUploadService {
           data: Stream.fromIterable([data]),
           options: Options(headers: {
             'Content-Type': 'video/mp4',
-            'Content-Length': data.length,
           }),
         );
         return response.headers.value('etag') ?? '';
@@ -570,7 +569,6 @@ Image.network(
 // {
 //   "id": "uuid",
 //   "url": "https://media.evercut.in/images/gallery/...",
-//   "photoUrl": "https://media.evercut.in/images/gallery/...",
 //   "category": "work_sample",
 //   "description": "...",
 //   "createdAt": "..."
@@ -628,4 +626,3 @@ await player.open(Media(
 ---
 
 *End of Flutter Integration Guide — Version 2.0*
-

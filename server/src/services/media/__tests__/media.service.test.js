@@ -39,8 +39,8 @@ test('requestUploadUrl creates pending media and returns a presigned R2 PUT URL'
     });
 
     let signedRequest = null;
-    t.mock.method(storageProvider, 'generateUploadUrl', async ({ key, contentType, contentLength }) => {
-        signedRequest = { key, contentType, contentLength };
+    t.mock.method(storageProvider, 'generateUploadUrl', async ({ key, contentType }) => {
+        signedRequest = { key, contentType };
         return 'https://r2.example/upload';
     });
 
@@ -54,6 +54,9 @@ test('requestUploadUrl creates pending media and returns a presigned R2 PUT URL'
 
     assert.equal(result.uploadUrl, 'https://r2.example/upload');
     assert.equal(result.mediaId, createdPayload._id);
+    assert.deepEqual(result.requiredHeaders, {
+        'Content-Type': 'image/jpeg',
+    });
     assert.equal(createdPayload.status, 'pending');
     assert.equal(createdPayload.purpose, 'gallery');
     assert.equal(createdPayload.r2Bucket, 'evercut-media-test');
@@ -61,7 +64,6 @@ test('requestUploadUrl creates pending media and returns a presigned R2 PUT URL'
     assert.deepEqual(signedRequest, {
         key: createdPayload.r2Key,
         contentType: 'image/jpeg',
-        contentLength: 2048,
     });
 });
 

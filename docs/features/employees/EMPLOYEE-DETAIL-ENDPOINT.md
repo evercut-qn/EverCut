@@ -60,7 +60,7 @@ Authorization: Bearer <jwt_token>
       "phoneNumber": "+919876543210",
       "gender": "Male",
       "dateOfBirth": "1990-05-15T00:00:00.000Z",
-      "photoUrl": "https://media.evercut.in/images/employee/...",
+      "photoUrl": "https://media.evercut.in/images/employees/...",
       "workingHours": {
         "start": "09:00",
         "end": "18:00"

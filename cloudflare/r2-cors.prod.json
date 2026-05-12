@@ -8,7 +8,7 @@
           "https://app.evercut.in"
         ],
         "methods": ["PUT", "GET", "HEAD"],
-        "headers": ["Content-Type", "Content-Length"]
+        "headers": ["Content-Type"]
       },
       "exposeHeaders": ["ETag"],
       "maxAgeSeconds": 3600

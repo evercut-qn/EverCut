@@ -10,7 +10,7 @@
           "http://127.0.0.1:5000"
         ],
         "methods": ["PUT", "GET", "HEAD"],
-        "headers": ["Content-Type", "Content-Length"]
+        "headers": ["Content-Type"]
       },
       "exposeHeaders": ["ETag"],
       "maxAgeSeconds": 3600
