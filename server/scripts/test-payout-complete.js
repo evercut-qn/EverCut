@@ -471,7 +471,7 @@ async function testRealApiScenarios() {
             beneficiaryId: testBeneficiaryId,
             name: 'Test Barber API',
             phone: '9876543210',
-            email: 'test@evercut.com',
+            email: 'test@evercut.in',
             vpa: 'success@upi', // Official Cashfree test UPI for success
         });
         
@@ -515,7 +515,7 @@ async function testRealApiScenarios() {
             beneficiaryId: testBeneficiaryId,
             name: 'Test Barber API Duplicate',
             phone: '9876543210',
-            email: 'test@evercut.com',
+            email: 'test@evercut.in',
             vpa: 'test@paytm',
         });
         

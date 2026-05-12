@@ -239,7 +239,7 @@ ${bold('SECURITY NOTES')}
   • Each secret is generated independently via crypto.randomBytes() (OS CSPRNG).
   • Secrets are base64url-encoded: URL-safe, no +/= characters.
   • The three secrets MUST be different — this is verified in --check mode.
-  • Never reuse secrets across environments (dev / staging / production).
+  • Never reuse secrets across environments (development / production).
   • Never commit .env to version control.
 `);
 };
@@ -371,7 +371,7 @@ const generate = (args) => {
     console.log(bold('── Security Reminders ────────────────────────────────────────────'));
     console.log(`  ${yellow('•')} Each secret above is cryptographically independent.`);
     console.log(`  ${yellow('•')} Never reuse the same secret for different token types.`);
-    console.log(`  ${yellow('•')} Never reuse secrets across environments (dev/staging/prod).`);
+    console.log(`  ${yellow('•')} Never reuse secrets across environments (dev/prod).`);
     console.log(`  ${yellow('•')} Never commit .env to version control.`);
     console.log(`  ${yellow('•')} Rotate secrets if any are exposed or the environment is compromised.`);
     console.log(`  ${yellow('•')} After rotation, all existing tokens are immediately invalidated.`);
