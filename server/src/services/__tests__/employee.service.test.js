@@ -1,13 +1,39 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import bookingRepository from '../../repositories/booking.repository.js';
-import employeeRepository from '../../repositories/employee.repository.js';
-import mediaRepository from '../../repositories/media.repository.js';
-import shopRepository from '../../repositories/shop.repository.js';
-import storageProvider from '../media/storage-provider.service.js';
-import notificationEvents from '../notification-events.service.js';
-import * as employeeService from '../employee.service.js';
+const ensureRequiredEnv = () => {
+    const defaults = {
+        MONGODB_URI: 'mongodb://localhost:27017/evercut-test',
+        FIREBASE_PROJECT_ID: 'evercut-test',
+        FIREBASE_CLIENT_EMAIL: 'firebase@example.com',
+        FIREBASE_PRIVATE_KEY: '-----BEGIN PRIVATE KEY-----\\nabc\\n-----END PRIVATE KEY-----',
+        CF_ACCOUNT_ID: 'test-account',
+        R2_ACCESS_KEY_ID: 'test-access-key',
+        R2_SECRET_ACCESS_KEY: 'test-secret-key',
+        R2_BUCKET: 'evercut-media-test',
+        CDN_BASE_URL: 'https://media.evercut.test',
+        MEDIA_TOKEN_SECRET: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+        MSG91_AUTH_KEY: 'msg91-auth',
+        MSG91_OTP_TEMPLATE_ID: 'msg91-template',
+        JWT_ACCESS_SECRET: 'access-secret',
+        JWT_REFRESH_SECRET: 'refresh-secret',
+        JWT_ONBOARDING_SECRET: 'onboarding-secret',
+    };
+
+    for (const [key, value] of Object.entries(defaults)) {
+        process.env[key] ??= value;
+    }
+};
+
+ensureRequiredEnv();
+
+const bookingRepository = (await import('../../repositories/booking.repository.js')).default;
+const employeeRepository = (await import('../../repositories/employee.repository.js')).default;
+const mediaRepository = (await import('../../repositories/media.repository.js')).default;
+const shopRepository = (await import('../../repositories/shop.repository.js')).default;
+const storageProvider = (await import('../media/storage-provider.service.js')).default;
+const notificationEvents = (await import('../notification-events.service.js')).default;
+const employeeService = await import('../employee.service.js');
 
 test('deleteEmployee blocks unresolved bookings for that employee', async (t) => {
     t.mock.method(shopRepository, 'findByOwnerId', async () => ({ _id: 'shop-1' }));
