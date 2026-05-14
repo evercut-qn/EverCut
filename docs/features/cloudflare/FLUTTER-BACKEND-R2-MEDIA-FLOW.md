@@ -71,9 +71,7 @@ Request:
 {
   "contentType": "image/png",
   "sizeBytes": 68422,
-  "purpose": "gallery",
-  "entityId": "optionalEntityObjectId",
-  "originalName": "front-chair.png"
+  "purpose": "gallery"
 }
 ```
 
@@ -88,9 +86,6 @@ Success response, status `201`:
   "data": {
     "mediaId": "6808052d-604d-4bed-abd7-6a3a86ee3c2a",
     "uploadUrl": "https://...presigned-r2-url...",
-    "requiredHeaders": {
-      "Content-Type": "image/png"
-    },
     "r2Key": "images/gallery/user-id/media-id.png",
     "expiresAt": "2026-05-12T12:00:00.000Z"
   }
@@ -106,7 +101,7 @@ Content-Type: image/png
 <raw file bytes>
 ```
 
-The direct upload is successful when R2 returns a 2xx status. Send only the client headers from `data.requiredHeaders`, preserve the full query string in `data.uploadUrl`, and do not send the EverCut bearer token or any other `Authorization` header to R2. The backend still validates the final object size during confirm, so if the file changes after requesting the URL, request a new upload URL.
+The direct upload is successful when R2 returns a 2xx status. Send the Content-Type header matching the contentType you declared in the request body, preserve the full query string in `data.uploadUrl`, and do not send the EverCut bearer token or any other `Authorization` header to R2. The backend still validates the final object size during confirm, so if the file changes after requesting the URL, request a new upload URL.
 
 ## Confirm Upload Route
 
@@ -167,9 +162,6 @@ Response:
     "url": "https://...worker-url...?exp=...&token=...",
     "contentType": "image/png",
     "fileSize": 68422,
-    "category": "interior",
-    "description": "Front chair",
-    "originalName": "front-chair.png",
     "entityId": "shopObjectId",
     "entityType": "Shop",
     "createdAt": "2026-05-12T11:43:29.000Z",
@@ -202,9 +194,7 @@ Request:
 
 ```json
 {
-  "mediaIds": ["media-id-1", "media-id-2"],
-  "category": "interior",
-  "description": "Main shop gallery"
+  "mediaIds": ["media-id-1", "media-id-2"]
 }
 ```
 
@@ -220,9 +210,7 @@ Success response, status `201`:
       "type": "image",
       "status": "ready",
       "purpose": "gallery",
-      "url": "https://...worker-url...?exp=...&token=...",
-      "category": "interior",
-      "description": "Main shop gallery"
+      "url": "https://...worker-url...?exp=...&token=..."
     }
   ]
 }
@@ -230,13 +218,7 @@ Success response, status `201`:
 
 ### `GET /api/v1/media/gallery`
 
-Barber-only route.
-
-Query parameters:
-
-- `page`
-- `limit`
-- `category`, where `all` returns every category
+Barber-only route. Returns all gallery media for the authenticated barber's shop.
 
 Response:
 
@@ -247,18 +229,9 @@ Response:
   "data": [
     {
       "id": "media-id-1",
-      "url": "https://...worker-url...?exp=...&token=...",
-      "category": "interior"
+      "url": "https://...worker-url...?exp=...&token=..."
     }
-  ],
-  "meta": {
-    "pagination": {
-      "page": 1,
-      "limit": 20,
-      "total": 1,
-      "totalPages": 1
-    }
-  }
+  ]
 }
 ```
 
@@ -386,7 +359,7 @@ Dev and prod use the same API contract. Differences are infrastructure-only:
 ## Implementation Checklist for Flutter
 
 - Request upload URL from backend before uploading bytes.
-- Upload directly to `uploadUrl` using the returned `requiredHeaders`; do not attach API authorization headers to the R2 request.
+- Upload directly to `uploadUrl` using the Content-Type header matching the contentType you declared in the request body; do not attach API authorization headers to the R2 request.
 - Confirm upload with `mediaId` only after R2 returns success.
 - Store/use backend resource IDs, not R2 keys.
 - Display returned signed URLs as-is.

@@ -48,19 +48,14 @@ test('requestUploadUrl creates pending media and returns a presigned R2 PUT URL'
         contentType: 'image/jpeg',
         sizeBytes: 2048,
         purpose: 'gallery',
-        entityId: 'shop-1',
-        originalName: 'work sample.jpg',
     });
 
     assert.equal(result.uploadUrl, 'https://r2.example/upload');
     assert.equal(result.mediaId, createdPayload._id);
-    assert.deepEqual(result.requiredHeaders, {
-        'Content-Type': 'image/jpeg',
-    });
     assert.equal(createdPayload.status, 'pending');
     assert.equal(createdPayload.purpose, 'gallery');
     assert.equal(createdPayload.r2Bucket, 'evercut-media-test');
-    assert.match(createdPayload.r2Key, /^images\/gallery\/shop-1\/[0-9a-f-]+\.jpg$/);
+    assert.match(createdPayload.r2Key, /^images\/gallery\/user-1\/[0-9a-f-]+\.jpg$/);
     assert.deepEqual(signedRequest, {
         key: createdPayload.r2Key,
         contentType: 'image/jpeg',

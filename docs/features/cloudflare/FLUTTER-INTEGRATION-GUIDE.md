@@ -140,7 +140,6 @@ class MediaUploadService {
   Future<MediaUploadResult> uploadImage({
     required File file,
     required String purpose,
-    String? entityId,
     void Function(int sent, int total)? onProgress,
   }) async {
     // 1. Detect content type from file extension
@@ -152,14 +151,10 @@ class MediaUploadService {
       'contentType': mimeType,
       'sizeBytes': fileSize,
       'purpose': purpose,
-      if (entityId != null) 'entityId': entityId,
     });
 
     final uploadUrl = urlResponse.data['data']['uploadUrl'] as String;
     final mediaId = urlResponse.data['data']['mediaId'] as String;
-    final requiredHeaders = Map<String, dynamic>.from(
-      urlResponse.data['data']['requiredHeaders'] as Map,
-    ).map((key, value) => MapEntry(key, value.toString()));
 
     // 3. Upload directly to R2 via presigned PUT
     final fileBytes = await file.readAsBytes();
@@ -167,7 +162,7 @@ class MediaUploadService {
       uploadUrl,
       data: Stream.fromIterable([fileBytes]),
       options: Options(
-        headers: requiredHeaders,
+        headers: { 'Content-Type': mimeType },
       ),
       onSendProgress: onProgress,
     );
@@ -209,7 +204,6 @@ for (final file in selectedFiles) {
   final result = await mediaUploadService.uploadImage(
     file: file,
     purpose: 'gallery',
-    entityId: shopId,
     onProgress: (sent, total) {
       final fileIndex = selectedFiles.indexOf(file);
       final overallProgress = (fileIndex + sent / total) / selectedFiles.length;
@@ -240,7 +234,6 @@ await apiClient.post('/media/gallery', data: {
 final photoResult = await mediaUploadService.uploadImage(
   file: employeePhoto,
   purpose: 'employee',
-  entityId: shopId,
 );
 
 // Step 2: Send employee data with mediaId (no file)
@@ -287,7 +280,6 @@ await apiClient.post('/onboarding/customers', data: {
 final coverResult = await mediaUploadService.uploadImage(
   file: coverImage,
   purpose: 'cover',
-  entityId: shopId,
 );
 
 await apiClient.patch('/shops/me/media/cover', data: {

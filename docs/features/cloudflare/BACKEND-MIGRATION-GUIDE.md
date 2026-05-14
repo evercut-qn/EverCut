@@ -198,9 +198,6 @@ The `photo.*` module (7 files, ~282 lines) contains **zero domain logic** unique
 | Photo-specific concept | Generic media equivalent |
 |---|---|
 | `shopId` | `entityId` + `entityType: 'Shop'` |
-| `photoType` (shop_interior, work_sample, etc.) | `metadata.category` |
-| `description` | `metadata.description` |
-| `photoName` | `metadata.originalName` |
 | `config.upload.maxPhotosPerShop = 10` | `config.media.maxGalleryPerShop` in `config/index.js` |
 | `isActive` soft-delete | `status: 'deleted'` |
 | `fileSize`, `mimeType` | `actualSize`, `contentType` |
@@ -444,7 +441,6 @@ Body: {
   "contentType": "image/jpeg",
   "sizeBytes": 245760,
   "purpose": "gallery",
-  "entityId": "6654abc..."          // Optional — shopId for gallery, etc.
 }
 
 Backend:
@@ -452,14 +448,14 @@ Backend:
   2. Validate contentType against allowlist
   3. Validate sizeBytes against limit (10 MB for images)
   4. Generate UUID for mediaId
-  5. Compute R2 object key: `images/{purpose}/{entityContext}/{uuid}.{ext}`
+  5. Compute R2 object key: `images/{purpose}/{userId}/{uuid}.{ext}`
   6. Create Media record (status: 'pending', r2Key, userId)
   7. Generate presigned PUT URL with:
      - ContentType locked to declared type
      - Content-Length is not signed because browser clients cannot set it manually
      - X-Amz-Content-Sha256 and X-Amz-Date remain in the query string
      - Expiry: 15 minutes
-  8. Return { mediaId, uploadUrl, requiredHeaders, r2Key, expiresAt }
+  8. Return { mediaId, uploadUrl, r2Key, expiresAt }
 
 Step 2: DIRECT UPLOAD TO R2
 ───────────────────────────
@@ -604,7 +600,6 @@ import {
     ALL_MEDIA_STATUSES,
     ALL_MEDIA_PURPOSES,
     ALL_MEDIA_ENTITY_TYPES,
-    ALL_GALLERY_CATEGORIES,
 } from '../utils/constants.js';
 
 const mediaSchema = new mongoose.Schema(
@@ -670,24 +665,6 @@ const mediaSchema = new mongoose.Schema(
             default: null,
         },
 
-        // ── Domain metadata (replaces photo-specific fields) ─
-        metadata: {
-            category: {
-                type: String,
-                enum: [...ALL_GALLERY_CATEGORIES, null],
-                default: null,
-            },
-            description: {
-                type: String,
-                maxlength: 500,
-                default: null,
-            },
-            originalName: {
-                type: String,
-                default: null,
-            },
-        },
-
         // ── Video-specific ───────────────────────────
         durationSeconds: { type: Number, default: null },
         multipartUploadId: { type: String, default: null },
@@ -736,9 +713,6 @@ The `photo.model.js` file is deleted entirely. All its functionality is absorbed
 | `shopId` | `entityId` + `entityType: 'Shop'` |
 | `photoUrl` | `r2Key` (URL constructed at serialization time) |
 | `cloudinaryId` | Not needed — `r2Key` serves as unique identifier |
-| `photoName` | `metadata.originalName` |
-| `photoType` | `metadata.category` |
-| `description` | `metadata.description` |
 | `fileSize` | `actualSize` |
 | `mimeType` | `contentType` |
 | `isActive` | `status !== 'deleted'` |
@@ -876,19 +850,6 @@ export const MEDIA_ENTITY_TYPE = Object.freeze({
     SERVICE: 'Service',
 });
 export const ALL_MEDIA_ENTITY_TYPES = [...Object.values(MEDIA_ENTITY_TYPE), null];
-
-// ---------------------------------------------------------------------------
-// Gallery Categories (replaces PHOTO_TYPE)
-// ---------------------------------------------------------------------------
-export const GALLERY_CATEGORY = Object.freeze({
-    SHOP_INTERIOR: 'shop_interior',
-    SHOP_EXTERIOR: 'shop_exterior',
-    WORK_SAMPLE: 'work_sample',
-    BEFORE_AFTER: 'before_after',
-    TEAM: 'team',
-    OTHER: 'other',
-});
-export const ALL_GALLERY_CATEGORIES = Object.values(GALLERY_CATEGORY);
 
 // ---------------------------------------------------------------------------
 // Content Type → Extension Mapping
@@ -1452,7 +1413,7 @@ const buildR2Key = (purpose, contextId, uuid, extension) => {
 /**
  * Step 1: Generate a presigned upload URL.
  */
-export const requestUploadUrl = async (userId, { contentType, sizeBytes, purpose, entityId }) => {
+export const requestUploadUrl = async (userId, { contentType, sizeBytes, purpose }) => {
     const mediaType = resolveMediaType(contentType);
 
     if (!validateContentType(contentType, mediaType)) {
@@ -1467,9 +1428,8 @@ export const requestUploadUrl = async (userId, { contentType, sizeBytes, purpose
 
     const mediaId = uuidv4();
     const extension = MIME_TO_EXTENSION[contentType] || 'bin';
-    const contextId = entityId || userId.toString();
+    const contextId = userId.toString();
     const r2Key = buildR2Key(purpose, contextId, mediaId, extension);
-    const requiredHeaders = buildPresignedPutHeaders(contentType);
 
     const { url: uploadUrl, expiresAt } = await storageProvider.generatePresignedPutUrl(
         r2Key,
@@ -1487,7 +1447,7 @@ export const requestUploadUrl = async (userId, { contentType, sizeBytes, purpose
         r2Bucket: config.r2.bucket,
         contentType,
         declaredSize: sizeBytes,
-        entityId: entityId || null,
+        entityId: null,
         entityType: null,
         uploadExpiresAt: new Date(Date.now() + config.media.pendingUploadTtlHours * 3600_000),
     });
@@ -1500,7 +1460,7 @@ export const requestUploadUrl = async (userId, { contentType, sizeBytes, purpose
         sizeBytes,
     });
 
-    return { mediaId, uploadUrl, requiredHeaders, r2Key, expiresAt };
+    return { mediaId, uploadUrl, r2Key, expiresAt };
 };
 
 /**
@@ -1632,8 +1592,6 @@ export const attachGalleryMedia = async (ownerId, mediaIds, category = 'other', 
                 entityId: shop._id,
                 entityType: 'Shop',
                 purpose: 'gallery',
-                'metadata.category': category,
-                'metadata.description': description,
             },
             { new: true },
         );
@@ -1650,34 +1608,12 @@ export const attachGalleryMedia = async (ownerId, mediaIds, category = 'other', 
  * Get gallery media for the current barber's shop.
  * Replaces: photo.service.getPhotos()
  */
-export const getShopGallery = async (ownerId, queryFilters = {}) => {
+export const getShopGallery = async (ownerId) => {
     const shop = await shopRepository.findByOwnerId(ownerId);
     if (!shop) throw new NotFoundError('Shop profile');
 
-    const filter = {
-        entityId: shop._id,
-        entityType: 'Shop',
-        purpose: 'gallery',
-        status: MEDIA_STATUS.READY,
-    };
-
-    if (queryFilters.category && queryFilters.category !== 'all') {
-        filter['metadata.category'] = queryFilters.category;
-    }
-
-    const total = await Media.countDocuments(filter);
-    const { skip, limit, pagination } = buildPagination(queryFilters, total);
-
-    const items = await Media.find(filter)
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .lean();
-
-    return {
-        items: serializeMediaList(items),
-        pagination,
-    };
+    const items = await mediaRepository.findByEntity(shop._id, MEDIA_ENTITY_TYPE.SHOP, { purpose: MEDIA_PURPOSE.GALLERY });
+    return serializeMediaList(items);
 };
 
 /**
@@ -1889,7 +1825,6 @@ import {
     uploadUrlSchema,
     confirmUploadSchema,
     attachGallerySchema,
-    galleryFilterSchema,
 } from '../validators/media.validator.js';
 import { ROLES } from '../utils/constants.js';
 
@@ -1904,7 +1839,7 @@ router.post('/confirm', validate(confirmUploadSchema, 'body'), mediaController.c
 
 // ── Gallery (replaces /photos routes) ────────────────────────────────────
 router.post('/gallery', authorize(ROLES.BARBER), validate(attachGallerySchema, 'body'), mediaController.attachGallery);
-router.get('/gallery', authorize(ROLES.BARBER), validate(galleryFilterSchema, 'query'), mediaController.getGallery);
+router.get('/gallery', authorize(ROLES.BARBER), mediaController.getGallery);
 
 // ── Single Media CRUD ────────────────────────────────────────────────────
 router.get('/:id', validate(objectIdParamSchema, 'params'), mediaController.getMedia);
@@ -1939,7 +1874,6 @@ import Joi from 'joi';
 import config from '../config/index.js';
 import {
     ALL_MEDIA_PURPOSES,
-    ALL_GALLERY_CATEGORIES,
 } from '../utils/constants.js';
 import { paginationSchema } from './common.validator.js';
 
@@ -1956,9 +1890,6 @@ export const uploadUrlSchema = Joi.object({
     purpose: Joi.string()
         .valid(...ALL_MEDIA_PURPOSES)
         .required(),
-    entityId: Joi.string()
-        .pattern(/^[a-fA-F0-9]{24}$/)
-        .optional(),
 });
 
 export const confirmUploadSchema = Joi.object({
@@ -1972,19 +1903,6 @@ export const attachGallerySchema = Joi.object({
         .min(1)
         .max(10)
         .required(),
-    category: Joi.string()
-        .valid(...ALL_GALLERY_CATEGORIES)
-        .default('other'),
-    description: Joi.string()
-        .max(500)
-        .allow('')
-        .default(''),
-});
-
-export const galleryFilterSchema = paginationSchema.keys({
-    category: Joi.string()
-        .valid('all', ...ALL_GALLERY_CATEGORIES)
-        .default('all'),
 });
 
 // Shared schema for endpoints that accept a mediaId in body
@@ -2059,23 +1977,16 @@ class MediaRepository {
      * Replaces: photoRepository.getStatsByShop()
      */
     async getStatsByEntity(entityId, entityType) {
-        const [byCategory, totalSize] = await Promise.all([
-            Media.aggregate([
-                { $match: { entityId, entityType, status: 'ready', purpose: 'gallery' } },
-                { $group: { _id: '$metadata.category', count: { $sum: 1 }, totalSize: { $sum: '$actualSize' } } },
-            ]),
-            Media.aggregate([
-                { $match: { entityId, entityType, status: 'ready', purpose: 'gallery' } },
-                { $group: { _id: null, totalSize: { $sum: '$actualSize' } } },
-            ]),
+        const sizeResult = await Media.aggregate([
+            { $match: { entityId, entityType, status: 'ready', purpose: 'gallery' } },
+            { $group: { _id: null, totalSize: { $sum: '$actualSize' } } },
         ]);
 
         const totalItems = await this.countByEntity(entityId, entityType, { purpose: 'gallery' });
 
         return {
             totalItems,
-            totalSize: totalSize[0]?.totalSize || 0,
-            byCategory,
+            totalSize: sizeResult[0]?.totalSize || 0,
         };
     }
 
@@ -2122,10 +2033,6 @@ export const serializeMedia = (media) => {
         url: r2KeyToUrl(plain.r2Key),
         contentType: plain.contentType,
         fileSize: plain.actualSize || plain.declaredSize,
-        // Domain metadata (replaces photoType, description, photoName)
-        category: plain.metadata?.category ?? null,
-        description: plain.metadata?.description ?? null,
-        originalName: plain.metadata?.originalName ?? null,
         // Entity association
         entityId: plain.entityId?.toString() ?? null,
         entityType: plain.entityType ?? null,
@@ -2580,9 +2487,6 @@ photoUrl: r2KeyToUrl(plain.photoR2Key),
 +        entityId: createdShop._id,
 +        entityType: 'Shop',
 +        purpose: 'gallery',
-+        'metadata.category': 'shop_interior',
-+        'metadata.description': 'Uploaded during onboarding',
-+        'metadata.originalName': 'onboarding-shop-image',
 +    });
 ```
 
@@ -2882,7 +2786,7 @@ MEDIA_TOKEN_SECRET=generate_64_char_random_hex_string
 | File | Change Summary |
 |------|---------------|
 | `config/index.js` | Remove `cloudinary` block; replace `upload` block with `media` block containing size limits, MIME allowlists, gallery cap, presigned URL TTL, and multipart settings; add `r2` block loaded via `requireEnv` |
-| `utils/constants.js` | Remove `PHOTO_TYPE` + `ALL_PHOTO_TYPES`; add `MEDIA_TYPE`, `MEDIA_STATUS`, `MEDIA_PURPOSE`, `MEDIA_ENTITY_TYPE`, `GALLERY_CATEGORY`, `MIME_TO_EXTENSION` with their `ALL_*` array exports (enums only — limits and MIME allowlists stay in `config.media`) |
+| `utils/constants.js` | Remove `PHOTO_TYPE` + `ALL_PHOTO_TYPES`; add `MEDIA_TYPE`, `MEDIA_STATUS`, `MEDIA_PURPOSE`, `MEDIA_ENTITY_TYPE`, `MIME_TO_EXTENSION` with their `ALL_*` array exports (enums only — limits and MIME allowlists stay in `config.media`) |
 | `services/employee.service.js` | Remove Cloudinary, use mediaService |
 | `services/user.service.js` | Remove Cloudinary, use mediaService |
 | `services/account.service.js` | Remove updateBarberProfilePicture (moved to media) |
@@ -2946,11 +2850,6 @@ const migratePhotos = async () => {
                 actualSize: size,
                 entityId: photo.shopId,
                 entityType: 'Shop',
-                metadata: {
-                    category: photo.photoType || 'other',
-                    description: photo.description,
-                    originalName: photo.photoName,
-                },
                 uploadExpiresAt: new Date(Date.now() + 365 * 24 * 3600_000),
                 confirmedAt: photo.createdAt,
             });
@@ -3042,12 +2941,10 @@ Content-Type: application/json
     "contentType": "image/jpeg",
     "sizeBytes": 245760,
     "purpose": "gallery",
-    "entityId": "{{shopId}}"
 }
 // Assert: 201, body.data.uploadUrl exists, body.data.mediaId exists
 // Save: pm.collectionVariables.set("mediaId", body.data.mediaId)
 // Save: pm.collectionVariables.set("uploadUrl", body.data.uploadUrl)
-// Save: pm.collectionVariables.set("uploadHeaders", body.data.requiredHeaders)
 
 // Step 2: Upload directly to R2
 PUT {{uploadUrl}}

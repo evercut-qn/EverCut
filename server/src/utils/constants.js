@@ -224,17 +224,6 @@ export const MEDIA_ENTITY_TYPE = Object.freeze({
 
 export const ALL_MEDIA_ENTITY_TYPES = [...Object.values(MEDIA_ENTITY_TYPE), null];
 
-export const GALLERY_CATEGORY = Object.freeze({
-    SHOP_INTERIOR: 'shop_interior',
-    SHOP_EXTERIOR: 'shop_exterior',
-    WORK_SAMPLE: 'work_sample',
-    BEFORE_AFTER: 'before_after',
-    TEAM: 'team',
-    OTHER: 'other',
-});
-
-export const ALL_GALLERY_CATEGORIES = Object.values(GALLERY_CATEGORY);
-
 export const MIME_TO_EXTENSION = Object.freeze({
     'image/jpeg': 'jpg',
     'image/png': 'png',

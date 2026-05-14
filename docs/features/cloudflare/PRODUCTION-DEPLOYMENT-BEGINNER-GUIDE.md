@@ -396,7 +396,7 @@ After production backend and Worker deployment:
 POST /api/v1/media/upload-url
 ```
 
-3. Upload the image to returned `uploadUrl` using `No Auth` and the headers returned in `requiredHeaders`.
+3. Upload the image to returned `uploadUrl` using `No Auth` and a `Content-Type` header matching the contentType from the upload-url request.
 4. Confirm:
 
 ```http
@@ -443,8 +443,7 @@ Fix:
 2. Copy the returned `uploadUrl`.
 3. Confirm the copied URL still contains `X-Amz-Date`, `X-Amz-Signature`, and the other query parameters.
 4. In Postman, set the direct R2 request Authorization tab to `No Auth`.
-5. Send only the returned `requiredHeaders`, normally `Content-Type`.
-6. Do not add `x-amz-date`, `x-amz-content-sha256`, or the EverCut bearer token manually.
+5. Send a `Content-Type` header matching the contentType from the upload-url request. Do not add `x-amz-date`, `x-amz-content-sha256`, or the EverCut bearer token manually.
 
 ### Direct R2 upload returns `Missing x-amz-content-sha256`
 

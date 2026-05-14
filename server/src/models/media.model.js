@@ -1,6 +1,5 @@
 import mongoose from 'mongoose';
 import {
-    ALL_GALLERY_CATEGORIES,
     ALL_MEDIA_ENTITY_TYPES,
     ALL_MEDIA_PURPOSES,
     ALL_MEDIA_STATUSES,
@@ -67,23 +66,6 @@ const mediaSchema = new mongoose.Schema(
             type: String,
             enum: ALL_MEDIA_ENTITY_TYPES,
             default: null,
-        },
-        metadata: {
-            category: {
-                type: String,
-                enum: [...ALL_GALLERY_CATEGORIES, null],
-                default: null,
-            },
-            description: {
-                type: String,
-                maxlength: 500,
-                default: null,
-            },
-            originalName: {
-                type: String,
-                default: null,
-            },
-            _id: false,
         },
         durationSeconds: { type: Number, default: null },
         multipartUploadId: { type: String, default: null },

@@ -64,8 +64,8 @@ export const deleteMedia = async (req, res, next) => {
 
 export const attachGallery = async (req, res, next) => {
     try {
-        const { mediaIds, category, description } = getValidatedRequestData(req, 'body');
-        const result = await mediaService.attachGalleryMedia(req.user._id, mediaIds, category, description);
+        const { mediaIds } = getValidatedRequestData(req, 'body');
+        const result = await mediaService.attachGalleryMedia(req.user._id, mediaIds);
         return res.status(201).json(ApiResponse.success(result, 'Gallery media attached'));
     } catch (err) {
         next(err);
@@ -74,9 +74,8 @@ export const attachGallery = async (req, res, next) => {
 
 export const getGallery = async (req, res, next) => {
     try {
-        const query = getValidatedRequestData(req, 'query');
-        const result = await mediaService.getShopGallery(req.user._id, query);
-        return res.status(200).json(ApiResponse.paginated(result.items, result.pagination, 'Gallery fetched'));
+        const result = await mediaService.getShopGallery(req.user._id);
+        return res.status(200).json(ApiResponse.success(result, 'Gallery fetched'));
     } catch (err) {
         next(err);
     }

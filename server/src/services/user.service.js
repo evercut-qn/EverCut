@@ -3,6 +3,7 @@ import { NotFoundError, BadRequestError } from '../utils/api-error.js';
 import notificationEvents from './notification-events.service.js';
 import { serializeCustomerProfile } from '../serializers/customer.serializer.js';
 import * as mediaService from './media/media.service.js';
+import { MEDIA_ENTITY_TYPE, MEDIA_PURPOSE } from '../utils/constants.js';
 
 /**
  * Customer-facing profile service.
@@ -44,7 +45,7 @@ export const updateProfile = async (userId, data) => {
     const updated = await customerRepository.updateByUserId(userId, data);
 
     if (photoMediaId) {
-        await mediaService.linkMediaToEntity(photoMediaId, profile._id, 'Customer', 'avatar');
+        await mediaService.linkMediaToEntity(photoMediaId, profile._id, MEDIA_ENTITY_TYPE.CUSTOMER, MEDIA_PURPOSE.AVATAR);
         if (profile.photoR2Key && profile.photoR2Key !== nextPhotoR2Key) {
             mediaService.deleteObjectByKey(profile.photoR2Key).catch(() => {});
         }

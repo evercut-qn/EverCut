@@ -15,10 +15,6 @@ import logger from '../../utils/logger.js';
 
 const PRESIGNED_UPLOAD_SIGNABLE_HEADERS = new Set(['content-type']);
 
-export const buildPresignedPutHeaders = (contentType) => ({
-    'Content-Type': contentType,
-});
-
 class StorageProvider {
     constructor(client = r2Client, bucket = config.r2.bucket) {
         this.client = client;

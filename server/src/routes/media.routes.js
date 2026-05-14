@@ -7,7 +7,6 @@ import { validate } from '../middleware/validate.middleware.js';
 import {
     attachGallerySchema,
     confirmUploadSchema,
-    galleryFilterSchema,
     mediaIdParamSchema,
     uploadUrlSchema,
 } from '../validators/media.validator.js';
@@ -23,7 +22,7 @@ router.use(authenticate);
 router.post('/upload-url', validate(uploadUrlSchema, 'body'), mediaController.requestUploadUrl);
 router.post('/confirm', validate(confirmUploadSchema, 'body'), mediaController.confirmUpload);
 router.post('/gallery', authorize(ROLES.BARBER), validate(attachGallerySchema, 'body'), mediaController.attachGallery);
-router.get('/gallery', authorize(ROLES.BARBER), validate(galleryFilterSchema, 'query'), mediaController.getGallery);
+router.get('/gallery', authorize(ROLES.BARBER), mediaController.getGallery);
 router.get('/gallery/stats', authorize(ROLES.BARBER), mediaController.getGalleryStats);
 router.get('/:id', validate(mediaIdParamSchema, 'params'), mediaController.getMedia);
 router.delete('/:id', validate(mediaIdParamSchema, 'params'), mediaController.deleteMedia);

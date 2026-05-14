@@ -157,12 +157,12 @@ Flutter App  ──►  POST /media/upload-url  ──►  Node.js API
                   { mimeType, sizeBytes, purpose }
 
 Node.js API  ──►  Flutter App
-                  { uploadUrl, mediaId, requiredHeaders }
+                   { uploadUrl, mediaId }
 ```
 
 - The server receives and returns only small JSON — no file data
 - The `uploadUrl` is a **presigned URL**: a time-limited, cryptographically signed link that grants permission to upload exactly one specific file (correct type, correct size, correct destination) within 15 minutes
-- The app must send the returned `requiredHeaders` during the direct PUT, usually only `Content-Type`
+- The app must send the Content-Type header matching the contentType it declared in the request body during the direct PUT
 - The direct R2 request must not include the EverCut bearer token; the presigned URL already contains the temporary R2 authorization in its query string
 
 **Step 2 — App uploads directly to Cloudflare R2**

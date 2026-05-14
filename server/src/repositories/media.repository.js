@@ -71,24 +71,16 @@ class MediaRepository {
     }
 
     async getStatsByEntity(entityId, entityType) {
-        const [byCategory, totalSize] = await Promise.all([
-            Media.aggregate([
-                { $match: { entityId, entityType, status: MEDIA_STATUS.READY, purpose: 'gallery' } },
-                { $group: { _id: '$metadata.category', count: { $sum: 1 }, totalSize: { $sum: '$actualSize' } } },
-            ]),
-            Media.aggregate([
-                { $match: { entityId, entityType, status: MEDIA_STATUS.READY, purpose: 'gallery' } },
-                { $group: { _id: null, totalSize: { $sum: '$actualSize' } } },
-            ]),
+        const sizeResult = await Media.aggregate([
+            { $match: { entityId, entityType, status: MEDIA_STATUS.READY, purpose: 'gallery' } },
+            { $group: { _id: null, totalSize: { $sum: '$actualSize' } } },
         ]);
 
         const totalItems = await this.countByEntity(entityId, entityType, { purpose: 'gallery' });
         return {
             totalItems,
             totalPhotos: totalItems,
-            totalSize: totalSize[0]?.totalSize || 0,
-            byCategory,
-            byType: byCategory,
+            totalSize: sizeResult[0]?.totalSize || 0,
         };
     }
 

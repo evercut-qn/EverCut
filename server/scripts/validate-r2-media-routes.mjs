@@ -51,15 +51,11 @@ const assertCondition = (condition, message) => {
   if (!condition) throw new Error(message);
 };
 
-const assertPresignedUploadContract = (uploadUrl, requiredHeaders) => {
+const assertPresignedUploadContract = (uploadUrl) => {
   const parsed = new URL(uploadUrl);
   assertCondition(parsed.searchParams.get('X-Amz-Date'), 'presigned URL is missing X-Amz-Date');
   assertCondition(parsed.searchParams.get('X-Amz-Content-Sha256') === 'UNSIGNED-PAYLOAD', 'presigned URL is missing query payload signature');
   assertCondition(parsed.searchParams.get('X-Amz-SignedHeaders') === 'content-type;host', `unexpected signed headers: ${parsed.searchParams.get('X-Amz-SignedHeaders')}`);
-  assertCondition(requiredHeaders?.['Content-Type'], 'Content-Type upload header missing');
-  assertCondition(!requiredHeaders?.Authorization, 'direct R2 upload must not send Authorization');
-  assertCondition(!requiredHeaders?.['x-amz-content-sha256'], 'x-amz-content-sha256 must stay in the presigned query, not request headers');
-  assertCondition(!requiredHeaders?.['Content-Length'], 'Content-Length must not be signed because browsers cannot set it manually');
 };
 
 const decodeJwtPayload = (token) => {
@@ -219,7 +215,7 @@ const assertStaticRouteCoverage = async () => {
   });
 };
 
-const uploadAndConfirm = async ({ token, purpose, originalName, label }) => {
+const uploadAndConfirm = async ({ token, purpose, label }) => {
   const file = await fs.readFile(SAMPLE_IMAGE_PATH);
   const contentType = 'image/png';
 
@@ -230,19 +226,17 @@ const uploadAndConfirm = async ({ token, purpose, originalName, label }) => {
         contentType,
         sizeBytes: file.length,
         purpose,
-        originalName,
       },
     });
     assertCondition(response.status === 201, `Expected 201, got ${response.status}: ${JSON.stringify(data)}`);
     assertCondition(data?.data?.mediaId, 'mediaId missing');
     assertCondition(data?.data?.uploadUrl, 'uploadUrl missing');
-    assertPresignedUploadContract(data.data.uploadUrl, data.data.requiredHeaders);
+    assertPresignedUploadContract(data.data.uploadUrl);
     markMediaRoutes('POST /media/upload-url');
     return {
       statusCode: response.status,
       mediaId: data.data.mediaId,
       uploadUrl: data.data.uploadUrl,
-      requiredHeaders: data.data.requiredHeaders,
       r2Key: data.data.r2Key,
     };
   });
@@ -251,7 +245,7 @@ const uploadAndConfirm = async ({ token, purpose, originalName, label }) => {
     const response = await fetch(uploadRequest.uploadUrl, {
       method: 'PUT',
       headers: {
-        ...(uploadRequest.requiredHeaders || {}),
+        'Content-Type': 'image/png',
       },
       body: file,
     });
@@ -279,7 +273,7 @@ const uploadAndConfirm = async ({ token, purpose, originalName, label }) => {
   });
 };
 
-const uploadAndConfirmOnboarding = async ({ token, originalName, label }) => {
+const uploadAndConfirmOnboarding = async ({ token, label }) => {
   const file = await fs.readFile(SAMPLE_IMAGE_PATH);
   const contentType = 'image/png';
 
@@ -290,19 +284,17 @@ const uploadAndConfirmOnboarding = async ({ token, originalName, label }) => {
         contentType,
         sizeBytes: file.length,
         purpose: 'onboarding',
-        originalName,
       },
     });
     assertCondition(response.status === 201, `Expected 201, got ${response.status}: ${JSON.stringify(data)}`);
     assertCondition(data?.data?.mediaId, 'mediaId missing');
     assertCondition(data?.data?.uploadUrl, 'uploadUrl missing');
-    assertPresignedUploadContract(data.data.uploadUrl, data.data.requiredHeaders);
+    assertPresignedUploadContract(data.data.uploadUrl);
     markMediaRoutes('POST /media/onboarding/upload-url');
     return {
       statusCode: response.status,
       mediaId: data.data.mediaId,
       uploadUrl: data.data.uploadUrl,
-      requiredHeaders: data.data.requiredHeaders,
       r2Key: data.data.r2Key,
     };
   });
@@ -311,7 +303,7 @@ const uploadAndConfirmOnboarding = async ({ token, originalName, label }) => {
     const response = await fetch(uploadRequest.uploadUrl, {
       method: 'PUT',
       headers: {
-        ...(uploadRequest.requiredHeaders || {}),
+        'Content-Type': 'image/png',
       },
       body: file,
     });
@@ -376,7 +368,7 @@ const main = async () => {
   await runStep('Customer cannot attach barber gallery', async () => {
     const { response } = await request('POST', '/media/gallery', {
       token: customer.token,
-      body: { mediaIds: ['not-a-real-media-id'], category: 'other', description: 'negative test' },
+      body: { mediaIds: ['not-a-real-media-id'] },
     });
     assertCondition(response.status === 403, `Expected 403, got ${response.status}`);
     return { statusCode: response.status };
@@ -393,7 +385,6 @@ const main = async () => {
 
   const customerOnboardingMedia = await uploadAndConfirmOnboarding({
     token: customerOnboarding.token,
-    originalName: 'route-validation-customer-onboarding.png',
     label: 'Customer onboarding media',
   });
   await verifyCdnUrl(customerOnboardingMedia.cdnUrl, 'Customer onboarding media');
@@ -426,7 +417,6 @@ const main = async () => {
 
   const barberOnboardingMedia = await uploadAndConfirmOnboarding({
     token: barberOnboarding.token,
-    originalName: 'route-validation-barber-onboarding.png',
     label: 'Barber onboarding media',
   });
   await verifyCdnUrl(barberOnboardingMedia.cdnUrl, 'Barber onboarding media');
@@ -472,7 +462,6 @@ const main = async () => {
   const galleryMedia = await uploadAndConfirm({
     token: barber.token,
     purpose: 'gallery',
-    originalName: 'route-validation-gallery.png',
     label: 'Barber gallery media',
   });
   await verifyCdnUrl(galleryMedia.cdnUrl, 'Barber gallery media');
@@ -498,8 +487,6 @@ const main = async () => {
       token: barber.token,
       body: {
         mediaIds: [galleryMedia.mediaId],
-        category: 'shop_interior',
-        description: `Route validation ${new Date().toISOString()}`,
       },
     });
     assertCondition(response.status === 201, `Expected 201, got ${response.status}: ${JSON.stringify(data)}`);
@@ -508,7 +495,7 @@ const main = async () => {
   });
 
   await runStep('GET /media/gallery lists gallery', async () => {
-    const { response, data } = await request('GET', '/media/gallery?category=all&page=1&limit=20', { token: barber.token });
+    const { response, data } = await request('GET', '/media/gallery', { token: barber.token });
     assertCondition(response.status === 200, `Expected 200, got ${response.status}: ${JSON.stringify(data)}`);
     assertCondition(Array.isArray(data?.data), 'Gallery data must be an array');
     for (const item of data.data) {
@@ -535,7 +522,6 @@ const main = async () => {
   const shopPictureMedia = await uploadAndConfirm({
     token: barber.token,
     purpose: 'profile',
-    originalName: 'route-validation-shop-picture.png',
     label: 'Shop owner picture media',
   });
   await runStep('PATCH /shops/me/media/picture updates barber picture', async () => {
@@ -552,7 +538,6 @@ const main = async () => {
   const coverMedia = await uploadAndConfirm({
     token: barber.token,
     purpose: 'cover',
-    originalName: 'route-validation-cover.png',
     label: 'Shop cover media',
   });
   await runStep('PATCH /shops/me/media/cover updates cover', async () => {
@@ -569,7 +554,6 @@ const main = async () => {
   const employeeMedia = await uploadAndConfirm({
     token: barber.token,
     purpose: 'employee',
-    originalName: 'route-validation-employee.png',
     label: 'Employee create media',
   });
   const employee = await runStep('POST /employees creates employee with photoMediaId', async () => {
@@ -596,7 +580,6 @@ const main = async () => {
   const employeeUpdateMedia = await uploadAndConfirm({
     token: barber.token,
     purpose: 'employee',
-    originalName: 'route-validation-employee-update.png',
     label: 'Employee update media',
   });
   await runStep('PATCH /employees/:id updates employee with photoMediaId', async () => {
@@ -624,7 +607,6 @@ const main = async () => {
   const customerMedia = await uploadAndConfirm({
     token: customer.token,
     purpose: 'avatar',
-    originalName: 'route-validation-customer.png',
     label: 'Customer profile media',
   });
   await runStep('PATCH /customers/me updates customer photoMediaId', async () => {

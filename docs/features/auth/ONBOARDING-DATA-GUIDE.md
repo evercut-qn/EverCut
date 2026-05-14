@@ -41,8 +41,7 @@ Content-Type: application/json
 {
   "contentType": "image/jpeg",
   "sizeBytes": 245760,
-  "purpose": "onboarding",
-  "originalName": "profile.jpg"
+  "purpose": "onboarding"
 }
 ```
 
@@ -201,7 +200,7 @@ Both onboarding endpoints return the created `user`, the created `profile` or `s
 
 ## Flutter Notes
 
-Use one authenticated API client for EverCut endpoints and a plain client for the R2 `PUT`. The R2 request must include the headers returned in `requiredHeaders`, usually only `Content-Type`. Do not send the onboarding bearer token to R2.
+Use one authenticated API client for EverCut endpoints and a plain client for the R2 `PUT`. The R2 request must include a Content-Type header matching the contentType declared in the upload-url request. Do not send the onboarding bearer token to R2.
 
 ```dart
 Future<String> uploadOnboardingPhoto({
@@ -219,19 +218,16 @@ Future<String> uploadOnboardingPhoto({
       'contentType': contentType,
       'sizeBytes': sizeBytes,
       'purpose': 'onboarding',
-      'originalName': 'profile.jpg',
     },
     options: Options(headers: {'Authorization': 'Bearer $onboardingToken'}),
   );
 
   final data = presign.data['data'];
-  final requiredHeaders = Map<String, dynamic>.from(data['requiredHeaders'] as Map)
-      .map((key, value) => MapEntry(key, value.toString()));
 
   await uploadClient.put(
     data['uploadUrl'],
     data: file.openRead(),
-    options: Options(headers: requiredHeaders),
+    options: Options(headers: { 'Content-Type': contentType }),
   );
 
   final confirm = await apiClient.post(

@@ -3,7 +3,6 @@ import mediaRepository from '../../repositories/media.repository.js';
 import shopRepository from '../../repositories/shop.repository.js';
 import config from '../../config/index.js';
 import { BadRequestError, NotFoundError } from '../../utils/api-error.js';
-import { buildPagination } from '../../utils/pagination.utils.js';
 import {
     MEDIA_ENTITY_TYPE,
     MEDIA_PURPOSE,
@@ -13,7 +12,7 @@ import {
 } from '../../utils/constants.js';
 import { serializeMedia, serializeMediaList } from '../../serializers/media.serializer.js';
 import logger from '../../utils/logger.js';
-import storageProvider, { buildPresignedPutHeaders } from './storage-provider.service.js';
+import storageProvider from './storage-provider.service.js';
 import { buildMediaUrl } from './media-url.service.js';
 import { validateContentType, validateFileSize, validateMagicBytes } from './media-validation.service.js';
 
@@ -39,7 +38,7 @@ const buildR2Key = (purpose, contextId, mediaId, extension) => {
     return keyMap[purpose] || `images/misc/${safeContext}/${mediaId}.${extension}`;
 };
 
-export const requestUploadUrl = async (userId, { contentType, sizeBytes, purpose, entityId, originalName }) => {
+export const requestUploadUrl = async (userId, { contentType, sizeBytes, purpose }) => {
     const ownerKey = userId.toString();
     const mediaType = resolveMediaType(contentType);
     if (!validateContentType(contentType, mediaType)) {
@@ -52,9 +51,8 @@ export const requestUploadUrl = async (userId, { contentType, sizeBytes, purpose
 
     const mediaId = crypto.randomUUID();
     const extension = MIME_TO_EXTENSION[contentType] || 'bin';
-    const contextId = entityId || ownerKey;
+    const contextId = ownerKey;
     const r2Key = buildR2Key(purpose, contextId, mediaId, extension);
-    const requiredHeaders = buildPresignedPutHeaders(contentType);
     const uploadUrl = await storageProvider.generateUploadUrl({
         key: r2Key,
         contentType,
@@ -72,11 +70,8 @@ export const requestUploadUrl = async (userId, { contentType, sizeBytes, purpose
         r2Bucket: config.r2.bucket,
         contentType,
         declaredSize: sizeBytes,
-        entityId: entityId || null,
+        entityId: null,
         entityType: null,
-        metadata: {
-            originalName: originalName || null,
-        },
         uploadExpiresAt: new Date(Date.now() + config.media.pendingUploadTtlHours * 3600_000),
     });
 
@@ -91,7 +86,6 @@ export const requestUploadUrl = async (userId, { contentType, sizeBytes, purpose
     return {
         mediaId: created._id.toString(),
         uploadUrl,
-        requiredHeaders,
         r2Key,
         expiresAt,
     };
@@ -153,7 +147,7 @@ export const deleteMedia = async (userId, mediaId) => {
     return { message: 'Media deleted' };
 };
 
-export const attachGalleryMedia = async (ownerId, mediaIds, category = 'other', description = '') => {
+export const attachGalleryMedia = async (ownerId, mediaIds) => {
     const shop = await shopRepository.findByOwnerId(ownerId);
     if (!shop) throw new NotFoundError('Shop profile');
     if (!Array.isArray(mediaIds) || mediaIds.length === 0) {
@@ -171,8 +165,6 @@ export const attachGalleryMedia = async (ownerId, mediaIds, category = 'other', 
             entityId: shop._id,
             entityType: MEDIA_ENTITY_TYPE.SHOP,
             purpose: MEDIA_PURPOSE.GALLERY,
-            'metadata.category': category,
-            'metadata.description': description,
         });
         if (!media) throw new BadRequestError(`Media ${mediaId} not found, unconfirmed, or already attached`);
         attached.push(media);
@@ -181,20 +173,12 @@ export const attachGalleryMedia = async (ownerId, mediaIds, category = 'other', 
     return serializeMediaList(attached);
 };
 
-export const getShopGallery = async (ownerId, queryFilters = {}) => {
+export const getShopGallery = async (ownerId) => {
     const shop = await shopRepository.findByOwnerId(ownerId);
     if (!shop) throw new NotFoundError('Shop profile');
 
-    const filter = { purpose: MEDIA_PURPOSE.GALLERY };
-    if (queryFilters.category && queryFilters.category !== 'all') {
-        filter['metadata.category'] = queryFilters.category;
-    }
-
-    const total = await mediaRepository.countByEntity(shop._id, MEDIA_ENTITY_TYPE.SHOP, filter);
-    const { skip, limit, pagination } = buildPagination(queryFilters, total);
-    const items = await mediaRepository.findByEntity(shop._id, MEDIA_ENTITY_TYPE.SHOP, filter, { skip, limit });
-
-    return { items: serializeMediaList(items), pagination };
+    const items = await mediaRepository.findByEntity(shop._id, MEDIA_ENTITY_TYPE.SHOP, { purpose: MEDIA_PURPOSE.GALLERY });
+    return serializeMediaList(items);
 };
 
 export const getGalleryByShopId = async (shopId) => (
