@@ -1538,7 +1538,7 @@ const barberBookingsCollection = {
 const barberMediaCollection = {
   info: {
     name: 'EverCut - Barber Media',
-    description: 'Cloudflare R2 media workflow: presign, direct upload, confirm, attach to gallery, read, stats, and delete.',
+    description: 'Cloudflare R2 media workflow: presign, direct upload, confirm, attach to gallery, read, stats, and delete. Also includes onboarding media uploads and validation scenarios.',
     schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
   },
   auth: bearerAuth('barber_access_token'),
@@ -1551,6 +1551,9 @@ const barberMediaCollection = {
       textVariable('media_upload_url', ''),
       textVariable('media_upload_content_type', 'image/png'),
       textVariable('media_upload_content_length', '406926'),
+      textVariable('onboarding_media_id', ''),
+      textVariable('onboarding_media_upload_url', ''),
+      textVariable('onboarding_media_upload_content_type', 'image/png'),
     ),
   ],
   item: [
@@ -1658,6 +1661,91 @@ const barberMediaCollection = {
           "pm.collectionVariables.unset('media_id');",
           "pm.globals.unset('shared_media_id');"
         ),
+      }),
+    },
+    {
+      name: '9. Request Onboarding Upload URL',
+      ...request({
+        method: 'POST',
+        url: '{{base_url}}/{{api_prefix}}/media/onboarding/upload-url',
+        auth: bearerAuth('barber_onboarding_token'),
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "contentType": "{{media_upload_content_type}}",\n  "sizeBytes": {{media_upload_content_length}},\n  "purpose": "onboarding",\n  "originalName": "sample-upload.png"\n}`),
+        description: 'Creates a temporary pending Media record for onboarding sessions. Requires an onboarding token from OTP verification for a new phone number.',
+        event: testEvent(
+          "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
+          "const response = pm.response.json();",
+          "const data = response.data || {};",
+          "if (data.mediaId) pm.collectionVariables.set('onboarding_media_id', data.mediaId);",
+          "if (data.uploadUrl) pm.collectionVariables.set('onboarding_media_upload_url', data.uploadUrl);",
+          "const headers = data.requiredHeaders || {};",
+          "pm.collectionVariables.set('onboarding_media_upload_content_type', headers['Content-Type'] || headers['content-type'] || 'image/png');",
+          "pm.test('upload URL includes SigV4 date', function () { pm.expect(data.uploadUrl).to.include('X-Amz-Date='); });"
+        ),
+      }),
+    },
+    {
+      name: '10. Direct PUT Onboarding File To R2',
+      ...request({
+        method: 'PUT',
+        url: '{{onboarding_media_upload_url}}',
+        auth: { type: 'noauth' },
+        headers: [
+          { key: 'Content-Type', value: '{{onboarding_media_upload_content_type}}' },
+        ],
+        body: { mode: 'file', file: { src: 'assets/sample-upload.png' } },
+        description: 'Uploads the onboarding binary file directly to Cloudflare R2 using the presigned URL. This request does not call the EverCut API.',
+        event: rawTestEvent(
+          "pm.test('status is 200 or 201', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+          "pm.test('request does not send Authorization to R2', function () { pm.expect(pm.request.headers.has('Authorization')).to.equal(false); });"
+        ),
+      }),
+    },
+    {
+      name: '11. Confirm Onboarding Upload',
+      ...request({
+        method: 'POST',
+        url: '{{base_url}}/{{api_prefix}}/media/onboarding/confirm',
+        auth: bearerAuth('barber_onboarding_token'),
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "mediaId": "{{onboarding_media_id}}"\n}`),
+        description: 'Confirms an onboarding upload before it is consumed by POST /onboarding/customers or POST /onboarding/barbers as photoMediaId.',
+        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
+      }),
+    },
+    {
+      name: '12. Upload URL Requires Authentication',
+      ...request({
+        method: 'POST',
+        url: '{{base_url}}/{{api_prefix}}/media/upload-url',
+        auth: { type: 'noauth' },
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "contentType": "image/png",\n  "sizeBytes": 100,\n  "purpose": "gallery"\n}`),
+        description: 'Negative test: regular upload URL creation requires a user JWT.',
+        event: testEvent("pm.test('status is 401', function () { pm.response.to.have.status(401); });"),
+      }),
+    },
+    {
+      name: '13. Unsupported MIME Is Rejected',
+      ...request({
+        method: 'POST',
+        url: '{{base_url}}/{{api_prefix}}/media/upload-url',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "contentType": "application/pdf",\n  "sizeBytes": 100,\n  "purpose": "gallery"\n}`),
+        description: 'Negative test: the upload URL validator accepts only configured image/video MIME types.',
+        event: testEvent("pm.test('status is 400', function () { pm.response.to.have.status(400); });"),
+      }),
+    },
+    {
+      name: '14. Customer Cannot Attach Barber Gallery',
+      ...request({
+        method: 'POST',
+        url: '{{base_url}}/{{api_prefix}}/media/gallery',
+        auth: bearerAuth('customer_access_token'),
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "mediaIds": ["{{media_id}}"],\n  "category": "other",\n  "description": "Negative auth test"\n}`),
+        description: 'Negative test: gallery attachment is restricted to BARBER users.',
+        event: testEvent("pm.test('status is 403', function () { pm.response.to.have.status(403); });"),
       }),
     },
   ],
