@@ -593,10 +593,7 @@ hookdeck listen 5000 cashfree-webhooks --path /api/v1/payouts/webhook
 
 #### Method 1: Trigger Real Payout
 
-1. Run payout batch:
-```bash
-node scripts/test-payout-complete.js
-```
+1. Run payout batch via the server API or admin endpoint.
 
 2. Wait for Cashfree to process (1-5 minutes)
 
@@ -852,7 +849,7 @@ db.paymenttransactions.find(
 - Real payout webhooks WILL include proper signatures
 - If you see `Request completed, status:200` - everything is working!
 
-**To verify with real signature**: Trigger an actual payout using `node scripts/test-payout-complete.js`
+**To verify with real signature**: Trigger an actual payout via the server API.
 
 ---
 
@@ -944,10 +941,7 @@ hookdeck source list
 **View webhook history**:
 - Dashboard: https://dashboard.hookdeck.io
 
-**Test payout flow**:
-```bash
-node scripts/test-payout-complete.js
-```
+**Test payout flow**: Trigger a payout via the server API.
 
 ---
 

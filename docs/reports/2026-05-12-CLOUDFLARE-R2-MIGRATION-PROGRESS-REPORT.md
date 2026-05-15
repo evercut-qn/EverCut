@@ -347,59 +347,7 @@ Result:
 | Remaining R2 objects under `images/cover/` | `0` |
 | Cover objects under `images/covers/` | present |
 
-## 3.14 Media Route Validation Script
-
-A route validation script was created and expanded:
-
-- `server/scripts/validate-r2-media-routes.mjs`
-
-It validates the full affected media flow using:
-
-| Actor | Phone | OTP |
-|---|---|---|
-| Barber | `9876543211` | `123456` |
-| Customer | `9876543210` | `123456` |
-
-It also creates a temporary onboarding user to test onboarding media uploads.
-
-The script validates:
-
-1. Barber OTP login.
-2. Customer OTP login.
-3. Temporary onboarding OTP login.
-4. Unauthenticated media upload rejection.
-5. Customer blocked from barber-only gallery route.
-6. Onboarding upload URL generation.
-7. Onboarding direct R2 PUT.
-8. Onboarding upload confirm.
-9. Signed Worker media delivery.
-10. Unsigned Worker media rejection.
-11. Barber media upload URL generation.
-12. Barber direct R2 PUT.
-13. Barber upload confirm.
-14. `GET /media/:id`.
-15. Gallery attach.
-16. Gallery list.
-17. Gallery stats.
-18. Media delete.
-19. Shop owner picture update.
-20. Shop cover update.
-21. Employee create with `photoMediaId`.
-22. Employee update with `photoMediaId`.
-23. Employee cleanup.
-24. Customer profile update with `photoMediaId`.
-
-It also verifies the presigned URL contract:
-
-1. `X-Amz-Date` exists in the URL.
-2. `X-Amz-Content-Sha256=UNSIGNED-PAYLOAD` exists in the query.
-3. `X-Amz-SignedHeaders=content-type;host`.
-4. `requiredHeaders` includes `Content-Type`.
-5. `requiredHeaders` does not include `Authorization`.
-6. `requiredHeaders` does not include `x-amz-content-sha256`.
-7. `requiredHeaders` does not include `Content-Length`.
-
-## 3.15 Repository Query Bug Found During Validation
+## 3.14 Repository Query Bug Found During Validation
 
 During route validation, `GET /media/:id` exposed a backend bug.
 
@@ -423,7 +371,7 @@ Result:
 
 - `GET /media/:id` passed after retesting.
 
-## 3.16 Documentation Created Or Updated
+## 3.15 Documentation Created Or Updated
 
 The following documentation was created or updated as part of the work:
 

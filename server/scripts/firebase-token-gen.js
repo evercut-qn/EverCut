@@ -240,7 +240,7 @@ async function main() {
 
   writeFileSync(PATHS.output, lines.join('\n'));
 
-  // ── Save tokens to JSON (consumed by verify-token.js) ──
+  // ── Save tokens to JSON ──
   const jsonOutput = {
     generatedAt: new Date().toISOString(),
     expiresAt,

@@ -2870,8 +2870,6 @@ After migration finalization, serializers output URLs using this priority:
 1. If `r2Key` / `coverR2Key` / `photoR2Key` exists, construct a signed CDN URL.
 2. If the R2 key is null, return null.
 
-Run `scripts/finalize-r2-media-cutover.mjs --write` only after `scripts/migrate-legacy-media-to-r2.mjs --write` reports no unmigrated references.
-
 ---
 
 ## 19. Postman Testing Coverage

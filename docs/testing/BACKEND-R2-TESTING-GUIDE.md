@@ -122,7 +122,7 @@ MongoDB:
 
 - `Media.status` moves from `pending` to `ready` after confirm.
 - `Shop.coverR2Key`, `Shop.ownerPhotoR2Key`, `Employee.photoR2Key`, and `Customer.photoR2Key` are populated after attachment/replacement.
-- Retired URL fields are absent after `finalize-r2-media-cutover.mjs --write`.
+- Retired URL fields are absent after cutover finalization.
 
 CDN/cache:
 
@@ -130,39 +130,11 @@ CDN/cache:
 - Repeat the same URL and verify cache hit headers through the Cloudflare dashboard/logs.
 - Change width/quality parameters and verify each variant is independently cached.
 
-## Legacy Media Migration
-
-Dry run first:
-
-```powershell
-cd server
-node scripts/migrate-legacy-media-to-r2.mjs --limit=25
-```
-
-Apply after reviewing logs:
-
-```powershell
-cd server
-node scripts/migrate-legacy-media-to-r2.mjs --write
-```
-
-The script copies URL-backed records into R2, creates `Media` records, and fills R2 key fields.
-
-Finalize the cutover after migration succeeds:
-
-```powershell
-cd server
-node scripts/finalize-r2-media-cutover.mjs
-node scripts/finalize-r2-media-cutover.mjs --write
-```
-
-The finalizer refuses to write if any old URL-backed record lacks an R2 key or migrated gallery `Media` record. In write mode it removes retired URL fields and drops the old gallery collection.
-
 ## Rollback
 
-1. Restore the most recent database backup taken before `finalize-r2-media-cutover.mjs --write`.
+1. Restore the most recent database backup taken before cutover finalization.
 2. Revert the application deployment to the previous build.
-3. Pause `migrate-legacy-media-to-r2.mjs`; it is idempotent and can resume later.
+3. Pause migration; it is idempotent and can resume later.
 4. Do not purge old remote originals until rollback is no longer required.
 
 ## Post-Release Checks

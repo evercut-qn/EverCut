@@ -1399,7 +1399,6 @@ In the new design, `authenticate` is used only on routes that require a fully on
 | File | Reason |
 |---|---|
 | `scripts/firebase-token-gen.js` | Firebase test token generator — no longer needed |
-| `scripts/verify-token.js` | Firebase token verifier — replace with JWT helper if desired |
 | `scripts/test-tokens.txt` | Generated Firebase tokens (delete if present locally) |
 | `scripts/test-tokens.json` | Generated Firebase tokens (delete if present locally) |
 
