@@ -15,6 +15,7 @@ export const addServiceSchema = Joi.object({
     serviceFor: Joi.string().valid(...ALL_SERVICE_FOR).default('unisex'),
     actualPrice: priceSchema.required(),
     offerPrice: priceSchema.max(Joi.ref('actualPrice')).default(0),
+    imageMediaId: Joi.string().optional(),
     duration: Joi.number().integer().min(1).when('serviceType', {
         is: 'single',
         then: Joi.optional(),
@@ -37,6 +38,7 @@ export const updateServiceSchema = Joi.object({
     serviceFor: Joi.string().valid(...ALL_SERVICE_FOR),
     actualPrice: priceSchema,
     offerPrice: priceSchema,
+    imageMediaId: Joi.string().optional(),
     duration: Joi.number().integer().min(1),
     bundledServices: bundledServicesSchema,
     totalDuration: Joi.number().integer().min(1),

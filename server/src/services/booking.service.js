@@ -355,7 +355,7 @@ const buildBookingDetailsPayload = async (booking) => {
     const services = normalizeBookedServices(
         await serviceRepository.findByIds(
             booking.serviceIds,
-            'serviceName finalPrice totalPrice actualPrice offerPrice imageUrl serviceType duration totalDuration',
+            'serviceName finalPrice totalPrice actualPrice offerPrice imageR2Key serviceType duration totalDuration',
         ),
     );
     const totalAmount = sumServicePrices(services);

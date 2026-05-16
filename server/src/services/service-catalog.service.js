@@ -6,11 +6,10 @@ import { buildPagination } from '../utils/pagination.utils.js';
 import { calculateDiscountedPrice, normalizeServicePricing } from '../utils/service-pricing.utils.js';
 import { serializeService, serializeServices } from '../serializers/service.serializer.js';
 import { serializeShopSummary } from '../serializers/shop.serializer.js';
-import { buildMediaUrl } from './media/media-url.service.js';
-
-/**
- * Service-catalog service - manages the salon services (haircut, etc.)
- */
+import { MEDIA_ENTITY_TYPE, MEDIA_PURPOSE } from '../utils/constants.js';
+import * as mediaService from './media/media.service.js';
+import storageProvider from './media/storage-provider.service.js';
+import serviceDefaultImageRepository from '../repositories/service-default-image.repository.js';
 
 const normalizeBundledServices = (bundledServices = []) => (
     [...new Set(
@@ -38,10 +37,26 @@ const buildServiceFilters = (queryFilters = {}) => {
     return filters;
 };
 
-const resolveServiceImage = async (serviceName, serviceType) => {
-    const formattedName = serviceName.toLowerCase().replace(/\s+/g, '');
-    const folderPath = serviceType === 'bundled' ? 'images/services/bundled' : 'images/services/single';
-    return buildMediaUrl(`${folderPath}/${formattedName}.jpg`) || buildMediaUrl('images/services/default/service.jpg');
+const resolveDefaultServiceImageR2Key = async (serviceName, serviceType, serviceFor, bundledServices = []) => {
+    // 1. Try to find a specific match in the database
+    const match = await serviceDefaultImageRepository.findBestMatch(serviceName, serviceType, serviceFor);
+    if (match) return match.r2Key;
+
+    // 2. Specialized logic for bundled services if no direct match found
+    if (serviceType === 'bundled' && bundledServices.length > 0) {
+        const concatenated = bundledServices
+            .map((s) => s.toLowerCase().replace(/\s+/g, ''))
+            .sort()
+            .join('');
+        const bundleMatch = await serviceDefaultImageRepository.findByName(concatenated);
+        if (bundleMatch) return bundleMatch.r2Key;
+    }
+
+    // 3. Absolute fallback (should have been handled by findBestMatch if seed exists)
+    const fallback = await serviceDefaultImageRepository.findFallback(serviceType, serviceFor) 
+        || await serviceDefaultImageRepository.findFallback('single', serviceFor);
+    
+    return fallback?.r2Key || 'images/services/default/service.jpg';
 };
 
 const buildServicePayload = (data, existingService = null) => {
@@ -114,15 +129,40 @@ export const addService = async (ownerId, data) => {
     const serviceData = buildServicePayload(data);
     await ensureUniqueActiveService(shop._id, serviceData);
 
+    let imageR2Key;
+    let imageMediaId = null;
+
+    if (data.imageMediaId) {
+        const media = await mediaService.resolveReadyMediaById(data.imageMediaId);
+        imageR2Key = media.r2Key;
+        imageMediaId = data.imageMediaId;
+    } else {
+        imageR2Key = await resolveDefaultServiceImageR2Key(
+            serviceData.serviceName,
+            serviceData.serviceType,
+            serviceData.serviceFor,
+            serviceData.bundledServices,
+        );
+    }
+
     let createdService;
     try {
         createdService = await serviceRepository.create({
             shopId: shop._id,
-            imageUrl: await resolveServiceImage(serviceData.serviceName, serviceData.serviceType),
+            imageR2Key,
             ...serviceData,
         });
     } catch (error) {
         rethrowDuplicateServiceWrite(error);
+    }
+
+    if (imageMediaId) {
+        await mediaService.linkMediaToEntity(
+            imageMediaId,
+            createdService._id,
+            MEDIA_ENTITY_TYPE.SERVICE,
+            MEDIA_PURPOSE.SERVICE,
+        );
     }
 
     return serializeService(createdService);
@@ -152,8 +192,24 @@ export const updateService = async (ownerId, serviceId, data) => {
     const updateData = buildServicePayload(data, existingService);
     await ensureUniqueActiveService(shop._id, updateData, existingService._id);
 
-    if (updateData.serviceName !== existingService.serviceName) {
-        updateData.imageUrl = await resolveServiceImage(updateData.serviceName, updateData.serviceType);
+    let imageMediaId = data.imageMediaId;
+    let oldR2KeyToDelete = null;
+
+    if (imageMediaId) {
+        const media = await mediaService.resolveReadyMediaById(imageMediaId);
+        oldR2KeyToDelete = existingService.imageR2Key;
+        updateData.imageR2Key = media.r2Key;
+    } else if (
+        updateData.serviceName !== existingService.serviceName
+        || updateData.serviceFor !== existingService.serviceFor
+    ) {
+        // Only resolve new default if name or gender changed and no manual image provided
+        updateData.imageR2Key = await resolveDefaultServiceImageR2Key(
+            updateData.serviceName,
+            updateData.serviceType,
+            updateData.serviceFor,
+            updateData.bundledServices,
+        );
     }
 
     let updated;
@@ -163,6 +219,20 @@ export const updateService = async (ownerId, serviceId, data) => {
         rethrowDuplicateServiceWrite(error);
     }
     if (!updated) throw new NotFoundError('Service');
+
+    if (imageMediaId) {
+        await mediaService.linkMediaToEntity(
+            imageMediaId,
+            updated._id,
+            MEDIA_ENTITY_TYPE.SERVICE,
+            MEDIA_PURPOSE.SERVICE,
+        );
+
+        if (oldR2KeyToDelete && oldR2KeyToDelete !== updated.imageR2Key) {
+            storageProvider.deleteObject(oldR2KeyToDelete).catch(() => {});
+        }
+    }
+
     return serializeService(updated);
 };
 

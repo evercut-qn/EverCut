@@ -10,7 +10,7 @@ export const serializeMedia = (media) => {
     const plain = sanitizeForResponse(raw);
     if (!plain) return null;
 
-    const url = r2KeyToUrl(raw.r2Key);
+    const url = r2KeyToUrl(raw.r2Key) || plain.url;
     return compact({
         id: plain.id,
         type: plain.type,

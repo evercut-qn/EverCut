@@ -1,0 +1,136 @@
+{
+  "images": [
+    {
+      "name": "single-shave-male",
+      "keywords": ["shave", "beard trim", "beard", "trim"],
+      "serviceType": "single",
+      "serviceFor": "male",
+      "file": "assets/services/single-shave-male.jpg",
+      "contentType": "image/jpeg"
+    },
+    {
+      "name": "bundled-haircutshave-male",
+      "keywords": ["haircut", "shave", "combo", "bundle", "men"],
+      "serviceType": "bundled",
+      "serviceFor": "male",
+      "file": "assets/services/bundled-haircutshave-male.jpg",
+      "contentType": "image/jpeg"
+    },
+    {
+      "name": "single-facial-female",
+      "keywords": ["facial", "face cleanup", "face", "beauty", "women"],
+      "serviceType": "single",
+      "serviceFor": "female",
+      "file": "assets/services/single-facial-female.jpg",
+      "contentType": "image/jpeg"
+    },
+    {
+      "name": "single-facial-male",
+      "keywords": ["facial", "face cleanup", "face", "men"],
+      "serviceType": "single",
+      "serviceFor": "male",
+      "file": "assets/services/single-facial-male.jpg",
+      "contentType": "image/jpeg"
+    },
+    {
+      "name": "bundled-haircutshave-female",
+      "keywords": ["haircut", "shave", "combo", "bundle", "women"],
+      "serviceType": "bundled",
+      "serviceFor": "female",
+      "file": "assets/services/bundled-haircutshave-female.jpg",
+      "contentType": "image/jpeg"
+    },
+    {
+      "name": "single-cleanup-female",
+      "keywords": ["cleanup", "face cleanup", "women"],
+      "serviceType": "single",
+      "serviceFor": "female",
+      "file": "assets/services/single-cleanup-female.jpg",
+      "contentType": "image/jpeg"
+    },
+    {
+      "name": "single-haircut-female",
+      "keywords": ["haircut", "hair cut", "women", "style"],
+      "serviceType": "single",
+      "serviceFor": "female",
+      "file": "assets/services/single-haircut-female.jpg",
+      "contentType": "image/jpeg"
+    },
+    {
+      "name": "single-massage-female",
+      "keywords": ["massage", "body massage", "women", "relax"],
+      "serviceType": "single",
+      "serviceFor": "female",
+      "file": "assets/services/single-massage-female.jpg",
+      "contentType": "image/jpeg"
+    },
+    {
+      "name": "single-haircolor-female",
+      "keywords": ["hair color", "hair colour", "women", "style"],
+      "serviceType": "single",
+      "serviceFor": "female",
+      "file": "assets/services/single-haircolor-female.jpg",
+      "contentType": "image/jpeg"
+    },
+    {
+      "name": "single-haircolor-male",
+      "keywords": ["hair color", "hair colour", "men", "style"],
+      "serviceType": "single",
+      "serviceFor": "male",
+      "file": "assets/services/single-haircolor-male.jpg",
+      "contentType": "image/jpeg"
+    },
+    {
+      "name": "single-haircut-male",
+      "keywords": ["haircut", "hair cut", "men", "fade", "style"],
+      "serviceType": "single",
+      "serviceFor": "male",
+      "file": "assets/services/single-haircut-male.jpg",
+      "contentType": "image/jpeg"
+    },
+    {
+      "name": "single-trim-male",
+      "keywords": ["trim", "beard trim", "hair trim", "men"],
+      "serviceType": "single",
+      "serviceFor": "male",
+      "file": "assets/services/single-trim-male.jpg",
+      "contentType": "image/jpeg"
+    },
+    {
+      "name": "single-headmassage-female",
+      "keywords": ["head massage", "massage", "women", "relax"],
+      "serviceType": "single",
+      "serviceFor": "female",
+      "file": "assets/services/single-headmassage-female.jpg",
+      "contentType": "image/jpeg"
+    },
+    {
+      "name": "single-headmassage-male",
+      "keywords": ["head massage", "massage", "men", "relax"],
+      "serviceType": "single",
+      "serviceFor": "male",
+      "file": "assets/services/single-headmassage-male.jpg",
+      "contentType": "image/jpeg"
+    },
+    {
+      "name": "single-cleanup-male",
+      "keywords": ["cleanup", "face cleanup", "men"],
+      "serviceType": "single",
+      "serviceFor": "male",
+      "file": "assets/services/single-cleanup-male.jpg",
+      "contentType": "image/jpeg"
+    },
+    {
+      "name": "single-massage-male",
+      "keywords": ["massage", "body massage", "men", "relax"],
+      "serviceType": "single",
+      "serviceFor": "male",
+      "file": "assets/services/single-massage-male.jpg",
+      "contentType": "image/jpeg"
+    }
+  ],
+  "defaults": {
+    "single": "assets/services/single-haircut-male.jpg",
+    "bundled": "assets/services/bundled-haircutshave-male.jpg"
+  }
+}

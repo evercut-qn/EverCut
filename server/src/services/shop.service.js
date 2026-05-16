@@ -395,12 +395,12 @@ export const getShopInfoForCustomer = async (shopId) => {
         serviceRepository.findByShopIdAndType(
             shopId,
             'single',
-            'serviceName duration finalPrice actualPrice offerPrice imageUrl serviceFor serviceType',
+            'serviceName duration finalPrice actualPrice offerPrice imageR2Key serviceFor serviceType',
         ),
         serviceRepository.findByShopIdAndType(
             shopId,
             'bundled',
-            'serviceName bundledServices totalDuration totalPrice finalPrice actualPrice offerPrice imageUrl serviceFor serviceType',
+            'serviceName bundledServices totalDuration totalPrice finalPrice actualPrice offerPrice imageR2Key serviceFor serviceType',
         ),
         mediaService.getGalleryByShopId(shopId),
         ratingRepository.getShopSummary(shopId),
@@ -536,7 +536,7 @@ export const getNearbyServicesByGender = async (coordinates, gender, searchTerm)
     const services = await serviceRepository.findByShopIds(
         shopIds,
         serviceFilter,
-        'serviceName shopId serviceFor imageUrl serviceType',
+        'serviceName shopId serviceFor imageR2Key serviceType',
     );
 
     return {
