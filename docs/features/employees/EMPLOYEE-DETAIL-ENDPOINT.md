@@ -142,7 +142,7 @@ Authorization: Bearer <jwt_token>
 | `firstName` | String | Employee first name |
 | `lastName` | String | Employee last name |
 | `phoneNumber` | String | Contact phone number |
-| `gender` | String | Gender (Male/Female/Other) |
+| `gender` | String | Gender (Male/Female/Transgender) |
 | `dateOfBirth` | Date | Date of birth |
 | `photoUrl` | String | Signed CDN URL generated from the employee R2 media key |
 | `workingHours` | Object | Working hours (start/end times) |
