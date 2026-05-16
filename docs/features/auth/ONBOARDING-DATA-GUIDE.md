@@ -81,7 +81,7 @@ Content-Type: application/json
 | `firstName` | string | Yes | 1-50 chars |
 | `lastName` | string | Yes | 1-50 chars |
 | `email` | string | Yes | Valid email |
-| `gender` | string | Yes | `Male`, `Female`, or `Other` |
+| `gender` | string | Yes | `Male`, `Female`, or `Transgender` |
 | `dateOfBirth` | string | Yes | `YYYY-MM-DD`, must be in the past |
 | `address` | string | Yes | Human-readable address |
 | `location` | object | Yes | GeoJSON point, `[longitude, latitude]` |
@@ -117,9 +117,9 @@ Content-Type: application/json
 | `lastName` | string | Yes | Owner last name |
 | `email` | string | Yes | Valid email |
 | `dateOfBirth` | string | Yes | `YYYY-MM-DD`, must be in the past |
-| `gender` | string | Yes | `Male`, `Female`, or `Other` |
+| `gender` | string | Yes | `Male`, `Female`, or `Transgender` |
 | `shopName` | string | Yes | 1-100 chars |
-| `category` | string | Yes | `Salon`, `Beauty Parlour`, `Barber`, or `Door-Step` |
+| `category` | string | Yes | `Hair Salon`, `Beauty Salon`, `Barber Shop`, or `Doorstep Service` |
 | `targetCustomers` | string | Yes | `male`, `female`, or `unisex` |
 | `address` | string | Yes | Human-readable address |
 | `location` | object | Yes | GeoJSON point, `[longitude, latitude]` |
@@ -142,7 +142,7 @@ Content-Type: application/json
   "dateOfBirth": "1991-01-12",
   "gender": "Male",
   "shopName": "John's Barber Studio",
-  "category": "Barber",
+  "category": "Barber Shop",
   "targetCustomers": "male",
   "address": "MG Road, Bengaluru",
   "location": {
