@@ -3,9 +3,9 @@
 **Document Type:** Internal Technical Reference  
 **Audience:** Backend & Frontend Developers  
 **Platform:** Evercut (by Quantneural)  
-**Source:** Evercut Professional Report — Storage, Subscription & Platform Cost Analysis  
-**Revision Note:** Updated to reflect confirmed user-type separation: Barbers and Customers; updated with confirmed business clarifications; scoped exclusively to subscription and platform fee content  
-**Status:** Based on current internal research and estimations; updated with confirmed clarifications
+**Source:** Evercut Professional Report — Storage, Subscription & Platform Cost Analysis; Gap Solutions Document  
+**Revision Note:** Updated to reflect confirmed user-type separation: Barbers and Customers; updated with confirmed business clarifications; updated with finalised gap answers; scoped exclusively to subscription and platform fee content  
+**Status:** All core business rules confirmed. See Section 12 for remaining open items.
 
 ---
 
@@ -15,8 +15,8 @@ Evercut has **two distinct user types**, and the two primary monetisation system
 
 | System | Applies To | Does NOT Apply To |
 |---|---|---|
-| **Subscription Plans** (Section 2 of PDF) | **Barbers** only | Customers |
-| **Platform Fee Structure** (Section 3 of PDF) | **Customers** only | Barbers |
+| **Subscription Plans** | **Barbers** only | Customers |
+| **Platform Fee Structure** | **Customers** only | Barbers |
 
 These systems are **completely separate**. They share no logic, no counters, and no lifecycle dependencies. A barber's subscription tier has no effect on platform fees, and a customer's booking behaviour has no effect on any barber's subscription. Every section of this document is labelled with the applicable user type. Developers must never mix logic across these two user contexts.
 
@@ -100,11 +100,12 @@ These mechanisms operate in entirely separate domains:
 
 > **Applies To: Barbers only. Customers have no subscription plan.**
 
-Evercut offers three subscription tiers for barbers. The table below is the canonical feature matrix as defined in the source document.
+Evercut offers three subscription tiers for barbers. The table below is the canonical feature matrix.
 
 | Feature | Basic | Popular ⭐ | Advanced |
 |---|---|---|---|
 | **Internal Label** | Get Started | Most Recommended | Premium Growth |
+| **Monthly Price** | ₹0 (Free) | ₹299/month | ₹499/month |
 | **Verification Badge** | Not Verified | Blue Badge | Yellow Badge |
 | **Photo Uploads** | 10 Photos | 30 Photos | 50 Photos |
 | **Video Uploads** | 2 Videos | 10 Videos | 15 Videos |
@@ -116,19 +117,19 @@ Evercut offers three subscription tiers for barbers. The table below is the cano
 
 ### Plan Pricing Model
 
-| Plan | Pricing |
-|---|---|
-| Basic | **Free** — no subscription charge |
-| Popular | **Paid** — monthly subscription; exact price to be confirmed (see Section 12) |
-| Advanced | **Paid** — monthly subscription; exact price to be confirmed (see Section 12) |
+| Plan | Price | Billing |
+|---|---|---|
+| Basic | **₹0** — completely free | No billing; no renewal cycle; no expiry |
+| Popular | **₹299/month** | Monthly; auto-renews every 30 days |
+| Advanced | **₹499/month** | Monthly; auto-renews every 30 days |
 
-> **Basic is a completely free tier**, equivalent to the free-tier model used by most major platforms. Barbers on Basic access the platform at no cost but with limited features. Only the **Popular** and **Advanced** plans are paid subscription plans. There is no charge or billing involved for the Basic plan.
+> **Basic is a completely free tier**, equivalent to the free-tier model used by most major platforms. Barbers on Basic access the platform at no cost but with limited features. Only the **Popular** and **Advanced** plans involve any subscription charge. The pricing is designed to provide affordable entry-level access while offering premium growth and visibility features at higher tiers.
 
-### Plan Identifiers (Suggested)
+### Plan Identifiers
 
 Each plan must be assigned a stable internal identifier used consistently across the database, APIs, and frontend:
 
-| Plan Name | Suggested Enum / Key |
+| Plan Name | Enum / Key |
 |---|---|
 | Basic | `PLAN_BASIC` |
 | Popular | `PLAN_POPULAR` |
@@ -155,8 +156,10 @@ The photo upload limit defines the **maximum cumulative number of photos** a bar
 **Business Logic:**
 
 - The limit is treated as a **cumulative total upload cap**, not a concurrent active storage cap. A barber who deletes a gallery photo does **not** free up an upload slot — the slot is permanently consumed.
+- Upload enforcement uses the `total_photos_uploaded` counter, which only ever increments and is never decremented under any circumstance.
+- Separately, `active_photos_count` tracks how many photos are currently visible on the profile. This is used for display and downgrade/hidden-media management (see Section 3.3) and is distinct from the upload cap counter.
 - The system must prevent a new upload if the barber's `total_photos_uploaded` equals or exceeds the plan limit.
-- **Average assumed file size: 8 MB per image** (used for internal cost modelling only; not exposed to barbers).
+- **Average assumed file size: 8 MB per image** (internal planning reference only; never exposed to barbers).
 
 **Enforcement Flow:**
 
@@ -170,8 +173,10 @@ On barber gallery photo upload request:
        → Return error: "Photo upload limit reached for your plan. Upgrade to upload more."
   5. ELSE:
        → Proceed with upload to storage
-       → On success: increment total_photos_uploaded by 1
-       → Store file reference in barber profile
+       → On success:
+           - Increment total_photos_uploaded by 1
+           - Increment active_photos_count by 1
+           - Store file reference in barber profile
 ```
 
 ### 3.2 Video Uploads
@@ -189,8 +194,8 @@ The video upload limit defines the **maximum cumulative number of videos** a bar
 **Business Logic:**
 
 - Same cumulative total upload cap model as photos. Deleting a gallery video does **not** free up an upload slot — the slot is permanently consumed.
-- Videos carry a higher infrastructure cost due to file size, even though the per-MB rate is identical to images.
-- **Average assumed file size: 50 MB per video** (used for internal cost modelling only).
+- Upload enforcement uses `total_videos_uploaded`; profile visibility uses `active_videos_count`.
+- **Average assumed file size: 50 MB per video** (internal planning reference only).
 
 **Enforcement Flow:**
 
@@ -204,19 +209,88 @@ On barber gallery video upload request:
        → Return error: "Video upload limit reached for your plan. Upgrade to upload more."
   5. ELSE:
        → Proceed with upload to storage
-       → On success: increment total_videos_uploaded by 1
-       → Store file reference in barber profile
+       → On success:
+           - Increment total_videos_uploaded by 1
+           - Increment active_videos_count by 1
+           - Store file reference in barber profile
 ```
 
 ### 3.3 Upload Enforcement — Edge Cases
 
+#### On File Deletion
+
 | Scenario | Required Behaviour |
 |---|---|
-| Barber deletes a gallery photo or video | The cumulative counter does **not** decrement. The upload slot is permanently consumed and is not recovered by deletion. The file is removed from the profile but the count stands. |
-| Barber downgrades plan; cumulative count already exceeds new plan limit | Soft-lock: block new uploads; do not auto-delete existing gallery media. Existing files remain visible on the profile. Flag account or prompt barber to acknowledge the limit. **Exact excess-media policy must be confirmed (see Section 12).** |
-| Barber upgrades plan | New higher cumulative limit applies immediately. No action required on existing media. |
-| Plan lapses or expires | Revert to Basic limits immediately (no grace period). If cumulative counts exceed Basic limits, soft-lock applies — no new gallery uploads permitted. |
-| Upload fails mid-transfer | Do not increment the cumulative counter. Roll back any partial storage writes. |
+| Barber deletes a gallery photo | `total_photos_uploaded` does **not** decrement — the upload slot is permanently consumed. `active_photos_count` decrements by 1. The file is removed from storage and the profile. |
+| Barber deletes a gallery video | `total_videos_uploaded` does **not** decrement. `active_videos_count` decrements by 1. The file is removed from storage and the profile. |
+
+#### On Plan Downgrade or Expiry — Excess Media Policy
+
+When a barber downgrades to a lower plan (or their paid plan expires and reverts to Basic), the new plan's upload limit may be lower than the number of files currently active on the barber's profile. In this case, the platform follows a **hidden/inactive media model** as the primary approach, with a manual-removal fallback if that is technically infeasible.
+
+---
+
+**Primary Approach — Hidden/Inactive Media (Preferred)**
+
+Excess active files that exceed the new plan's active count limit are **automatically marked as hidden or inactive** on the barber's public profile. They are not deleted — they remain stored in the system. When the barber upgrades their plan again to a tier that accommodates those files, hidden media is **automatically reactivated** and becomes visible on the profile again.
+
+> **Example:** A barber on the Advanced plan has 50 active photos (`active_photos_count = 50`, `total_photos_uploaded = 50`). They downgrade to Basic (active limit: 10). 10 photos remain visible; the remaining 40 are marked hidden. `active_photos_count` becomes 10. `total_photos_uploaded` remains 50 — unchanged. The barber cannot upload any new photos on Basic (50 >= 10 cumulative limit). If the barber re-upgrades to Advanced, all 50 photos reactivate and `active_photos_count` returns to 50.
+
+Key rules under this approach:
+
+- Existing files are **never auto-deleted** by a downgrade or expiry event.
+- `total_photos_uploaded` and `total_videos_uploaded` are **never decremented** — these cumulative counters are completely unaffected by hidden/inactive status changes.
+- `active_photos_count` and `active_videos_count` are updated to reflect the new plan's active limit.
+- The barber **cannot upload new files** if `total_photos_uploaded >= new_plan_limit`, even while some files are hidden. Hidden status does not free cumulative upload slots.
+- **Ordering rule:** When excess files are hidden, a decision must be made on which specific files stay active and which are hidden. This ordering rule has not yet been finalised. See Section 12, Open Question 2.
+
+```
+On plan downgrade or expiry — media handling (Primary Approach):
+  1. Determine new_photo_limit and new_video_limit for the new plan
+  2. IF active_photos_count > new_photo_limit:
+       excess = active_photos_count - new_photo_limit
+       → Mark [excess] photo files as hidden (per ordering rule — TBD)
+       → active_photos_count = new_photo_limit
+  3. IF active_videos_count > new_video_limit:
+       excess = active_videos_count - new_video_limit
+       → Mark [excess] video files as hidden (per ordering rule — TBD)
+       → active_videos_count = new_video_limit
+  4. total_photos_uploaded and total_videos_uploaded → unchanged
+
+On plan upgrade — media reactivation:
+  1. Determine new_photo_limit and new_video_limit for the new plan
+  2. IF hidden photos exist AND active_photos_count < new_photo_limit:
+       → Reactivate hidden photos up to new_photo_limit
+       → active_photos_count updated accordingly
+  3. IF hidden videos exist AND active_videos_count < new_video_limit:
+       → Reactivate hidden videos up to new_video_limit
+       → active_videos_count updated accordingly
+```
+
+---
+
+**Fallback Approach — Manual Removal (Only if Primary Approach is Technically Infeasible)**
+
+If the platform cannot technically support hidden/inactive media handling at the time of implementation, the downgrade process must **not be permitted** until the barber manually removes enough files to bring their active count within the new plan's limit.
+
+> **Example:** A barber on Advanced has 50 active photos and wishes to downgrade to Basic (limit: 10). The downgrade is blocked. The barber is shown a prompt explaining that they must delete 40 photos before the downgrade can proceed. Only after `active_photos_count <= 10` is the downgrade allowed.
+
+Key rules under this approach:
+
+- The downgrade UI must clearly communicate how many files must be removed and what the new plan limit is.
+- Auto-deletion by the platform is not permitted under either approach.
+- This approach must only be used if the Primary Approach cannot be implemented.
+
+> **Recommendation:** The Primary Approach is strongly preferred for data safety, merchant trust, and user experience. The Fallback Approach is a last resort only.
+
+---
+
+#### Other Upload Edge Cases
+
+| Scenario | Required Behaviour |
+|---|---|
+| Barber upgrades plan | New higher cumulative limit applies immediately. Hidden media (if any) reactivates up to the new plan limit automatically. No action required on already-active files. |
+| Upload fails mid-transfer | Do not increment any counter. Roll back any partial storage writes. |
 
 ### 3.4 Verification Badge System
 
@@ -230,8 +304,8 @@ A verification badge is a trust signal displayed on the barber's public profile.
 
 **Business Logic:**
 
-- The badge must always reflect the barber's current active plan in real time. It must not lag behind subscription state changes.
-- The badge is best treated as a **derived property** computed from the subscription tier at read time, eliminating sync issues entirely.
+- The badge must always reflect the barber's current active plan in real time.
+- The badge is best treated as a **derived property** computed from `active_plan` at read time, eliminating sync issues entirely.
 - If stored separately for performance, it must be updated synchronously within the same transaction as any subscription state change.
 
 **State Transitions:**
@@ -243,7 +317,9 @@ A verification badge is a trust signal displayed on the barber's public profile.
 | Barber upgrades: Popular → Advanced | Blue → Yellow |
 | Barber downgrades: Advanced → Popular | Yellow → Blue |
 | Barber downgrades: Popular → Basic | Blue → None |
-| Subscription lapses or is cancelled | Revert to None (Basic state) |
+| Subscription expires or is cancelled | Revert to None (Basic state) |
+| UPI AutoPay paused — current cycle still active | No change; badge remains at current tier until cycle end |
+| UPI AutoPay paused — current cycle ends without renewal | Revert to None (Basic state) |
 
 **Derivation Mapping:**
 
@@ -258,7 +334,7 @@ function getBadge(active_plan):
 
 Promotional visibility controls how prominently a barber appears across the platform's search results, discovery feeds, and local/geographic recommendation surfaces.
 
-| Plan | Visibility Level | Behaviour |
+| Plan | Visibility Label | Behaviour |
 |---|---|---|
 | Basic | None | Organic listing only. No ranking boost applied. |
 | Popular | Enhanced Reach & Local Visibility | Boosted within local/geographic area of the barber. |
@@ -268,11 +344,18 @@ Promotional visibility controls how prominently a barber appears across the plat
 
 - Barbers on Basic appear solely through organic relevance ranking — no artificial boost is applied.
 - Barbers on Popular receive a geo-localised boost specific to their service area or city.
-- Barbers on Advanced receive the highest ranking priority across all customer-facing discovery surfaces (search, featured, local, etc.).
-- Specific numerical boost weights or scoring values are a product/algorithm decision not defined in the source document. This document defines only the existence and ordering of tiers.
-- The visibility tier must be updated in the search/recommendation engine whenever a barber's subscription changes.
+- Barbers on Advanced receive the highest ranking priority across all customer-facing discovery surfaces.
+- The visibility tier must be updated in the search/recommendation engine on every subscription lifecycle event.
 
-**Derivation Mapping:**
+**Current Implementation Scope — Tier Labels Only; No Fabricated Analytics:**
+
+The exact recommendation algorithm, scoring weights, and boost values are **not defined at this stage** of the platform. Building a genuine recommendation engine requires user behaviour data, booking history, and sustained development effort that is outside the current launch scope.
+
+The following rules are absolute and must be enforced in both code and product decisions:
+
+- The platform will **only display the feature-based visibility labels** per plan tier as listed above. No numerical analytics, recommendation counts, or discovery statistics will be surfaced to barbers.
+- **No fabricated or simulated analytics will ever be generated or displayed.** Examples of prohibited fabricated stats: "15 customers discovered your shop through priority visibility," "8 bookings were generated through recommendations." Such numbers would not reflect real system behaviour and are considered misleading and unethical regardless of how technically simple they are to generate.
+- Recommendation analytics and visibility statistics will only be introduced in the product **after a genuine recommendation engine is fully built, tested, and validated** on real platform data.
 
 ```
 function getVisibilityTier(active_plan):
@@ -293,7 +376,7 @@ Statements are financial/transaction records that barbers can download from thei
 
 **Business Logic:**
 
-- The download limit is a **per-billing-cycle cap** — the counter resets at the start of each new monthly billing cycle upon subscription renewal.
+- The download limit is a **per-billing-cycle cap**. The counter resets to `0` at the start of each new monthly billing cycle upon successful subscription renewal.
 - The system maintains a `statements_downloaded_this_period` counter per barber.
 
 **Enforcement Flow:**
@@ -304,13 +387,14 @@ On barber statement download request:
   2. Fetch barber's statements_downloaded_this_period
   3. IF statements_downloaded_this_period >= statement_limit:
        → Reject request
-       → Return error: "Statement download limit reached for this period. Upgrade your plan or wait for renewal."
+       → Return error: "Statement download limit reached for this period.
+                        Upgrade your plan or wait for renewal."
   4. ELSE:
        → Serve the statement download
        → Increment statements_downloaded_this_period by 1
 ```
 
-**Counter Reset:** The counter resets to `0` at the start of each new monthly billing cycle (upon subscription renewal).
+**Counter Reset:** Resets to `0` at the start of each new monthly billing cycle upon successful renewal.
 
 **Edge Cases:**
 
@@ -318,26 +402,28 @@ On barber statement download request:
 |---|---|
 | Barber upgrades mid-cycle | New higher limit applies immediately; existing count is retained. Barber gains headroom from the higher limit immediately. |
 | Barber downgrades mid-cycle | If `statements_downloaded_this_period` already exceeds the new plan limit, no further downloads are permitted until the counter resets at the next renewal. |
-| Subscription lapses | Basic limits apply immediately. Barber is capped at 1 download for any partial or lapsed period. |
+| Subscription expires or lapses | Basic limits apply immediately. Barber is capped at 1 download for the current or any lapsed period. |
 
 ### 3.7 Customer Support Tier Routing
 
-A barber's subscription plan determines the support queue and priority level they receive when contacting Evercut support.
+A barber's subscription plan determines the support label and queue associated with their support tickets.
 
-| Plan | Support Tier | Queue Behaviour |
+| Plan | Support Tier Label | Queue |
 |---|---|---|
-| Basic | Standard Support | Standard queue; no prioritisation |
-| Popular | Premium Support – Basic | Premium queue; baseline SLA applied |
-| Advanced | Premium Support – Priority | Highest-priority queue; fastest SLA |
+| Basic | Standard Support | Standard queue |
+| Popular | Premium Support – Basic | Premium queue |
+| Advanced | Premium Support – Priority | Priority queue |
 
 **Business Logic:**
 
-- When a barber submits a support ticket, the system reads their active subscription plan and tags the ticket with the corresponding support tier.
-- This tag must be passed to the support tooling (CRM, helpdesk) to enable automatic queue routing.
-- Specific SLA times are not defined in the source document and must be confirmed by the business/operations team.
-- Open tickets retain the support tier assigned at time of submission. Upgrades after submission do not automatically re-prioritise existing open tickets unless a business rule specifies otherwise.
+**Initial stage:** At the current scale of the platform, merchant volume is manageable and Evercut will treat all support requests with high priority regardless of subscription tier. This is an internal operational decision — the support tier labels per plan are still displayed in the product and tagged on tickets, but actual SLA differentiation between queues has not yet been activated in operations.
 
-**Derivation Mapping:**
+**At scale:** As merchant volume grows, the support structure will gradually transition to fully differentiated SLA enforcement per tier — Standard, Premium Basic, and Premium Priority — as defined in the subscription plans. Specific SLA response time targets are an operations decision and will be defined separately when the differentiated support model is activated.
+
+**Developer implementation:** The system must still tag every support ticket with the barber's support tier at the time of submission — always, regardless of whether operations currently enforces SLA differentiation. This ensures the tagging infrastructure is ready when differentiated SLAs are activated.
+
+- Open tickets retain the support tier tag assigned at time of submission.
+- Upgrades after submission do not automatically re-prioritise existing open tickets unless a business rule specifies otherwise.
 
 ```
 function getSupportTier(active_plan):
@@ -354,9 +440,9 @@ function getSupportTier(active_plan):
 
 ### 4.1 Plan Assignment at Registration
 
-- When a barber registers, they must be assigned a subscription plan. The default is `PLAN_BASIC` (free). Upgrade to a paid plan is available at any time.
+- When a barber registers, they are assigned `PLAN_BASIC` by default (free). Upgrade to a paid plan is available at any time.
 - The subscription record must be created simultaneously with the barber account.
-- Barbers on `PLAN_BASIC` have no billing — the free plan carries no charge and no renewal cycle.
+- Barbers on `PLAN_BASIC` have no billing — the free plan carries no charge, no renewal cycle, and no expiry.
 
 ### 4.2 Effects of Plan Changes
 
@@ -364,11 +450,11 @@ All plan changes (upgrade or downgrade) must trigger the following effects synch
 
 | Feature | On Upgrade | On Downgrade |
 |---|---|---|
-| Upload Limits | New higher cumulative limit applies immediately | New lower cumulative limit applies immediately; if cumulative count already exceeds new limit, new uploads are blocked |
-| Verification Badge | Updated to new tier badge immediately | Reverted to lower tier badge immediately |
-| Promotional Visibility | Boost tier upgraded immediately | Boost tier reduced immediately |
-| Statement Limit | Higher limit applies for current period | Lower limit applies; if already exceeded, further downloads blocked until reset |
-| Support Tier | Higher priority applied to new tickets | Lower priority applied to new tickets |
+| Upload Limits | New higher cumulative limit applies immediately. Hidden media (if any) reactivates up to the new plan limit. | New lower limit applies. Excess active media is hidden per the Primary Approach (Section 3.3). New uploads blocked if cumulative counter already exceeds new limit. |
+| Verification Badge | Updated to new tier badge immediately. | Reverted to lower tier badge immediately. |
+| Promotional Visibility | Boost tier upgraded immediately. | Boost tier reduced immediately. |
+| Statement Limit | Higher limit applies for current period. | Lower limit applies; if already exceeded, further downloads blocked until reset. |
+| Support Tier | Higher priority tag applied to new tickets. | Lower priority tag applied to new tickets. |
 
 ### 4.3 Subscription Expiry & Lapse
 
@@ -377,23 +463,61 @@ When a paid subscription (Popular or Advanced) expires without renewal, features
 - All features revert to `PLAN_BASIC` behaviour immediately.
 - Badge reverts to "Not Verified."
 - Visibility boost is removed.
-- Gallery upload limits revert to Basic cumulative caps. If existing cumulative counts already exceed Basic limits, soft-lock applies — no new uploads permitted.
-- Statement download counter is not reset; it resumes at its current value under Basic limits.
+- Excess active gallery media is hidden per the Primary Approach (Section 3.3). No new uploads permitted if cumulative counters already exceed Basic limits.
+- `statements_downloaded_this_period` is not reset; the barber resumes under Basic limits (max 1 per period).
 
-### 4.4 Billing Cycle, Renewal & Cancellation
+### 4.4 Billing Cycle, Renewal, Pause & Cancellation
 
-**Confirmed:**
+#### Confirmed Rules
 
 | Detail | Value |
 |---|---|
 | Billing cycle | **Monthly** |
-| Renewal | **Automatic** — paid subscriptions (Popular and Advanced) renew automatically at the end of each monthly cycle |
-| Basic plan billing | **None** — the Basic plan is free; no billing or renewal applies |
+| Plan duration | **30 days** — fixed from activation date, regardless of usage or inactivity |
+| Renewal | **Automatic** — paid plans (Popular and Advanced) auto-renew every 30 days |
+| Basic plan billing | **None** — free plan; no billing, no renewal, no expiry |
 
-**Still to be confirmed:**
+> **Fixed-duration model:** Once a paid plan is activated, the subscription runs for its full 30-day period regardless of whether the barber is active on the platform. Inactive usage does not earn extra days. This follows the standard telecom subscription model (e.g., Airtel, Jio) and keeps billing simple, predictable, and operationally manageable.
 
-- Exact subscription price per paid tier (Popular and Advanced)
-- Cancellation policy: immediate termination vs. end-of-period access
+#### Pause Behaviour — Platform vs. UPI AutoPay
+
+**No pause functionality exists on the Evercut platform itself.** Barbers cannot initiate a pause from within the app. The platform does not expose any pause, hold, or freeze mechanism, and the subscription always runs for its full fixed 30-day duration from the platform's perspective.
+
+However, in India, barbers who pay via **UPI AutoPay** can pause or cancel their AutoPay mandate directly from their payment app (e.g., Google Pay, PhonePe, Paytm). This is an external action outside of Evercut's control. When this happens, the flow is handled entirely through payment gateway webhooks — no platform-side intervention is required or permitted. The platform reacts only to webhook events.
+
+```
+UPI AutoPay Pause — Webhook-Driven Flow:
+
+  Barber pauses UPI AutoPay mandate in their payment app:
+    → Payment gateway detects the pause
+    → Renewal payment is NOT collected at next billing date
+    → Platform receives a webhook: renewal_failed or mandate_paused
+
+  While current billing cycle is still active (subscription_end_date not yet reached):
+    → Barber retains full access to their current plan's features
+    → No change to active_plan, badge, visibility, uploads, or any other feature
+    → No platform-side action required — access continues normally until cycle end
+
+  When subscription_end_date is reached with no successful renewal payment:
+    → Platform processes this identically to a standard subscription expiry (Section 4.3)
+    → active_plan reverts to PLAN_BASIC immediately
+    → All paid plan features removed; excess media hidden; badge removed; visibility boost removed
+
+  Barber resumes UPI AutoPay mandate in their payment app:
+    → Payment gateway collects renewal payment
+    → Platform receives a webhook: payment_success or subscription_renewed
+    → active_plan is restored to the previously held paid tier (Popular or Advanced)
+    → All plan features reinstated immediately
+    → Hidden media reactivates up to the restored plan limit
+    → New subscription_end_date set: current date + 30 days
+    → statements_downloaded_this_period resets to 0
+```
+
+> **Developer note:** The platform must not attempt to detect, anticipate, or manage UPI AutoPay pauses proactively. The correct model is purely webhook-reactive: grant access until the current cycle's `subscription_end_date`; process a missed renewal webhook exactly as a standard expiry. The external pause mechanism in the user's payment app is entirely invisible to the platform until a webhook signals a failed renewal.
+
+#### Cancellation
+
+The cancellation policy — specifically whether cancellation terminates access immediately or allows access to continue until the end of the current 30-day billing period — is **not yet confirmed**. See Section 12, Open Question 1.
 
 ---
 
@@ -403,7 +527,7 @@ When a paid subscription (Popular or Advanced) expires without renewal, features
 
 ### 5.1 Maximum Storage Footprint per Barber (Estimated)
 
-The figures below represent **maximum cumulative storage** per barber — the total storage consumed if a barber uploads the full number of files permitted under their plan. Since upload limits are cumulative (not concurrent), deleted files reduce active content on the profile but do not reduce total storage consumed.
+The figures below represent **maximum cumulative storage** per barber — the total storage that would be consumed if a barber uploads the full number of files permitted by their plan's cumulative cap. Since upload limits are cumulative (not concurrent), deleted files reduce active content on the profile but do not reduce storage consumed. Hidden files also continue to occupy storage.
 
 | Plan | Max Photos | Photo Storage | Max Videos | Video Storage | Total Max Storage |
 |---|---|---|---|---|---|
@@ -451,7 +575,7 @@ The ₹10 cap for combined bookings must be **explicitly enforced in code** rath
 
 ### 6.5 Minimum Booking Amount Constraint
 
-- The minimum booking amount threshold of **₹70 applies to the service amount only** — that is, the total cost of selected services or bundles, before the platform fee is added. The platform fee is never included in this threshold calculation.
+- The minimum booking amount threshold of **₹70 applies to the service amount only** — the total cost of selected services or bundles, before the platform fee is added. The platform fee is never included in this threshold calculation.
 - A service amount of ₹70 with a ₹4 platform fee (total ₹74 charged) is valid. The ₹70 check is on the service amount alone.
 - If the service amount falls below ₹70, the booking must be **rejected at creation time**.
 - This validation applies to **all customers**, including those within the introductory fee waiver period.
@@ -467,18 +591,16 @@ The ₹10 cap for combined bookings must be **explicitly enforced in code** rath
 
 As an introductory incentive, Evercut **waives the platform fee** on a customer's **first two bookings**.
 
-The following distinctions are critical and must be clearly understood by all developers:
-
 | Aspect | Detail |
 |---|---|
 | **What IS waived** | The platform fee (₹4 or ₹10) |
 | **What is NOT waived** | The booking amount (the cost of the service/bundle paid to the barber) |
 | **Who receives this offer** | Customers — per account, one time |
-| **Who does NOT receive this offer** | Barbers. This offer has no barber-side equivalent whatsoever. |
+| **Who does NOT receive this offer** | Barbers. This offer has no barber-side equivalent. |
 | **How many qualifying bookings** | First 2 bookings ever made by the customer account |
 | **When the offer resets** | It does not reset. It is a one-time, lifetime offer per customer account. |
 
-This offer must never be implemented or described as "free bookings." The customer still pays the full service amount to the barber on every booking. Only the platform fee component is waived.
+This offer must never be implemented or described as "free bookings." The customer still pays the full service amount on every booking. Only the platform fee component is waived.
 
 ### 7.2 Fee Waiver Counter
 
@@ -514,10 +636,10 @@ function resolveCustomerPlatformFee(customer, booking_type):
 | Customer's 1st booking (any type, service amount ≥ ₹70) | Platform fee = ₹0. Counter increments to 1 after payment success. Service amount charged in full. |
 | Customer's 2nd booking (any type, service amount ≥ ₹70) | Platform fee = ₹0. Counter increments to 2 after payment success. `fee_waiver_exhausted` becomes `true`. |
 | Customer's 3rd booking onwards | Standard platform fee applies (₹4 or ₹10). |
-| Service amount below ₹70 during waiver period | Booking rejected. Minimum service amount validation applies regardless of waiver status. Counter must NOT increment. |
+| Service amount below ₹70 during waiver period | Booking rejected. Counter must NOT increment. |
 | Payment fails on a waiver-eligible booking | Counter must NOT increment. Waiver slot is preserved for the customer's next successful booking. |
-| Customer cancels a waiver-covered booking after payment | The counter does **not** decrement. The fee waiver slot consumed by that booking is permanently used, regardless of the cancellation. |
-| Customer re-registers with a new account to reset waiver | The waiver must be tied to a persistent identifier beyond just the account (e.g., verified phone number) to prevent gaming. Anti-abuse mechanism must be confirmed (see Section 12). |
+| Customer cancels a waiver-covered booking after payment | The counter does **not** decrement. The fee waiver slot is permanently used, regardless of the cancellation. |
+| Customer re-registers with a new account to reset waiver | The waiver must be tied to a persistent identifier beyond just the account (e.g., verified phone number) to prevent gaming. Anti-abuse mechanism must be confirmed — see Section 12, Open Question 3. |
 | Same customer books two different barbers | The waiver applies per customer account across all barbers — not per barber. The first 2 bookings ever (regardless of which barber) are waiver-eligible. |
 
 ---
@@ -563,7 +685,7 @@ Customer initiates booking:
 
 > **Atomicity Requirement:** The booking record must only be persisted and the waiver counter only incremented after confirmed payment success from the payment gateway's webhook or callback. A payment failure must leave no side effects on the customer's waiver counter or on any booking record.
 
-### 8.3 Booking Record Fields (Suggested)
+### 8.3 Booking Record Fields
 
 | Field | Type | Description |
 |---|---|---|
@@ -661,14 +783,16 @@ This section provides a consolidated view of the key fields required per entity,
 | `barber_id` | UUID | Unique identifier |
 | `active_plan` | Enum | `PLAN_BASIC`, `PLAN_POPULAR`, `PLAN_ADVANCED` |
 | `subscription_status` | Enum | `ACTIVE`, `EXPIRED`, `CANCELLED`. Basic plan always remains `ACTIVE` (free; cannot expire). |
-| `subscription_start_date` | Date | Start of current monthly billing cycle. Applies to paid plans (Popular, Advanced) only. |
-| `subscription_end_date` | Date | End of current monthly billing cycle; auto-renewal date. Applies to paid plans only. |
+| `subscription_start_date` | Date | Start of current 30-day billing cycle. Paid plans only. |
+| `subscription_end_date` | Date | End of current 30-day billing cycle; auto-renewal date. Paid plans only. |
 | `verification_badge` | Derived / Enum | `NONE`, `BLUE`, `YELLOW` — derived from `active_plan` |
 | `visibility_tier` | Derived / Enum | `NONE`, `LOCAL`, `PRIORITY` — derived from `active_plan` |
 | `support_tier` | Derived / Enum | Derived from `active_plan` |
-| `total_photos_uploaded` | Integer | Cumulative total gallery photos ever uploaded. Never decremented. Used to enforce the plan photo upload limit. |
-| `total_videos_uploaded` | Integer | Cumulative total gallery videos ever uploaded. Never decremented. Used to enforce the plan video upload limit. |
-| `statements_downloaded_this_period` | Integer | Resets to 0 at the start of each new monthly billing cycle upon renewal |
+| `total_photos_uploaded` | Integer | Cumulative gallery photos ever uploaded. **Never decremented under any circumstance.** Used for upload cap enforcement. |
+| `total_videos_uploaded` | Integer | Cumulative gallery videos ever uploaded. **Never decremented under any circumstance.** Used for upload cap enforcement. |
+| `active_photos_count` | Integer | Gallery photos currently active (visible on profile). Decrements on delete or hidden-media downgrade; increments on upload or reactivation on upgrade. |
+| `active_videos_count` | Integer | Gallery videos currently active (visible on profile). Decrements on delete or hidden-media downgrade; increments on upload or reactivation on upgrade. |
+| `statements_downloaded_this_period` | Integer | Resets to 0 at the start of each new monthly billing cycle upon successful renewal. |
 
 ### 10.2 Customer Document (MongoDB)
 
@@ -702,39 +826,47 @@ This section provides a consolidated view of the key fields required per entity,
 
 - [ ] Define barber data model with all subscription-related fields
 - [ ] Implement plan assignment at barber registration (default: `PLAN_BASIC`, free)
-- [ ] Implement plan upgrade flow with immediate feature effect
-- [ ] Implement plan downgrade flow with immediate feature reversion and soft-lock logic
-- [ ] Implement subscription expiry/lapse handling: revert to Basic immediately, no grace period
-- [ ] Implement monthly billing cycle for paid plans (Popular and Advanced)
-- [ ] Implement automatic subscription renewal at end of each monthly cycle
-- [ ] Implement cancellation logic (immediate vs. end-of-period) — **pending business confirmation**
+- [ ] Implement plan upgrade flow with immediate feature effect and hidden media reactivation
+- [ ] Implement plan downgrade flow: immediate feature reversion; hidden-media logic (Primary Approach); Fallback Approach if Primary not technically feasible
+- [ ] Implement subscription expiry/lapse handling: revert to Basic immediately, no grace period; trigger hidden-media logic
+- [ ] Implement fixed 30-day billing cycle for paid plans (Popular and Advanced)
+- [ ] Implement automatic subscription renewal via payment gateway at end of each 30-day cycle
+- [ ] Implement webhook handling for: renewal success, renewal failure / mandate paused, mandate resumed
+- [ ] On renewal failure or mandate-paused webhook: do NOT change access — hold current plan until `subscription_end_date` is reached
+- [ ] On `subscription_end_date` reached with no successful renewal: trigger standard expiry flow (Section 4.3)
+- [ ] On renewal success / mandate-resumed webhook: restore plan, reactivate hidden media, reset `statements_downloaded_this_period` to 0, set new `subscription_end_date` (current date + 30 days)
+- [ ] Implement cancellation logic — **pending business confirmation** (see Section 12, Open Question 1)
 
 ### Barber — Upload Enforcement
 
-- [ ] Track `total_photos_uploaded` per barber (cumulative; increment on successful gallery upload; never decrement)
-- [ ] Track `total_videos_uploaded` per barber (cumulative; increment on successful gallery upload; never decrement)
-- [ ] Enforce photo upload limit against cumulative counter before accepting upload (pre-upload validation)
-- [ ] Enforce video upload limit against cumulative counter before accepting upload (pre-upload validation)
-- [ ] Implement soft-lock on downgrade or expiry: block new uploads, do not auto-delete existing gallery media
-- [ ] Return clear error message with upgrade prompt when cumulative limit is reached
+- [ ] Track `total_photos_uploaded` per barber (cumulative; increment on successful gallery upload; **never decrement**)
+- [ ] Track `total_videos_uploaded` per barber (cumulative; increment on successful gallery upload; **never decrement**)
+- [ ] Track `active_photos_count` per barber (increment on upload or reactivation; decrement on delete or hidden-media downgrade)
+- [ ] Track `active_videos_count` per barber (increment on upload or reactivation; decrement on delete or hidden-media downgrade)
+- [ ] Enforce upload cap against cumulative counter (`total_photos_uploaded` / `total_videos_uploaded`) before accepting any gallery upload
+- [ ] On downgrade or expiry: apply hidden-media logic — mark excess active files as hidden; update `active_photos_count` / `active_videos_count`
+- [ ] On upgrade: reactivate hidden files up to new plan limit; update `active_photos_count` / `active_videos_count`
+- [ ] Return clear error message with upgrade prompt when cumulative upload limit is reached
+- [ ] Implement ordering rule for which files are hidden on downgrade — **pending decision** (see Section 12, Open Question 2)
 
 ### Barber — Badge & Visibility
 
 - [ ] Derive verification badge from `active_plan` at read time (or sync on plan change event)
-- [ ] Update badge on all subscription lifecycle events (upgrade, downgrade, expiry, cancellation)
+- [ ] Update badge on all subscription lifecycle events (upgrade, downgrade, expiry, UPI AutoPay cycle-end without renewal)
 - [ ] Integrate visibility tier signal into search/recommendation engine
 - [ ] Update visibility tier on all subscription lifecycle events
+- [ ] Do **NOT** implement or display any fabricated recommendation analytics or visibility counts — only feature-based tier labels
 
 ### Barber — Statements
 
 - [ ] Track `statements_downloaded_this_period` per barber
 - [ ] Enforce plan-level statement download limit on each download request
-- [ ] Reset counter to 0 at the start of each new monthly billing cycle upon renewal
-- [ ] Handle mid-cycle upgrades (new limit applies immediately) and downgrades (block if exceeded)
+- [ ] Reset counter to 0 on successful renewal webhook
+- [ ] Handle mid-cycle upgrades (new limit applies immediately) and downgrades (block further downloads if limit already exceeded)
 
 ### Barber — Support Routing
 
-- [ ] Tag support tickets with barber's support tier at time of submission
+- [ ] Tag all support tickets with barber's support tier at time of submission (always — regardless of current SLA enforcement status)
 - [ ] Route tickets to appropriate support queue based on tier tag
 
 ### Customer — Platform Fees & Waiver
@@ -757,18 +889,15 @@ This section provides a consolidated view of the key fields required per entity,
 
 ## 12. Open Questions & Gaps
 
-The following items are not yet resolved and must be confirmed by the business team before or during the development phase.
+The following items are not yet resolved and must be confirmed before or during the development phase.
 
 | # | Open Question | Applies To | Area |
 |---|---|---|---|
-| 1 | What are the exact prices for the Popular and Advanced plans? (Basic is confirmed free.) | Barber | Billing |
-| 2 | What is the exact policy for gallery media that exceeds upload limits after a plan downgrade or expiry? (e.g., must barber manually remove excess files? Is there a prompt or deadline?) | Barber | Uploads |
-| 3 | What are the SLAs (response times) for Standard, Premium Basic, and Premium Priority support? | Barber | Support |
-| 4 | What are the specific boost weights or scoring values for each promotional visibility tier? | Barber | Visibility |
-| 5 | Can barber subscriptions be paused or put on hold? If so, how do features (badge, visibility, uploads, statements) behave during the hold? | Barber | Lifecycle |
-| 6 | How is the fee waiver tied to the customer's identity to prevent gaming via account re-registration? (e.g., verified phone number as persistent identifier) | Customer | Bookings |
-| 7 | What is the refund policy for platform fees on customer-cancelled bookings? | Customer | Bookings |
+| 1 | What is the cancellation policy? Does cancellation terminate features immediately, or does the barber retain access until the end of the current 30-day billing period? | Barber | Lifecycle |
+| 2 | When a downgrade or expiry triggers the hidden-media policy and only a subset of active files can remain visible, which files stay active and which are hidden? Options: oldest uploads stay active (newest hidden); newest stay active (oldest hidden); barber is prompted to manually select which files to keep active. | Barber | Uploads |
+| 3 | How is the fee waiver tied to the customer's identity to prevent gaming via account re-registration? (e.g., verified phone number as a persistent identifier that carries across accounts) | Customer | Bookings |
+| 4 | What is the refund policy for platform fees on customer-cancelled bookings? | Customer | Bookings |
 
 ---
 
-*This document is based on the Evercut Professional Report (Storage, Subscription & Platform Cost Analysis) and incorporates confirmed clarifications on the Barber/Customer user-type separation. It is intended for internal development use by Quantneural and is scoped exclusively to subscription and platform fee systems. All structures are based on current internal research and estimations and are subject to change.*
+*This document is based on the Evercut Professional Report (Storage, Subscription & Platform Cost Analysis) and the Gap Solutions document, and incorporates confirmed clarifications on the Barber/Customer user-type separation. It is intended for internal development use by Quantneural and is scoped exclusively to subscription and platform fee systems. All confirmed rules reflect finalised business decisions as of the current revision.*
