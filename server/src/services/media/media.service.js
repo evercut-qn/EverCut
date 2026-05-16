@@ -182,7 +182,7 @@ export const getShopGallery = async (ownerId) => {
 };
 
 export const getGalleryByShopId = async (shopId) => (
-    serializeMediaList(await mediaRepository.findByEntity(shopId, MEDIA_ENTITY_TYPE.SHOP, { purpose: MEDIA_PURPOSE.GALLERY }))
+    mediaRepository.findByEntity(shopId, MEDIA_ENTITY_TYPE.SHOP, { purpose: MEDIA_PURPOSE.GALLERY })
 );
 
 export const getGalleryStats = async (ownerId) => {

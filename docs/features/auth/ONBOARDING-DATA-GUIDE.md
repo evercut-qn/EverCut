@@ -172,7 +172,7 @@ Content-Type: application/json
 
 ## Success Response Shape
 
-Both onboarding endpoints return the created `user`, the created `profile` or `shop`, and session tokens.
+Both onboarding endpoints return the created `user`, the created `profile` (for customers) or `shop` (for barbers), and session tokens. Note that the `shop` profile returned during onboarding does not include the `photos` (gallery) array.
 
 ```json
 {

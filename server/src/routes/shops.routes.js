@@ -23,30 +23,15 @@ import {
 const router = Router();
 
 // ============================================================================
-// Public Routes (no authentication required)
+// Collection Routes
 // ============================================================================
 
 // Shop discovery and browsing
 router.get('/', validate(shopListQuerySchema, 'query'), shopController.getShops);
 router.get('/services', validate(servicesByGenderQuerySchema, 'query'), shopController.getNearbyServices);
 router.get('/favorites', authenticate, authorize(ROLES.CUSTOMER), validate(paginationSchema, 'query'), shopController.getFavoriteShops);
-router.get('/:id', validate(shopIdParamSchema, 'params'), shopController.getShopById);
-router.get('/:id/services', validate(shopIdParamSchema, 'params'), validate(shopServicesQuerySchema, 'query'), shopController.getShopServices);
-router.get('/:id/employees', validate(shopIdParamSchema, 'params'), shopController.getShopEmployees);
-router.get('/:id/ratings', validate(shopIdParamSchema, 'params'), validate(paginationSchema, 'query'), ratingController.getShopRatings);
-router.get('/:id/ratings/analytics', validate(shopIdParamSchema, 'params'), ratingController.getShopRatingSummary);
 
-// ============================================================================
-// Protected Routes (authentication required)
-// ============================================================================
-
-// Customer-specific routes
-router.patch('/:id/favorite', authenticate, authorize(ROLES.CUSTOMER), validate(shopIdParamSchema, 'params'), validate(shopFavoritePatchSchema, 'body'), shopController.setFavoriteShop);
-
-// Shared routes (CUSTOMER + BARBER)
-router.get('/:id/availability', authenticate, authorize(ROLES.CUSTOMER, ROLES.BARBER), validate(shopIdParamSchema, 'params'), validate(shopAvailabilityQuerySchema, 'query'), shopController.getShopAvailability);
-
-// Barber-specific routes
+// Barber-specific profile management
 router.get('/me', authenticate, authorize(ROLES.BARBER), shopController.getMyShop);
 router.patch('/me', authenticate, authorize(ROLES.BARBER), validate(updateBusinessSchema, 'body'), shopController.updateMyShop);
 router.get('/me/payout-details', authenticate, authorize(ROLES.BARBER), shopController.getPayoutDetails);
@@ -54,5 +39,21 @@ router.patch('/me/payout-details', authenticate, authorize(ROLES.BARBER), valida
 router.patch('/me/security', authenticate, authorize(ROLES.BARBER), validate(updatePinSchema, 'body'), shopController.updateMyPin);
 router.patch('/me/media/picture', authenticate, authorize(ROLES.BARBER), validate(mediaIdBodySchema, 'body'), shopController.updateMyPicture);
 router.patch('/me/media/cover', authenticate, authorize(ROLES.BARBER), validate(mediaIdBodySchema, 'body'), shopController.updateMyCover);
+
+// ============================================================================
+// Resource Routes (with :id parameter)
+// ============================================================================
+
+router.get('/:id', validate(shopIdParamSchema, 'params'), shopController.getShopById);
+router.get('/:id/services', validate(shopIdParamSchema, 'params'), validate(shopServicesQuerySchema, 'query'), shopController.getShopServices);
+router.get('/:id/employees', validate(shopIdParamSchema, 'params'), shopController.getShopEmployees);
+router.get('/:id/ratings', validate(shopIdParamSchema, 'params'), validate(paginationSchema, 'query'), ratingController.getShopRatings);
+router.get('/:id/ratings/analytics', validate(shopIdParamSchema, 'params'), ratingController.getShopRatingSummary);
+
+// Customer-specific resource routes
+router.patch('/:id/favorite', authenticate, authorize(ROLES.CUSTOMER), validate(shopIdParamSchema, 'params'), validate(shopFavoritePatchSchema, 'body'), shopController.setFavoriteShop);
+
+// Shared resource routes
+router.get('/:id/availability', authenticate, authorize(ROLES.CUSTOMER, ROLES.BARBER), validate(shopIdParamSchema, 'params'), validate(shopAvailabilityQuerySchema, 'query'), shopController.getShopAvailability);
 
 export default router;

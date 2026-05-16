@@ -2439,8 +2439,7 @@ photoUrl: r2KeyToUrl(plain.photoR2Key),
      });
 
 +    // Link media to the new user and entity
-+    await mediaService.linkMediaToEntity(media._id, profile._id, 'Customer', 'avatar');
-+    await Media.findByIdAndUpdate(media._id, { userId: user._id });
++    await mediaService.linkMediaToEntity(profileData.photoMediaId, profile._id, MEDIA_ENTITY_TYPE.CUSTOMER, MEDIA_PURPOSE.AVATAR);
 ```
 
 ### 15.2 Barber Onboarding
@@ -2469,25 +2468,18 @@ photoUrl: r2KeyToUrl(plain.photoR2Key),
          pinHash,
      };
 
-     const createdShop = await shopRepository.create(shopCreateData);
-
--    const photo = await photoRepository.create({
--        shopId: createdShop._id,
--        photoUrl: file.path,
--        cloudinaryId: file.public_id || file.filename,
--        photoName: file.originalname || 'onboarding-shop-image',
--        photoType: 'shop_interior',
--        description: 'Uploaded during onboarding',
--        fileSize: file.size,
--        mimeType: file.mimetype,
--    });
-+    // Link media as gallery item + cover for the new shop
-+    await Media.findByIdAndUpdate(media._id, {
-+        userId: user._id,
-+        entityId: createdShop._id,
-+        entityType: 'Shop',
-+        purpose: 'gallery',
-+    });
++    const createdShop = await shopRepository.create(shopCreateData);
++
++    // Link media as cover for the new shop
++    await mediaService.linkMediaToEntity(shopData.photoMediaId, createdShop._id, MEDIA_ENTITY_TYPE.SHOP, MEDIA_PURPOSE.COVER);
++
++    const tokens = await issueAuthenticationTokens(user);
++
++    return {
++        user: serializeUser(user),
++        shop: serializeBarberProfile(createdShop, user),
++        tokens,
++    };
 ```
 
 ### 15.3 All Route Updates

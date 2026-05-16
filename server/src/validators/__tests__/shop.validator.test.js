@@ -35,7 +35,7 @@ test('updateBusinessSchema rejects invalid shop-hour strings', () => {
 test('updateBusinessSchema rejects deprecated shop update aliases', () => {
     const result = updateBusinessSchema.validate({
         shopOwner: 'Postman Barber',
-        businessCategory: 'Barber',
+        businessCategory: 'Barber Shop',
         shopLocation: 'MG Road',
         breakTimings: '[{"start":"13:00","end":"14:00"}]',
     }, {

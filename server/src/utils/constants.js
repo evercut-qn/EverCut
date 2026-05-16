@@ -119,10 +119,10 @@ export const PAYOUT_MODES = Object.freeze({
 // ---------------------------------------------------------------------------
 
 export const SHOP_CATEGORY = Object.freeze({
-    SALON: 'Salon',
-    BEAUTY_PARLOUR: 'Beauty Parlour',
-    BARBER: 'Barber',
-    DOOR_STEP: 'Door-Step',
+    SALON: 'Hair Salon',
+    BEAUTY_PARLOUR: 'Beauty Salon',
+    BARBER: 'Barber Shop',
+    DOOR_STEP: 'Doorstep Service',
 });
 
 export const ALL_SHOP_CATEGORIES = Object.values(SHOP_CATEGORY);
@@ -241,7 +241,7 @@ export const MIME_TO_EXTENSION = Object.freeze({
 export const GENDER = Object.freeze({
     MALE: 'Male',
     FEMALE: 'Female',
-    OTHER: 'Other',
+    TRANSGENDER: 'Transgender',
 });
 
 export const ALL_GENDERS = Object.values(GENDER);

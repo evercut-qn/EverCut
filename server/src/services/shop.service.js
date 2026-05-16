@@ -141,25 +141,31 @@ const normalizeUpdateBody = (body = {}) => {
 
 const validateAndAssign = (key, value, updateData, errors) => {
     switch (key) {
-        case 'category':
+        case 'category': {
             if (!ALL_SHOP_CATEGORIES.includes(value)) {
                 errors.push(`Invalid category. Must be one of: ${ALL_SHOP_CATEGORIES.join(', ')}`);
                 return;
             }
             updateData[key] = value;
             return;
+        }
+
+        case 'gender':
+        case 'ownerGender': {
+            if (!ALL_GENDERS.includes(value)) {
+                errors.push(`Invalid gender. Must be one of: ${ALL_GENDERS.join(', ')}`);
+                return;
+            }
+            updateData[key] = value;
+            return;
+        }
 
         case 'targetCustomers': {
-            const targetRaw = String(value).trim().toLowerCase();
-            const target = {
-                men: 'male',
-                women: 'female',
-            }[targetRaw] || targetRaw;
-            if (!ALL_SERVICE_FOR.includes(target)) {
+            if (!ALL_SERVICE_FOR.includes(value)) {
                 errors.push(`Invalid targetCustomers. Must be one of: ${ALL_SERVICE_FOR.join(', ')}`);
                 return;
             }
-            updateData[key] = target;
+            updateData[key] = value;
             return;
         }
 
@@ -404,12 +410,11 @@ export const getShopInfoForCustomer = async (shopId) => {
     const formattedRatings = ratings.map(serializeRating);
 
     return {
-        shop: serializeShopProfile(shop, { privateView: false }),
+        shop: serializeShopProfile(shop, { privateView: false, photos }),
         services: {
             single: serializeServices(singleServices.map(normalizeServicePricing)),
             bundled: serializeServices(bundledServices.map(normalizeServicePricing)),
         },
-        photos,
         ratings: { ...ratingSummary, details: formattedRatings },
     };
 };

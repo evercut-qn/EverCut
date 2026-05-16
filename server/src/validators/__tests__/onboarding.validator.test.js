@@ -10,7 +10,7 @@ const buildValidPayload = () => ({
     gender: 'Male',
     dateOfBirth: '1991-01-12',
     shopName: 'Postman Test Barber Studio',
-    category: 'Barber',
+    category: 'Barber Shop',
     targetCustomers: 'male',
     upiId: 'test.barber@upi',
     accountHolderName: 'Test Barber',
@@ -55,7 +55,7 @@ test('barberOnboardingSchema rejects deprecated barber onboarding aliases', () =
     const result = barberOnboardingSchema.validate({
         ...buildValidPayload(),
         category: undefined,
-        businessCategory: 'Barber',
+        businessCategory: 'Barber Shop',
         upiAddress: 'test.barber@upi',
     }, {
         abortEarly: false,

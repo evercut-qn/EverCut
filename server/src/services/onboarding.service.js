@@ -120,7 +120,7 @@ const normalizeBarberOnboardingInput = (authUser, shopData) => {
 
     const email = String(shopData.email || authUser?.email || '').trim().toLowerCase();
     const phoneNumber = String(authUser?.phoneNumber || '').trim();
-    const category = shopData.category;
+    const category = String(shopData.category || '').trim();
     const address = String(shopData.address || '').trim();
     const upiId = String(shopData.upiId || '').trim();
 
@@ -154,11 +154,7 @@ const normalizeBarberOnboardingInput = (authUser, shopData) => {
 
     const breakTimes = parseBreakTimes(shopData.breakTimes ?? []);
 
-    const targetCustomersRaw = String(shopData.targetCustomers || '').trim().toLowerCase();
-    const targetCustomers = {
-        men: 'male',
-        women: 'female',
-    }[targetCustomersRaw] || targetCustomersRaw;
+    const targetCustomers = String(shopData.targetCustomers || '').trim();
     if (!ALL_SERVICE_FOR.includes(targetCustomers)) {
         throw new BadRequestError(`targetCustomers must be one of: ${ALL_SERVICE_FOR.join(', ')}`);
     }
@@ -364,14 +360,13 @@ export const createBarberOnboarding = async (phoneNumber, shopData) => {
     }
 
     const createdShop = await shopRepository.create(shopCreateData);
-    await mediaService.linkMediaToEntity(shopData.photoMediaId, createdShop._id, MEDIA_ENTITY_TYPE.SHOP, MEDIA_PURPOSE.GALLERY);
-    const photos = await mediaService.getGalleryByShopId(createdShop._id);
+    await mediaService.linkMediaToEntity(shopData.photoMediaId, createdShop._id, MEDIA_ENTITY_TYPE.SHOP, MEDIA_PURPOSE.COVER);
 
     const tokens = await issueAuthenticationTokens(user);
 
     return {
         user: serializeUser(user),
-        shop: serializeBarberProfile(createdShop, user, { photos }),
+        shop: serializeBarberProfile(createdShop, user),
         tokens,
     };
 };

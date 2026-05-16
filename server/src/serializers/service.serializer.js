@@ -4,6 +4,7 @@ import {
 } from '../utils/service-pricing.utils.js';
 import { sanitizeForResponse, toIdString, toPlainObject } from './core.serializer.js';
 import { serializeShopSummary } from './shop.serializer.js';
+import { buildMediaUrl } from '../services/media/media-url.service.js';
 
 const compact = (value) => Object.fromEntries(
     Object.entries(value).filter(([, nestedValue]) => nestedValue !== undefined),
@@ -28,7 +29,7 @@ export const serializeService = (service, options = {}) => {
         serviceName: plain.serviceName ?? null,
         serviceType: plain.serviceType ?? null,
         serviceFor: plain.serviceFor ?? null,
-        imageUrl: plain.imageUrl ?? null,
+        imageUrl: buildMediaUrl(plain.imageR2Key) ?? null,
         duration: plain.duration,
         actualPrice: plain.actualPrice,
         offerPrice: plain.offerPrice ?? 0,

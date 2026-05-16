@@ -32,7 +32,7 @@ const breakTimesSchema = Joi.alternatives().try(
     Joi.string().trim(),
 );
 
-const targetCustomersSchema = Joi.string().valid(...ALL_SERVICE_FOR, 'men', 'women');
+const targetCustomersSchema = Joi.string().valid(...ALL_SERVICE_FOR);
 
 export const customerOnboardingSchema = Joi.object({
     email: Joi.string().email().required(),

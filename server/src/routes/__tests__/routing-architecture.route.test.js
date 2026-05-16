@@ -285,6 +285,10 @@ test('shops and employees expose the normalized me, payout, availability, and an
     );
 
     assert.match(shopRoutes, /router\.get\('\/me'/);
+    assert.ok(
+        shopRoutes.indexOf("router.get('/me'") < shopRoutes.indexOf("router.get('/:id'"),
+        'GET /shops/me must be registered before GET /shops/:id',
+    );
     assert.match(shopRoutes, /router\.patch\('\/me'/);
     assert.match(shopRoutes, /\/me\/payout-details/);
     assert.match(shopRoutes, /\/me\/security/);

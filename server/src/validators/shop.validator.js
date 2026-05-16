@@ -71,7 +71,7 @@ const breakTimesSchema = Joi.alternatives().try(
     Joi.string().trim(),
 );
 
-const targetCustomersSchema = Joi.string().valid(...ALL_SERVICE_FOR, 'men', 'women');
+const targetCustomersSchema = Joi.string().valid(...ALL_SERVICE_FOR);
 const ifscSchema = Joi.string().trim().pattern(/^[A-Z]{4}0[A-Z0-9]{6}$/i);
 const bankAccountSchema = Joi.string().trim().min(6).max(34);
 

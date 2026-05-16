@@ -50,7 +50,7 @@ test('resource serializers expose only id for each resource own identity', () =>
         ownerName: 'Asha Rao',
         ownerFirstName: 'Asha',
         ownerLastName: 'Rao',
-        ownerGender: 'female',
+        ownerGender: 'Female',
         ownerDateOfBirth: '1990-01-01',
         facilities: ['Wi-Fi'],
         availableDays: ['Monday'],
@@ -96,6 +96,10 @@ test('resource serializers expose only id for each resource own identity', () =>
 
     assert.equal('photoUrl' in samples.media, false);
     assert.match(samples.media.url, /^https:\/\/.+\/images\/gallery\/shop-1\/photo\.jpg\?exp=/);
+
+    // Double serialization check
+    const doubleSerialized = serializeMedia(samples.media);
+    assert.equal(doubleSerialized.url, samples.media.url, 'Double serialization should not lose the URL');
 });
 
 test('serializers do not duplicate populated relation ids beside relation objects', () => {
