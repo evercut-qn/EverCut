@@ -9,6 +9,11 @@ const serviceDefaultImageSchema = new mongoose.Schema(
             lowercase: true,
             trim: true,
         },
+        categoryId: {
+            type: String,
+            required: true,
+            index: true,
+        },
         serviceType: {
             type: String,
             enum: ['single', 'bundled'],
@@ -30,6 +35,11 @@ const serviceDefaultImageSchema = new mongoose.Schema(
             default: [],
         },
         isFallback: {
+            type: Boolean,
+            default: false,
+            index: true,
+        },
+        isGlobalDefault: {
             type: Boolean,
             default: false,
             index: true,

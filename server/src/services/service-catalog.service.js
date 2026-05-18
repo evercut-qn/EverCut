@@ -38,7 +38,7 @@ const buildServiceFilters = (queryFilters = {}) => {
 };
 
 const resolveDefaultServiceImageR2Key = async (serviceName, serviceType, serviceFor, bundledServices = []) => {
-    // 1. Try to find a specific match in the database
+    // 1. Try to find a specific match in the database (Exact -> Fuzzy -> Global Gender -> Global Unisex)
     const match = await serviceDefaultImageRepository.findBestMatch(serviceName, serviceType, serviceFor);
     if (match) return match.r2Key;
 
@@ -52,11 +52,8 @@ const resolveDefaultServiceImageR2Key = async (serviceName, serviceType, service
         if (bundleMatch) return bundleMatch.r2Key;
     }
 
-    // 3. Absolute fallback (should have been handled by findBestMatch if seed exists)
-    const fallback = await serviceDefaultImageRepository.findFallback(serviceType, serviceFor) 
-        || await serviceDefaultImageRepository.findFallback('single', serviceFor);
-    
-    return fallback?.r2Key || 'images/services/default/service.jpg';
+    // 3. Absolute system fallback (should ideally be handled by step 1's Global Unisex fallback)
+    return 'images/services/single/default/unisex.jpg';
 };
 
 const buildServicePayload = (data, existingService = null) => {

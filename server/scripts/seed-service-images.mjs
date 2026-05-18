@@ -40,9 +40,9 @@ const counters = {
     upserted: 0,
 };
 
-const buildR2Key = (serviceType, serviceFor, name, contentType) => {
-    const ext = EXTENSION_MAP[contentType] || extname(name).slice(1) || 'jpg';
-    return `images/services/${serviceType}/${serviceFor}/${name}.${ext}`;
+const buildR2Key = (serviceType, categoryId, serviceFor, contentType) => {
+    const ext = EXTENSION_MAP[contentType] || 'jpg';
+    return `images/services/${serviceType}/${categoryId}/${serviceFor}.${ext}`;
 };
 
 const loadManifest = async () => {
@@ -53,7 +53,7 @@ const loadManifest = async () => {
 
 const uploadOne = async (entry) => {
     const filePath = resolve(__dirname, '..', entry.file);
-    const r2Key = buildR2Key(entry.serviceType, entry.serviceFor, entry.name, entry.contentType);
+    const r2Key = buildR2Key(entry.serviceType, entry.categoryId, entry.serviceFor, entry.contentType);
 
     counters.planned += 1;
 
@@ -74,8 +74,10 @@ const uploadOne = async (entry) => {
             await storageProvider.putObject(r2Key, buffer, entry.contentType, {
                 seeded: 'service-image',
                 name: entry.name,
+                categoryId: entry.categoryId,
                 serviceType: entry.serviceType,
                 serviceFor: entry.serviceFor,
+                isGlobalDefault: entry.isGlobalDefault ? 'true' : 'false',
             });
             counters.uploaded += 1;
             logger.info('Uploaded service image to R2', { r2Key, file: entry.file });
@@ -91,17 +93,19 @@ const uploadOne = async (entry) => {
     // Prepare DB record
     const dbRecord = {
         name: entry.name,
+        categoryId: entry.categoryId,
         serviceType: entry.serviceType,
         serviceFor: entry.serviceFor,
         r2Key,
         keywords: entry.keywords,
-        isFallback: false,
+        isGlobalDefault: !!entry.isGlobalDefault,
+        isFallback: !!entry.isGlobalDefault, // Maintain compatibility for now
     };
 
     if (!dryRun) {
         await serviceDefaultImageRepository.upsert(dbRecord);
         counters.upserted += 1;
-        logger.info('Upserted image record to DB', { name: entry.name });
+        logger.info('Upserted image record to DB', { name: entry.name, categoryId: entry.categoryId });
     } else {
         logger.info('DRY RUN planned DB upsert', { name: entry.name });
     }
@@ -109,65 +113,8 @@ const uploadOne = async (entry) => {
     return { r2Key, ...entry };
 };
 
-const uploadDefault = async (serviceType, serviceFor, filePath, contentType) => {
-    const r2Key = `images/services/default/${serviceType}/${serviceFor}.${EXTENSION_MAP[contentType] || 'jpg'}`;
-    const resolvedPath = resolve(__dirname, '..', filePath);
-
-    counters.planned += 1;
-
-    let exists = false;
-    if (!force) {
-        try {
-            await storageProvider.headObject(r2Key);
-            logger.info('Default object already exists in R2, skipping upload', { r2Key });
-            counters.skipped += 1;
-            exists = true;
-        } catch {
-        }
-    }
-
-    if (!exists && !dryRun) {
-        try {
-            const buffer = await readFile(resolvedPath);
-            await storageProvider.putObject(r2Key, buffer, contentType, {
-                seeded: 'service-default-image',
-                serviceType,
-                serviceFor,
-            });
-            counters.uploaded += 1;
-            logger.info('Uploaded default service image to R2', { r2Key, file: filePath });
-        } catch (err) {
-            counters.failed += 1;
-            logger.error('Failed to upload default service image', { r2Key, file: filePath, error: err.message });
-            throw err;
-        }
-    } else if (!exists && dryRun) {
-        logger.info('DRY RUN planned default upload', { r2Key, file: filePath });
-    }
-
-    // Prepare DB record for fallback
-    const dbRecord = {
-        name: `default-${serviceType}-${serviceFor}`,
-        serviceType,
-        serviceFor,
-        r2Key,
-        keywords: ['default', 'fallback', serviceType, serviceFor],
-        isFallback: true,
-    };
-
-    if (!dryRun) {
-        await serviceDefaultImageRepository.upsert(dbRecord);
-        counters.upserted += 1;
-        logger.info('Upserted fallback image record to DB', { serviceType, serviceFor });
-    } else {
-        logger.info('DRY RUN planned DB fallback upsert', { serviceType, serviceFor });
-    }
-
-    return r2Key;
-};
-
 try {
-    logger.info('Starting service image seeding (Database-Driven)', { dryRun, force });
+    logger.info('Starting production-grade service image seeding', { dryRun, force });
 
     if (!dryRun) {
         await connectDB();
@@ -175,12 +122,31 @@ try {
 
     const manifest = await loadManifest();
 
+    // 1. Process all images in the manifest
     for (const entry of manifest.images) {
         await uploadOne(entry);
     }
 
-    await uploadDefault('single', 'male', manifest.defaults.single, 'image/jpeg');
-    await uploadDefault('bundled', 'male', manifest.defaults.bundled, 'image/jpeg');
+    // 2. Validation: Ensure all 6 global defaults exist in DB
+    if (!dryRun) {
+        const types = ['single', 'bundled'];
+        const genders = ['male', 'female', 'unisex'];
+        let missingCount = 0;
+
+        for (const type of types) {
+            for (const gender of genders) {
+                const found = await serviceDefaultImageRepository.findGlobalDefault(type, gender);
+                if (!found) {
+                    logger.error('CRITICAL: Missing global default after seeding', { type, gender });
+                    missingCount += 1;
+                }
+            }
+        }
+
+        if (missingCount > 0) {
+            throw new Error(`Seeding failed: ${missingCount} global defaults are missing.`);
+        }
+    }
 
     logger.info('Service image seeding complete', counters);
 } catch (err) {

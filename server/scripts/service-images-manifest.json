@@ -1,136 +1,594 @@
 {
   "images": [
     {
-      "name": "single-shave-male",
-      "keywords": ["shave", "beard trim", "beard", "trim"],
-      "serviceType": "single",
-      "serviceFor": "male",
-      "file": "assets/services/single-shave-male.jpg",
-      "contentType": "image/jpeg"
-    },
-    {
-      "name": "bundled-haircutshave-male",
-      "keywords": ["haircut", "shave", "combo", "bundle", "men"],
-      "serviceType": "bundled",
-      "serviceFor": "male",
-      "file": "assets/services/bundled-haircutshave-male.jpg",
-      "contentType": "image/jpeg"
-    },
-    {
-      "name": "single-facial-female",
-      "keywords": ["facial", "face cleanup", "face", "beauty", "women"],
-      "serviceType": "single",
-      "serviceFor": "female",
-      "file": "assets/services/single-facial-female.jpg",
-      "contentType": "image/jpeg"
-    },
-    {
-      "name": "single-facial-male",
-      "keywords": ["facial", "face cleanup", "face", "men"],
-      "serviceType": "single",
-      "serviceFor": "male",
-      "file": "assets/services/single-facial-male.jpg",
-      "contentType": "image/jpeg"
-    },
-    {
-      "name": "bundled-haircutshave-female",
-      "keywords": ["haircut", "shave", "combo", "bundle", "women"],
-      "serviceType": "bundled",
-      "serviceFor": "female",
-      "file": "assets/services/bundled-haircutshave-female.jpg",
-      "contentType": "image/jpeg"
-    },
-    {
-      "name": "single-cleanup-female",
-      "keywords": ["cleanup", "face cleanup", "women"],
-      "serviceType": "single",
-      "serviceFor": "female",
-      "file": "assets/services/single-cleanup-female.jpg",
-      "contentType": "image/jpeg"
-    },
-    {
-      "name": "single-haircut-female",
-      "keywords": ["haircut", "hair cut", "women", "style"],
-      "serviceType": "single",
-      "serviceFor": "female",
-      "file": "assets/services/single-haircut-female.jpg",
-      "contentType": "image/jpeg"
-    },
-    {
-      "name": "single-massage-female",
-      "keywords": ["massage", "body massage", "women", "relax"],
-      "serviceType": "single",
-      "serviceFor": "female",
-      "file": "assets/services/single-massage-female.jpg",
-      "contentType": "image/jpeg"
-    },
-    {
-      "name": "single-haircolor-female",
-      "keywords": ["hair color", "hair colour", "women", "style"],
-      "serviceType": "single",
-      "serviceFor": "female",
-      "file": "assets/services/single-haircolor-female.jpg",
-      "contentType": "image/jpeg"
-    },
-    {
-      "name": "single-haircolor-male",
-      "keywords": ["hair color", "hair colour", "men", "style"],
-      "serviceType": "single",
-      "serviceFor": "male",
-      "file": "assets/services/single-haircolor-male.jpg",
-      "contentType": "image/jpeg"
-    },
-    {
+      "categoryId": "haircut",
       "name": "single-haircut-male",
-      "keywords": ["haircut", "hair cut", "men", "fade", "style"],
+      "keywords": ["haircut", "trim", "fade", "hair cut", "men", "barber"],
       "serviceType": "single",
       "serviceFor": "male",
-      "file": "assets/services/single-haircut-male.jpg",
+      "file": "assets/services/single/haircut/male.jpg",
+      "isGlobalDefault": false,
       "contentType": "image/jpeg"
     },
     {
-      "name": "single-trim-male",
-      "keywords": ["trim", "beard trim", "hair trim", "men"],
-      "serviceType": "single",
-      "serviceFor": "male",
-      "file": "assets/services/single-trim-male.jpg",
-      "contentType": "image/jpeg"
-    },
-    {
-      "name": "single-headmassage-female",
-      "keywords": ["head massage", "massage", "women", "relax"],
+      "categoryId": "haircut",
+      "name": "single-haircut-female",
+      "keywords": ["haircut", "trim", "layer cut", "hair cut", "women", "style"],
       "serviceType": "single",
       "serviceFor": "female",
-      "file": "assets/services/single-headmassage-female.jpg",
+      "file": "assets/services/single/haircut/female.jpg",
+      "isGlobalDefault": false,
       "contentType": "image/jpeg"
     },
     {
+      "categoryId": "haircut",
+      "name": "single-haircut-unisex",
+      "keywords": ["haircut", "trim", "hair cut", "unisex", "style"],
+      "serviceType": "single",
+      "serviceFor": "unisex",
+      "file": "assets/services/single/haircut/unisex.jpg",
+      "isGlobalDefault": false,
+      "contentType": "image/jpeg"
+    },
+    {
+      "categoryId": "shave",
+      "name": "single-shave-male",
+      "keywords": ["shave", "beard trim", "beard", "men", "straight razor"],
+      "serviceType": "single",
+      "serviceFor": "male",
+      "file": "assets/services/single/shave/male.jpg",
+      "isGlobalDefault": false,
+      "contentType": "image/jpeg"
+    },
+    {
+      "categoryId": "shave",
+      "name": "single-shave-unisex",
+      "keywords": ["shave", "beard trim", "beard", "unisex"],
+      "serviceType": "single",
+      "serviceFor": "unisex",
+      "file": "assets/services/single/shave/unisex.jpg",
+      "isGlobalDefault": false,
+      "contentType": "image/jpeg"
+    },
+    {
+      "categoryId": "facial",
+      "name": "single-facial-male",
+      "keywords": ["facial", "face cleanup", "face", "men", "skin care"],
+      "serviceType": "single",
+      "serviceFor": "male",
+      "file": "assets/services/single/facial/male.jpg",
+      "isGlobalDefault": false,
+      "contentType": "image/jpeg"
+    },
+    {
+      "categoryId": "facial",
+      "name": "single-facial-female",
+      "keywords": ["facial", "face cleanup", "face", "women", "beauty", "skin care"],
+      "serviceType": "single",
+      "serviceFor": "female",
+      "file": "assets/services/single/facial/female.jpg",
+      "isGlobalDefault": false,
+      "contentType": "image/jpeg"
+    },
+    {
+      "categoryId": "facial",
+      "name": "single-facial-unisex",
+      "keywords": ["facial", "face cleanup", "face", "unisex", "skin care"],
+      "serviceType": "single",
+      "serviceFor": "unisex",
+      "file": "assets/services/single/facial/unisex.jpg",
+      "isGlobalDefault": false,
+      "contentType": "image/jpeg"
+    },
+    {
+      "categoryId": "massage",
+      "name": "single-massage-male",
+      "keywords": ["massage", "body massage", "men", "relax", "spa"],
+      "serviceType": "single",
+      "serviceFor": "male",
+      "file": "assets/services/single/massage/male.jpg",
+      "isGlobalDefault": false,
+      "contentType": "image/jpeg"
+    },
+    {
+      "categoryId": "massage",
+      "name": "single-massage-female",
+      "keywords": ["massage", "body massage", "women", "relax", "spa"],
+      "serviceType": "single",
+      "serviceFor": "female",
+      "file": "assets/services/single/massage/female.jpg",
+      "isGlobalDefault": false,
+      "contentType": "image/jpeg"
+    },
+    {
+      "categoryId": "massage",
+      "name": "single-massage-unisex",
+      "keywords": ["massage", "body massage", "unisex", "relax", "spa"],
+      "serviceType": "single",
+      "serviceFor": "unisex",
+      "file": "assets/services/single/massage/unisex.jpg",
+      "isGlobalDefault": false,
+      "contentType": "image/jpeg"
+    },
+    {
+      "categoryId": "haircolor",
+      "name": "single-haircolor-female",
+      "keywords": ["hair color", "hair colour", "women", "style", "dye"],
+      "serviceType": "single",
+      "serviceFor": "female",
+      "file": "assets/services/single/haircolor/female.jpg",
+      "isGlobalDefault": false,
+      "contentType": "image/jpeg"
+    },
+    {
+      "categoryId": "haircolor",
+      "name": "single-haircolor-male",
+      "keywords": ["hair color", "hair colour", "men", "style", "dye"],
+      "serviceType": "single",
+      "serviceFor": "male",
+      "file": "assets/services/single/haircolor/male.jpg",
+      "isGlobalDefault": false,
+      "contentType": "image/jpeg"
+    },
+    {
+      "categoryId": "haircolor",
+      "name": "single-haircolor-unisex",
+      "keywords": ["hair color", "hair colour", "unisex", "style", "dye"],
+      "serviceType": "single",
+      "serviceFor": "unisex",
+      "file": "assets/services/single/haircolor/unisex.jpg",
+      "isGlobalDefault": false,
+      "contentType": "image/jpeg"
+    },
+    {
+      "categoryId": "cleanup",
+      "name": "single-cleanup-male",
+      "keywords": ["cleanup", "face cleanup", "men", "skin"],
+      "serviceType": "single",
+      "serviceFor": "male",
+      "file": "assets/services/single/cleanup/male.jpg",
+      "isGlobalDefault": false,
+      "contentType": "image/jpeg"
+    },
+    {
+      "categoryId": "cleanup",
+      "name": "single-cleanup-female",
+      "keywords": ["cleanup", "face cleanup", "women", "skin"],
+      "serviceType": "single",
+      "serviceFor": "female",
+      "file": "assets/services/single/cleanup/female.jpg",
+      "isGlobalDefault": false,
+      "contentType": "image/jpeg"
+    },
+    {
+      "categoryId": "cleanup",
+      "name": "single-cleanup-unisex",
+      "keywords": ["cleanup", "face cleanup", "unisex", "skin"],
+      "serviceType": "single",
+      "serviceFor": "unisex",
+      "file": "assets/services/single/cleanup/unisex.jpg",
+      "isGlobalDefault": false,
+      "contentType": "image/jpeg"
+    },
+    {
+      "categoryId": "headmassage",
       "name": "single-headmassage-male",
       "keywords": ["head massage", "massage", "men", "relax"],
       "serviceType": "single",
       "serviceFor": "male",
-      "file": "assets/services/single-headmassage-male.jpg",
+      "file": "assets/services/single/headmassage/male.jpg",
+      "isGlobalDefault": false,
       "contentType": "image/jpeg"
     },
     {
-      "name": "single-cleanup-male",
-      "keywords": ["cleanup", "face cleanup", "men"],
+      "categoryId": "headmassage",
+      "name": "single-headmassage-female",
+      "keywords": ["head massage", "massage", "women", "relax"],
       "serviceType": "single",
-      "serviceFor": "male",
-      "file": "assets/services/single-cleanup-male.jpg",
+      "serviceFor": "female",
+      "file": "assets/services/single/headmassage/female.jpg",
+      "isGlobalDefault": false,
       "contentType": "image/jpeg"
     },
     {
-      "name": "single-massage-male",
-      "keywords": ["massage", "body massage", "men", "relax"],
+      "categoryId": "headmassage",
+      "name": "single-headmassage-unisex",
+      "keywords": ["head massage", "massage", "unisex", "relax"],
+      "serviceType": "single",
+      "serviceFor": "unisex",
+      "file": "assets/services/single/headmassage/unisex.jpg",
+      "isGlobalDefault": false,
+      "contentType": "image/jpeg"
+    },
+    {
+      "categoryId": "pedicure",
+      "name": "single-pedicure-male",
+      "keywords": ["pedicure", "foot care", "men", "spa"],
       "serviceType": "single",
       "serviceFor": "male",
-      "file": "assets/services/single-massage-male.jpg",
+      "file": "assets/services/single/pedicure/male.jpg",
+      "isGlobalDefault": false,
+      "contentType": "image/jpeg"
+    },
+    {
+      "categoryId": "pedicure",
+      "name": "single-pedicure-female",
+      "keywords": ["pedicure", "foot care", "women", "spa"],
+      "serviceType": "single",
+      "serviceFor": "female",
+      "file": "assets/services/single/pedicure/female.jpg",
+      "isGlobalDefault": false,
+      "contentType": "image/jpeg"
+    },
+    {
+      "categoryId": "pedicure",
+      "name": "single-pedicure-unisex",
+      "keywords": ["pedicure", "foot care", "unisex", "spa"],
+      "serviceType": "single",
+      "serviceFor": "unisex",
+      "file": "assets/services/single/pedicure/unisex.jpg",
+      "isGlobalDefault": false,
+      "contentType": "image/jpeg"
+    },
+    {
+      "categoryId": "manicure",
+      "name": "single-manicure-male",
+      "keywords": ["manicure", "hand care", "men", "spa"],
+      "serviceType": "single",
+      "serviceFor": "male",
+      "file": "assets/services/single/manicure/male.jpg",
+      "isGlobalDefault": false,
+      "contentType": "image/jpeg"
+    },
+    {
+      "categoryId": "manicure",
+      "name": "single-manicure-female",
+      "keywords": ["manicure", "hand care", "women", "spa"],
+      "serviceType": "single",
+      "serviceFor": "female",
+      "file": "assets/services/single/manicure/female.jpg",
+      "isGlobalDefault": false,
+      "contentType": "image/jpeg"
+    },
+    {
+      "categoryId": "manicure",
+      "name": "single-manicure-unisex",
+      "keywords": ["manicure", "hand care", "unisex", "spa"],
+      "serviceType": "single",
+      "serviceFor": "unisex",
+      "file": "assets/services/single/manicure/unisex.jpg",
+      "isGlobalDefault": false,
+      "contentType": "image/jpeg"
+    },
+    {
+      "categoryId": "waxing",
+      "name": "single-waxing-male",
+      "keywords": ["waxing", "hair removal", "men"],
+      "serviceType": "single",
+      "serviceFor": "male",
+      "file": "assets/services/single/waxing/male.jpg",
+      "isGlobalDefault": false,
+      "contentType": "image/jpeg"
+    },
+    {
+      "categoryId": "waxing",
+      "name": "single-waxing-female",
+      "keywords": ["waxing", "hair removal", "women"],
+      "serviceType": "single",
+      "serviceFor": "female",
+      "file": "assets/services/single/waxing/female.jpg",
+      "isGlobalDefault": false,
+      "contentType": "image/jpeg"
+    },
+    {
+      "categoryId": "waxing",
+      "name": "single-waxing-unisex",
+      "keywords": ["waxing", "hair removal", "unisex"],
+      "serviceType": "single",
+      "serviceFor": "unisex",
+      "file": "assets/services/single/waxing/unisex.jpg",
+      "isGlobalDefault": false,
+      "contentType": "image/jpeg"
+    },
+    {
+      "categoryId": "threading",
+      "name": "single-threading-male",
+      "keywords": ["threading", "eyebrow", "men"],
+      "serviceType": "single",
+      "serviceFor": "male",
+      "file": "assets/services/single/threading/male.jpg",
+      "isGlobalDefault": false,
+      "contentType": "image/jpeg"
+    },
+    {
+      "categoryId": "threading",
+      "name": "single-threading-female",
+      "keywords": ["threading", "eyebrow", "women"],
+      "serviceType": "single",
+      "serviceFor": "female",
+      "file": "assets/services/single/threading/female.jpg",
+      "isGlobalDefault": false,
+      "contentType": "image/jpeg"
+    },
+    {
+      "categoryId": "threading",
+      "name": "single-threading-unisex",
+      "keywords": ["threading", "eyebrow", "unisex"],
+      "serviceType": "single",
+      "serviceFor": "unisex",
+      "file": "assets/services/single/threading/unisex.jpg",
+      "isGlobalDefault": false,
+      "contentType": "image/jpeg"
+    },
+    {
+      "categoryId": "makeup",
+      "name": "single-makeup-female",
+      "keywords": ["makeup", "bridal", "women", "beauty"],
+      "serviceType": "single",
+      "serviceFor": "female",
+      "file": "assets/services/single/makeup/female.jpg",
+      "isGlobalDefault": false,
+      "contentType": "image/jpeg"
+    },
+    {
+      "categoryId": "makeup",
+      "name": "single-makeup-male",
+      "keywords": ["makeup", "men", "beauty"],
+      "serviceType": "single",
+      "serviceFor": "male",
+      "file": "assets/services/single/makeup/male.jpg",
+      "isGlobalDefault": false,
+      "contentType": "image/jpeg"
+    },
+    {
+      "categoryId": "makeup",
+      "name": "single-makeup-unisex",
+      "keywords": ["makeup", "unisex", "beauty"],
+      "serviceType": "single",
+      "serviceFor": "unisex",
+      "file": "assets/services/single/makeup/unisex.jpg",
+      "isGlobalDefault": false,
+      "contentType": "image/jpeg"
+    },
+    {
+      "categoryId": "haircut-shave",
+      "name": "bundled-haircutshave-male",
+      "keywords": ["haircut", "shave", "combo", "bundle", "men"],
+      "serviceType": "bundled",
+      "serviceFor": "male",
+      "file": "assets/services/bundled/haircut-shave/male.jpg",
+      "isGlobalDefault": false,
+      "contentType": "image/jpeg"
+    },
+    {
+      "categoryId": "haircut-shave",
+      "name": "bundled-haircutshave-female",
+      "keywords": ["haircut", "shave", "combo", "bundle", "women"],
+      "serviceType": "bundled",
+      "serviceFor": "female",
+      "file": "assets/services/bundled/haircut-shave/female.jpg",
+      "isGlobalDefault": false,
+      "contentType": "image/jpeg"
+    },
+    {
+      "categoryId": "haircut-shave",
+      "name": "bundled-haircutshave-unisex",
+      "keywords": ["haircut", "shave", "combo", "bundle", "unisex"],
+      "serviceType": "bundled",
+      "serviceFor": "unisex",
+      "file": "assets/services/bundled/haircut-shave/unisex.jpg",
+      "isGlobalDefault": false,
+      "contentType": "image/jpeg"
+    },
+    {
+      "categoryId": "haircut-facial",
+      "name": "bundled-haircutfacial-male",
+      "keywords": ["haircut", "facial", "combo", "bundle", "men"],
+      "serviceType": "bundled",
+      "serviceFor": "male",
+      "file": "assets/services/bundled/haircut-facial/male.jpg",
+      "isGlobalDefault": false,
+      "contentType": "image/jpeg"
+    },
+    {
+      "categoryId": "haircut-facial",
+      "name": "bundled-haircutfacial-female",
+      "keywords": ["haircut", "facial", "combo", "bundle", "women"],
+      "serviceType": "bundled",
+      "serviceFor": "female",
+      "file": "assets/services/bundled/haircut-facial/female.jpg",
+      "isGlobalDefault": false,
+      "contentType": "image/jpeg"
+    },
+    {
+      "categoryId": "haircut-facial",
+      "name": "bundled-haircutfacial-unisex",
+      "keywords": ["haircut", "facial", "combo", "bundle", "unisex"],
+      "serviceType": "bundled",
+      "serviceFor": "unisex",
+      "file": "assets/services/bundled/haircut-facial/unisex.jpg",
+      "isGlobalDefault": false,
+      "contentType": "image/jpeg"
+    },
+    {
+      "categoryId": "spa",
+      "name": "bundled-spa-unisex",
+      "keywords": ["spa", "massage", "facial", "bundle", "unisex"],
+      "serviceType": "bundled",
+      "serviceFor": "unisex",
+      "file": "assets/services/bundled/spa/unisex.jpg",
+      "isGlobalDefault": false,
+      "contentType": "image/jpeg"
+    },
+    {
+      "categoryId": "spa",
+      "name": "bundled-spa-female",
+      "keywords": ["spa", "massage", "facial", "bundle", "female"],
+      "serviceType": "bundled",
+      "serviceFor": "female",
+      "file": "assets/services/bundled/spa/female.jpg",
+      "isGlobalDefault": false,
+      "contentType": "image/jpeg"
+    },
+    {
+      "categoryId": "spa",
+      "name": "bundled-spa-male",
+      "keywords": ["spa", "massage", "facial", "bundle", "male"],
+      "serviceType": "bundled",
+      "serviceFor": "male",
+      "file": "assets/services/bundled/spa/male.jpg",
+      "isGlobalDefault": false,
+      "contentType": "image/jpeg"
+    },
+    {
+      "categoryId": "full-grooming",
+      "name": "bundled-fullgrooming-male",
+      "keywords": ["grooming", "full package", "men", "bundle"],
+      "serviceType": "bundled",
+      "serviceFor": "male",
+      "file": "assets/services/bundled/full-grooming/male.jpg",
+      "isGlobalDefault": false,
+      "contentType": "image/jpeg"
+    },
+    {
+      "categoryId": "full-grooming",
+      "name": "bundled-fullgrooming-female",
+      "keywords": ["grooming", "full package", "women", "bundle"],
+      "serviceType": "bundled",
+      "serviceFor": "female",
+      "file": "assets/services/bundled/full-grooming/female.jpg",
+      "isGlobalDefault": false,
+      "contentType": "image/jpeg"
+    },
+    {
+      "categoryId": "full-grooming",
+      "name": "bundled-fullgrooming-unisex",
+      "keywords": ["grooming", "full package", "unisex", "bundle"],
+      "serviceType": "bundled",
+      "serviceFor": "unisex",
+      "file": "assets/services/bundled/full-grooming/unisex.jpg",
+      "isGlobalDefault": false,
+      "contentType": "image/jpeg"
+    },
+    {
+      "categoryId": "bridal-package",
+      "name": "bundled-bridalpackage-female",
+      "keywords": ["bridal", "wedding", "women", "makeup", "package"],
+      "serviceType": "bundled",
+      "serviceFor": "female",
+      "file": "assets/services/bundled/bridal-package/female.jpg",
+      "isGlobalDefault": false,
+      "contentType": "image/jpeg"
+    },
+    {
+      "categoryId": "bridal-package",
+      "name": "bundled-bridalpackage-unisex",
+      "keywords": ["bridal", "wedding", "unisex", "makeup", "package"],
+      "serviceType": "bundled",
+      "serviceFor": "unisex",
+      "file": "assets/services/bundled/bridal-package/unisex.jpg",
+      "isGlobalDefault": false,
+      "contentType": "image/jpeg"
+    },
+    {
+      "categoryId": "bridal-package",
+      "name": "bundled-bridalpackage-male",
+      "keywords": ["groom", "wedding", "men", "package"],
+      "serviceType": "bundled",
+      "serviceFor": "male",
+      "file": "assets/services/bundled/bridal-package/male.jpg",
+      "isGlobalDefault": false,
+      "contentType": "image/jpeg"
+    },
+    {
+      "categoryId": "skincare-combo",
+      "name": "bundled-skincarecombo-unisex",
+      "keywords": ["skincare", "facial", "cleanup", "bundle", "unisex"],
+      "serviceType": "bundled",
+      "serviceFor": "unisex",
+      "file": "assets/services/bundled/skincare-combo/unisex.jpg",
+      "isGlobalDefault": false,
+      "contentType": "image/jpeg"
+    },
+    {
+      "categoryId": "skincare-combo",
+      "name": "bundled-skincarecombo-male",
+      "keywords": ["skincare", "facial", "cleanup", "bundle", "male"],
+      "serviceType": "bundled",
+      "serviceFor": "male",
+      "file": "assets/services/bundled/skincare-combo/male.jpg",
+      "isGlobalDefault": false,
+      "contentType": "image/jpeg"
+    },
+    {
+      "categoryId": "skincare-combo",
+      "name": "bundled-skincarecombo-female",
+      "keywords": ["skincare", "facial", "cleanup", "bundle", "female"],
+      "serviceType": "bundled",
+      "serviceFor": "female",
+      "file": "assets/services/bundled/skincare-combo/female.jpg",
+      "isGlobalDefault": false,
+      "contentType": "image/jpeg"
+    },
+    {
+      "categoryId": "default",
+      "name": "global-single-male",
+      "keywords": ["default", "fallback", "men"],
+      "serviceType": "single",
+      "serviceFor": "male",
+      "file": "assets/services/single/default/male.jpg",
+      "isGlobalDefault": true,
+      "contentType": "image/jpeg"
+    },
+    {
+      "categoryId": "default",
+      "name": "global-single-female",
+      "keywords": ["default", "fallback", "women"],
+      "serviceType": "single",
+      "serviceFor": "female",
+      "file": "assets/services/single/default/female.jpg",
+      "isGlobalDefault": true,
+      "contentType": "image/jpeg"
+    },
+    {
+      "categoryId": "default",
+      "name": "global-single-unisex",
+      "keywords": ["default", "fallback", "unisex"],
+      "serviceType": "single",
+      "serviceFor": "unisex",
+      "file": "assets/services/single/default/unisex.jpg",
+      "isGlobalDefault": true,
+      "contentType": "image/jpeg"
+    },
+    {
+      "categoryId": "default",
+      "name": "global-bundled-male",
+      "keywords": ["default", "fallback", "men", "bundle"],
+      "serviceType": "bundled",
+      "serviceFor": "male",
+      "file": "assets/services/bundled/default/male.jpg",
+      "isGlobalDefault": true,
+      "contentType": "image/jpeg"
+    },
+    {
+      "categoryId": "default",
+      "name": "global-bundled-female",
+      "keywords": ["default", "fallback", "women", "bundle"],
+      "serviceType": "bundled",
+      "serviceFor": "female",
+      "file": "assets/services/bundled/default/female.jpg",
+      "isGlobalDefault": true,
+      "contentType": "image/jpeg"
+    },
+    {
+      "categoryId": "default",
+      "name": "global-bundled-unisex",
+      "keywords": ["default", "fallback", "unisex", "bundle"],
+      "serviceType": "bundled",
+      "serviceFor": "unisex",
+      "file": "assets/services/bundled/default/unisex.jpg",
+      "isGlobalDefault": true,
       "contentType": "image/jpeg"
     }
-  ],
-  "defaults": {
-    "single": "assets/services/single-haircut-male.jpg",
-    "bundled": "assets/services/bundled-haircutshave-male.jpg"
-  }
+  ]
 }

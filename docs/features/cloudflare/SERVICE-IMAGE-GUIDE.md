@@ -1,49 +1,42 @@
-# EverCut — Service Image System Guide
+# EverCut — Service Image System Guide (v2)
 
-> **Complete guide for seeding, managing, and resolving service images in Cloudflare R2.**
+> **Complete guide for seeding, managing, and resolving service images in Cloudflare R2 with high precision.**
 
 ---
 
 ## 1. Overview
 
-Service images are stored as **R2 keys** (`imageR2Key`) in MongoDB — not signed URLs. Signed CDN URLs are generated fresh at read time via `buildMediaUrl()`.
+Service images are stored as **R2 keys** (`imageR2Key`) in MongoDB. Signed CDN URLs are generated fresh at read time.
 
 **Two ways a service gets its image:**
 
-1. **Custom upload** — Client passes `imageMediaId` when creating/updating a service. The server resolves the confirmed media record, stores its `r2Key` as `imageR2Key`, and links the media to the service entity.
-2. **Intelligent default assignment** — When no `imageMediaId` is provided, the server matches the service name and gender against a seeded image collection (`service_default_images`) and assigns the most relevant default R2 key.
+1. **Custom upload** — Client passes `imageMediaId`.
+2. **Intelligent default assignment** — The server matches the service name and gender against a seeded image collection (`service_default_images`) using a deterministic 4-step hierarchy.
 
 ---
 
-## 2. How Default Image Assignment Works
+## 2. Deterministic Resolution Hierarchy
 
-When a service is created or updated without `imageMediaId`, the `resolveDefaultServiceImageR2Key()` function in `service-catalog.service.js` matches the service against the `ServiceDefaultImage` collection.
+When a service is created/updated without `imageMediaId`, the `resolveDefaultServiceImageR2Key()` function follows this priority:
 
-**Matching priority (highest to lowest):**
-
-1. **Exact match (Name + Type + Gender)** — Normalize the service name (lowercase, remove spaces) and look for an exact match for that name, service type, and gender.
-
-2. **Keyword scoring (Type + Gender filter)** — Filter the collection by `serviceType` and `serviceFor`. Then, perform a text search on the `keywords` field using the service name. Pick the entry with the highest relevance score.
-
-3. **Bundle concatenation** — For bundled services only: concatenate the `bundledServices` names (normalized, sorted) into a single key and look for an exact name match.
-
-4. **Generic fallback** — If nothing matches, return the fallback image for that specific type and gender (e.g., `images/services/default/single/male.jpg`).
+1.  **Exact Match:** Name + Type + Gender (e.g., `premiumhaircut` for `male`).
+2.  **Category Fuzzy Match:** Text search on `keywords` within the same Type + Gender (e.g., matching "Fade" to the `haircut` category for `male`).
+3.  **Global Gender Fallback:** If no specific category matches, use the **Global Default** for that gender (e.g., `images/services/single/default/male.jpg`).
+4.  **Absolute System Fallback:** As a last resort, use the **Global Unisex Default** (`images/services/single/default/unisex.jpg`).
 
 ---
 
-## 3. Preparing Images for Seeding
+## 3. Tiered Asset Organization
 
-### Directory Structure
+Images are organized in a tiered structure to support precise matching and clean management.
 
-All service images MUST be placed in `server/assets/services/`. The naming convention follows `[type]-[category]-[gender].jpg`.
+**Directory Structure:**
+`server/assets/services/[serviceType]/[categoryId]/[serviceFor].jpg`
 
-```
-server/assets/services/
-├── single-haircut-male.jpg      → Single service image (male)
-├── single-haircut-female.jpg    → Single service image (female)
-├── bundled-haircutshave-male.jpg → Bundled service image
-└── ...
-```
+**Example:**
+- `server/assets/services/single/haircut/male.jpg`
+- `server/assets/services/single/haircut/unisex.jpg`
+- `server/assets/services/single/default/female.jpg`
 
 ---
 
@@ -51,55 +44,34 @@ server/assets/services/
 
 **Path:** `server/scripts/service-images-manifest.json`
 
-This is the single source of truth for the seed script. It defines every image to upload along with its matching keywords and gender.
+The single source of truth for the seeding process.
 
-### Format
+### Categories
+- **Single:** `haircut`, `shave`, `facial`, `massage`, `haircolor`, `cleanup`, `headmassage`, `pedicure`, `manicure`, `waxing`, `threading`, `makeup`.
+- **Bundled:** `haircut-shave`, `haircut-facial`, `full-grooming`, `bridal-package`, `skincare-combo`, `spa`.
 
-```json
-{
-  "images": [
-    {
-      "name": "single-haircut-male",
-      "keywords": ["haircut", "trim", "fade", "hair cut"],
-      "serviceType": "single",
-      "serviceFor": "male",
-      "file": "assets/services/single-haircut-male.jpg",
-      "contentType": "image/jpeg"
-    }
-  ],
-  "defaults": {
-    "single": "assets/services/single-haircut-male.jpg",
-    "bundled": "assets/services/bundled-haircutshave-male.jpg"
-  }
-}
-```
-
-### Field Reference
-
-| Field | Required | Description |
-|-------|----------|-------------|
-| `name` | Yes | Unique identifier (lowercase kebab-case). Determines the R2 key suffix. |
-| `keywords` | Yes | Array of terms for fuzzy matching. |
-| `serviceType` | Yes | `"single"` or `"bundled"`. |
-| `serviceFor` | Yes | `"male"`, `"female"`, or `"unisex"`. |
-| `file` | Yes | Relative path from `server/` to the local file. |
-| `contentType` | Yes | MIME type (`image/jpeg`, `image/png`, `image/webp`). |
+### Schema
+- `categoryId`: Group identifier (e.g., `haircut`, `shave`).
+- `name`: Unique identifier for the image record.
+- `keywords`: Array of terms for fuzzy matching.
+- `serviceType`: `single` or `bundled`.
+- `serviceFor`: `male`, `female`, or `unisex`.
+- `isGlobalDefault`: Boolean (only one per Type + Gender).
 
 ---
 
-## 5. Running the Seed Script
+## 5. Key Scripts
 
-The seed script (`scripts/seed-service-images.mjs`) reads the manifest, uploads each image to R2, and upserts the metadata into MongoDB.
-
+### Seeding
 ```bash
-# 1. Dry-run first
-node scripts/seed-service-images.mjs
-
-# 2. Upload and update DB
-node scripts/seed-service-images.mjs --write
-
-# 3. Force re-upload
+# Upload assets to R2 and sync metadata to MongoDB
 node scripts/seed-service-images.mjs --write --force
+```
+
+### Re-resolution (Maintenance)
+```bash
+# Re-calculate default images for all active services in the DB
+node scripts/re-resolve-service-images.mjs --write
 ```
 
 ---
@@ -108,8 +80,7 @@ node scripts/seed-service-images.mjs --write --force
 
 | File | Purpose |
 |------|---------|
-| `server/src/models/service-default-image.model.js` | Database schema for default images |
-| `server/src/repositories/service-default-image.repository.js` | Resolution logic (deterministic matching) |
+| `server/src/models/service-default-image.model.js` | Database schema with `categoryId` and `isGlobalDefault` |
+| `server/src/repositories/service-default-image.repository.js` | 4-step deterministic resolution logic |
 | `server/src/services/service-catalog.service.js` | Service layer integration |
-| `server/scripts/seed-service-images.mjs` | Seeding script |
-| `server/scripts/service-images-manifest.json` | Master image configuration |
+| `server/tests/service-image-resolution.test.js` | Automated verification of resolution branches |

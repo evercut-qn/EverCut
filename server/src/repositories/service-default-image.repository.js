@@ -18,16 +18,20 @@ class ServiceDefaultImageRepository {
         return ServiceDefaultImage.find({ serviceType }).lean();
     }
 
-    async findFallback(serviceType, serviceFor = 'male') {
-        return ServiceDefaultImage.findOne({ serviceType, serviceFor, isFallback: true }).lean()
-            || ServiceDefaultImage.findOne({ serviceType, isFallback: true }).lean();
+    async findGlobalDefault(serviceType, serviceFor) {
+        return ServiceDefaultImage.findOne({
+            serviceType,
+            serviceFor,
+            isGlobalDefault: true,
+        }).lean();
     }
 
     /**
      * Finds the best matching default image for a given service name, type and gender.
-     * 1. Attempts exact name match (normalized).
+     * 1. Attempts exact name match (normalized) within the same type and gender.
      * 2. Falls back to text search on keywords within the same service type and gender.
-     * 3. Falls back to the 'isFallback' image for that service type and gender.
+     * 3. Falls back to the global default for that service type and gender.
+     * 4. Falls back to the absolute unisex global default for that service type.
      */
     async findBestMatch(serviceName, serviceType, serviceFor) {
         const normalized = serviceName.toLowerCase().replace(/\s+/g, '');
@@ -40,7 +44,7 @@ class ServiceDefaultImageRepository {
         }).lean();
         if (exact) return exact;
 
-        // 2. Try text search score on keywords
+        // 2. Try text search score on keywords within same gender
         const fuzzy = await ServiceDefaultImage.findOne(
             trustQueryOperators({
                 serviceType,
@@ -54,8 +58,12 @@ class ServiceDefaultImageRepository {
 
         if (fuzzy && fuzzy.score > 0.5) return fuzzy;
 
-        // 3. Fallback to generic default for the type and gender
-        return this.findFallback(serviceType, serviceFor);
+        // 3. Fallback to global default for the type and gender
+        const genderDefault = await this.findGlobalDefault(serviceType, serviceFor);
+        if (genderDefault) return genderDefault;
+
+        // 4. Absolute fallback to unisex global default for the type
+        return this.findGlobalDefault(serviceType, 'unisex');
     }
 
     async getAll() {
