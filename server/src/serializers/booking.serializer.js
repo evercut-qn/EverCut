@@ -12,8 +12,23 @@ const compact = (value) => Object.fromEntries(
 
 const resolveId = (value) => (value && typeof value === 'object' ? value.id : toIdString(value));
 
+const isObjectIdLike = (value) => (
+    value
+    && typeof value === 'object'
+    && (
+        typeof value.toHexString === 'function'
+        || value._bsontype === 'ObjectId'
+    )
+);
+
+const isPopulatedRef = (value) => (
+    value
+    && typeof value === 'object'
+    && !isObjectIdLike(value)
+);
+
 const serializeBookingRef = (value, serializer) => (
-    value && typeof value === 'object' ? serializer(value) : undefined
+    isPopulatedRef(value) ? serializer(value) : undefined
 );
 
 const toDateOnlyString = (value) => {
@@ -40,24 +55,25 @@ const withEmployeeBookingAvailability = (employee, bookingDate) => {
 };
 
 export const serializeBooking = (booking, options = {}) => {
-    const plain = sanitizeForResponse(toPlainObject(booking));
+    const raw = toPlainObject(booking);
+    const plain = sanitizeForResponse(raw);
     if (!plain) return null;
 
     const rawServices = options.services
-        || plain.services
+        || raw.services
         || (
-            Array.isArray(plain.serviceIds) && plain.serviceIds.some((service) => service && typeof service === 'object')
-                ? plain.serviceIds
+            Array.isArray(raw.serviceIds) && raw.serviceIds.some((service) => service && typeof service === 'object')
+                ? raw.serviceIds
                 : []
         );
     const services = serializeServices(rawServices);
 
-    const customer = serializeBookingRef(plain.customerId || plain.customer, serializeCustomerSummary);
+    const customer = serializeBookingRef(raw.customerId || raw.customer, serializeCustomerSummary);
     const employee = serializeBookingRef(
-        withEmployeeBookingAvailability(plain.employeeId || plain.employee, plain.date),
+        withEmployeeBookingAvailability(raw.employeeId || raw.employee, raw.date ?? plain.date),
         (value) => serializeEmployee(value, { publicView: true }),
     );
-    const shop = serializeBookingRef(plain.shopId || plain.shop, serializeShopSummary);
+    const shop = serializeBookingRef(raw.shopId || raw.shop, serializeShopSummary);
 
     return compact({
         id: plain.id,
@@ -106,13 +122,14 @@ export const serializeBooking = (booking, options = {}) => {
 };
 
 export const serializeBookingCreation = (booking) => {
-    const plain = sanitizeForResponse(toPlainObject(booking));
+    const raw = toPlainObject(booking);
+    const plain = sanitizeForResponse(raw);
     if (!plain) return null;
 
-    const rawServices = plain.services
+    const rawServices = raw.services
         || (
-            Array.isArray(plain.serviceIds) && plain.serviceIds.some((service) => service && typeof service === 'object')
-                ? plain.serviceIds
+            Array.isArray(raw.serviceIds) && raw.serviceIds.some((service) => service && typeof service === 'object')
+                ? raw.serviceIds
                 : []
         );
     const services = serializeServices(rawServices);
@@ -125,8 +142,8 @@ export const serializeBookingCreation = (booking) => {
         id: plain.id || toIdString(plain.bookingId),
         shopId: plain.shopId?.id || toIdString(plain.shopId),
         customerId: plain.customerId?.id || toIdString(plain.customerId),
-        employeeId: plain.employee ? undefined : (plain.employeeId?.id || toIdString(plain.employeeId)),
-        employee: plain.employee ? serializeEmployee(plain.employee, { publicView: true }) : undefined,
+        employeeId: raw.employee ? undefined : (plain.employeeId?.id || toIdString(plain.employeeId)),
+        employee: raw.employee ? serializeEmployee(raw.employee, { publicView: true }) : undefined,
         serviceIds: services.length > 0
             ? undefined
             : (Array.isArray(plain.serviceIds) ? plain.serviceIds.map(toIdString).filter(Boolean) : undefined),
@@ -148,20 +165,21 @@ export const serializeBookingCreation = (booking) => {
 };
 
 export const serializeBookingDetails = (details) => {
-    const plain = sanitizeForResponse(toPlainObject(details));
+    const raw = toPlainObject(details);
+    const plain = sanitizeForResponse(raw);
     if (!plain) return null;
 
     return compact({
         id: plain.id || toIdString(plain.bookingId),
-        customer: plain.customer ? serializeCustomerSummary(plain.customer) : null,
-        employee: plain.employee
-            ? serializeEmployee(withEmployeeBookingAvailability(plain.employee, plain.date), { publicView: true })
+        customer: raw.customer ? serializeCustomerSummary(raw.customer) : null,
+        employee: raw.employee
+            ? serializeEmployee(withEmployeeBookingAvailability(raw.employee, raw.date ?? plain.date), { publicView: true })
             : null,
-        shop: plain.shop ? serializeShopSummary(plain.shop) : null,
+        shop: raw.shop ? serializeShopSummary(raw.shop) : null,
         date: plain.date,
         time: plain.time,
         endTime: plain.endTime,
-        services: serializeServices(plain.services || []),
+        services: serializeServices(raw.services || []),
         subTotal: plain.subTotal,
         platformFee: plain.platformFee,
         totalAmount: plain.totalAmount,

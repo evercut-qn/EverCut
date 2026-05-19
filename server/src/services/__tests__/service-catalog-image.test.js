@@ -60,4 +60,54 @@ describe('ServiceCatalog Image Resolution', () => {
         const result = await serviceCatalog.addService(ownerId, serviceData);
         assert.equal(result.imageUrl.includes('bundled-exact-key'), true);
     });
+
+    it('searchServices: should request fields required for complete service cards', async (t) => {
+        let capturedSelectFields = null;
+
+        t.mock.method(serviceRepository, 'searchByName', (query, filters, selectFields) => {
+            capturedSelectFields = selectFields;
+            return [
+                {
+                    _id: 'service-1',
+                    serviceName: 'Premium Fade',
+                    serviceType: 'single',
+                    serviceFor: 'male',
+                    imageR2Key: 'images/services/premium-fade.jpg',
+                    duration: 45,
+                    actualPrice: 500,
+                    offerPrice: 100,
+                    finalPrice: 400,
+                    shopId: {
+                        _id: 'shop-1',
+                        shopName: 'EverCut Studio',
+                        coverR2Key: 'shops/cover.jpg',
+                    },
+                },
+            ];
+        });
+
+        const result = await serviceCatalog.searchServices('fade', 'male');
+
+        for (const field of [
+            'serviceName',
+            'serviceFor',
+            'serviceType',
+            'imageR2Key',
+            'duration',
+            'actualPrice',
+            'offerPrice',
+            'finalPrice',
+            'totalDuration',
+            'totalPrice',
+            'bundledServices',
+            'shopId',
+        ]) {
+            assert.match(capturedSelectFields, new RegExp(`\\b${field}\\b`));
+        }
+
+        assert.equal(result[0].imageUrl.includes('images/services/premium-fade.jpg'), true);
+        assert.equal(result[0].actualPrice, 500);
+        assert.equal(result[0].finalPrice, 400);
+        assert.equal(result[0].shop.coverUrl.includes('shops/cover.jpg'), true);
+    });
 });

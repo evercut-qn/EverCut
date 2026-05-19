@@ -63,6 +63,7 @@ class CustomerRepository {
                     select: 'firstName lastName photoR2Key',
                     options: { includeDeleted: true },
                 },
+                { path: 'customerId', select: 'firstName lastName photoR2Key' },
                 { path: 'shopId', select: 'shopName address coverR2Key' },
             ],
         }).lean();
@@ -78,6 +79,7 @@ class CustomerRepository {
                     select: 'firstName lastName photoR2Key',
                     options: { includeDeleted: true },
                 },
+                { path: 'customerId', select: 'firstName lastName photoR2Key' },
                 { path: 'shopId', select: 'shopName address coverR2Key' },
             ],
         }).lean();

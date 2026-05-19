@@ -18,8 +18,8 @@ export const serializeService = (service, options = {}) => {
     if (!plain) return null;
 
     const effectivePrice = getEffectiveServicePrice(plain);
-    const shop = plain.shopId && typeof plain.shopId === 'object'
-        ? serializeShopSummary(plain.shopId)
+    const shop = normalized.shopId && typeof normalized.shopId === 'object'
+        ? serializeShopSummary(normalized.shopId)
         : undefined;
 
     return compact({
@@ -29,7 +29,7 @@ export const serializeService = (service, options = {}) => {
         serviceName: plain.serviceName ?? null,
         serviceType: plain.serviceType ?? null,
         serviceFor: plain.serviceFor ?? null,
-        imageUrl: buildMediaUrl(plain.imageR2Key) ?? null,
+        imageUrl: buildMediaUrl(normalized.imageR2Key) ?? null,
         duration: plain.duration,
         actualPrice: plain.actualPrice,
         offerPrice: plain.offerPrice ?? 0,
