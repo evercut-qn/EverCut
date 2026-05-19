@@ -11,6 +11,21 @@ import * as mediaService from './media/media.service.js';
 import storageProvider from './media/storage-provider.service.js';
 import serviceDefaultImageRepository from '../repositories/service-default-image.repository.js';
 
+const SERVICE_CARD_FIELDS = [
+    'serviceName',
+    'serviceFor',
+    'serviceType',
+    'imageR2Key',
+    'duration',
+    'actualPrice',
+    'offerPrice',
+    'finalPrice',
+    'totalDuration',
+    'totalPrice',
+    'bundledServices',
+    'shopId',
+].join(' ');
+
 const normalizeBundledServices = (bundledServices = []) => (
     [...new Set(
         bundledServices
@@ -246,7 +261,7 @@ export const searchServices = async (query, gender) => {
     const filters = {};
     if (gender) filters.serviceFor = { $regex: new RegExp(`^${escapeRegex(gender)}$`, 'i') };
     return serializeServices(
-        await serviceRepository.searchByName(query, filters, 'serviceName serviceFor shopId'),
+        await serviceRepository.searchByName(query, filters, SERVICE_CARD_FIELDS),
         { includeShop: true },
     );
 };
@@ -259,7 +274,7 @@ export const searchShops = async (query) => {
 
 export const getServicesByGender = async (gender) => {
     return serializeServices(
-        await serviceRepository.findByGender(gender, 'serviceName shopId serviceFor serviceType'),
+        await serviceRepository.findByGender(gender, SERVICE_CARD_FIELDS),
         { includeShop: true },
     );
 };

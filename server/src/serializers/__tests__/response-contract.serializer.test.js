@@ -179,6 +179,72 @@ test('booking serializer adds employee availability for the booking date without
     assert.equal('blockedDates' in booking.employee, false);
 });
 
+test('booking serializer preserves nested media keys long enough to build public URLs', () => {
+    const booking = serializeBooking({
+        _id: '507f1f77bcf86cd799439011',
+        date: '2026-05-30',
+        customerId: {
+            _id: '507f1f77bcf86cd799439012',
+            firstName: 'Mina',
+            photoR2Key: 'images/customers/customer-1.png',
+        },
+        employeeId: {
+            _id: '507f1f77bcf86cd799439014',
+            firstName: 'Dev',
+            lastName: 'Patel',
+            photoR2Key: 'images/employees/employee-1.png',
+            blockedDates: [],
+        },
+        shopId: {
+            _id: '507f1f77bcf86cd799439013',
+            shopName: 'EverCut Studio',
+            coverR2Key: 'images/shops/shop-1.png',
+        },
+        serviceIds: [
+            {
+                _id: '507f1f77bcf86cd799439015',
+                serviceName: 'Haircut',
+                serviceType: 'single',
+                serviceFor: 'male',
+                imageR2Key: 'images/services/haircut.png',
+                duration: 30,
+                actualPrice: 500,
+                offerPrice: 50,
+                finalPrice: 450,
+            },
+        ],
+    });
+
+    assert.match(booking.customer.photoUrl, /images\/customers\/customer-1\.png/);
+    assert.match(booking.employee.photoUrl, /images\/employees\/employee-1\.png/);
+    assert.match(booking.shop.coverUrl, /images\/shops\/shop-1\.png/);
+    assert.match(booking.services[0].imageUrl, /images\/services\/haircut\.png/);
+    assert.equal('photoR2Key' in booking.employee, false);
+    assert.equal('coverR2Key' in booking.shop, false);
+    assert.equal('imageR2Key' in booking.services[0], false);
+});
+
+test('booking serializer keeps bare ObjectId refs as ids instead of empty relation objects', () => {
+    const objectId = {
+        _bsontype: 'ObjectId',
+        toHexString: () => '507f1f77bcf86cd799439013',
+    };
+
+    const booking = serializeBooking({
+        _id: '507f1f77bcf86cd799439011',
+        customerId: objectId,
+        shopId: objectId,
+        employeeId: objectId,
+    });
+
+    assert.equal(booking.customerId, '507f1f77bcf86cd799439013');
+    assert.equal(booking.shopId, '507f1f77bcf86cd799439013');
+    assert.equal(booking.employeeId, '507f1f77bcf86cd799439013');
+    assert.equal('customer' in booking, false);
+    assert.equal('shop' in booking, false);
+    assert.equal('employee' in booking, false);
+});
+
 test('serializers no longer export deprecated API aliases', async () => {
     const shopSerializer = await readFile(path.join(srcDir, 'serializers', 'shop.serializer.js'), 'utf8');
     const barberProfileUtils = await readFile(path.join(srcDir, 'utils', 'barber-profile.utils.js'), 'utf8');

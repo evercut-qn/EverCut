@@ -47,6 +47,20 @@ import { buildMediaUrl } from './media/media-url.service.js';
 // ── Customer: create booking ─────────────────────────────────────────────
 
 const normalizeBookedServices = (services = []) => services.map(normalizeServicePricing);
+const BOOKING_SERVICE_CARD_FIELDS = [
+    'serviceName',
+    'serviceFor',
+    'serviceType',
+    'imageR2Key',
+    'duration',
+    'actualPrice',
+    'offerPrice',
+    'finalPrice',
+    'totalDuration',
+    'totalPrice',
+    'bundledServices',
+    'shopId',
+].join(' ');
 const toObjectIdString = (value) => String(value?._id || value || '');
 const paginateArray = (items, query = {}) => {
     const { skip, limit, pagination } = buildPagination(query, items.length);
@@ -355,7 +369,7 @@ const buildBookingDetailsPayload = async (booking) => {
     const services = normalizeBookedServices(
         await serviceRepository.findByIds(
             booking.serviceIds,
-            'serviceName finalPrice totalPrice actualPrice offerPrice imageR2Key serviceType duration totalDuration',
+            BOOKING_SERVICE_CARD_FIELDS,
         ),
     );
     const totalAmount = sumServicePrices(services);
@@ -458,7 +472,7 @@ export const createBooking = async (userId, data) => {
     const services = normalizeBookedServices(
         await serviceRepository.findByIds(
             serviceIds,
-            'serviceName finalPrice totalPrice actualPrice offerPrice serviceType shopId duration totalDuration',
+            BOOKING_SERVICE_CARD_FIELDS,
         ),
     );
     if (!services.length) throw new NotFoundError('Services');
@@ -690,7 +704,7 @@ const reorderBooking = async (userId, bookingId, newDate, newTime) => {
     const services = normalizeBookedServices(
         await serviceRepository.findByIds(
             existing.serviceIds,
-            'serviceName finalPrice totalPrice actualPrice offerPrice serviceType duration totalDuration',
+            BOOKING_SERVICE_CARD_FIELDS,
         ),
     );
     const totalAmount = sumServicePrices(services);

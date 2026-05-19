@@ -16,9 +16,26 @@ const EMPLOYEE_POPULATE = {
 
 const EMPLOYEE_NAME_POPULATE = {
     path: 'employeeId',
-    select: 'firstName lastName blockedDates',
+    select: 'firstName lastName photoR2Key blockedDates',
     options: { includeDeleted: true },
 };
+
+const BOOKING_SERVICE_CARD_FIELDS = [
+    'serviceName',
+    'serviceFor',
+    'serviceType',
+    'imageR2Key',
+    'duration',
+    'actualPrice',
+    'offerPrice',
+    'finalPrice',
+    'totalDuration',
+    'totalPrice',
+    'bundledServices',
+].join(' ');
+
+const CUSTOMER_SUMMARY_FIELDS = 'firstName lastName photoR2Key userId';
+const CUSTOMER_NAME_FIELDS = 'firstName lastName photoR2Key';
 
 class BookingRepository {
     async create(data, options = {}) {
@@ -54,7 +71,7 @@ class BookingRepository {
             .populate(EMPLOYEE_POPULATE)
             .populate({
                 path: 'customerId',
-                select: 'firstName lastName userId',
+                select: CUSTOMER_SUMMARY_FIELDS,
                 populate: { path: 'userId', select: 'email phoneNumber' },
             })
             .lean();
@@ -136,11 +153,11 @@ class BookingRepository {
         const query = Booking.find(trustQueryOperators({ employeeId: { $in: employeeIds }, ...filters }))
             .populate({
                 path: 'customerId',
-                select: 'firstName lastName userId',
+                select: CUSTOMER_SUMMARY_FIELDS,
                 populate: { path: 'userId', select: 'phoneNumber' },
             })
             .populate(EMPLOYEE_NAME_POPULATE)
-            .populate('serviceIds', 'serviceName offerPrice');
+            .populate('serviceIds', BOOKING_SERVICE_CARD_FIELDS);
 
         if (options.skip !== undefined) query.skip(options.skip);
         if (options.limit !== undefined) query.limit(options.limit);
@@ -151,11 +168,11 @@ class BookingRepository {
         const query = Booking.find(trustQueryOperators({ shopId, ...filters }))
             .populate({
                 path: 'customerId',
-                select: 'firstName lastName userId',
+                select: CUSTOMER_SUMMARY_FIELDS,
                 populate: { path: 'userId', select: 'phoneNumber' },
             })
             .populate(EMPLOYEE_NAME_POPULATE)
-            .populate('serviceIds', 'serviceName offerPrice')
+            .populate('serviceIds', BOOKING_SERVICE_CARD_FIELDS)
             .sort({ date: -1, createdAt: -1 });
 
         if (options.skip !== undefined) query.skip(options.skip);
@@ -191,7 +208,7 @@ class BookingRepository {
 
     async findByStatusPopulated(status, employeeIds, options = {}) {
         const query = Booking.find(trustQueryOperators({ status, employeeId: { $in: employeeIds } }))
-            .populate('customerId', 'firstName lastName')
+            .populate('customerId', CUSTOMER_NAME_FIELDS)
             .populate(EMPLOYEE_NAME_POPULATE)
             .lean();
 
@@ -202,7 +219,7 @@ class BookingRepository {
 
     async findByStatusForShop(shopId, status, options = {}) {
         const query = Booking.find(trustQueryOperators({ shopId, status }))
-            .populate('customerId', 'firstName lastName')
+            .populate('customerId', CUSTOMER_NAME_FIELDS)
             .populate(EMPLOYEE_NAME_POPULATE)
             .sort({ date: -1, createdAt: -1 })
             .lean();
@@ -240,7 +257,7 @@ class BookingRepository {
         }))
             .populate({
                 path: 'customerId',
-                select: 'firstName lastName userId',
+                select: CUSTOMER_SUMMARY_FIELDS,
                 populate: { path: 'userId', select: 'phoneNumber email' },
             })
             .populate('shopId', 'shopName ownerId')
@@ -289,9 +306,9 @@ class BookingRepository {
             customerId,
             date: { $gte: startDate, $lte: endDate },
         }))
-            .populate('serviceIds', 'serviceName offerPrice duration')
+            .populate('serviceIds', BOOKING_SERVICE_CARD_FIELDS)
             .populate(EMPLOYEE_NAME_POPULATE)
-            .populate('shopId', 'shopName address')
+            .populate('shopId', 'shopName address coverR2Key')
             .lean();
     }
 
