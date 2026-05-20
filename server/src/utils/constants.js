@@ -173,8 +173,8 @@ export const ALL_SERVICE_TYPES = Object.values(SERVICE_TYPE);
 // ---------------------------------------------------------------------------
 
 export const SERVICE_FOR = Object.freeze({
-    MALE: 'male',
-    FEMALE: 'female',
+    MEN: 'men',
+    WOMEN: 'women',
     UNISEX: 'unisex',
 });
 
@@ -239,9 +239,9 @@ export const MIME_TO_EXTENSION = Object.freeze({
 // ---------------------------------------------------------------------------
 
 export const GENDER = Object.freeze({
-    MALE: 'Male',
-    FEMALE: 'Female',
-    TRANSGENDER: 'Transgender',
+    MALE: 'male',
+    FEMALE: 'female',
+    TRANSGENDER: 'transgender',
 });
 
 export const ALL_GENDERS = Object.values(GENDER);

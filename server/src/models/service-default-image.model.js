@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { ALL_SERVICE_FOR } from '../utils/constants.js';
 
 const serviceDefaultImageSchema = new mongoose.Schema(
     {
@@ -22,7 +23,7 @@ const serviceDefaultImageSchema = new mongoose.Schema(
         },
         serviceFor: {
             type: String,
-            enum: ['male', 'female', 'unisex'],
+            enum: ALL_SERVICE_FOR,
             required: true,
             index: true,
         },

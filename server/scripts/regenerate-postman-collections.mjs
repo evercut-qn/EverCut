@@ -401,7 +401,7 @@ const onboardingCollection = {
         url: '{{base_url}}/{{api_prefix}}/onboarding/customers',
         auth: bearerAuth('customer_onboarding_token'),
         headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody(`{\n  "firstName": "Test",\n  "lastName": "Customer",\n  "email": "test.customer@example.com",\n  "gender": "Male",\n  "dateOfBirth": "1994-06-15",\n  "address": "${customerLocationText}",\n  "location": ${customerLocationGeoJson},\n  "photoMediaId": "{{shared_media_id}}"\n}`),
+        body: jsonBody(`{\n  "firstName": "Test",\n  "lastName": "Customer",\n  "email": "test.customer@example.com",\n  "gender": "male",\n  "dateOfBirth": "1994-06-15",\n  "address": "${customerLocationText}",\n  "location": ${customerLocationGeoJson},\n  "photoMediaId": "{{shared_media_id}}"\n}`),
         description: 'Creates the customer for the OTP-verified customer test user using a confirmed R2 mediaId. Run the media upload flow first if shared_media_id is empty. A rerun returns 409 because onboarding only succeeds once per account.',
         event: testEvent(
           "pm.test('status is 201 or 409', function () { pm.expect(pm.response.code).to.be.oneOf([201, 409]); });",
@@ -424,7 +424,7 @@ const onboardingCollection = {
         url: '{{base_url}}/{{api_prefix}}/onboarding/barbers',
         auth: bearerAuth('barber_onboarding_token'),
         headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody(`{\n  "firstName": "Test",\n  "lastName": "Barber",\n  "email": "test.barber@example.com",\n  "dateOfBirth": "1991-01-12",\n  "gender": "Male",\n  "shopName": "Postman Test Barber Studio",\n  "category": "Barber Shop",\n  "targetCustomers": "male",\n  "address": "${barberLocationText}",\n  "location": ${barberLocationGeoJson},\n  "amenities": ["Air Conditioning","Waiting Area","Drinking Water","Washrooms","Parking Area","Wi-Fi","Charging Points"],\n  "workingDays": ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"],\n  "workingHours": {"openTime":"09:00","closeTime":"20:00"},\n  "breakTimes": [{"start":"13:00","end":"14:00"}],\n  "accountHolderName": "Test Barber",\n  "bankName": "HDFC Bank",\n  "upiId": "test.barber@upi",\n  "pin": "1234",\n  "confirmPin": "1234",\n  "photoMediaId": "{{shared_media_id}}"\n}`),
+        body: jsonBody(`{\n  "firstName": "Test",\n  "lastName": "Barber",\n  "email": "test.barber@example.com",\n  "dateOfBirth": "1991-01-12",\n  "gender": "male",\n  "shopName": "Postman Test Barber Studio",\n  "category": "Barber Shop",\n  "targetCustomers": "men",\n  "address": "${barberLocationText}",\n  "location": ${barberLocationGeoJson},\n  "amenities": ["Air Conditioning","Waiting Area","Drinking Water","Washrooms","Parking Area","Wi-Fi","Charging Points"],\n  "workingDays": ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"],\n  "workingHours": {"openTime":"09:00","closeTime":"20:00"},\n  "breakTimes": [{"start":"13:00","end":"14:00"}],\n  "accountHolderName": "Test Barber",\n  "bankName": "HDFC Bank",\n  "upiId": "test.barber@upi",\n  "pin": "1234",\n  "confirmPin": "1234",\n  "photoMediaId": "{{shared_media_id}}"\n}`),
         description: 'Creates the barber shop for the OTP-verified barber test user using a confirmed R2 mediaId. Shop schedule values can be sent in HH:MM or hh:mm AM/PM format and are normalized by the backend.',
         event: testEvent(
           "pm.test('status is 201 or 409', function () { pm.expect(pm.response.code).to.be.oneOf([201, 409]); });",
@@ -486,7 +486,7 @@ const customerCollection = {
       name: '3. Get Services By Gender And Capture IDs',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/shops/services?gender=male&coordinates={{coordinates}}',
+        url: '{{base_url}}/{{api_prefix}}/shops/services?gender=men&coordinates={{coordinates}}',
         description: 'Uses the shared Bengaluru coordinates so the response includes the barber shop created by onboarding. The script captures the first nearby Postman shop and service IDs.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
@@ -865,7 +865,7 @@ const customerShopDiscoveryCollection = {
       name: '10. Search Services',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/services/search?query={{service_search_query}}&gender=male',
+        url: '{{base_url}}/{{api_prefix}}/services/search?query={{service_search_query}}&gender=men',
         description: 'Searches the customer-visible service catalogue for the services created by the barber service collection.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -986,7 +986,7 @@ const barberProfileCollection = {
         method: 'PATCH',
         url: '{{base_url}}/{{api_prefix}}/shops/me',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody(`{\n  "firstName": "Test",\n  "lastName": "Barber",\n  "dateOfBirth": "1991-01-12",\n  "gender": "Male",\n  "shopName": "Postman Test Barber Studio",\n  "category": "Barber Shop",\n  "targetCustomers": "male",\n  "address": "${barberLocationText}",\n  "location": ${barberLocationGeoJson},\n  "amenities": ["Air Conditioning", "Waiting Area", "Parking Area", "Wi-Fi"],\n  "workingDays": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],\n  "workingHours": {\n    "openTime": "09:00",\n    "closeTime": "20:00"\n  },\n  "breakTimes": [\n    {\n      "start": "13:00",\n      "end": "14:00"\n    }\n  ],\n  "bio": "Updated from the automated Postman profile collection."\n}`),
+        body: jsonBody(`{\n  "firstName": "Test",\n  "lastName": "Barber",\n  "dateOfBirth": "1991-01-12",\n  "gender": "male",\n  "shopName": "Postman Test Barber Studio",\n  "category": "Barber Shop",\n  "targetCustomers": "men",\n  "address": "${barberLocationText}",\n  "location": ${barberLocationGeoJson},\n  "amenities": ["Air Conditioning", "Waiting Area", "Parking Area", "Wi-Fi"],\n  "workingDays": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],\n  "workingHours": {\n    "openTime": "09:00",\n    "closeTime": "20:00"\n  },\n  "breakTimes": [\n    {\n      "start": "13:00",\n      "end": "14:00"\n    }\n  ],\n  "bio": "Updated from the automated Postman profile collection."\n}`),
         description: 'Updates only barber profile and business fields. Payout details are managed through /shops/me/payout-details. NOTE: Email updates must use PATCH /account/email endpoint.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -1320,7 +1320,7 @@ const barberServicesCollection = {
         method: 'POST',
         url: '{{base_url}}/{{api_prefix}}/services',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody(`{\n  "serviceName": "{{single_service_name}}",\n  "serviceType": "single",\n  "serviceFor": "male",\n  "duration": 30,\n  "actualPrice": 500,\n  "offerPrice": 50\n}`),
+        body: jsonBody(`{\n  "serviceName": "{{single_service_name}}",\n  "serviceType": "single",\n  "serviceFor": "men",\n  "duration": 30,\n  "actualPrice": 500,\n  "offerPrice": 50\n}`),
         description: 'Creates a single service using only fields that the API validator accepts.',
         event: mergedEvents(
           ["pm.collectionVariables.set('single_service_name', `Postman Express Cut ${Date.now().toString().slice(-6)}`);"],
@@ -1339,7 +1339,7 @@ const barberServicesCollection = {
         method: 'POST',
         url: '{{base_url}}/{{api_prefix}}/services',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody(`{\n  "serviceName": "{{bundled_service_name}}",\n  "serviceType": "bundled",\n  "serviceFor": "male",\n  "actualPrice": 900,\n  "offerPrice": 100,\n  "bundledServices": ["Haircut", "Beard Trim", "Head Massage"],\n  "totalDuration": 75\n}`),
+        body: jsonBody(`{\n  "serviceName": "{{bundled_service_name}}",\n  "serviceType": "bundled",\n  "serviceFor": "men",\n  "actualPrice": 900,\n  "offerPrice": 100,\n  "bundledServices": ["Haircut", "Beard Trim", "Head Massage"],\n  "totalDuration": 75\n}`),
         description: 'Creates a bundled service using the fields required by the backend validator.',
         event: mergedEvents(
           ["pm.collectionVariables.set('bundled_service_name', `Postman Grooming Combo ${Date.now().toString().slice(-6)}`);"],

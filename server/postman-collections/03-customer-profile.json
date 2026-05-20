@@ -140,7 +140,7 @@
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/shops/services?gender=male&coordinates={{coordinates}}",
+        "url": "{{base_url}}/{{api_prefix}}/shops/services?gender=men&coordinates={{coordinates}}",
         "description": "Uses the shared Bengaluru coordinates so the response includes the barber shop created by onboarding. The script captures the first nearby Postman shop and service IDs."
       },
       "event": [

@@ -58,7 +58,7 @@ Authorization: Bearer <jwt_token>
       "firstName": "Ram",
       "lastName": "Kumar",
       "phoneNumber": "+919876543210",
-      "gender": "Male",
+      "gender": "male",
       "dateOfBirth": "1990-05-15T00:00:00.000Z",
       "photoUrl": "https://media.evercut.in/images/employees/...",
       "workingHours": {
@@ -142,7 +142,7 @@ Authorization: Bearer <jwt_token>
 | `firstName` | String | Employee first name |
 | `lastName` | String | Employee last name |
 | `phoneNumber` | String | Contact phone number |
-| `gender` | String | Gender (Male/Female/Transgender) |
+| `gender` | String | Gender (male/female/transgender) |
 | `dateOfBirth` | Date | Date of birth |
 | `photoUrl` | String | Signed CDN URL generated from the employee R2 media key |
 | `workingHours` | Object | Working hours (start/end times) |

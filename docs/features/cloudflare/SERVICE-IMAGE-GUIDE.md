@@ -19,9 +19,9 @@ Service images are stored as **R2 keys** (`imageR2Key`) in MongoDB. Signed CDN U
 
 When a service is created/updated without `imageMediaId`, the `resolveDefaultServiceImageR2Key()` function follows this priority:
 
-1.  **Exact Match:** Name + Type + Gender (e.g., `premiumhaircut` for `male`).
-2.  **Category Fuzzy Match:** Text search on `keywords` within the same Type + Gender (e.g., matching "Fade" to the `haircut` category for `male`).
-3.  **Global Gender Fallback:** If no specific category matches, use the **Global Default** for that gender (e.g., `images/services/single/default/male.jpg`).
+1.  **Exact Match:** Name + Type + Gender (e.g., `premiumhaircut` for `men`).
+2.  **Category Fuzzy Match:** Text search on `keywords` within the same Type + Gender (e.g., matching "Fade" to the `haircut` category for `men`).
+3.  **Global Gender Fallback:** If no specific category matches, use the **Global Default** for that gender (e.g., `images/services/single/default/men.jpg`).
 4.  **Absolute System Fallback:** As a last resort, use the **Global Unisex Default** (`images/services/single/default/unisex.jpg`).
 
 ---
@@ -34,9 +34,9 @@ Images are organized in a tiered structure to support precise matching and clean
 `server/assets/services/[serviceType]/[categoryId]/[serviceFor].jpg`
 
 **Example:**
-- `server/assets/services/single/haircut/male.jpg`
+- `server/assets/services/single/haircut/men.jpg`
 - `server/assets/services/single/haircut/unisex.jpg`
-- `server/assets/services/single/default/female.jpg`
+- `server/assets/services/single/default/women.jpg`
 
 ---
 
@@ -55,7 +55,7 @@ The single source of truth for the seeding process.
 - `name`: Unique identifier for the image record.
 - `keywords`: Array of terms for fuzzy matching.
 - `serviceType`: `single` or `bundled`.
-- `serviceFor`: `male`, `female`, or `unisex`.
+- `serviceFor`: `men`, `women`, or `unisex`.
 - `isGlobalDefault`: Boolean (only one per Type + Gender).
 
 ---

@@ -504,7 +504,7 @@
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/services/search?query={{service_search_query}}&gender=male",
+        "url": "{{base_url}}/{{api_prefix}}/services/search?query={{service_search_query}}&gender=men",
         "description": "Searches the customer-visible service catalogue for the services created by the barber service collection."
       },
       "event": [

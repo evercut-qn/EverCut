@@ -6,13 +6,13 @@ import serviceDefaultImageRepository from '../service-default-image.repository.j
 describe('ServiceDefaultImageRepository', () => {
     it('findBestMatch: exact name match should take precedence', async (t) => {
         t.mock.method(ServiceDefaultImage, 'findOne', (query) => {
-            if (query.name === 'premiumhaircut' && query.serviceFor === 'male') {
+            if (query.name === 'premiumhaircut' && query.serviceFor === 'men') {
                 return { lean: () => ({ r2Key: 'exact-match-key' }) };
             }
             return { lean: () => null };
         });
 
-        const result = await serviceDefaultImageRepository.findBestMatch('Premium Haircut', 'single', 'male');
+        const result = await serviceDefaultImageRepository.findBestMatch('Premium Haircut', 'single', 'men');
         assert.equal(result.r2Key, 'exact-match-key');
     });
 
@@ -23,7 +23,7 @@ describe('ServiceDefaultImageRepository', () => {
             // First call is exact match (fails)
             if (findOneCalls === 1) return { lean: () => null };
             // Second call is fuzzy text search
-            if (query.$text && query.$text.$search === 'Fade Cut' && query.serviceFor === 'male') {
+            if (query.$text && query.$text.$search === 'Fade Cut' && query.serviceFor === 'men') {
                 return {
                     sort: () => ({
                         lean: () => ({ r2Key: 'fuzzy-match-key', score: 0.8 })
@@ -33,7 +33,7 @@ describe('ServiceDefaultImageRepository', () => {
             return { lean: () => null };
         });
 
-        const result = await serviceDefaultImageRepository.findBestMatch('Fade Cut', 'single', 'male');
+        const result = await serviceDefaultImageRepository.findBestMatch('Fade Cut', 'single', 'men');
         assert.equal(result.r2Key, 'fuzzy-match-key');
     });
 
@@ -46,13 +46,13 @@ describe('ServiceDefaultImageRepository', () => {
             // 2. Fuzzy match fail
             if (findOneCalls === 2) return { sort: () => ({ lean: () => null }) };
             // 3. Global gender fallback success
-            if (query.isGlobalDefault === true && query.serviceFor === 'male') {
+            if (query.isGlobalDefault === true && query.serviceFor === 'men') {
                 return { lean: () => ({ r2Key: 'global-male-key' }) };
             }
             return { lean: () => null };
         });
 
-        const result = await serviceDefaultImageRepository.findBestMatch('Unknown Service', 'single', 'male');
+        const result = await serviceDefaultImageRepository.findBestMatch('Unknown Service', 'single', 'men');
         assert.equal(result.r2Key, 'global-male-key');
     });
 
@@ -73,7 +73,7 @@ describe('ServiceDefaultImageRepository', () => {
             return { lean: () => null };
         });
 
-        const result = await serviceDefaultImageRepository.findBestMatch('Unknown Service', 'single', 'female');
+        const result = await serviceDefaultImageRepository.findBestMatch('Unknown Service', 'single', 'women');
         assert.equal(result.r2Key, 'global-unisex-key');
     });
 });

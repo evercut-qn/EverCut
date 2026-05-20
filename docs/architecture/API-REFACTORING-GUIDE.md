@@ -219,7 +219,7 @@ Authorization: Bearer {customer_access_token}
       "type": "Point",
       "coordinates": [77.5946, 12.9716]
     },
-    "gender": "Female",
+    "gender": "female",
     "dateOfBirth": "1995-03-15T00:00:00.000Z",
     "favoriteShopIds": [...],
     "favoriteBookingIds": [...],

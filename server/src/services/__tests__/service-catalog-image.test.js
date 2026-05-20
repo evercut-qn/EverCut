@@ -16,7 +16,7 @@ describe('ServiceCatalog Image Resolution', () => {
         const serviceData = {
             serviceName: 'Premium Fade',
             serviceType: 'single',
-            serviceFor: 'male',
+            serviceFor: 'men',
             actualPrice: 500
         };
 
@@ -27,7 +27,7 @@ describe('ServiceCatalog Image Resolution', () => {
         t.mock.method(serviceDefaultImageRepository, 'findBestMatch', (name, type, gender) => {
             assert.equal(name, 'Premium Fade');
             assert.equal(type, 'single');
-            assert.equal(gender, 'male');
+            assert.equal(gender, 'men');
             return { r2Key: 'resolved-male-key' };
         });
 
@@ -71,7 +71,7 @@ describe('ServiceCatalog Image Resolution', () => {
                     _id: 'service-1',
                     serviceName: 'Premium Fade',
                     serviceType: 'single',
-                    serviceFor: 'male',
+                    serviceFor: 'men',
                     imageR2Key: 'images/services/premium-fade.jpg',
                     duration: 45,
                     actualPrice: 500,
@@ -86,7 +86,7 @@ describe('ServiceCatalog Image Resolution', () => {
             ];
         });
 
-        const result = await serviceCatalog.searchServices('fade', 'male');
+        const result = await serviceCatalog.searchServices('fade', 'men');
 
         for (const field of [
             'serviceName',

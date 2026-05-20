@@ -130,7 +130,7 @@ try {
     // 2. Validation: Ensure all 6 global defaults exist in DB
     if (!dryRun) {
         const types = ['single', 'bundled'];
-        const genders = ['male', 'female', 'unisex'];
+        const genders = ['men', 'women', 'unisex'];
         let missingCount = 0;
 
         for (const type of types) {

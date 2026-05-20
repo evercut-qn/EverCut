@@ -129,7 +129,7 @@ Now:
 The old uniqueness model treated `shopId + serviceName` as unique. That was too broad for the UI and business model because it did not account for:
 
 - `serviceType` (`single` vs `bundled`)
-- `serviceFor` (`male`, `female`, `unisex`)
+- `serviceFor` (`men`, `women`, `unisex`)
 - soft-deleted records
 
 This could block legitimate combinations such as:

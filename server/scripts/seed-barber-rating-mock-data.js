@@ -45,7 +45,7 @@ const CUSTOMER_FIXTURES = [
         profile: {
             firstName: 'Ava',
             lastName: 'Replyless',
-            gender: 'Female',
+            gender: 'female',
             dateOfBirth: new Date('1996-04-12'),
             address: '101 Rating Fixture Street',
             location: { type: 'Point', coordinates: [77.5946, 12.9716] },
@@ -67,7 +67,7 @@ const CUSTOMER_FIXTURES = [
         profile: {
             firstName: 'Ben',
             lastName: 'Updated',
-            gender: 'Male',
+            gender: 'male',
             dateOfBirth: new Date('1994-06-21'),
             address: '102 Rating Fixture Street',
             location: { type: 'Point', coordinates: [77.5946, 12.9716] },
@@ -90,7 +90,7 @@ const CUSTOMER_FIXTURES = [
         profile: {
             firstName: 'Cara',
             lastName: 'Delete',
-            gender: 'Female',
+            gender: 'female',
             dateOfBirth: new Date('1991-11-05'),
             address: '103 Rating Fixture Street',
             location: { type: 'Point', coordinates: [77.5946, 12.9716] },
@@ -111,7 +111,7 @@ const EMPLOYEE_FIXTURE = {
     firstName: 'Marco',
     lastName: 'Fixture',
     phoneNumber: '+15550999001',
-    gender: 'Male',
+    gender: 'male',
     dateOfBirth: new Date('1992-09-09'),
     photoR2Key: 'images/employees/mock-shop/mock-employee-photo.jpg',
     workingHours: {
@@ -123,7 +123,7 @@ const EMPLOYEE_FIXTURE = {
 const SERVICE_FIXTURE = {
     serviceName: 'Mock Signature Haircut',
     serviceType: 'single',
-    serviceFor: 'male',
+    serviceFor: 'men',
     imageR2Key: 'images/services/default/service.jpg',
     duration: 45,
     actualPrice: 400,
@@ -173,10 +173,10 @@ const upsertShop = async (ownerId) => {
         ownerName: 'Test Barber Owner',
         ownerFirstName: 'Test',
         ownerLastName: 'Barber',
-        ownerGender: 'Male',
+        ownerGender: 'male',
         ownerDateOfBirth: new Date('1990-01-15'),
         category: 'Barber Shop',
-        targetCustomers: 'male',
+        targetCustomers: 'men',
         upiId: 'evercut.mock@upi',
         accountHolderName: 'Test Barber Owner',
         bankName: 'Mock Bank',
