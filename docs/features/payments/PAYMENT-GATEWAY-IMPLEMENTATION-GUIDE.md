@@ -2204,35 +2204,34 @@ export const triggerBarberPayout = async (barberId, bookingIds, totalPayoutInPai
         throw new NotFoundError('Booking');
     }
 
-    // Populate shop for payout details
+    // Populate shop to resolve the owning barber profile
     const populatedBooking = await booking.populate('shopId');
     const shop = populatedBooking.shopId;
+    const barberProfile = await barberRepository.findById(shop.barberId);
 
-    // Shop model has upiId, accountHolderName, bankName at ROOT level
-    // Additional payout config (bankAccount, ifsc, beneficiaryId)
-    // is in shop.payoutConfig (added during payment integration)
-    //
-    // IMPORTANT: Shop model does NOT have phone/email fields.
-    // These live on the User model (accessed via shop.ownerId).
+    // Barber owns payout config (bankAccount, ifsc, optional upiId, beneficiaryId).
+    // Shop only owns venue/business details.
+    // User owns phone/email and is accessed via barberProfile.userId.
     // We must populate the owner User to get phone and email for Cashfree beneficiary.
-    if (!shop?.upiId && !shop?.payoutConfig?.bankAccount) {
+    if (!barberProfile?.bankAccount || !barberProfile?.ifsc) {
         logger.error('[PayoutService] No payout details for shop', {
             shopId: shop?._id,
+            barberId: shop?.barberId,
         });
-        throw new BadRequestError('Shop has no payout details configured');
+        throw new BadRequestError('Barber has no payout details configured');
     }
 
     // Populate the owner User for phone and email
-    const ownerUser = await User.findById(shop.ownerId).select('phoneNumber email');
+    const ownerUser = await User.findById(barberProfile.userId).select('phoneNumber email');
 
     const barber = {
-        _id: shop.ownerId || shop._id,
-        fullName: shop.accountHolderName || shop.ownerName || shop.shopName,
+        _id: barberProfile._id,
+        fullName: barberProfile.accountHolderName || `${barberProfile.firstName} ${barberProfile.lastName}`,
         phone: ownerUser?.phoneNumber || '',   // User model field is 'phoneNumber'
         email: ownerUser?.email || '',          // User model field is 'email'
-        upiId: shop.upiId,
-        bankAccount: shop.payoutConfig?.bankAccount,
-        ifsc: shop.payoutConfig?.ifsc,
+        upiId: barberProfile.upiId,
+        bankAccount: barberProfile.bankAccount,
+        ifsc: barberProfile.ifsc,
     };
 
     // 5. Generate transfer ID
@@ -2441,17 +2440,18 @@ export const retryPayout = async (payoutId) => {
         const retryBooking = await bookingRepository.findById(payout.bookingId);
         const retryPopulated = await retryBooking.populate('shopId');
         const retryShop = retryPopulated.shopId;
-        const retryOwner = await User.findById(retryShop.ownerId).select('phoneNumber email');
+        const retryBarber = await barberRepository.findById(retryShop.barberId);
+        const retryOwner = await User.findById(retryBarber.userId).select('phoneNumber email');
 
         await _ensureBeneficiary(
             {
-                _id: retryShop.ownerId || retryShop._id,
-                fullName: retryShop.accountHolderName || retryShop.ownerName || retryShop.shopName,
+                _id: retryBarber._id,
+                fullName: `${retryBarber.firstName || ''} ${retryBarber.lastName || ''}`.trim() || retryShop.shopName,
                 phone: retryOwner?.phoneNumber || '',
                 email: retryOwner?.email || '',
-                upiId: retryShop.upiId,
-                bankAccount: retryShop.payoutConfig?.bankAccount,
-                ifsc: retryShop.payoutConfig?.ifsc,
+                upiId: retryBarber.upiId,
+                bankAccount: retryBarber.bankAccount,
+                ifsc: retryBarber.ifsc,
             },
             payout.beneficiaryId,
         );

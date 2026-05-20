@@ -167,7 +167,7 @@ evercut/
 | `Photo` | `cloudinaryId` | Cloudinary public_id | **Model deleted** — absorbed into Media |
 | `Shop` | `coverUrl` | Full Cloudinary URL | → `coverR2Key` |
 | `Shop` | `coverCloudinaryId` | Cloudinary public_id | → Remove |
-| `Shop` | `ownerPhotoUrl` | Full Cloudinary URL | → `ownerPhotoR2Key` |
+| `Shop` | `ownerPhotoUrl` | Full Cloudinary URL | → `Barber.photoR2Key` |
 | `Shop` | `ownerPhotoCloudinaryId` | Cloudinary public_id | → Remove |
 | `Employee` | `photoUrl` | Full Cloudinary URL | → `photoR2Key` |
 | `Employee` | `cloudinaryId` | Cloudinary public_id | → Remove |
@@ -744,7 +744,7 @@ The `photo.model.js` file is deleted entirely. All its functionality is absorbed
 +            type: String,
 +            default: null,
 +        },
-+        ownerPhotoR2Key: {
++        photoR2Key: {
 +            type: String,
 +            default: null,
 +        },
@@ -1565,7 +1565,7 @@ export const deleteMedia = async (userId, mediaId) => {
  * Replaces: photo.service.uploadPhotos()
  */
 export const attachGalleryMedia = async (ownerId, mediaIds, category = 'other', description = '') => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
+    const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop profile');
 
     if (!mediaIds || mediaIds.length === 0) {
@@ -1609,7 +1609,7 @@ export const attachGalleryMedia = async (ownerId, mediaIds, category = 'other', 
  * Replaces: photo.service.getPhotos()
  */
 export const getShopGallery = async (ownerId) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
+    const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop profile');
 
     const items = await mediaRepository.findByEntity(shop._id, MEDIA_ENTITY_TYPE.SHOP, { purpose: MEDIA_PURPOSE.GALLERY });
@@ -1644,7 +1644,7 @@ export const getGalleryByShopId = async (shopId) => {
 export const updateShopCover = async (ownerId, mediaId) => {
     if (!mediaId) throw new BadRequestError('No cover media ID provided');
 
-    const shop = await shopRepository.findByOwnerId(ownerId);
+    const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop profile');
 
     const media = await Media.findOne({
@@ -1656,7 +1656,7 @@ export const updateShopCover = async (ownerId, mediaId) => {
 
     const oldR2Key = shop.coverR2Key;
 
-    await shopRepository.updateByOwnerId(ownerId, { coverR2Key: media.r2Key });
+    await shopRepository.updateByBarberUserId(ownerId, { coverR2Key: media.r2Key });
 
     // Link media to entity
     await Media.findByIdAndUpdate(mediaId, {
@@ -1680,8 +1680,8 @@ export const updateShopCover = async (ownerId, mediaId) => {
 export const updateBarberProfilePicture = async (ownerId, mediaId) => {
     if (!mediaId) throw new BadRequestError('No profile picture media ID provided');
 
-    const shop = await shopRepository.findByOwnerId(ownerId);
-    if (!shop) throw new NotFoundError('Shop profile');
+    const barber = await barberRepository.findByUserId(ownerId);
+    if (!barber) throw new NotFoundError('Barber profile');
 
     const media = await Media.findOne({
         _id: mediaId,
@@ -1690,13 +1690,13 @@ export const updateBarberProfilePicture = async (ownerId, mediaId) => {
     });
     if (!media) throw new BadRequestError('Invalid or unconfirmed photo');
 
-    const oldR2Key = shop.ownerPhotoR2Key;
+    const oldR2Key = barber.photoR2Key;
 
-    await shopRepository.updateByOwnerId(ownerId, { ownerPhotoR2Key: media.r2Key });
+    await barberRepository.updateById(barber._id, { photoR2Key: media.r2Key });
 
     await Media.findByIdAndUpdate(mediaId, {
-        entityId: shop._id,
-        entityType: 'Shop',
+        entityId: barber._id,
+        entityType: 'Barber',
         purpose: 'profile',
     });
 
@@ -2228,7 +2228,7 @@ The `updateBarberProfilePicture` function previously in `account.service.js` is 
 +import * as mediaService from './media/media.service.js';
 
  export const getShopByOwner = async (ownerId, userContext) => {
-     const shop = await shopRepository.findByOwnerId(ownerId);
+     const shop = await shopRepository.findByBarberUserId(ownerId);
      if (!shop) throw new NotFoundError('Shop profile');
 
 -    const photos = await photoRepository.findByShopId(shop._id, {});
@@ -2333,7 +2333,6 @@ The `updateBarberProfilePicture` function previously in `account.service.js` is 
 +    'r2Key',
 +    'r2Bucket',
 +    'coverR2Key',
-+    'ownerPhotoR2Key',
 +    'photoR2Key',
 +    'multipartUploadId',
 +    'declaredSize',
@@ -2347,7 +2346,7 @@ The `updateBarberProfilePicture` function previously in `account.service.js` is 
 
 ### 14.2 Shop Serializer Updates
 
-All shop serializers that emit `coverUrl` or `ownerPhotoUrl` must construct URLs from R2 keys:
+Shop serializers that emit `coverUrl` and barber serializers that emit `ownerPhotoUrl` must construct URLs from R2 keys:
 
 ```javascript
 // In serializers/shop.serializer.js (or barber-profile.utils.js):
@@ -2357,7 +2356,7 @@ import { r2KeyToUrl } from '../services/media/media-url.service.js';
 //   coverUrl: plain.coverUrl
 // With URL construction from R2 key:
 //   coverUrl: r2KeyToUrl(plain.coverR2Key),
-//   ownerPhotoUrl: r2KeyToUrl(plain.ownerPhotoR2Key),
+//   ownerPhotoUrl: r2KeyToUrl(barber.photoR2Key),
 ```
 
 After the cutover finalizer runs, serializers must not read retired URL fields. Records without R2 keys return `null` for the media URL.
@@ -2395,7 +2394,7 @@ photoUrl: r2KeyToUrl(plain.photoR2Key),
 -        ownerPhotoUrl: shop.ownerPhotoUrl,
 -        photos: extras.photos || [],
 +        coverUrl: r2KeyToUrl(shop.coverR2Key) ?? shop.coverUrl ?? null,
-+        ownerPhotoUrl: r2KeyToUrl(shop.ownerPhotoR2Key) ?? shop.ownerPhotoUrl ?? null,
++        ownerPhotoUrl: r2KeyToUrl(barber.photoR2Key) ?? null,
 +        gallery: extras.gallery || [],
      };
  };
@@ -2786,7 +2785,8 @@ MEDIA_TOKEN_SECRET=generate_64_char_random_hex_string
 | `services/shop.service.js` | Replace photoRepository with mediaService |
 | `services/auth.service.js` | Replace photoRepository with mediaService |
 | `services/service-catalog.service.js` | Remove Cloudinary API, use buildMediaUrl |
-| `models/shop.model.js` | coverR2Key, ownerPhotoR2Key replace old fields |
+| `models/shop.model.js` | coverR2Key replaces old shop cover fields |
+| `models/barber.model.js` | photoR2Key replaces old owner photo fields |
 | `models/employee.model.js` | photoR2Key replaces photoUrl + cloudinaryId |
 | `models/customer.model.js` | photoR2Key replaces photoUrl + cloudinaryId |
 | `serializers/core.serializer.js` | Update sensitive keys list |

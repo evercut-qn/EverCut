@@ -349,7 +349,7 @@ Request 2 succeeds once per customer/shop pair. It returns `409 Conflict` on sub
 
 ### Shop Schedule Input
 
-Barber onboarding and shop schedule updates accept either `HH:MM` or `hh:mm AM/PM` values for `openTime`, `closeTime`, and break times. The backend normalizes shop schedule storage to `HH:MM`, while employee working hours stay `HH:MM` and are validated against that normalized schedule.
+Barber onboarding and shop schedule updates accept either `HH:MM` or `hh:mm AM/PM` values for `openTime`, `closeTime`, and optional break times. The backend normalizes shop schedule storage to `HH:MM`, while employee working hours stay `HH:MM` and are validated against that normalized schedule.
 
 ### `13-barber-ratings.json` — Add Reply (Request 2)
 

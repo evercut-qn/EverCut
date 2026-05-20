@@ -12,9 +12,10 @@ const buildValidPayload = () => ({
     shopName: 'Postman Test Barber Studio',
     category: 'Barber Shop',
     targetCustomers: 'men',
-    upiId: 'test.barber@upi',
     accountHolderName: 'Test Barber',
     bankName: 'HDFC Bank',
+    bankAccount: '12345678901234',
+    ifsc: 'HDFC0001234',
     address: 'MG Road, Bengaluru',
     location: { type: 'Point', coordinates: [77.5946, 12.9716] },
     workingDays: ['Monday', 'Tuesday', 'Wednesday'],
@@ -49,6 +50,36 @@ test('barberOnboardingSchema rejects break times outside shop hours', () => {
     });
 
     assert.match(result.error?.message || '', /breakTimes\[0\] must stay within shop hours/);
+});
+
+test('barberOnboardingSchema allows missing breakTimes and optional upiId', () => {
+    const result = barberOnboardingSchema.validate({
+        ...buildValidPayload(),
+        breakTimes: undefined,
+        upiId: undefined,
+    }, {
+        abortEarly: false,
+        allowUnknown: false,
+        stripUnknown: true,
+    });
+
+    assert.equal(result.error, undefined);
+    assert.deepEqual(result.value.breakTimes, []);
+    assert.equal(result.value.upiId, undefined);
+});
+
+test('barberOnboardingSchema requires bankAccount and ifsc', () => {
+    const result = barberOnboardingSchema.validate({
+        ...buildValidPayload(),
+        bankAccount: undefined,
+        ifsc: undefined,
+    }, {
+        abortEarly: false,
+        allowUnknown: false,
+        stripUnknown: true,
+    });
+
+    assert.match(result.error?.message || '', /bankAccount|ifsc/);
 });
 
 test('barberOnboardingSchema rejects deprecated barber onboarding aliases', () => {

@@ -46,21 +46,26 @@ test('resource serializers expose only id for each resource own identity', () =>
     const id = '507f1f77bcf86cd799439011';
     const shop = {
         _id: id,
+        barberId: '507f1f77bcf86cd799439012',
         shopName: 'EverCut Studio',
-        ownerName: 'Asha Rao',
-        ownerFirstName: 'Asha',
-        ownerLastName: 'Rao',
-        ownerGender: 'female',
-        ownerDateOfBirth: '1990-01-01',
         facilities: ['Wi-Fi'],
         availableDays: ['Monday'],
         openTime: '09:00',
         closeTime: '18:00',
+        coverR2Key: 'images/covers/shop-1/cover.jpg',
+    };
+    const barber = {
+        _id: '507f1f77bcf86cd799439012',
+        firstName: 'Asha',
+        lastName: 'Rao',
+        gender: 'female',
+        dateOfBirth: '1990-01-01',
         upiId: 'asha@upi',
         accountHolderName: 'Asha Rao',
         bankName: 'Ever Bank',
-        coverR2Key: 'images/covers/shop-1/cover.jpg',
-        ownerPhotoR2Key: 'images/profiles/shop-1/owner.jpg',
+        bankAccount: '12345678901234',
+        ifsc: 'HDFC0001234',
+        photoR2Key: 'images/profiles/shop-1/owner.jpg',
     };
 
     const samples = {
@@ -85,9 +90,13 @@ test('resource serializers expose only id for each resource own identity', () =>
         }),
         rating: serializeRating({ _id: id, rating: 5 }),
         service: serializeService({ _id: id, serviceName: 'Haircut', serviceType: 'single', duration: 30 }),
-        shopProfile: serializeShopProfile(shop, { privateView: true }),
+        shopProfile: serializeShopProfile(shop, { barber, privateView: true }),
         shopSummary: serializeShopSummary(shop),
-        barberProfile: serializeBarberProfile(shop, { email: 'owner@example.com', phoneNumber: '+919999999999' }),
+        barberProfile: serializeBarberProfile({
+            barber,
+            shop,
+            user: { email: 'owner@example.com', phoneNumber: '+919999999999' },
+        }),
     };
 
     for (const [resourceName, payload] of Object.entries(samples)) {

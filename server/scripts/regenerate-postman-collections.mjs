@@ -424,7 +424,7 @@ const onboardingCollection = {
         url: '{{base_url}}/{{api_prefix}}/onboarding/barbers',
         auth: bearerAuth('barber_onboarding_token'),
         headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody(`{\n  "firstName": "Test",\n  "lastName": "Barber",\n  "email": "test.barber@example.com",\n  "dateOfBirth": "1991-01-12",\n  "gender": "male",\n  "shopName": "Postman Test Barber Studio",\n  "category": "Barber Shop",\n  "targetCustomers": "men",\n  "address": "${barberLocationText}",\n  "location": ${barberLocationGeoJson},\n  "amenities": ["Air Conditioning","Waiting Area","Drinking Water","Washrooms","Parking Area","Wi-Fi","Charging Points"],\n  "workingDays": ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"],\n  "workingHours": {"openTime":"09:00","closeTime":"20:00"},\n  "breakTimes": [{"start":"13:00","end":"14:00"}],\n  "accountHolderName": "Test Barber",\n  "bankName": "HDFC Bank",\n  "upiId": "test.barber@upi",\n  "pin": "1234",\n  "confirmPin": "1234",\n  "photoMediaId": "{{shared_media_id}}"\n}`),
+        body: jsonBody(`{\n  "firstName": "Test",\n  "lastName": "Barber",\n  "email": "test.barber@example.com",\n  "dateOfBirth": "1991-01-12",\n  "gender": "male",\n  "shopName": "Postman Test Barber Studio",\n  "category": "Barber Shop",\n  "targetCustomers": "men",\n  "address": "${barberLocationText}",\n  "location": ${barberLocationGeoJson},\n  "amenities": ["Air Conditioning","Waiting Area","Drinking Water","Washrooms","Parking Area","Wi-Fi","Charging Points"],\n  "workingDays": ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"],\n  "workingHours": {"openTime":"09:00","closeTime":"20:00"},\n  "accountHolderName": "Test Barber",\n  "bankName": "HDFC Bank",\n  "bankAccount": "12345678901234",\n  "ifsc": "HDFC0001234",\n  "pin": "1234",\n  "confirmPin": "1234",\n  "photoMediaId": "{{shared_media_id}}"\n}`),
         description: 'Creates the barber shop for the OTP-verified barber test user using a confirmed R2 mediaId. Shop schedule values can be sent in HH:MM or hh:mm AM/PM format and are normalized by the backend.',
         event: testEvent(
           "pm.test('status is 201 or 409', function () { pm.expect(pm.response.code).to.be.oneOf([201, 409]); });",
@@ -1015,7 +1015,7 @@ const barberProfileCollection = {
         method: 'PATCH',
         url: '{{base_url}}/{{api_prefix}}/shops/me/payout-details',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody(`{\n  "accountHolderName": "Test Barber",\n  "bankName": "HDFC Bank",\n  "bankAccount": "12345678901234",\n  "ifsc": "HDFC0001234",\n  "upiId": "test.barber@upi"\n}`),
+        body: jsonBody(`{\n  "accountHolderName": "Test Barber",\n  "bankName": "HDFC Bank",\n  "bankAccount": "12345678901234",\n  "ifsc": "HDFC0001234"\n}`),
         description: 'Updates complete payout account details including account number and IFSC. Verification status resets to pending on change.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",

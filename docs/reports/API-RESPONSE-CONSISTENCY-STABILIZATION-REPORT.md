@@ -99,9 +99,10 @@ Before `/shops/me` contained repeated concepts:
 {
   "id": "shop_1",
   "shopId": "shop_1",
-  "ownerName": "Test Barber",
-  "ownerFirstName": "Test",
-  "ownerLastName": "Barber",
+  "owner": {
+    "firstName": "Test",
+    "lastName": "Barber"
+  },
   "facilities": ["Wi-Fi"],
   "amenities": ["Wi-Fi"],
   "availableDays": ["Monday"],

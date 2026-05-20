@@ -129,7 +129,9 @@ Content-Type: application/json
 | `breakTimes` | array | No | Optional `{ "start": "13:00", "end": "14:00" }` entries |
 | `accountHolderName` | string | Yes | Payout account holder |
 | `bankName` | string | Yes | Bank name |
-| `upiId` | string | Yes | UPI ID |
+| `bankAccount` | string | Yes | 6-34 digit payout bank account |
+| `ifsc` | string | Yes | Valid IFSC code |
+| `upiId` | string | No | Optional UPI ID |
 | `pin` | string | Yes | 4 digit account PIN |
 | `confirmPin` | string | Yes | Must match `pin` |
 | `photoMediaId` | string | No | Confirmed onboarding media ID for owner/shop profile |
@@ -163,7 +165,8 @@ Content-Type: application/json
   ],
   "accountHolderName": "John Barber",
   "bankName": "HDFC Bank",
-  "upiId": "john.barber@upi",
+  "bankAccount": "12345678901234",
+  "ifsc": "HDFC0001234",
   "pin": "1234",
   "confirmPin": "1234",
   "photoMediaId": "01HXMEDIAEXAMPLE"

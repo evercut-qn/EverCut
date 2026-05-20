@@ -210,7 +210,7 @@ Customer UPI ID is derived from phone number:
 ### Data Access Control
 ```javascript
 // Verify shop ownership
-const shop = await shopRepository.findByOwnerId(ownerId);
+const shop = await shopRepository.findByBarberUserId(ownerId);
 if (toObjectIdString(payment.shopId) !== toObjectIdString(shop._id)) {
   throw new ForbiddenError('You can only access transactions for your own shop');
 }

@@ -204,7 +204,7 @@
         "description": "Updates complete payout account details including account number and IFSC. Verification status resets to pending on change.",
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"accountHolderName\": \"Test Barber\",\n  \"bankName\": \"HDFC Bank\",\n  \"bankAccount\": \"12345678901234\",\n  \"ifsc\": \"HDFC0001234\",\n  \"upiId\": \"test.barber@upi\"\n}",
+          "raw": "{\n  \"accountHolderName\": \"Test Barber\",\n  \"bankName\": \"HDFC Bank\",\n  \"bankAccount\": \"12345678901234\",\n  \"ifsc\": \"HDFC0001234\"\n}",
           "options": {
             "raw": {
               "language": "json"

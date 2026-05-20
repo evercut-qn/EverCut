@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import mediaRepository from '../../repositories/media.repository.js';
+import barberRepository from '../../repositories/barber.repository.js';
 import shopRepository from '../../repositories/shop.repository.js';
 import config from '../../config/index.js';
 import { BadRequestError, NotFoundError } from '../../utils/api-error.js';
@@ -148,7 +149,7 @@ export const deleteMedia = async (userId, mediaId) => {
 };
 
 export const attachGalleryMedia = async (ownerId, mediaIds) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
+    const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop profile');
     if (!Array.isArray(mediaIds) || mediaIds.length === 0) {
         throw new BadRequestError('No media IDs provided');
@@ -174,7 +175,7 @@ export const attachGalleryMedia = async (ownerId, mediaIds) => {
 };
 
 export const getShopGallery = async (ownerId) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
+    const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop profile');
 
     const items = await mediaRepository.findByEntity(shop._id, MEDIA_ENTITY_TYPE.SHOP, { purpose: MEDIA_PURPOSE.GALLERY });
@@ -186,21 +187,21 @@ export const getGalleryByShopId = async (shopId) => (
 );
 
 export const getGalleryStats = async (ownerId) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
+    const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop profile');
     return mediaRepository.getStatsByEntity(shop._id, MEDIA_ENTITY_TYPE.SHOP);
 };
 
 export const updateShopCover = async (ownerId, mediaId) => {
     if (!mediaId) throw new BadRequestError('No cover media ID provided');
-    const shop = await shopRepository.findByOwnerId(ownerId);
+    const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop profile');
 
     const media = await mediaRepository.findReadyByIdAndUser(mediaId, ownerId);
     if (!media) throw new BadRequestError('Invalid or unconfirmed cover image');
 
     const oldR2Key = shop.coverR2Key;
-    const updated = await shopRepository.updateByOwnerId(ownerId, { coverR2Key: media.r2Key });
+    const updated = await shopRepository.updateByBarberUserId(ownerId, { coverR2Key: media.r2Key });
     await mediaRepository.updateById(mediaId, {
         entityId: shop._id,
         entityType: MEDIA_ENTITY_TYPE.SHOP,
@@ -214,24 +215,24 @@ export const updateShopCover = async (ownerId, mediaId) => {
 
 export const updateBarberProfilePicture = async (ownerId, mediaId) => {
     if (!mediaId) throw new BadRequestError('No profile picture media ID provided');
-    const shop = await shopRepository.findByOwnerId(ownerId);
-    if (!shop) throw new NotFoundError('Shop profile');
+    const barber = await barberRepository.findByUserId(ownerId);
+    if (!barber) throw new NotFoundError('Barber profile');
 
     const media = await mediaRepository.findReadyByIdAndUser(mediaId, ownerId);
     if (!media) throw new BadRequestError('Invalid or unconfirmed photo');
 
-    const oldR2Key = shop.ownerPhotoR2Key;
-    const updated = await shopRepository.updateByOwnerId(ownerId, { ownerPhotoR2Key: media.r2Key });
+    const oldR2Key = barber.photoR2Key;
+    const updated = await barberRepository.updateByUserId(ownerId, { photoR2Key: media.r2Key });
     await mediaRepository.updateById(mediaId, {
-        entityId: shop._id,
-        entityType: MEDIA_ENTITY_TYPE.SHOP,
+        entityId: barber._id,
+        entityType: MEDIA_ENTITY_TYPE.BARBER,
         purpose: MEDIA_PURPOSE.PROFILE,
     });
     if (oldR2Key && oldR2Key !== media.r2Key) {
         storageProvider.deleteObject(oldR2Key).catch(() => {});
     }
 
-    const photoUrl = buildMediaUrl(updated.ownerPhotoR2Key);
+    const photoUrl = buildMediaUrl(updated.photoR2Key);
     return { photoUrl, profilePhotoUrl: photoUrl, ownerPhotoUrl: photoUrl };
 };
 

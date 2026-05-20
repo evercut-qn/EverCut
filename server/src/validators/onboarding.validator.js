@@ -57,7 +57,6 @@ export const barberOnboardingSchema = Joi.object({
     ownerDateOfBirth: Joi.forbidden(),
     shopName: Joi.string().trim().min(1).max(100).required(),
     shopOwner: Joi.forbidden(),
-    ownerName: Joi.forbidden(),
     shopCategory: Joi.forbidden(),
     businessCategory: Joi.forbidden(),
     category: Joi.string().valid(...ALL_SHOP_CATEGORIES),
@@ -66,8 +65,8 @@ export const barberOnboardingSchema = Joi.object({
     upiAddress: Joi.forbidden(),
     accountHolderName: Joi.string().trim().min(1).max(100).required(),
     bankName: Joi.string().trim().min(1).max(120).required(),
-    bankAccount: Joi.string().trim().pattern(/^\d{6,34}$/).optional(),
-    ifsc: Joi.string().trim().pattern(/^[A-Z]{4}0[A-Z0-9]{6}$/i).optional(),
+    bankAccount: Joi.string().trim().pattern(/^\d{6,34}$/).required(),
+    ifsc: Joi.string().trim().pattern(/^[A-Z]{4}0[A-Z0-9]{6}$/i).required(),
     bio: Joi.string().max(500).allow('').default(''),
     address: Joi.string().trim(),
     shopLocation: Joi.forbidden(),
@@ -137,11 +136,6 @@ export const barberOnboardingSchema = Joi.object({
         if (!value.email) {
             return helpers.error('any.custom', {
                 message: 'email is required',
-            });
-        }
-        if (!value.upiId) {
-            return helpers.error('any.custom', {
-                message: 'upiId is required',
             });
         }
         if (!value.address) {

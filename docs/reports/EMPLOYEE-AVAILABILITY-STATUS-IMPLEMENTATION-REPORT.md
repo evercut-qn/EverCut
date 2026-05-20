@@ -85,7 +85,7 @@ export const updateEmployee active-state handling = async (req, res, next) => {
 ```javascript
 export const updateEmployee active-state handling = async (ownerId, employeeId, status) => {
     // 1. Verify shop ownership
-    const shop = await shopRepository.findByOwnerId(ownerId);
+    const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop profile');
 
     // 2. Verify employee belongs to shop

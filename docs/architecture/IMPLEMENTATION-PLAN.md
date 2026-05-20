@@ -343,9 +343,8 @@ const customerSchema = new mongoose.Schema({
 
 ```javascript
 const shopSchema = new mongoose.Schema({
-  ownerId:            { type: ObjectId, ref: 'User', required: true, unique: true },
+  barberId:           { type: ObjectId, ref: 'Barber', required: true, unique: true },
   shopName:           { type: String, required: true, trim: true },
-  ownerName:          { type: String, required: true, trim: true },
   category:           { type: String, enum: ['Hair Salon', 'Beauty Salon', 'Barber Shop', 'Doorstep Service'], required: true },
   upiId:              { type: String, required: true },
   bio:                { type: String, default: '' },

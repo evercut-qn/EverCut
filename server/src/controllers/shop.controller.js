@@ -1,4 +1,4 @@
-import shopRepository from '../repositories/shop.repository.js';
+import barberRepository from '../repositories/barber.repository.js';
 import * as bookingService from '../services/booking.service.js';
 import * as mediaService from '../services/media/media.service.js';
 import * as pinService from '../services/pin.service.js';
@@ -52,14 +52,14 @@ export const updateMyPin = async (req, res, next) => {
         const validation = pinService.validatePinUpdate({ currentPin, newPin, confirmNewPin });
         if (!validation.isValid) throw new BadRequestError(validation.message);
 
-        const shop = await shopRepository.findByOwnerId(req.user._id);
-        if (!shop) throw new NotFoundError('Shop profile');
+        const barber = await barberRepository.findByUserId(req.user._id);
+        if (!barber) throw new NotFoundError('Barber profile');
 
-        const isValid = await pinService.verifyPin(shop.pinHash, currentPin);
+        const isValid = await pinService.verifyPin(barber.pinHash, currentPin);
         if (!isValid) throw new BadRequestError('Current PIN is incorrect');
 
         const newHash = await pinService.hashPin(newPin);
-        await shopRepository.updateByOwnerId(req.user._id, { pinHash: newHash });
+        await barberRepository.updateByUserId(req.user._id, { pinHash: newHash });
 
         return res.status(200).json(ApiResponse.success(null, 'PIN updated successfully'));
     } catch (err) {

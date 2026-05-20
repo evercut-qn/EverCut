@@ -1,4 +1,5 @@
 import shopRepository from '../repositories/shop.repository.js';
+import barberRepository from '../repositories/barber.repository.js';
 import customerRepository from '../repositories/customer.repository.js';
 import serviceRepository from '../repositories/service.repository.js';
 import ratingRepository from '../repositories/rating.repository.js';
@@ -18,6 +19,7 @@ import { serializeServices } from '../serializers/service.serializer.js';
 import { serializeShopProfile, serializeShopSummary } from '../serializers/shop.serializer.js';
 import {
     ALL_SERVICE_FOR,
+    ALL_GENDERS,
     ALL_SHOP_AMENITIES,
     ALL_SHOP_CATEGORIES,
     DAYS_OF_WEEK,
@@ -36,22 +38,15 @@ const paginateArray = (items, query = {}) => {
 };
 
 export const getShopByOwner = async (ownerId, userContext) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
-    if (!shop) throw new NotFoundError('Shop profile');
+    const [barber, shop] = await loadBarberShop(ownerId);
 
     const photos = await mediaService.getGalleryByShopId(shop._id);
-    return serializeBarberProfile(shop, userContext, { photos });
+    return serializeBarberProfile({ barber, shop, user: userContext, photos });
 };
 
-const ALLOWED_UPDATE_FIELDS = [
+const SHOP_UPDATE_FIELDS = [
     'shopName',
     'numberOfEmployees',
-    'yearsOfExperience',
-    'ownerName',
-    'ownerFirstName',
-    'ownerLastName',
-    'ownerGender',
-    'ownerDateOfBirth',
     'location',
     'bio',
     'address',
@@ -63,6 +58,14 @@ const ALLOWED_UPDATE_FIELDS = [
     'closeTime',
     'breakTimes',
     'isOpen',
+];
+
+const BARBER_UPDATE_FIELDS = [
+    'firstName',
+    'lastName',
+    'gender',
+    'dateOfBirth',
+    'yearsOfExperience',
 ];
 
 const parseJsonIfString = (value) => {
@@ -114,10 +117,6 @@ const parseBreakTimes = (value) => {
 const normalizeUpdateBody = (body = {}) => {
     const normalized = { ...body };
 
-    normalized.ownerFirstName = normalized.firstName;
-    normalized.ownerLastName = normalized.lastName;
-    normalized.ownerGender = normalized.gender;
-    normalized.ownerDateOfBirth = normalized.dateOfBirth;
     normalized.facilities = normalized.amenities;
     normalized.availableDays = normalized.workingDays;
 
@@ -150,8 +149,7 @@ const validateAndAssign = (key, value, updateData, errors) => {
             return;
         }
 
-        case 'gender':
-        case 'ownerGender': {
+        case 'gender': {
             if (!ALL_GENDERS.includes(value)) {
                 errors.push(`Invalid gender. Must be one of: ${ALL_GENDERS.join(', ')}`);
                 return;
@@ -246,10 +244,10 @@ const validateAndAssign = (key, value, updateData, errors) => {
             return;
         }
 
-        case 'ownerDateOfBirth': {
+        case 'dateOfBirth': {
             const dt = new Date(value);
             if (Number.isNaN(dt.getTime())) {
-                errors.push('ownerDateOfBirth must be a valid date');
+                errors.push('dateOfBirth must be a valid date');
                 return;
             }
             updateData[key] = dt;
@@ -261,66 +259,73 @@ const validateAndAssign = (key, value, updateData, errors) => {
     }
 };
 
-export const updateBusinessInfo = async (ownerId, body, userContext) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
+async function loadBarberShop(userId) {
+    const barber = await barberRepository.findByUserId(userId);
+    if (!barber) throw new NotFoundError('Barber profile');
+    const shop = await shopRepository.findByBarberId(barber._id);
     if (!shop) throw new NotFoundError('Shop profile');
+    return [barber, shop];
+}
+
+export const updateBusinessInfo = async (ownerId, body, userContext) => {
+    const [barber, shop] = await loadBarberShop(ownerId);
 
     const normalizedBody = normalizeUpdateBody(body);
-    const updateData = {};
+    const shopUpdateData = {};
+    const barberUpdateData = {};
     const errors = [];
 
     for (const [key, value] of Object.entries(normalizedBody)) {
-        if (!ALLOWED_UPDATE_FIELDS.includes(key)) continue;
+        const isShopField = SHOP_UPDATE_FIELDS.includes(key);
+        const isBarberField = BARBER_UPDATE_FIELDS.includes(key);
+        if (!isShopField && !isBarberField) continue;
         if (value === undefined || value === null) continue;
         if (typeof value === 'string' && value === '' && key !== 'bio') continue;
 
-        // Remove email from update data - email updates must go through /account/email
         if (key === 'email') {
             continue;
         }
 
-        validateAndAssign(key, value, updateData, errors);
-    }
-
-    if ((updateData.ownerFirstName || updateData.ownerLastName) && !updateData.ownerName) {
-        const firstName = updateData.ownerFirstName || shop.ownerFirstName;
-        const lastName = updateData.ownerLastName || shop.ownerLastName;
-        updateData.ownerName = `${firstName || ''} ${lastName || ''}`.trim();
+        validateAndAssign(key, value, isBarberField ? barberUpdateData : shopUpdateData, errors);
     }
 
     const scheduleFieldsTouched = ['openTime', 'closeTime', 'breakTimes']
-        .some((field) => hasOwn(updateData, field));
+        .some((field) => hasOwn(shopUpdateData, field));
     if (scheduleFieldsTouched) {
         const scheduleResult = normalizeShopSchedule({
-            openTime: updateData.openTime ?? shop.openTime,
-            closeTime: updateData.closeTime ?? shop.closeTime,
-            breakTimes: updateData.breakTimes ?? shop.breakTimes ?? [],
+            openTime: shopUpdateData.openTime ?? shop.openTime,
+            closeTime: shopUpdateData.closeTime ?? shop.closeTime,
+            breakTimes: shopUpdateData.breakTimes ?? shop.breakTimes ?? [],
         });
 
         if (scheduleResult.error) {
             errors.push(scheduleResult.error);
         } else {
-            updateData.openTime = scheduleResult.value.openTime;
-            updateData.closeTime = scheduleResult.value.closeTime;
-            updateData.breakTimes = scheduleResult.value.breakTimes;
+            shopUpdateData.openTime = scheduleResult.value.openTime;
+            shopUpdateData.closeTime = scheduleResult.value.closeTime;
+            shopUpdateData.breakTimes = scheduleResult.value.breakTimes;
         }
     }
 
     if (errors.length) throw new BadRequestError('Validation failed', errors);
-    if (Object.keys(updateData).length === 0) {
+    if (Object.keys(shopUpdateData).length === 0 && Object.keys(barberUpdateData).length === 0) {
         throw new BadRequestError('No valid fields provided for update');
     }
 
     let updated = shop;
-    if (Object.keys(updateData).length > 0) {
-        updated = await shopRepository.updateByOwnerId(ownerId, updateData);
+    let updatedBarber = barber;
+    if (Object.keys(shopUpdateData).length > 0) {
+        updated = await shopRepository.updateByBarberId(barber._id, shopUpdateData);
+    }
+    if (Object.keys(barberUpdateData).length > 0) {
+        updatedBarber = await barberRepository.updateById(barber._id, barberUpdateData);
     }
     const photos = await mediaService.getGalleryByShopId(updated._id);
     await notificationEvents.notifyAccountUpdated({
         userId: ownerId,
         updateType: 'shop_profile',
     });
-    if (hasOwn(updateData, 'isOpen') && Boolean(shop.isOpen) !== Boolean(updated.isOpen)) {
+    if (hasOwn(shopUpdateData, 'isOpen') && Boolean(shop.isOpen) !== Boolean(updated.isOpen)) {
         await notificationEvents.notifyShopStatusUpdated({
             ownerId,
             shopId: updated._id,
@@ -329,60 +334,51 @@ export const updateBusinessInfo = async (ownerId, body, userContext) => {
     }
 
     return {
-        shop: serializeBarberProfile(updated, userContext, { photos }),
-        updatedFields: Object.keys(updateData),
+        shop: serializeBarberProfile({ barber: updatedBarber, shop: updated, user: userContext, photos }),
+        updatedFields: [...Object.keys(shopUpdateData), ...Object.keys(barberUpdateData)],
     };
 };
 
 export const getPayoutDetails = async (ownerId) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
-    if (!shop) throw new NotFoundError('Shop profile');
+    const barber = await barberRepository.findByUserId(ownerId);
+    if (!barber) throw new NotFoundError('Barber profile');
 
-    return serializeBankDetails(shop);
+    return serializeBankDetails(barber);
 };
 
 export const updatePayoutDetails = async (ownerId, body) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
-    if (!shop) throw new NotFoundError('Shop profile');
+    const barber = await barberRepository.findByUserId(ownerId);
+    if (!barber) throw new NotFoundError('Barber profile');
 
-    // Validate required fields
-    if (!body.accountHolderName || !body.bankName || !body.bankAccount || !body.ifsc || !body.upiId) {
+    if (!body.accountHolderName || !body.bankName || !body.bankAccount || !body.ifsc) {
         throw new BadRequestError('All bank details fields are required');
     }
 
-    // Check if bank details are changing
-    const currentPayoutConfig = shop.payoutConfig || {};
-    const isBankAccountChanging = currentPayoutConfig.bankAccount !== body.bankAccount;
-    const isIfscChanging = currentPayoutConfig.ifsc !== body.ifsc;
+    const isBankAccountChanging = barber.bankAccount !== body.bankAccount;
+    const isIfscChanging = barber.ifsc !== body.ifsc.toUpperCase();
     const isBankDetailsChanging = isBankAccountChanging || isIfscChanging;
 
     const updateData = {
         accountHolderName: body.accountHolderName,
         bankName: body.bankName,
-        upiId: body.upiId,
+        upiId: body.upiId || null,
+        bankAccount: body.bankAccount,
+        ifsc: body.ifsc.toUpperCase(),
         payoutConfig: {
-            ...(shop.payoutConfig || {}),
-            bankAccount: body.bankAccount,
-            ifsc: body.ifsc,
+            ...(barber.payoutConfig || {}),
         },
     };
 
-    // If bank details are changing, reset verification status
     if (isBankDetailsChanging) {
         updateData.payoutConfig.verificationStatus = 'pending';
         updateData.payoutConfig.verifiedAt = null;
-        // Keep beneficiaryId for tracking, but it will need re-verification
     }
 
-    const updated = await shopRepository.updateByOwnerId(ownerId, updateData);
+    const updated = await barberRepository.updateByUserId(ownerId, updateData);
     await notificationEvents.notifyAccountUpdated({
         userId: ownerId,
         updateType: 'payout_details',
     });
-
-    // TODO: Trigger beneficiary creation/update in payout gateway
-    // This should be handled by the payout service when needed
-    // await payoutService.createOrUpdateBeneficiary(updated);
 
     return serializeBankDetails(updated);
 };

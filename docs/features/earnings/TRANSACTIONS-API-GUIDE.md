@@ -230,7 +230,7 @@ Download a professional PDF statement of transactions within a date range.
 
 **PDF Features**:
 - Professional formatting with EverCut branding
-- Shop information and owner name
+- Shop information and barber first/last name
 - Statement period and generation date
 - Summary statistics (total transactions, total amount, average transaction)
 - Detailed transaction table with optimized column widths

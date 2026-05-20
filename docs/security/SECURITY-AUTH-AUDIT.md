@@ -372,8 +372,8 @@ if (updateData.phoneNumber) {
     }
 }
 
-// shop.service.js L316-323
-const updated = await shopRepository.updateByOwnerId(ownerId, updateData);
+// shop.service.js
+const updated = await shopRepository.updateByBarberUserId(ownerId, updateData);
 const userUpdates = {};
 if (updateData.email) userUpdates.email = updateData.email;
 if (updateData.phoneNumber) userUpdates.phoneNumber = updateData.phoneNumber;
@@ -656,12 +656,13 @@ export const getServicesByGender = async (gender) => {
 **Code:**
 ```javascript
 import shopRepository from '../../repositories/shop.repository.js';
+import barberRepository from '../../repositories/barber.repository.js';
 
 // In updatePin:
-const shop = await shopRepository.findByOwnerId(req.user._id);
-if (!shop) throw new NotFoundError('Shop profile');
+const barber = await barberRepository.findByUserId(req.user._id);
+if (!barber) throw new NotFoundError('Barber profile');
 // ...
-await shopRepository.updateByOwnerId(req.user._id, { pinHash: newHash });
+await barberRepository.updateById(barber._id, { pinHash: newHash });
 ```
 
 **Issue:** The controller directly imports and calls `shopRepository`, bypassing the service layer. PIN update logic should be in a service function.

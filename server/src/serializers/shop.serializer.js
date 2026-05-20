@@ -29,23 +29,26 @@ const toWorkingHours = (plain = {}) => ({
     closeTime: plain.closeTime ?? null,
 });
 
-const serializeOwner = (plain = {}, raw = {}, userContext = null, privateView = false) => {
+const serializeOwner = (barber = {}, userContext = null, privateView = false) => {
+    const rawBarber = toPlainObject(barber) || {};
+    const plain = sanitizeForResponse(rawBarber) || {};
     const user = userContext ? serializeUser(userContext) : {};
+    if (!Object.keys(plain).length && !Object.keys(user).length) return {};
 
     return compact({
         id: user?.id,
-        firstName: plain.ownerFirstName ?? null,
-        lastName: plain.ownerLastName ?? null,
-        gender: plain.ownerGender ?? null,
-        dateOfBirth: privateView ? (plain.ownerDateOfBirth ?? null) : undefined,
+        firstName: plain.firstName ?? null,
+        lastName: plain.lastName ?? null,
+        gender: plain.gender ?? null,
+        dateOfBirth: privateView ? (plain.dateOfBirth ?? null) : undefined,
         email: privateView ? (user?.email ?? null) : undefined,
         phoneNumber: privateView ? (user?.phoneNumber ?? null) : undefined,
-        photoUrl: buildMediaUrl(raw.ownerPhotoR2Key),
+        photoUrl: buildMediaUrl(rawBarber.photoR2Key),
     });
 };
 
-export const serializeBankDetails = (shop) => {
-    const raw = toPlainObject(shop);
+export const serializeBankDetails = (barber) => {
+    const raw = toPlainObject(barber);
     const plain = sanitizeForResponse(raw);
     if (!plain) return null;
 
@@ -56,8 +59,8 @@ export const serializeBankDetails = (shop) => {
         accountHolderName: plain.accountHolderName || null,
         bankName: plain.bankName || null,
         upiId: plain.upiId || null,
-        bankAccountLast4: maskBankAccount(raw?.payoutConfig?.bankAccount),
-        ifsc: plain.payoutConfig?.ifsc || null,
+        bankAccountLast4: maskBankAccount(raw?.bankAccount),
+        ifsc: plain.ifsc || null,
         verificationStatus,
         isVerified,
         verifiedAt: plain.payoutConfig?.verifiedAt || null,
@@ -92,7 +95,7 @@ export const serializeShopProfile = (shop, options = {}) => {
     const plain = sanitizeForResponse(raw);
     if (!plain) return null;
 
-    const owner = serializeOwner(plain, raw, options.userContext, options.privateView);
+    const owner = serializeOwner(options.barber, options.userContext, options.privateView);
 
     return compact({
         id: plain.id,
@@ -100,12 +103,12 @@ export const serializeShopProfile = (shop, options = {}) => {
         shopName: plain.shopName ?? null,
         category: plain.category ?? null,
         targetCustomers: plain.targetCustomers ?? null,
-        payout: options.privateView ? serializeBankDetails(shop) : undefined,
+        payout: options.privateView ? serializeBankDetails(options.barber) : undefined,
         bio: plain.bio ?? '',
         address: plain.address ?? null,
         location: plain.location ?? null,
         numberOfEmployees: plain.numberOfEmployees ?? null,
-        yearsOfExperience: plain.yearsOfExperience ?? null,
+        yearsOfExperience: options.privateView ? (sanitizeForResponse(toPlainObject(options.barber))?.yearsOfExperience ?? null) : undefined,
         amenities: plain.facilities ?? [],
         workingDays: plain.availableDays ?? [],
         workingHours: toWorkingHours(plain),
@@ -122,9 +125,10 @@ export const serializeShopProfile = (shop, options = {}) => {
     });
 };
 
-export const serializeBarberProfile = (shop, userContext = {}, { photos } = {}) => {
+export const serializeBarberProfile = ({ barber, shop, user, photos } = {}) => {
     const profile = serializeShopProfile(shop, {
-        userContext,
+        barber,
+        userContext: user,
         photos,
         privateView: true,
     });

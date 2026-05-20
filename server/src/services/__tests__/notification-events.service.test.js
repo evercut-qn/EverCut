@@ -38,6 +38,7 @@ ensureRequiredEnv();
 const notificationEvents = (await import('../notification-events.service.js')).default;
 const notificationService = (await import('../notification.service.js')).default;
 const bookingRepository = (await import('../../repositories/booking.repository.js')).default;
+const barberRepository = (await import('../../repositories/barber.repository.js')).default;
 const customerRepository = (await import('../../repositories/customer.repository.js')).default;
 const shopRepository = (await import('../../repositories/shop.repository.js')).default;
 
@@ -60,8 +61,12 @@ test('notifyBookingAwaitingConfirmation sends a deduped hybrid event to the shop
     }));
     t.mock.method(shopRepository, 'findById', async () => ({
         _id: shopId,
-        ownerId: barberUserId,
+        barberId: '507f1f77bcf86cd799439017',
         shopName: 'EverCut Studio',
+    }));
+    t.mock.method(barberRepository, 'findById', async () => ({
+        _id: '507f1f77bcf86cd799439017',
+        userId: barberUserId,
     }));
     t.mock.method(customerRepository, 'findById', async () => ({
         _id: customerId,

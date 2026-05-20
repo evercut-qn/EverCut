@@ -149,7 +149,7 @@ export const getBookings = async (req, res, next) => {
 **Changes:**
 ```javascript
 export const getBookingsByShop = async (ownerId, query = {}) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
+    const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop');
 
     // Build filters

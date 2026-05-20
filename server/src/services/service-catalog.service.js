@@ -135,7 +135,7 @@ const rethrowDuplicateServiceWrite = (error) => {
 };
 
 export const addService = async (ownerId, data) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
+    const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop profile');
 
     const serviceData = buildServicePayload(data);
@@ -181,7 +181,7 @@ export const addService = async (ownerId, data) => {
 };
 
 export const getServices = async (ownerId, queryFilters = {}) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
+    const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop profile');
 
     const filters = buildServiceFilters(queryFilters);
@@ -193,7 +193,7 @@ export const getServices = async (ownerId, queryFilters = {}) => {
 };
 
 export const updateService = async (ownerId, serviceId, data) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
+    const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop profile');
 
     const existingService = await serviceRepository.findById(serviceId);
@@ -249,7 +249,7 @@ export const updateService = async (ownerId, serviceId, data) => {
 };
 
 export const deleteService = async (ownerId, serviceId) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
+    const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop profile');
 
     const deleted = await serviceRepository.softDelete(serviceId, shop._id);

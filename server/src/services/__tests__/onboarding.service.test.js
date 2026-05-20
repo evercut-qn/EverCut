@@ -36,6 +36,7 @@ const ensureRequiredEnv = () => {
 ensureRequiredEnv();
 
 const shopRepository = (await import('../../repositories/shop.repository.js')).default;
+const barberRepository = (await import('../../repositories/barber.repository.js')).default;
 const userRepository = (await import('../../repositories/user.repository.js')).default;
 const mediaRepository = (await import('../../repositories/media.repository.js')).default;
 const onboardingService = await import('../onboarding.service.js');
@@ -44,11 +45,8 @@ test('createBarberOnboarding links media as COVER and does NOT return photos arr
     const mockUser = { _id: 'user-1', phoneNumber: '+919876543210', roleType: 'BARBER' };
     const mockShop = { 
         _id: 'shop-1', 
-        ownerId: 'user-1', 
+        barberId: 'barber-1', 
         shopName: 'Test Shop',
-        ownerFirstName: 'John',
-        ownerLastName: 'Doe',
-        ownerGender: 'male',
         category: 'Barber Shop',
         targetCustomers: 'men',
         address: 'Test Address',
@@ -58,11 +56,25 @@ test('createBarberOnboarding links media as COVER and does NOT return photos arr
         closeTime: '18:00',
         coverR2Key: 'key/1.jpg'
     };
+    const mockBarber = {
+        _id: 'barber-1',
+        userId: 'user-1',
+        firstName: 'John',
+        lastName: 'Doe',
+        gender: 'male',
+        dateOfBirth: '1990-01-01',
+        accountHolderName: 'John Doe',
+        bankName: 'Test Bank',
+        bankAccount: '12345678901234',
+        ifsc: 'HDFC0001234',
+        payoutConfig: { verificationStatus: 'pending' },
+    };
     const mockMedia = { _id: 'media-1', r2Key: 'key/1.jpg', status: 'ready' };
 
     t.mock.method(userRepository, 'findByPhone', async () => null);
     t.mock.method(userRepository, 'findByEmail', async () => null);
     t.mock.method(userRepository, 'create', async () => mockUser);
+    t.mock.method(barberRepository, 'create', async () => mockBarber);
     t.mock.method(shopRepository, 'create', async () => mockShop);
     t.mock.method(mediaRepository, 'findById', async () => mockMedia);
     
@@ -86,7 +98,8 @@ test('createBarberOnboarding links media as COVER and does NOT return photos arr
         targetCustomers: 'men',
         accountHolderName: 'John Doe',
         bankName: 'Test Bank',
-        upiId: 'test@upi',
+        bankAccount: '12345678901234',
+        ifsc: 'HDFC0001234',
         address: 'Test Address',
         location: { type: 'Point', coordinates: [0, 0] },
         workingDays: ['Monday'],

@@ -216,6 +216,7 @@ export const MEDIA_PURPOSE = Object.freeze({
 export const ALL_MEDIA_PURPOSES = Object.values(MEDIA_PURPOSE);
 
 export const MEDIA_ENTITY_TYPE = Object.freeze({
+    BARBER: 'Barber',
     SHOP: 'Shop',
     EMPLOYEE: 'Employee',
     CUSTOMER: 'Customer',

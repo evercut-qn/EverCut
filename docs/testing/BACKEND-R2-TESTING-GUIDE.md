@@ -121,7 +121,7 @@ R2 dashboard:
 MongoDB:
 
 - `Media.status` moves from `pending` to `ready` after confirm.
-- `Shop.coverR2Key`, `Shop.ownerPhotoR2Key`, `Employee.photoR2Key`, and `Customer.photoR2Key` are populated after attachment/replacement.
+- `Shop.coverR2Key`, `Barber.photoR2Key`, `Employee.photoR2Key`, and `Customer.photoR2Key` are populated after attachment/replacement.
 - Retired URL fields are absent after cutover finalization.
 
 CDN/cache:
