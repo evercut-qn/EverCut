@@ -5,7 +5,7 @@
 **Platform:** Evercut (by Quantneural)  
 **Source:** Evercut Professional Report — Storage, Subscription & Platform Cost Analysis; Gap Solutions Document  
 **Revision Note:** Updated to reflect confirmed user-type separation: Barbers and Customers; updated with confirmed business clarifications; updated with finalised gap answers; scoped exclusively to subscription and platform fee content  
-**Status:** All core business rules confirmed. See Section 12 for remaining open items.
+**Status:** All core business rules confirmed. Refund policy confirmed and integrated. See Section 12 for remaining open items.
 
 ---
 
@@ -37,6 +37,12 @@ These systems are **completely separate**. They share no logic, no counters, and
 4. [Barber Subscription Lifecycle](#4-barber-subscription-lifecycle)
 5. [Barber Storage & Upload Constraints per Plan](#5-barber-storage--upload-constraints-per-plan)
 6. [Customer Platform Fee Structure](#6-customer-platform-fee-structure)
+   - 6.1 Overview
+   - 6.2 Fee Table
+   - 6.3 Booking Type Definitions
+   - 6.4 Fee Cap Rule
+   - 6.5 Minimum Booking Amount Constraint
+   - 6.6 Cancellation & Refund Fee Structure
 7. [Customer Introductory Fee Waiver Logic](#7-customer-introductory-fee-waiver-logic)
 8. [Booking Rules & Validation Flow](#8-booking-rules--validation-flow)
 9. [End-to-End Booking Walkthrough — Customer Perspective](#9-end-to-end-booking-walkthrough--customer-perspective)
@@ -581,6 +587,88 @@ The ₹10 cap for combined bookings must be **explicitly enforced in code** rath
 - This validation applies to **all customers**, including those within the introductory fee waiver period.
 - This validation must occur **before** any platform fee calculation or waiver check.
 
+### 6.6 Cancellation & Refund Fee Structure
+
+When a booking is cancelled, the refund amount returned to the customer depends entirely on **who initiated the cancellation**. The platform implements two completely distinct refund paths, controlled by the `isBarberCancellation` flag in `payment.service.js`.
+
+#### Refund Path Summary
+
+| Cancellation Type | `isBarberCancellation` | Platform Fee | Refund Fee | Amount Returned to Customer |
+|---|---|---|---|---|
+| **Customer cancels** | `false` | **Withheld** — kept by platform | ₹7 (single) / ₹15 (bundle or combined) | `serviceAmount − refundFee` |
+| **Barber cancels or auto-cancel** | `true` | **Fully refunded** | ₹0 | `serviceAmount + platformFee` (full payment) |
+
+#### Customer Cancellation — Detailed Logic
+
+When a customer cancels a booking, the refund is calculated against the **service amount only** — the platform fee is already excluded from this base figure, as it is derived from `payment.settlement.serviceAmount`. The refund fee is then deducted from this base:
+
+```
+// Customer cancellation (isBarberCancellation = false)
+refundFee        = getRefundFeeInPaisa(payment)       // ₹7 (single) or ₹15 (bundle/combined)
+refundAmount     = serviceAmount - refundFee           // What the customer receives back
+platformFee      → withheld; recorded as platform deduction (not returned)
+```
+
+What the customer receives: `serviceAmount − refundFee`
+
+What the platform retains: the full platform fee (₹4 or ₹10) **plus** the refund fee (₹7 or ₹15)
+
+**Refund fee by booking type:**
+
+| Booking Type | Platform Fee | Refund Fee (Customer Cancellation) |
+|---|---|---|
+| Single | ₹4 | ₹7 |
+| Bundle | ₹10 | ₹15 |
+| Single + Bundle Combined | ₹10 | ₹15 |
+
+> **Important — Waiver Interaction:** If the cancelled booking had a platform fee waiver applied (i.e., it was one of the customer's first two bookings and `platform_fee = ₹0`), then the platform fee component withheld is ₹0 — there is nothing to withhold. However, the refund fee (₹7 or ₹15) is still deducted from the service amount. The waiver slot consumed by this booking is **not** reinstated regardless of cancellation (see §7.4).
+
+#### Barber Cancellation / Auto-Cancel — Detailed Logic
+
+When a barber cancels or the system triggers an auto-cancellation, the customer receives a **full refund** of everything they paid — service amount plus platform fee — with no deductions:
+
+```
+// Barber or auto-cancellation (isBarberCancellation = true)
+refundAmount = payment.amount    // Full gross payment: serviceAmount + platformFee
+refundFee    = ₹0
+platformFee  → fully refunded
+```
+
+What the customer receives: `serviceAmount + platformFee` (complete restoration)
+
+What the platform retains: ₹0
+
+#### Refund Calculation Summary
+
+```
+function calculateRefundAmount(payment, isBarberCancellation):
+  serviceAmount = payment.settlement.serviceAmount
+  platformFee   = payment.platformFee   // ₹4 or ₹10 (or ₹0 if waiver was applied)
+
+  IF isBarberCancellation == true:
+    refundFee    = 0
+    refundAmount = payment.amount        // serviceAmount + platformFee
+    platformFeeDeduction = 0
+
+  ELSE:  // Customer cancellation
+    refundFee    = getRefundFee(payment.booking_type)  // ₹7 or ₹15
+    refundAmount = serviceAmount - refundFee
+    platformFeeDeduction = platformFee                 // Withheld; not returned
+
+  return { refundAmount, refundFee, platformFeeDeduction }
+```
+
+#### Canonical Fee Config Values
+
+| Config Key | Value | Notes |
+|---|---|---|
+| `platformFeeSingle` | ₹4 | Platform fee for single bookings |
+| `platformFeeBundle` | ₹10 | Platform fee for bundle and combined bookings |
+| `refundFeeSingle` | ₹7 | Refund processing fee on customer cancellation of a single booking |
+| `refundFeeBundle` | ₹15 | Refund processing fee on customer cancellation of a bundle or combined booking |
+
+> **Note on config:** The value `platformFeeSingle: 3` present in `config/index.js` is **outdated and incorrect**. The correct and canonical value is **₹4**, as confirmed by the business. All implementation must use ₹4. The config must be updated to reflect this.
+
 ---
 
 ## 7. Customer Introductory Fee Waiver Logic
@@ -638,7 +726,7 @@ function resolveCustomerPlatformFee(customer, booking_type):
 | Customer's 3rd booking onwards | Standard platform fee applies (₹4 or ₹10). |
 | Service amount below ₹70 during waiver period | Booking rejected. Counter must NOT increment. |
 | Payment fails on a waiver-eligible booking | Counter must NOT increment. Waiver slot is preserved for the customer's next successful booking. |
-| Customer cancels a waiver-covered booking after payment | The counter does **not** decrement. The fee waiver slot is permanently used, regardless of the cancellation. |
+| Customer cancels a waiver-covered booking after payment | The waiver counter does **not** decrement — the fee waiver slot is permanently used regardless of cancellation. Additionally: since the platform fee on this booking was ₹0 (waived), there is no platform fee component to withhold. However, the refund fee (₹7 for single / ₹15 for bundle or combined) **is still deducted** from the service amount on customer cancellation. The waiver covered only the platform fee — it never applied to the refund processing fee. See §6.6. |
 | Customer re-registers with a new account to reset waiver | The waiver must be tied to a persistent identifier beyond just the account (e.g., verified phone number) to prevent gaming. Anti-abuse mechanism must be confirmed — see Section 12, Open Question 3. |
 | Same customer books two different barbers | The waiver applies per customer account across all barbers — not per barber. The first 2 bookings ever (regardless of which barber) are waiver-eligible. |
 
@@ -698,6 +786,9 @@ Customer initiates booking:
 | `total_charged` | Decimal | `booking_amount + platform_fee` |
 | `waiver_applied` | Boolean | Whether the fee waiver was used for this booking |
 | `status` | Enum | `PENDING`, `CONFIRMED`, `CANCELLED`, `COMPLETED` |
+| `cancellation_type` | Enum / Null | `CUSTOMER`, `BARBER`, `AUTO` — null if not cancelled |
+| `refund_fee` | Decimal / Null | Refund processing fee deducted on customer cancellation (₹7 or ₹15); ₹0 on barber/auto-cancel; null if not cancelled |
+| `refund_amount` | Decimal / Null | Amount actually returned to the customer on cancellation; null if not cancelled |
 | `created_at` | Timestamp | Booking creation datetime |
 
 ---
@@ -770,6 +861,65 @@ fee_waiver_bookings_used → NOT incremented; stays at 1/2
                          → Customer's second waiver slot is preserved
 ```
 
+### Scenario G — Customer Cancels a Confirmed Single Booking (₹250, No Waiver)
+
+```
+booking_amount           = ₹250   (service amount; already paid)
+platform_fee             = ₹4     (single; waiver already exhausted)
+total_charged_at_booking = ₹254
+
+[customer cancels → isBarberCancellation = false]
+
+grossAmount (base for refund) = serviceAmount = ₹250
+                                (platform fee is excluded from this base)
+refund_fee               = ₹7    (single booking)
+refund_amount            = ₹250 − ₹7 = ₹243
+
+Platform retains:          ₹4  (platform fee, withheld)
+                         + ₹7  (refund processing fee)
+                         = ₹11 total
+
+Customer receives back:    ₹243
+```
+
+### Scenario H — Customer Cancels a Confirmed Bundle Booking (₹500, Waiver Was Applied)
+
+```
+booking_amount           = ₹500   (service amount; already paid)
+platform_fee             = ₹0     (waiver was applied — this was customer's 1st booking)
+total_charged_at_booking = ₹500
+fee_waiver_bookings_used = 1/2    (slot consumed at booking time; not reinstated on cancel)
+
+[customer cancels → isBarberCancellation = false]
+
+grossAmount (base for refund) = serviceAmount = ₹500
+refund_fee               = ₹15   (bundle booking)
+refund_amount            = ₹500 − ₹15 = ₹485
+
+Platform retains:          ₹0  (platform fee was ₹0 — nothing to withhold)
+                         + ₹15 (refund processing fee)
+                         = ₹15 total
+
+Customer receives back:    ₹485
+fee_waiver_bookings_used → stays at 1/2 (slot NOT reinstated)
+```
+
+### Scenario I — Barber Cancels a Bundle Booking (₹400, No Waiver)
+
+```
+booking_amount           = ₹400   (service amount; already paid)
+platform_fee             = ₹10    (bundle; waiver exhausted)
+total_charged_at_booking = ₹410
+
+[barber cancels → isBarberCancellation = true]
+
+refund_fee               = ₹0    (zero deductions on barber cancellation)
+refund_amount            = ₹410  (full payment.amount returned)
+
+Platform retains:          ₹0
+Customer receives back:    ₹410  (complete restoration)
+```
+
 ---
 
 ## 10. Data Model Reference
@@ -814,8 +964,11 @@ This section provides a consolidated view of the key fields required per entity,
 | `booking_amount` | Decimal | Service cost before platform fee (must be ≥ ₹70) |
 | `platform_fee` | Decimal | ₹0 (waived), ₹4, or ₹10 |
 | `total_charged` | Decimal | `booking_amount + platform_fee` |
-| `waiver_applied` | Boolean | Whether the introductory fee waiver was used |
+| `waiver_applied` | Boolean | Whether the introductory fee waiver was used for this booking |
 | `status` | Enum | `PENDING`, `CONFIRMED`, `CANCELLED`, `COMPLETED` |
+| `cancellation_type` | Enum / Null | `CUSTOMER`, `BARBER`, `AUTO` — null if booking has not been cancelled |
+| `refund_fee` | Decimal / Null | Refund processing fee deducted on customer cancellation: ₹7 (single) / ₹15 (bundle or combined); ₹0 on barber or auto-cancel; null if not cancelled |
+| `refund_amount` | Decimal / Null | Actual amount returned to the customer on cancellation: `serviceAmount − refundFee` (customer cancel) or full `payment.amount` (barber/auto cancel); null if not cancelled |
 | `created_at` | Timestamp | Booking creation datetime |
 
 ---
@@ -885,6 +1038,21 @@ This section provides a consolidated view of the key fields required per entity,
 - [ ] Implement atomic booking persistence — only after payment confirmation
 - [ ] Persist all fee fields on booking record (`booking_amount`, `platform_fee`, `total_charged`, `waiver_applied`)
 
+### Customer — Cancellation & Refund
+
+- [ ] Implement `initiateRefund` with two distinct paths, controlled by the `isBarberCancellation` flag
+- [ ] **Customer cancellation path** (`isBarberCancellation = false`):
+  - [ ] Base refund amount on `payment.settlement.serviceAmount` (service amount only — platform fee excluded from base)
+  - [ ] Determine refund fee by booking type: ₹7 for `SINGLE`; ₹15 for `BUNDLE` or `COMBINED`
+  - [ ] Calculate `refund_amount = serviceAmount − refundFee`
+  - [ ] Withhold platform fee — record it as a platform deduction; do not include in refund
+  - [ ] Persist `cancellation_type = CUSTOMER`, `refund_fee`, and `refund_amount` on the booking record
+- [ ] **Barber / auto-cancel path** (`isBarberCancellation = true`):
+  - [ ] Refund the full `payment.amount` (service amount + platform fee combined) with zero deductions
+  - [ ] Persist `cancellation_type = BARBER` or `AUTO`, `refund_fee = 0`, and `refund_amount = payment.amount`
+- [ ] Ensure waiver slot is **never reinstated** on customer cancellation of a waiver-covered booking
+- [ ] **Fix config:** Update `platformFeeSingle` from `3` to `4` in `config/index.js`. The value `3` is outdated and incorrect; canonical value is ₹4 (see §6.6)
+
 ---
 
 ## 12. Open Questions & Gaps
@@ -896,7 +1064,6 @@ The following items are not yet resolved and must be confirmed before or during 
 | 1 | What is the cancellation policy? Does cancellation terminate features immediately, or does the barber retain access until the end of the current 30-day billing period? | Barber | Lifecycle |
 | 2 | When a downgrade or expiry triggers the hidden-media policy and only a subset of active files can remain visible, which files stay active and which are hidden? Options: oldest uploads stay active (newest hidden); newest stay active (oldest hidden); barber is prompted to manually select which files to keep active. | Barber | Uploads |
 | 3 | How is the fee waiver tied to the customer's identity to prevent gaming via account re-registration? (e.g., verified phone number as a persistent identifier that carries across accounts) | Customer | Bookings |
-| 4 | What is the refund policy for platform fees on customer-cancelled bookings? | Customer | Bookings |
 
 ---
 
