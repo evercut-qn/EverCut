@@ -72,16 +72,12 @@ const breakTimesSchema = Joi.alternatives().try(
 );
 
 const targetCustomersSchema = Joi.string().valid(...ALL_SERVICE_FOR);
-const ifscSchema = Joi.string().trim().pattern(/^[A-Z]{4}0[A-Z0-9]{6}$/i);
-const bankAccountSchema = Joi.string().trim().min(6).max(34);
-
 export const updateBusinessSchema = Joi.object({
     shopName: Joi.string().trim().min(1).max(100),
     firstName: Joi.string().trim().min(1).max(50),
     lastName: Joi.string().trim().min(1).max(50),
     gender: Joi.string().valid(...ALL_GENDERS),
     dateOfBirth: Joi.date(),
-    ownerName: Joi.forbidden(),
     shopOwner: Joi.forbidden(),
     ownerFirstName: Joi.forbidden(),
     ownerLastName: Joi.forbidden(),
@@ -125,10 +121,6 @@ export const updateBusinessSchema = Joi.object({
     ),
 })
     .custom((value, helpers) => {
-        value.ownerFirstName = value.firstName;
-        value.ownerLastName = value.lastName;
-        value.ownerGender = value.gender;
-        value.ownerDateOfBirth = value.dateOfBirth;
         value.facilities = value.amenities;
         value.availableDays = value.workingDays;
 
@@ -274,7 +266,7 @@ export const updatePayoutDetailsSchema = Joi.object({
     ifsc: Joi.string().trim().pattern(/^[A-Z]{4}0[A-Z0-9]{6}$/i).required().messages({
         'string.pattern.base': 'ifsc must be a valid IFSC code (e.g., SBIN0001234)',
     }),
-    upiId: Joi.string().trim().required(),
+    upiId: Joi.string().trim().optional(),
     // Strip any fields that should not be user-controlled
     verificationStatus: Joi.any().strip(),
     beneficiaryId: Joi.any().strip(),

@@ -65,17 +65,13 @@ This audit systematically traced every field in all models through the complete 
 
 | Field | Type | Status | Coverage |
 |-------|------|--------|----------|
-| `ownerId` | ObjectId | ✅ COMPLETE | Set on creation, used for lookups |
+| `barberId` | ObjectId | ✅ COMPLETE | Set on creation, used for shop ownership lookups |
 | `shopName` | String | ✅ COMPLETE | Create, Update, Read |
-| `ownerName` | String | ✅ COMPLETE | Create, Update, Read |
-| `ownerFirstName` | String | ✅ COMPLETE | Create, Update, Read |
-| `ownerLastName` | String | ✅ COMPLETE | Create, Update, Read |
-| `ownerGender` | String | ✅ COMPLETE | Create, Update, Read |
-| `ownerDateOfBirth` | Date | ✅ COMPLETE | Create, Update, Read |
 | `category` | String | ✅ COMPLETE | Create, Update, Read |
 | `targetCustomers` | String | ✅ COMPLETE | Create, Update, Read |
-| `upiId` | String | ✅ COMPLETE | Create, Update, Read (via UPI endpoint) |
-| `accountHolderName` | String | ✅ COMPLETE | Create, Update, Read (via UPI endpoint) |
+| `breakTimes` | Array | ✅ COMPLETE | Optional schedule breaks |
+
+Barber/person and payout fields now live on `barber.model.js` (`firstName`, `lastName`, `gender`, `dateOfBirth`, `bankAccount`, `ifsc`, optional `upiId`, and payout metadata).
 | `bankName` | String | ✅ COMPLETE | Create, Update, Read (via UPI endpoint) |
 | **`payoutConfig.bankAccount`** | **String** | **❌ CRITICAL GAP** | **Validator exists, service handles it, BUT no proper dedicated endpoint** |
 | **`payoutConfig.ifsc`** | **String** | **❌ CRITICAL GAP** | **Validator exists, service handles it, BUT no proper dedicated endpoint** |
@@ -430,30 +426,30 @@ export const verifyBankDetails = async (req, res, next) => {
 // shop.service.js
 
 export const getBankDetails = async (ownerId) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
-    if (!shop) throw new NotFoundError('Shop profile');
+    const barber = await barberRepository.findByUserId(ownerId);
+    if (!barber) throw new NotFoundError('Barber profile');
 
-    return serializeBankDetails(shop);
+    return serializeBankDetails(barber);
 };
 
 export const updateBankDetails = async (ownerId, body) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
-    if (!shop) throw new NotFoundError('Shop profile');
+    const barber = await barberRepository.findByUserId(ownerId);
+    if (!barber) throw new NotFoundError('Barber profile');
 
     const updateData = {
         accountHolderName: body.accountHolderName,
         bankName: body.bankName,
-        upiId: body.upiId,
+        upiId: body.upiId || null,
+        bankAccount: body.bankAccount,
+        ifsc: body.ifsc,
         payoutConfig: {
-            ...(shop.payoutConfig || {}),
-            bankAccount: body.bankAccount,
-            ifsc: body.ifsc,
+            ...(barber.payoutConfig || {}),
             verificationStatus: 'pending',
             verifiedAt: null,
         },
     };
 
-    const updated = await shopRepository.updateByOwnerId(ownerId, updateData);
+    const updated = await barberRepository.updateById(barber._id, updateData);
 
     // Trigger beneficiary creation/update
     await payoutService.createOrUpdateBeneficiary(updated);
@@ -462,11 +458,11 @@ export const updateBankDetails = async (ownerId, body) => {
 };
 
 export const verifyBankDetails = async (ownerId) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
-    if (!shop) throw new NotFoundError('Shop profile');
+    const barber = await barberRepository.findByUserId(ownerId);
+    if (!barber) throw new NotFoundError('Barber profile');
 
     // Trigger verification via payout gateway
-    const result = await payoutService.verifyBeneficiary(shop);
+    const result = await payoutService.verifyBeneficiary(barber);
 
     return result;
 };

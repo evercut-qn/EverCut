@@ -36,7 +36,7 @@ const notificationEvents = (await import('../notification-events.service.js')).d
 const employeeService = await import('../employee.service.js');
 
 test('deleteEmployee blocks unresolved bookings for that employee', async (t) => {
-    t.mock.method(shopRepository, 'findByOwnerId', async () => ({ _id: 'shop-1' }));
+    t.mock.method(shopRepository, 'findByBarberUserId', async () => ({ _id: 'shop-1' }));
     t.mock.method(employeeRepository, 'findById', async () => ({
         _id: 'employee-1',
         shopId: 'shop-1',
@@ -62,7 +62,7 @@ test('deleteEmployee blocks unresolved bookings for that employee', async (t) =>
 });
 
 test('addEmployee cleans up uploaded photo when a duplicate write slips past the pre-check', async (t) => {
-    t.mock.method(shopRepository, 'findByOwnerId', async () => ({
+    t.mock.method(shopRepository, 'findByBarberUserId', async () => ({
         _id: 'shop-1',
         openTime: '09:00',
         closeTime: '18:00',
@@ -107,7 +107,7 @@ test('addEmployee cleans up uploaded photo when a duplicate write slips past the
 });
 
 test('addEmployee accepts 24-hour employee hours when legacy shop hours are stored in AM/PM format', async (t) => {
-    t.mock.method(shopRepository, 'findByOwnerId', async () => ({
+    t.mock.method(shopRepository, 'findByBarberUserId', async () => ({
         _id: 'shop-1',
         openTime: '09:00 AM',
         closeTime: '08:00 PM',
@@ -138,7 +138,7 @@ test('addEmployee accepts 24-hour employee hours when legacy shop hours are stor
 });
 
 test('addEmployee defaults working hours to normalized 24-hour shop hours', async (t) => {
-    t.mock.method(shopRepository, 'findByOwnerId', async () => ({
+    t.mock.method(shopRepository, 'findByBarberUserId', async () => ({
         _id: 'shop-1',
         openTime: '09:00 AM',
         closeTime: '08:00 PM',
@@ -167,7 +167,7 @@ test('addEmployee defaults working hours to normalized 24-hour shop hours', asyn
 });
 
 test('updateEmployee persists desired active state through the employee resource update', async (t) => {
-    t.mock.method(shopRepository, 'findByOwnerId', async () => ({
+    t.mock.method(shopRepository, 'findByBarberUserId', async () => ({
         _id: 'shop-1',
         openTime: '09:00',
         closeTime: '18:00',
@@ -205,7 +205,7 @@ test('updateEmployee persists desired active state through the employee resource
 });
 
 test('updateEmployeeAvailability blocks only new leave dates and notifies affected bookings', async (t) => {
-    t.mock.method(shopRepository, 'findByOwnerId', async () => ({ _id: 'shop-1' }));
+    t.mock.method(shopRepository, 'findByBarberUserId', async () => ({ _id: 'shop-1' }));
     t.mock.method(employeeRepository, 'findById', async () => ({
         _id: 'employee-1',
         shopId: 'shop-1',
@@ -289,7 +289,7 @@ test('updateEmployeeAvailability blocks only new leave dates and notifies affect
 });
 
 test('updateEmployeeAvailability removes blocked dates without notifying customers', async (t) => {
-    t.mock.method(shopRepository, 'findByOwnerId', async () => ({ _id: 'shop-1' }));
+    t.mock.method(shopRepository, 'findByBarberUserId', async () => ({ _id: 'shop-1' }));
     t.mock.method(employeeRepository, 'findById', async () => ({
         _id: 'employee-1',
         shopId: 'shop-1',

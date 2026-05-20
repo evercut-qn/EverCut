@@ -101,7 +101,7 @@ test('getPayments lists only the authenticated customer payments', async (t) => 
 });
 
 test('getPayments lists only the authenticated barber shop payments', async (t) => {
-    t.mock.method(shopRepository, 'findByOwnerId', async () => ({ _id: 'shop-1' }));
+    t.mock.method(shopRepository, 'findByBarberUserId', async () => ({ _id: 'shop-1' }));
 
     let countFilter = null;
     t.mock.method(paymentRepository, 'countAll', async (filter) => {
@@ -533,7 +533,7 @@ test('initiateRefund rejects barbers who do not own the booking shop', async (t)
         payoutStatus: 'not_initiated',
     }));
 
-    t.mock.method(shopRepository, 'findByOwnerId', async () => ({
+    t.mock.method(shopRepository, 'findByBarberUserId', async () => ({
         _id: 'shop-2',
     }));
 
@@ -572,7 +572,7 @@ test('initiateRefund enforces barber ownership when the actor uses req.user.role
         payoutStatus: 'not_initiated',
     }));
 
-    t.mock.method(shopRepository, 'findByOwnerId', async () => ({
+    t.mock.method(shopRepository, 'findByBarberUserId', async () => ({
         _id: 'shop-2',
     }));
 

@@ -15,7 +15,7 @@ const payoutTransactionSchema = new mongoose.Schema(
         ],
         barberId: {
             type: mongoose.Schema.Types.ObjectId,
-            ref: 'User',
+            ref: 'Barber',
             required: true,
             index: true,
         },

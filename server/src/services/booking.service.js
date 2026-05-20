@@ -583,7 +583,7 @@ const getBookingDetailsForShopOwner = async (bookingId, ownerId) => {
     const booking = await bookingRepository.findByIdPopulated(bookingId);
     if (!booking) throw new NotFoundError('Booking');
 
-    const shop = await shopRepository.findByOwnerId(ownerId);
+    const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop');
 
     const bookingShopId = booking.shopId?._id || booking.shopId;
@@ -1224,7 +1224,7 @@ export const getShopAvailability = async (shopId, date, serviceId) => {
 // ── Barber-side: booking management ──────────────────────────────────────
 
 export const getBookingsByShop = async (ownerId, query = {}) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
+    const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop');
 
     // Build filters
@@ -1269,7 +1269,7 @@ const updateBookingStatusForShopOwner = async (bookingId, status, ownerId) => {
     ];
     if (!allowed.includes(status)) throw new BadRequestError(`Invalid status. Allowed: ${allowed.join(', ')}`);
 
-    const shop = await shopRepository.findByOwnerId(ownerId);
+    const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop');
 
     const booking = await bookingRepository.findById(bookingId);
@@ -1331,7 +1331,7 @@ export const updateBookingStatus = async (bookingId, user, status) => {
 };
 
 const buildBookingSummaryAnalytics = async (ownerId) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
+    const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop');
 
     const [total, pending, awaitingConfirmation, completed, cancelled] = await Promise.all([
@@ -1345,7 +1345,7 @@ const buildBookingSummaryAnalytics = async (ownerId) => {
 };
 
 const buildMilestoneAnalytics = async (ownerId, query = {}) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
+    const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop');
 
     const period = query.month && query.year
@@ -1429,7 +1429,7 @@ const confirmBookingByBarber = async (bookingId, ownerId) => {
     const booking = await bookingRepository.findById(bookingId);
     if (!booking) throw new NotFoundError('Booking');
 
-    const shop = await shopRepository.findByOwnerId(ownerId);
+    const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop');
 
     if (booking.shopId.toString() !== shop._id.toString()) {
@@ -1469,7 +1469,7 @@ const cancelBookingByBarber = async (bookingId, ownerId) => {
     const booking = await bookingRepository.findById(bookingId);
     if (!booking) throw new NotFoundError('Booking');
 
-    const shop = await shopRepository.findByOwnerId(ownerId);
+    const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop');
 
     if (booking.shopId.toString() !== shop._id.toString()) {
@@ -1647,7 +1647,7 @@ export const autoCancelAwaitingBookings = async () => {
  * Shows real-time occupancy and booking status breakdown
  */
 const buildTodayAnalytics = async (ownerId) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
+    const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop');
 
     const today = new Date();
@@ -1755,7 +1755,7 @@ const buildTodayAnalytics = async (ownerId) => {
  * Shows appointments organized by status (active/upcoming)
  */
 const buildQueueAnalytics = async (ownerId) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
+    const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop');
 
     const now = new Date();

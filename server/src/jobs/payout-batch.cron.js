@@ -67,7 +67,7 @@ export const runPayoutBatchNow = async ({
 
     const groupedPayouts = new Map();
     for (const booking of pendingBookings) {
-        const barberId = String(booking.shopId?.ownerId || booking.shopId);
+        const barberId = String(booking.shopId?.barberId || booking.shopId);
         if (!groupedPayouts.has(barberId)) {
             groupedPayouts.set(barberId, {
                 bookingIds: [],

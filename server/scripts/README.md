@@ -64,7 +64,7 @@ All collections are defined in code — request items, URLs, bodies, pre-request
 node scripts/regenerate-postman-collections.mjs
 ```
 
-**Output:** `postman-collections/01-authentication.json` … `postman-collections/13-barber-ratings.json`
+**Output:** `postman-collections/01-authentication.json` … `postman-collections/16-notifications.json`
 
 > Does not touch `EverCut.postman_environment.json` or `EverCut.postman_environment.local.json`.
 

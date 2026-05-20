@@ -15,7 +15,6 @@ const SENSITIVE_KEYS = new Set([
     'r2Key',
     'r2Bucket',
     'coverR2Key',
-    'ownerPhotoR2Key',
     'photoR2Key',
     'sdkOrderToken',
     'gatewayResponse',

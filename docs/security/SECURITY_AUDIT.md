@@ -326,7 +326,7 @@ const firebaseUid = req.firebaseUser?.firebaseUid || req.body.firebaseUid || "te
 
 ```js
 // Verify the barber owns the shop this rating belongs to
-const shop = await shopRepository.findByOwnerId(ownerId);
+const shop = await shopRepository.findByBarberUserId(ownerId);
 if (!shop || rating.shopId.toString() !== shop._id.toString()) {
     throw new BadRequestError('You can only manage ratings on your own shop');
 }

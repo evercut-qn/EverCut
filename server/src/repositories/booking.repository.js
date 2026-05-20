@@ -62,7 +62,7 @@ class BookingRepository {
     async findByIds(ids, options = {}) {
         return Booking.find(trustQueryOperators({ _id: { $in: ids } }))
             .session(options.session || null)
-            .populate('shopId', 'ownerId upiId accountHolderName bankName payoutConfig ownerName shopName');
+            .populate('shopId', 'barberId shopName');
     }
 
     async findByIdPopulated(id) {
@@ -260,7 +260,7 @@ class BookingRepository {
                 select: CUSTOMER_SUMMARY_FIELDS,
                 populate: { path: 'userId', select: 'phoneNumber email' },
             })
-            .populate('shopId', 'shopName ownerId')
+            .populate('shopId', 'shopName barberId')
             .lean();
     }
 
@@ -298,7 +298,7 @@ class BookingRepository {
             status: { $in: [BOOKING_STATUS.COMPLETED, BOOKING_STATUS.NO_SHOW] },
             payoutStatus: PAYOUT_STATUS.NOT_INITIATED,
             paymentStatus: PAYMENT_STATUS.SUCCESS,
-        })).populate('shopId', 'ownerId upiId accountHolderName bankName payoutConfig ownerName shopName');
+        })).populate('shopId', 'barberId shopName');
     }
 
     async findByCustomerWithDateRange(customerId, startDate, endDate) {

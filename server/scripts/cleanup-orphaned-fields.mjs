@@ -25,6 +25,7 @@ import connectDB, { disconnectDB } from '../src/config/database.config.js';
 import logger from '../src/utils/logger.js';
 
 import Service from '../src/models/service.model.js';
+import Barber from '../src/models/barber.model.js';
 import Customer from '../src/models/customer.model.js';
 import Shop from '../src/models/shop.model.js';
 import Employee from '../src/models/employee.model.js';
@@ -58,6 +59,7 @@ const getSchemaKeys = (model) => {
 
 const models = [
     ['services', Service],
+    ['barbers', Barber],
     ['customers', Customer],
     ['shops', Shop],
     ['employees', Employee],

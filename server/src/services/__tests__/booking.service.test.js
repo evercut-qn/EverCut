@@ -53,7 +53,7 @@ const getInWindowBookingDate = (daysFromNow = 1) => {
 };
 
 test('getBookingsByShop loads bookings by shopId so deleted employees do not disappear from history', async (t) => {
-    t.mock.method(shopRepository, 'findByOwnerId', async () => ({ _id: 'shop-1' }));
+    t.mock.method(shopRepository, 'findByBarberUserId', async () => ({ _id: 'shop-1' }));
 
     let countFilter = null;
     t.mock.method(bookingRepository, 'countAll', async (filter) => {
@@ -141,7 +141,7 @@ test('getCustomerBookings applies explicit status, payment, and date filters', a
 });
 
 test('getBookingsByShop rejects employee filters outside the owned shop', async (t) => {
-    t.mock.method(shopRepository, 'findByOwnerId', async () => ({ _id: 'shop-1' }));
+    t.mock.method(shopRepository, 'findByBarberUserId', async () => ({ _id: 'shop-1' }));
     t.mock.method(employeeRepository, 'findById', async () => ({
         _id: 'employee-2',
         shopId: 'shop-2',
@@ -157,7 +157,7 @@ test('getBookingsByShop rejects employee filters outside the owned shop', async 
 });
 
 test('getBookingAnalytics returns the monthly completed-booking target state for the requested period', async (t) => {
-    t.mock.method(shopRepository, 'findByOwnerId', async () => ({ _id: 'shop-1' }));
+    t.mock.method(shopRepository, 'findByBarberUserId', async () => ({ _id: 'shop-1' }));
     t.mock.method(employeeRepository, 'findByShopId', async () => []);
     t.mock.method(bookingRepository, 'countAll', async () => 0);
     t.mock.method(bookingRepository, 'countByStatusForShop', async () => 0);
@@ -225,7 +225,7 @@ test('getBookingAnalytics returns the monthly completed-booking target state for
 });
 
 test('getBookingAnalytics returns no next milestone once all visible targets are completed', async (t) => {
-    t.mock.method(shopRepository, 'findByOwnerId', async () => ({ _id: 'shop-1' }));
+    t.mock.method(shopRepository, 'findByBarberUserId', async () => ({ _id: 'shop-1' }));
     t.mock.method(employeeRepository, 'findByShopId', async () => []);
     t.mock.method(bookingRepository, 'countAll', async () => 0);
     t.mock.method(bookingRepository, 'countByStatusForShop', async () => 0);
@@ -245,7 +245,7 @@ test('getBookingAnalytics returns no next milestone once all visible targets are
 });
 
 test('getBookingAnalytics returns summary, milestones, today pulse, and both queue buckets', async (t) => {
-    t.mock.method(shopRepository, 'findByOwnerId', async () => ({
+    t.mock.method(shopRepository, 'findByBarberUserId', async () => ({
         _id: 'shop-1',
         openTime: '09:00',
         closeTime: '10:00',
@@ -845,7 +845,7 @@ test('updateBookingStatus returns a customer-friendly manual-refund message when
 });
 
 test('updateBookingStatus releases the exact booking range when a booking is completed', async (t) => {
-    t.mock.method(shopRepository, 'findByOwnerId', async () => ({ _id: 'shop-1' }));
+    t.mock.method(shopRepository, 'findByBarberUserId', async () => ({ _id: 'shop-1' }));
     t.mock.method(bookingRepository, 'findById', async () => ({
         _id: 'booking-1',
         shopId: 'shop-1',

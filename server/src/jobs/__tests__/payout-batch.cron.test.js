@@ -41,9 +41,9 @@ const payoutBatchJob = await import('../payout-batch.cron.js');
 
 test('runPayoutBatchNow groups completed bookings by barber and creates one payout per barber', async (t) => {
     t.mock.method(bookingRepository, 'findCompletedWithPendingPayout', async () => ([
-        { _id: 'booking-1', shopId: { _id: 'shop-1', ownerId: 'barber-1' } },
-        { _id: 'booking-2', shopId: { _id: 'shop-1', ownerId: 'barber-1' } },
-        { _id: 'booking-3', shopId: { _id: 'shop-2', ownerId: 'barber-2' } },
+        { _id: 'booking-1', shopId: { _id: 'shop-1', barberId: 'barber-1' } },
+        { _id: 'booking-2', shopId: { _id: 'shop-1', barberId: 'barber-1' } },
+        { _id: 'booking-3', shopId: { _id: 'shop-2', barberId: 'barber-2' } },
     ]));
 
     t.mock.method(paymentRepository, 'findCompletedByBookingIds', async () => ([
@@ -82,7 +82,7 @@ test('runPayoutBatchNow groups completed bookings by barber and creates one payo
 
 test('runPayoutBatchNow prefers barberPayout when settlement values diverge from serviceAmount', async (t) => {
     t.mock.method(bookingRepository, 'findCompletedWithPendingPayout', async () => ([
-        { _id: 'booking-1', shopId: { _id: 'shop-1', ownerId: 'barber-1' } },
+        { _id: 'booking-1', shopId: { _id: 'shop-1', barberId: 'barber-1' } },
     ]));
 
     t.mock.method(paymentRepository, 'findCompletedByBookingIds', async () => ([

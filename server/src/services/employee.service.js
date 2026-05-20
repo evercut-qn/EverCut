@@ -214,7 +214,7 @@ const rethrowDuplicateEmployeeWrite = async (error, uploadedR2Key) => {
 const buildDeletedPhoneNumber = (employeeId) => `deleted-${employeeId}-${Date.now()}`;
 
 export const addEmployee = async (ownerId, data) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
+    const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop profile');
 
     const normalizedData = normalizeEmployeePayload(data, shop);
@@ -255,7 +255,7 @@ export const addEmployee = async (ownerId, data) => {
 };
 
 export const getEmployees = async (ownerId, query = {}) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
+    const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop profile');
 
     const total = await employeeRepository.countByShopId(shop._id);
@@ -266,7 +266,7 @@ export const getEmployees = async (ownerId, query = {}) => {
 };
 
 export const getEmployeeById = async (ownerId, employeeId) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
+    const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop profile');
 
     const employee = await employeeRepository.findById(employeeId);
@@ -369,7 +369,7 @@ export const getEmployeeById = async (ownerId, employeeId) => {
 };
 
 export const updateEmployee = async (ownerId, employeeId, data) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
+    const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop profile');
 
     const employee = await employeeRepository.findById(employeeId);
@@ -425,7 +425,7 @@ export const updateEmployee = async (ownerId, employeeId, data) => {
 };
 
 export const updateEmployeeAvailability = async (ownerId, employeeId, data) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
+    const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop profile');
 
     const employee = await employeeRepository.findById(employeeId);
@@ -498,7 +498,7 @@ export const updateEmployeeAvailability = async (ownerId, employeeId, data) => {
 };
 
 export const deleteEmployee = async (ownerId, employeeId) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
+    const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop profile');
 
     const employee = await employeeRepository.findById(employeeId);
@@ -532,7 +532,7 @@ export const deleteEmployee = async (ownerId, employeeId) => {
  * Shows each employee's daily appointment progress
  */
 export const getStaffAvailability = async (ownerId) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
+    const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop');
 
     const today = new Date();

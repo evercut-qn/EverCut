@@ -39,7 +39,7 @@ const normalizeReplyText = (replyText) => {
 };
 
 const getOwnedShop = async (ownerId) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
+    const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop');
     return sanitizeForResponse(shop);
 };

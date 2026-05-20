@@ -20,7 +20,7 @@ describe('ServiceCatalog Image Resolution', () => {
             actualPrice: 500
         };
 
-        t.mock.method(shopRepository, 'findByOwnerId', () => ({ _id: shopId }));
+        t.mock.method(shopRepository, 'findByBarberUserId', () => ({ _id: shopId }));
         t.mock.method(serviceRepository, 'findByShopIdAndName', () => null);
         t.mock.method(serviceRepository, 'create', (data) => data);
         
@@ -46,7 +46,7 @@ describe('ServiceCatalog Image Resolution', () => {
             actualPrice: 800
         };
 
-        t.mock.method(shopRepository, 'findByOwnerId', () => ({ _id: shopId }));
+        t.mock.method(shopRepository, 'findByBarberUserId', () => ({ _id: shopId }));
         t.mock.method(serviceRepository, 'findByShopIdAndName', () => null);
         t.mock.method(serviceRepository, 'create', (data) => data);
         

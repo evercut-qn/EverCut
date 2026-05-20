@@ -67,7 +67,7 @@ test('getRatingsByShop returns 404 when the shop does not exist', async (t) => {
 test('getRatingSummaryForBarber resolves the owned shop before aggregating ratings', async (t) => {
     const shopId = '64b7f4c2a9d3f1b2c8e4d001';
 
-    t.mock.method(shopRepository, 'findByOwnerId', async () => ({ _id: shopId }));
+    t.mock.method(shopRepository, 'findByBarberUserId', async () => ({ _id: shopId }));
     t.mock.method(shopRepository, 'findById', async () => ({ _id: shopId }));
     t.mock.method(ratingRepository, 'getShopSummary', async (shopId) => ({
         shopId,
@@ -93,7 +93,7 @@ test('upsertReplyToRating creates a first reply and notifies the customer', asyn
         _id: 'rating-1',
         shopId: 'shop-1',
     }));
-    t.mock.method(shopRepository, 'findByOwnerId', async () => ({ _id: 'shop-1' }));
+    t.mock.method(shopRepository, 'findByBarberUserId', async () => ({ _id: 'shop-1' }));
 
     let addArgs = null;
     t.mock.method(ratingRepository, 'addReply', async (ratingId, replyText, repliedBy) => {
@@ -144,7 +144,7 @@ test('upsertReplyToRating updates an existing reply without sending a duplicate 
         shopId: 'shop-1',
         reply: { text: 'Old reply' },
     }));
-    t.mock.method(shopRepository, 'findByOwnerId', async () => ({ _id: 'shop-1' }));
+    t.mock.method(shopRepository, 'findByBarberUserId', async () => ({ _id: 'shop-1' }));
 
     let updateArgs = null;
     t.mock.method(ratingRepository, 'updateReply', async (ratingId, replyText, repliedBy) => {
@@ -199,7 +199,7 @@ test('removeRating uses ForbiddenError when the rating belongs to a different sh
         _id: 'rating-1',
         shopId: 'shop-2',
     }));
-    t.mock.method(shopRepository, 'findByOwnerId', async () => ({ _id: 'shop-1' }));
+    t.mock.method(shopRepository, 'findByBarberUserId', async () => ({ _id: 'shop-1' }));
 
     await assert.rejects(
         () => ratingService.removeRating('rating-1', 'owner-1'),

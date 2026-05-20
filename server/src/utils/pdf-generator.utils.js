@@ -142,6 +142,8 @@ const drawTableRow = (doc, y, values, columnWidths, columnAligns, options = {}) 
  * 
  * @param {Object} options - PDF generation options
  * @param {Object} options.shop - Shop information
+ * @param {string} options.shop.firstName - Barber first name
+ * @param {string} options.shop.lastName - Barber last name
  * @param {Array} options.transactions - Array of transaction objects
  * @param {Object} options.dateRange - Start and end dates
  * @param {Object} options.summary - Summary statistics
@@ -149,6 +151,7 @@ const drawTableRow = (doc, y, values, columnWidths, columnAligns, options = {}) 
  */
 export const generateTransactionStatementPDF = (options) => {
     const { shop, transactions, dateRange, summary } = options;
+    const barberName = `${shop.firstName || ''} ${shop.lastName || ''}`.trim() || 'N/A';
     
     // Create PDF document
     const doc = new PDFDocument({
@@ -205,12 +208,12 @@ export const generateTransactionStatementPDF = (options) => {
     doc.fontSize(9)
         .fillColor('#6B7280')
         .font('Helvetica')
-        .text('Owner', 60, yPosition + 45);
+        .text('Barber', 60, yPosition + 45);
     
     doc.fontSize(10)
         .fillColor('#1F2937')
         .font('Helvetica')
-        .text(shop.ownerName || 'N/A', 60, yPosition + 58);
+        .text(barberName, 60, yPosition + 58);
     
     // Date range box
     const dateBoxX = doc.page.width - 300;

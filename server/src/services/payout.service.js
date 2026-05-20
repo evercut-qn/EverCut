@@ -1,6 +1,7 @@
 import bookingRepository from '../repositories/booking.repository.js';
 import paymentRepository from '../repositories/payment.repository.js';
 import payoutRepository from '../repositories/payout.repository.js';
+import barberRepository from '../repositories/barber.repository.js';
 import shopRepository from '../repositories/shop.repository.js';
 import userRepository from '../repositories/user.repository.js';
 import cashfreePayoutAdapter from '../adapters/cashfree/cashfree-payout.adapter.js';
@@ -46,8 +47,8 @@ const generateTransferId = (barberId) => {
 };
 const generateBeneficiaryId = (barberId) => `BARBER_${barberId}`;
 
-const buildShopPayoutConfig = (shop, updates = {}) => ({
-    ...(shop.payoutConfig || {}),
+const buildBarberPayoutConfig = (barber, updates = {}) => ({
+    ...(barber?.payoutConfig || {}),
     ...updates,
 });
 
@@ -57,7 +58,12 @@ const getShopAndBarber = async (shopId) => {
         throw new NotFoundError('Shop');
     }
 
-    const owner = await userRepository.findById(shop.ownerId);
+    const barberProfile = await barberRepository.findById(shop.barberId);
+    if (!barberProfile) {
+        throw new NotFoundError('Barber profile');
+    }
+
+    const owner = await userRepository.findById(barberProfile.userId);
     if (!owner) {
         throw new NotFoundError('Barber owner');
     }
@@ -65,15 +71,22 @@ const getShopAndBarber = async (shopId) => {
     return {
         shop,
         barber: {
-            _id: shop.ownerId,
-            fullName: shop.accountHolderName || shop.ownerName || shop.shopName,
+            _id: barberProfile._id,
+            userId: barberProfile.userId,
+            fullName: barberProfile.accountHolderName || `${barberProfile.firstName} ${barberProfile.lastName}`.trim() || shop.shopName,
             phone: owner.phoneNumber,
             email: owner.email,
-            upiId: shop.upiId,
-            bankAccount: shop.payoutConfig?.bankAccount || null,
-            ifsc: shop.payoutConfig?.ifsc || null,
+            upiId: barberProfile.upiId,
+            bankAccount: barberProfile.bankAccount || null,
+            ifsc: barberProfile.ifsc || null,
+            payoutConfig: barberProfile.payoutConfig || {},
         },
     };
+};
+
+const getPayoutRecipientUserId = async (barberId) => {
+    const barber = await barberRepository.findById(barberId);
+    return barber?.userId || null;
 };
 
 const applyPayoutSuccess = async (payout, { utr, updatedAt }) => {
@@ -96,9 +109,10 @@ const applyPayoutSuccess = async (payout, { utr, updatedAt }) => {
     });
 
     await paymentRepository.markSettledByIds(payout.paymentTransactionIds, processedAt);
+    const barberUserId = await getPayoutRecipientUserId(payout.barberId);
     await notificationEvents.notifyPayoutStatus({
         payoutId: payout._id,
-        barberId: payout.barberId,
+        barberId: barberUserId,
         status: PAYOUT_TRANSACTION_STATUS.SUCCESS,
         amountInRupees: payout.amountInRupees,
     });
@@ -131,9 +145,10 @@ const applyPayoutFailure = async (payout, status, { failureReason, errorCode = n
         await paymentRepository.markUnsettledByIds(payout.paymentTransactionIds);
     }
 
+    const barberUserId = await getPayoutRecipientUserId(payout.barberId);
     await notificationEvents.notifyPayoutStatus({
         payoutId: payout._id,
-        barberId: payout.barberId,
+        barberId: barberUserId,
         status,
         amountInRupees: payout.amountInRupees,
         failureReason: failureReason || status,
@@ -143,7 +158,8 @@ const applyPayoutFailure = async (payout, status, { failureReason, errorCode = n
 const ensureRetryable = (error) => !NON_RETRYABLE_ERROR_CODES.has(error?.providerCode || error?.code);
 
 async function ensureBeneficiary(shop, barber, beneficiaryId) {
-    const existingBeneficiaryId = shop.payoutConfig?.beneficiaryId || beneficiaryId;
+    const barberProfile = await barberRepository.findById(barber._id);
+    const existingBeneficiaryId = barberProfile?.payoutConfig?.beneficiaryId || beneficiaryId;
     const existing = await cashfreePayoutAdapter.getBeneficiary(existingBeneficiaryId);
 
     if (existing) {
@@ -180,11 +196,11 @@ async function ensureBeneficiary(shop, barber, beneficiaryId) {
             // Create new beneficiary with updated details (fall through to creation logic below)
         } else {
             // Beneficiary details match - use existing
-            if (shop.payoutConfig?.beneficiaryId !== existingBeneficiaryId) {
-                await shopRepository.updateById(shop._id, {
-                    payoutConfig: buildShopPayoutConfig(shop, {
+            if (barberProfile?.payoutConfig?.beneficiaryId !== existingBeneficiaryId) {
+                await barberRepository.updateById(barber._id, {
+                    payoutConfig: buildBarberPayoutConfig(barberProfile, {
                         beneficiaryId: existingBeneficiaryId,
-                        beneficiaryCreatedAt: shop.payoutConfig?.beneficiaryCreatedAt || new Date(),
+                        beneficiaryCreatedAt: barberProfile?.payoutConfig?.beneficiaryCreatedAt || new Date(),
                         verifiedAt: new Date(),
                         verificationStatus: 'verified',
                     }),
@@ -206,8 +222,8 @@ async function ensureBeneficiary(shop, barber, beneficiaryId) {
         ifsc: barber.ifsc,
     });
 
-    await shopRepository.updateById(shop._id, {
-        payoutConfig: buildShopPayoutConfig(shop, {
+    await barberRepository.updateById(barber._id, {
+        payoutConfig: buildBarberPayoutConfig(barberProfile, {
             beneficiaryId,
             beneficiaryCreatedAt: new Date(),
             verifiedAt: new Date(),
@@ -249,7 +265,7 @@ export const triggerBarberPayout = async (barberId, bookingIds, totalPayoutInPai
 
     const firstBooking = bookings[0];
     const { shop, barber } = await getShopAndBarber(firstBooking.shopId?._id || firstBooking.shopId);
-    if (barberId && toObjectIdString(shop.ownerId) !== toObjectIdString(barberId)) {
+    if (barberId && toObjectIdString(shop.barberId) !== toObjectIdString(barberId)) {
         throw new BadRequestError('Bookings do not belong to the requested barber');
     }
 
@@ -289,16 +305,16 @@ export const triggerBarberPayout = async (barberId, bookingIds, totalPayoutInPai
     const beneficiaryId = await ensureBeneficiary(
         shop,
         barber,
-        shop.payoutConfig?.beneficiaryId || generateBeneficiaryId(shop.ownerId),
+        barber.payoutConfig?.beneficiaryId || generateBeneficiaryId(barber._id),
     );
 
-    const transferId = generateTransferId(shop.ownerId);
+    const transferId = generateTransferId(barber._id);
     const amountInRupees = payoutAmountInPaisa / 100;
     const paymentTransactionIds = paymentTransactions.map((payment) => payment._id);
 
     const payoutTransaction = await payoutRepository.create({
         bookingIds,
-        barberId: shop.ownerId,
+        barberId: barber._id,
         shopId: shop._id,
         paymentTransactionIds,
         transferId,
@@ -335,7 +351,7 @@ export const triggerBarberPayout = async (barberId, bookingIds, totalPayoutInPai
 
         logger.info('[PayoutService] Aggregated payout initiated', {
             payoutId: payoutTransaction._id,
-            barberId: toObjectIdString(shop.ownerId),
+            barberId: toObjectIdString(barber._id),
             bookingCount: bookingIds.length,
             amountInRupees,
             transferId,
@@ -468,7 +484,7 @@ export const retryPayout = async (payoutId) => {
     const beneficiaryId = await ensureBeneficiary(
         shop,
         barber,
-        payout.beneficiaryId || shop.payoutConfig?.beneficiaryId || generateBeneficiaryId(shop.ownerId),
+        payout.beneficiaryId || barber.payoutConfig?.beneficiaryId || generateBeneficiaryId(barber._id),
     );
     // Extract base transfer ID (remove any existing retry suffix)
     const baseTransferId = payout.transferId.split('_R')[0];

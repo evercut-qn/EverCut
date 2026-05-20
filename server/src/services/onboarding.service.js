@@ -1,5 +1,6 @@
 import customerRepository from '../repositories/customer.repository.js';
 import shopRepository from '../repositories/shop.repository.js';
+import barberRepository from '../repositories/barber.repository.js';
 import userRepository from '../repositories/user.repository.js';
 import { serializeBarberProfile } from '../utils/barber-profile.utils.js';
 import {
@@ -115,8 +116,6 @@ const parseBreakTimes = (value) => {
 const normalizeBarberOnboardingInput = (authUser, shopData) => {
     const firstName = String(shopData.firstName || '').trim();
     const lastName = String(shopData.lastName || '').trim();
-    const ownerNameFromNameParts = `${firstName} ${lastName}`.trim();
-    const ownerName = ownerNameFromNameParts;
 
     const email = String(shopData.email || authUser?.email || '').trim().toLowerCase();
     const phoneNumber = String(authUser?.phoneNumber || '').trim();
@@ -161,6 +160,8 @@ const normalizeBarberOnboardingInput = (authUser, shopData) => {
 
     const accountHolderName = String(shopData.accountHolderName || '').trim();
     const bankName = String(shopData.bankName || '').trim();
+    const bankAccount = String(shopData.bankAccount || '').trim();
+    const ifsc = String(shopData.ifsc || '').trim().toUpperCase();
     const location = normalizeLocation(shopData.location);
 
     if (!firstName || !lastName) {
@@ -190,11 +191,11 @@ const normalizeBarberOnboardingInput = (authUser, shopData) => {
     if (!openTime || !closeTime) {
         throw new BadRequestError('openTime and closeTime are required');
     }
-    if (!upiId) {
-        throw new BadRequestError('upiId is required');
-    }
     if (!accountHolderName || !bankName) {
         throw new BadRequestError('accountHolderName and bankName are required');
+    }
+    if (!bankAccount || !ifsc) {
+        throw new BadRequestError('bankAccount and ifsc are required');
     }
 
     const normalizedSchedule = normalizeShopSchedule({ openTime, closeTime, breakTimes });
@@ -207,7 +208,6 @@ const normalizeBarberOnboardingInput = (authUser, shopData) => {
         lastName,
         gender: shopData.gender,
         dateOfBirth: shopData.dateOfBirth,
-        ownerName,
         shopName: String(shopData.shopName || '').trim(),
         category,
         targetCustomers,
@@ -215,6 +215,8 @@ const normalizeBarberOnboardingInput = (authUser, shopData) => {
         email,
         accountHolderName,
         bankName,
+        bankAccount,
+        ifsc,
         upiId,
         bio: shopData.bio || '',
         address,
@@ -313,51 +315,44 @@ export const createBarberOnboarding = async (phoneNumber, shopData) => {
 
     const pinHash = await hashPin(normalized.pin);
 
-    // Prepare payout config if bank details are provided
-    const payoutConfig = {};
-    if (shopData.bankAccount && shopData.ifsc) {
-        payoutConfig.bankAccount = String(shopData.bankAccount).trim();
-        payoutConfig.ifsc = String(shopData.ifsc).trim().toUpperCase();
-        payoutConfig.verificationStatus = 'pending';
-    }
-
     const user = await userRepository.create({
         phoneNumber: normalized.phoneNumber,
         email: normalized.email,
         roleType: ROLES.BARBER,
     });
 
-    const shopCreateData = {
-        ownerId: user._id,
-        shopName: normalized.shopName,
-        ownerName: normalized.ownerName,
-        ownerFirstName: normalized.firstName,
-        ownerLastName: normalized.lastName,
-        ownerGender: normalized.gender,
-        ownerDateOfBirth: normalized.dateOfBirth,
-        category: normalized.category,
-        targetCustomers: normalized.targetCustomers,
+    const barber = await barberRepository.create({
+        userId: user._id,
+        firstName: normalized.firstName,
+        lastName: normalized.lastName,
+        gender: normalized.gender,
+        dateOfBirth: normalized.dateOfBirth,
+        yearsOfExperience: normalized.yearsOfExperience,
         accountHolderName: normalized.accountHolderName,
         bankName: normalized.bankName,
-        upiId: normalized.upiId,
+        bankAccount: normalized.bankAccount,
+        ifsc: normalized.ifsc,
+        upiId: normalized.upiId || null,
+        payoutConfig: { verificationStatus: 'pending' },
+        pinHash,
+    });
+
+    const shopCreateData = {
+        barberId: barber._id,
+        shopName: normalized.shopName,
+        category: normalized.category,
+        targetCustomers: normalized.targetCustomers,
         bio: normalized.bio,
         address: normalized.address,
         location: normalized.location,
         numberOfEmployees: normalized.numberOfEmployees,
-        yearsOfExperience: normalized.yearsOfExperience,
         facilities: normalized.facilities,
         availableDays: normalized.availableDays,
         openTime: normalized.openTime,
         closeTime: normalized.closeTime,
         breakTimes: normalized.breakTimes,
         coverR2Key: media.r2Key,
-        pinHash,
     };
-
-    // Only add payoutConfig if bank details were provided
-    if (Object.keys(payoutConfig).length > 0) {
-        shopCreateData.payoutConfig = payoutConfig;
-    }
 
     const createdShop = await shopRepository.create(shopCreateData);
     await mediaService.linkMediaToEntity(shopData.photoMediaId, createdShop._id, MEDIA_ENTITY_TYPE.SHOP, MEDIA_PURPOSE.COVER);
@@ -366,7 +361,7 @@ export const createBarberOnboarding = async (phoneNumber, shopData) => {
 
     return {
         user: serializeUser(user),
-        shop: serializeBarberProfile(createdShop, user),
+        shop: serializeBarberProfile({ barber, shop: createdShop, user }),
         tokens,
     };
 };

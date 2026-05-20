@@ -572,10 +572,11 @@ export const resolveOtpSession = async (phoneNumber) => {
         if (existingUser.roleType === ROLES.CUSTOMER) {
             profile = await customerRepository.findByUserId(existingUser._id);
         } else if (existingUser.roleType === ROLES.BARBER) {
-            const shop = await shopRepository.findByOwnerId(existingUser._id);
-            if (shop) {
+            const barber = await barberRepository.findByUserId(existingUser._id);
+            const shop = barber ? await shopRepository.findByBarberId(barber._id) : null;
+            if (barber && shop) {
                 const photos = await photoRepository.findByShopId(shop._id, {});
-                profile = serializeBarberProfile(shop, existingUser, { photos });
+                profile = serializeBarberProfile({ barber, shop, user: existingUser, photos });
             }
         }
         return { isNewUser: false, user: existingUser, profile, tokens };

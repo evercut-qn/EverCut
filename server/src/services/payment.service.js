@@ -206,7 +206,7 @@ const buildPaymentListFilter = async (actorOrUserId, query = {}) => {
     }
 
     if (actor.roleType === ROLES.BARBER) {
-        const shop = await shopRepository.findByOwnerId(actor.userId);
+        const shop = await shopRepository.findByBarberUserId(actor.userId);
         if (!shop) throw new NotFoundError('Shop profile');
         filter.shopId = shop._id;
         return applyPaymentQueryFilters(filter, query);
@@ -225,7 +225,7 @@ const assertPaymentAccess = async (actorOrUserId, payment) => {
     if (actor.roleType === ROLES.ADMIN) return;
 
     if (actor.roleType === ROLES.BARBER) {
-        const shop = await shopRepository.findByOwnerId(actor.userId);
+        const shop = await shopRepository.findByBarberUserId(actor.userId);
         if (!shop || toObjectIdString(payment.shopId) !== toObjectIdString(shop._id)) {
             throw new ForbiddenError('You can only access payments for your own shop');
         }
@@ -430,7 +430,7 @@ const assertRefundPermission = async (actor, booking) => {
         throw new ForbiddenError('You are not allowed to initiate refunds');
     }
 
-    const actorShop = await shopRepository.findByOwnerId(actor.userId || actor._id);
+    const actorShop = await shopRepository.findByBarberUserId(actor.userId || actor._id);
     if (!actorShop || toObjectIdString(actorShop._id) !== toObjectIdString(booking.shopId)) {
         throw new ForbiddenError('Barbers can only refund bookings for their own shop');
     }

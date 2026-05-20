@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 
 import bookingRepository from '../repositories/booking.repository.js';
+import barberRepository from '../repositories/barber.repository.js';
 import customerRepository from '../repositories/customer.repository.js';
 import ratingRepository from '../repositories/rating.repository.js';
 import shopRepository from '../repositories/shop.repository.js';
@@ -65,6 +66,11 @@ const loadBookingContext = async (bookingId) => {
     return { booking, shop, customer };
 };
 
+const getShopOwnerUserId = async (shop) => {
+    const barber = await barberRepository.findById(shop?.barberId);
+    return barber?.userId || null;
+};
+
 const bookingData = (booking, shop, customer, extra = {}) => ({
     bookingId: toObjectIdString(booking._id),
     shopId: toObjectIdString(shop._id),
@@ -83,10 +89,11 @@ export const notifyBookingAwaitingConfirmation = async ({ bookingId, paymentId =
         if (context.skipped) return context;
 
         const { booking, shop, customer } = context;
-        if (!shop.ownerId) return { skipped: true, reason: 'shop_owner_missing' };
+        const shopOwnerUserId = await getShopOwnerUserId(shop);
+        if (!shopOwnerUserId) return { skipped: true, reason: 'shop_owner_missing' };
 
         const result = await notificationService.notifyUser({
-            recipientUserId: shop.ownerId,
+            recipientUserId: shopOwnerUserId,
             actorUserId: customer.userId,
             type: NOTIFICATION_TYPE.HYBRID,
             eventType: NOTIFICATION_EVENT.BOOKING_AWAITING_CONFIRMATION,
@@ -142,7 +149,8 @@ export const notifyBookingCancelled = async ({
         if (context.skipped) return context;
 
         const { booking, shop, customer } = context;
-        const recipientUserId = cancelledBy === 'customer' ? shop.ownerId : customer.userId;
+        const shopOwnerUserId = await getShopOwnerUserId(shop);
+        const recipientUserId = cancelledBy === 'customer' ? shopOwnerUserId : customer.userId;
         if (!recipientUserId) return { skipped: true, reason: 'recipient_missing' };
 
         const title = cancelledBy === 'customer' ? 'Booking cancelled by customer' : 'Booking cancelled';
@@ -181,7 +189,7 @@ export const notifyBookingAutoCancelled = async ({ bookingId }) => safeNotify(
 
         const result = await notificationService.notifyUser({
             recipientUserId: customer.userId,
-            actorUserId: shop.ownerId || null,
+            actorUserId: await getShopOwnerUserId(shop),
             type: NOTIFICATION_TYPE.HYBRID,
             eventType: NOTIFICATION_EVENT.BOOKING_AUTO_CANCELLED,
             title: 'Booking auto-cancelled',
@@ -212,7 +220,7 @@ export const notifyBookingEmployeeUnavailable = async ({
 
         const result = await notificationService.notifyUser({
             recipientUserId: customer.userId,
-            actorUserId: shop.ownerId || null,
+            actorUserId: await getShopOwnerUserId(shop),
             type: NOTIFICATION_TYPE.HYBRID,
             eventType: NOTIFICATION_EVENT.BOOKING_EMPLOYEE_UNAVAILABLE,
             title: 'Booking update',
@@ -365,10 +373,11 @@ export const notifyRatingReceived = async ({ ratingId }) => safeNotify(
             shopRepository.findById(rating.shopId),
             customerRepository.findById(rating.customerId),
         ]);
-        if (!shop?.ownerId || !customer) return { skipped: true, reason: 'rating_context_missing' };
+        const shopOwnerUserId = await getShopOwnerUserId(shop);
+        if (!shopOwnerUserId || !customer) return { skipped: true, reason: 'rating_context_missing' };
 
         const result = await notificationService.notifyUser({
-            recipientUserId: shop.ownerId,
+            recipientUserId: shopOwnerUserId,
             actorUserId: customer.userId || null,
             type: NOTIFICATION_TYPE.HYBRID,
             eventType: NOTIFICATION_EVENT.RATING_RECEIVED,

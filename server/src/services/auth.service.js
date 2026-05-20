@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import config from '../config/index.js';
 import customerRepository from '../repositories/customer.repository.js';
+import barberRepository from '../repositories/barber.repository.js';
 import shopRepository from '../repositories/shop.repository.js';
 import userRepository from '../repositories/user.repository.js';
 import { UnauthorizedError } from '../utils/api-error.js';
@@ -59,11 +60,13 @@ const loadUserProfile = async (user) => {
     }
 
     if (user.roleType === ROLES.BARBER) {
-        const shop = await shopRepository.findByOwnerId(user._id);
+        const barber = await barberRepository.findByUserId(user._id);
+        if (!barber) return null;
+        const shop = await shopRepository.findByBarberId(barber._id);
         if (!shop) return null;
 
         const photos = await mediaService.getGalleryByShopId(shop._id);
-        return serializeBarberProfile(shop, user, { photos });
+        return serializeBarberProfile({ barber, shop, user, photos });
     }
 
     return null;

@@ -36,6 +36,7 @@ const ensureRequiredEnv = () => {
 ensureRequiredEnv();
 
 const customerRepository = (await import('../../repositories/customer.repository.js')).default;
+const barberRepository = (await import('../../repositories/barber.repository.js')).default;
 const mediaRepository = (await import('../../repositories/media.repository.js')).default;
 const shopRepository = (await import('../../repositories/shop.repository.js')).default;
 const notificationEvents = (await import('../notification-events.service.js')).default;
@@ -111,8 +112,13 @@ test('removeFavoriteShop is idempotent when the shop is no longer visible', asyn
 });
 
 test('updateBusinessInfo persists desired open state and emits a shop-status notification', async (t) => {
-    t.mock.method(shopRepository, 'findByOwnerId', async () => ({
+    t.mock.method(barberRepository, 'findByUserId', async () => ({
+        _id: 'barber-1',
+        userId: 'owner-1',
+    }));
+    t.mock.method(shopRepository, 'findByBarberId', async () => ({
         _id: 'shop-1',
+        barberId: 'barber-1',
         isOpen: true,
         openTime: '09:00',
         closeTime: '18:00',
@@ -121,10 +127,11 @@ test('updateBusinessInfo persists desired open state and emits a shop-status not
     t.mock.method(mediaRepository, 'findByEntity', async () => []);
 
     let updateArgs = null;
-    t.mock.method(shopRepository, 'updateByOwnerId', async (ownerId, updateData) => {
-        updateArgs = { ownerId, updateData };
+    t.mock.method(shopRepository, 'updateByBarberId', async (barberId, updateData) => {
+        updateArgs = { barberId, updateData };
         return {
             _id: 'shop-1',
+            barberId,
             ...updateData,
         };
     });
@@ -142,7 +149,7 @@ test('updateBusinessInfo persists desired open state and emits a shop-status not
     const result = await shopService.updateBusinessInfo('owner-1', { isOpen: false }, {});
 
     assert.deepEqual(updateArgs, {
-        ownerId: 'owner-1',
+        barberId: 'barber-1',
         updateData: { isOpen: false },
     });
     assert.deepEqual(accountUpdate, {
