@@ -214,7 +214,7 @@ Provisions EverCut's subscription plans (Popular, Advanced) on Razorpay. The Bas
 |---|---|
 | **Idempotent** | Detects existing plans by name + amount + period. Running twice will NOT create duplicates. |
 | **Safe by default** | Default mode is dry run — shows what would be created without actually creating anything. |
-| **Production guard** | Refuses to create plans in LIVE mode unless `RAZORPAY_CONFIRM_LIVE=true` is set. |
+| **Production guard** | Refuses to create production plans unless `RAZORPAY_CONFIRM_PRODUCTION=true` is set. |
 | **ESM format** | Uses `import/export` matching the EverCut codebase convention. |
 
 **Usage:**
@@ -234,6 +234,7 @@ node scripts/create-razorpay-plans.mjs --help
 ```
 
 **Prerequisites:**
+- `RAZORPAY_ENV=SANDBOX` or `RAZORPAY_ENV=PRODUCTION` in `.env`
 - `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET` in `.env`
 - `npm install razorpay` (if not already installed)
 
@@ -245,9 +246,9 @@ RAZORPAY_PLAN_ID_ADVANCED=plan_xxxxxxxxxxxxxxxx
 
 **Plan pricing changes:** Razorpay plans are immutable once created. If you change pricing, create new plans (with new names/amounts) and update the plan IDs in `.env`. Old plans remain on Razorpay but are simply unused.
 
-**For LIVE (production) mode:**
+**For PRODUCTION mode:**
 ```bash
-RAZORPAY_CONFIRM_LIVE=true node scripts/create-razorpay-plans.mjs --execute
+RAZORPAY_CONFIRM_PRODUCTION=true node scripts/create-razorpay-plans.mjs --execute
 ```
 
 ## Generated files *(gitignored)*

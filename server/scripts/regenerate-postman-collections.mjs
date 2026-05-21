@@ -2342,6 +2342,291 @@ const notificationsCollection = {
   ],
 };
 
+const subscriptionWebhookBody = `{
+  "id": "evt_subscription_activated_postman",
+  "entity": "event",
+  "event": "subscription.activated",
+  "created_at": 1770000000,
+  "payload": {
+    "subscription": {
+      "entity": {
+        "id": "{{razorpay_subscription_id}}",
+        "plan_id": "{{razorpay_plan_id_popular}}",
+        "customer_id": "cust_postman_123",
+        "status": "active",
+        "current_start": 1770000000,
+        "current_end": 1772592000,
+        "notes": {
+          "barber_id": "{{barber_profile_id}}",
+          "plan_type": "PLAN_POPULAR"
+        }
+      }
+    },
+    "payment": {
+      "entity": {
+        "id": "pay_postman_123",
+        "amount": 29900,
+        "currency": "INR",
+        "status": "captured",
+        "method": "upi"
+      }
+    }
+  }
+}`;
+
+const subscriptionRenewalWebhookBody = `{
+  "id": "evt_subscription_charged_postman",
+  "entity": "event",
+  "event": "subscription.charged",
+  "created_at": 1772592000,
+  "payload": {
+    "subscription": {
+      "entity": {
+        "id": "{{razorpay_subscription_id}}",
+        "plan_id": "{{razorpay_plan_id_popular}}",
+        "status": "active",
+        "current_start": 1772592000,
+        "current_end": 1775184000
+      }
+    },
+    "payment": {
+      "entity": {
+        "id": "pay_postman_renewal_123",
+        "amount": 29900,
+        "currency": "INR",
+        "status": "captured",
+        "invoice_id": "inv_postman_renewal_123"
+      }
+    }
+  }
+}`;
+
+const subscriptionUpdatedWebhookBody = `{
+  "id": "evt_subscription_updated_postman",
+  "entity": "event",
+  "event": "subscription.updated",
+  "created_at": 1772592000,
+  "payload": {
+    "subscription": {
+      "entity": {
+        "id": "{{razorpay_subscription_id}}",
+        "plan_id": "{{razorpay_plan_id_advanced}}",
+        "status": "active",
+        "current_start": 1772592000,
+        "current_end": 1775184000
+      }
+    }
+  }
+}`;
+
+const subscriptionPaymentFailedWebhookBody = `{
+  "id": "evt_subscription_payment_failed_postman",
+  "entity": "event",
+  "event": "payment.failed",
+  "created_at": 1772592000,
+  "payload": {
+    "payment": {
+      "entity": {
+        "id": "pay_postman_failed_123",
+        "subscription_id": "{{razorpay_subscription_id}}",
+        "amount": 29900,
+        "currency": "INR",
+        "status": "failed",
+        "error_code": "BAD_REQUEST_ERROR",
+        "error_description": "Payment failed"
+      }
+    }
+  }
+}`;
+
+const razorpayWebhookSignatureEvent = mergedEvents(
+  [
+    "const secret = pm.environment.get('razorpay_webhook_secret') || pm.collectionVariables.get('razorpay_webhook_secret');",
+    "const body = pm.request.body && pm.request.body.raw ? pm.request.body.raw : '';",
+    "if (secret && typeof CryptoJS !== 'undefined') {",
+    "  const signature = CryptoJS.HmacSHA256(body, secret).toString(CryptoJS.enc.Hex);",
+    "  pm.request.headers.upsert({ key: 'x-razorpay-signature', value: signature });",
+    "}",
+  ],
+  [
+    "pm.test('webhook is acknowledged or signature is rejected', function () { pm.expect(pm.response.code).to.be.oneOf([200, 400]); });",
+  ],
+);
+
+const subscriptionsCollection = {
+  info: {
+    name: 'EverCut - Subscriptions',
+    description: 'Barber subscription lifecycle collection covering plan listing, Razorpay subscription checkout, upgrade/downgrade, cancellation, transactions, and webhook simulation. Run authentication and onboarding first to capture barber_access_token.',
+    schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
+  },
+  auth: bearerAuth('barber_access_token'),
+  event: collectionPreRequest({
+    syncPairs: [
+      ['barber_profile_id', 'barber_profile_id'],
+      ['razorpay_subscription_id', 'razorpay_subscription_id'],
+    ],
+  }),
+  variable: [
+    ...baseVariables(
+      textVariable('subscription_plan_id', 'PLAN_POPULAR', 'Plan to subscribe to or downgrade to. Use PLAN_POPULAR or PLAN_ADVANCED for paid plans.'),
+      textVariable('subscription_upgrade_plan_id', 'PLAN_ADVANCED', 'Plan used by the upgrade request.'),
+      textVariable('subscription_downgrade_plan_id', 'PLAN_POPULAR', 'Plan used by the downgrade request.'),
+      textVariable('razorpay_subscription_id', 'sub_postman_123', 'Razorpay subscription id used in webhook examples.'),
+      textVariable('razorpay_plan_id_popular', 'plan_test_popular', 'Razorpay Popular plan id for webhook examples.'),
+      textVariable('razorpay_plan_id_advanced', 'plan_test_advanced', 'Razorpay Advanced plan id for webhook examples.'),
+      textVariable('razorpay_webhook_secret', '', 'Webhook secret configured in Razorpay dashboard and server env.'),
+      textVariable('barber_profile_id', '', 'Mongo Barber _id used in Razorpay notes for local webhook simulations.'),
+    ),
+  ],
+  item: [
+    {
+      name: '1. List Plans',
+      ...request({
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/subscriptions/plans',
+        auth: { type: 'noauth' },
+        description: 'Public plan catalog with pricing and entitlement limits.',
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          "const response = pm.response.json();",
+          "pm.test('three plans returned', function () { pm.expect(response.data.map((p) => p.id)).to.include.members(['PLAN_BASIC', 'PLAN_POPULAR', 'PLAN_ADVANCED']); });"
+        ),
+      }),
+    },
+    {
+      name: '2. Get My Subscription',
+      ...request({
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/subscriptions/me',
+        description: 'Returns current subscription state, usage counters, and resolved entitlements for the authenticated barber.',
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          "const response = pm.response.json();",
+          "pm.test('subscription response includes usage', function () { pm.expect(response.data).to.have.property('usage'); });"
+        ),
+      }),
+    },
+    {
+      name: '3. Subscribe To Paid Plan',
+      ...request({
+        method: 'POST',
+        url: '{{base_url}}/{{api_prefix}}/subscriptions/subscribe',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "planId": "{{subscription_plan_id}}"\n}`),
+        description: 'Creates a Razorpay subscription and returns checkoutUrl, razorpaySubscriptionId, and razorpayKeyId.',
+        event: testEvent(
+          "pm.test('status is 201 or conflict when already subscribed', function () { pm.expect(pm.response.code).to.be.oneOf([201, 400, 409]); });",
+          "const response = pm.response.json();",
+          "if (response.data?.razorpaySubscriptionId) {",
+          "  pm.collectionVariables.set('razorpay_subscription_id', response.data.razorpaySubscriptionId);",
+          "  pm.globals.set('razorpay_subscription_id', response.data.razorpaySubscriptionId);",
+          "}"
+        ),
+      }),
+    },
+    {
+      name: '4. Upgrade Subscription',
+      ...request({
+        method: 'POST',
+        url: '{{base_url}}/{{api_prefix}}/subscriptions/upgrade',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "planId": "{{subscription_upgrade_plan_id}}"\n}`),
+        description: 'Upgrades a paid Razorpay subscription immediately. Use subscribe first when currently on Basic.',
+        event: testEvent("pm.test('status is 200 or validation error', function () { pm.expect(pm.response.code).to.be.oneOf([200, 400, 404]); });"),
+      }),
+    },
+    {
+      name: '5. Downgrade Subscription',
+      ...request({
+        method: 'POST',
+        url: '{{base_url}}/{{api_prefix}}/subscriptions/downgrade',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "planId": "{{subscription_downgrade_plan_id}}"\n}`),
+        description: 'Schedules paid downgrades for next renewal. Downgrade to PLAN_BASIC is handled as end-of-cycle cancellation.',
+        event: testEvent("pm.test('status is 200 or validation error', function () { pm.expect(pm.response.code).to.be.oneOf([200, 400, 404]); });"),
+      }),
+    },
+    {
+      name: '6. Cancel Subscription',
+      ...request({
+        method: 'POST',
+        url: '{{base_url}}/{{api_prefix}}/subscriptions/cancel',
+        description: 'Cancels the current paid subscription at cycle end while retaining access until currentPeriodEnd.',
+        event: testEvent("pm.test('status is 200 or no active paid subscription', function () { pm.expect(pm.response.code).to.be.oneOf([200, 400, 404, 409]); });"),
+      }),
+    },
+    {
+      name: '7. Get Subscription Transactions',
+      ...request({
+        method: 'GET',
+        url: {
+          raw: '{{base_url}}/{{api_prefix}}/subscriptions/transactions?page=1&limit=20',
+          host: ['{{base_url}}'],
+          path: ['{{api_prefix}}', 'subscriptions', 'transactions'],
+          query: [
+            { key: 'page', value: '1' },
+            { key: 'limit', value: '20' },
+          ],
+        },
+        description: 'Lists immutable subscription lifecycle audit records for the authenticated barber.',
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          "const response = pm.response.json();",
+          "pm.test('paginated transaction response', function () { pm.expect(response).to.have.nested.property('meta.pagination'); });"
+        ),
+      }),
+    },
+    {
+      name: '8. Simulate Razorpay Activated Webhook',
+      ...request({
+        method: 'POST',
+        url: '{{base_url}}/{{api_prefix}}/subscriptions/webhook',
+        auth: { type: 'noauth' },
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(subscriptionWebhookBody),
+        description: 'Local Razorpay webhook simulation. The pre-request script signs the raw JSON body with razorpay_webhook_secret.',
+        event: razorpayWebhookSignatureEvent,
+      }),
+    },
+    {
+      name: '9. Simulate Razorpay Renewal Webhook',
+      ...request({
+        method: 'POST',
+        url: '{{base_url}}/{{api_prefix}}/subscriptions/webhook',
+        auth: { type: 'noauth' },
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(subscriptionRenewalWebhookBody),
+        description: 'Local subscription.charged webhook simulation for renewal and statement-counter reset validation.',
+        event: razorpayWebhookSignatureEvent,
+      }),
+    },
+    {
+      name: '10. Simulate Razorpay Plan Updated Webhook',
+      ...request({
+        method: 'POST',
+        url: '{{base_url}}/{{api_prefix}}/subscriptions/webhook',
+        auth: { type: 'noauth' },
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(subscriptionUpdatedWebhookBody),
+        description: 'Local subscription.updated webhook simulation for provider-driven upgrade or downgrade reconciliation.',
+        event: razorpayWebhookSignatureEvent,
+      }),
+    },
+    {
+      name: '11. Simulate Razorpay Payment Failed Webhook',
+      ...request({
+        method: 'POST',
+        url: '{{base_url}}/{{api_prefix}}/subscriptions/webhook',
+        auth: { type: 'noauth' },
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(subscriptionPaymentFailedWebhookBody),
+        description: 'Local payment.failed webhook simulation for retry/failure audit records.',
+        event: razorpayWebhookSignatureEvent,
+      }),
+    },
+  ],
+};
+
 const environmentTemplate = {
   id: 'evercut-local-environment',
   name: 'EverCut Local',
@@ -2359,6 +2644,11 @@ const environmentTemplate = {
     { key: 'barber_onboarding_token', value: '', enabled: true },
     { key: 'admin_access_token', value: '', enabled: true },
     { key: 'fcm_token', value: 'postman-fcm-token-{{$timestamp}}', enabled: true },
+    { key: 'razorpay_webhook_secret', value: '', enabled: true },
+    { key: 'razorpay_subscription_id', value: '', enabled: true },
+    { key: 'razorpay_plan_id_popular', value: '', enabled: true },
+    { key: 'razorpay_plan_id_advanced', value: '', enabled: true },
+    { key: 'barber_profile_id', value: '', enabled: true },
   ],
   _postman_variable_scope: 'environment',
   _postman_exported_at: new Date().toISOString(),
@@ -2381,4 +2671,5 @@ writeCollection('13-barber-ratings.json', barberRatingsCollection);
 writeCollection('14-operational-analytics.json', analyticsCollection);
 writeCollection('15-payments-payouts.json', paymentsPayoutsCollection);
 writeCollection('16-notifications.json', notificationsCollection);
+writeCollection('17-subscriptions.json', subscriptionsCollection);
 writeFileSync(resolve(COLLECTIONS_DIR, 'EverCut.postman_environment.json'), `${JSON.stringify(environmentTemplate, null, 2)}\n`);

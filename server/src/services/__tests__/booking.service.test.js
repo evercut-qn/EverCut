@@ -251,6 +251,11 @@ test('getBookingAnalytics returns no next milestone once all visible targets are
 });
 
 test('getBookingAnalytics returns summary, milestones, today pulse, and both queue buckets', async (t) => {
+    t.mock.timers.enable({
+        apis: ['Date'],
+        now: new Date('2026-03-15T12:00:00.000Z'),
+    });
+
     t.mock.method(shopRepository, 'findByBarberUserId', async () => ({
         _id: 'shop-1',
         openTime: '09:00',

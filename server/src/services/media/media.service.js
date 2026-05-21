@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import mediaRepository from '../../repositories/media.repository.js';
 import barberRepository from '../../repositories/barber.repository.js';
 import shopRepository from '../../repositories/shop.repository.js';
+import subscriptionRepository from '../../repositories/subscription.repository.js';
 import config from '../../config/index.js';
 import { BadRequestError, NotFoundError } from '../../utils/api-error.js';
 import {
@@ -11,6 +12,7 @@ import {
     MEDIA_TYPE,
     MIME_TO_EXTENSION,
 } from '../../utils/constants.js';
+import { getPlanCapabilities, PLAN_IDS } from '../../config/subscription.config.js';
 import { serializeMedia, serializeMediaList } from '../../serializers/media.serializer.js';
 import logger from '../../utils/logger.js';
 import storageProvider from './storage-provider.service.js';
@@ -37,6 +39,53 @@ const buildR2Key = (purpose, contextId, mediaId, extension) => {
         [MEDIA_PURPOSE.VIDEO_THUMBNAIL]: `thumbnails/videos/${mediaId}.${extension}`,
     };
     return keyMap[purpose] || `images/misc/${safeContext}/${mediaId}.${extension}`;
+};
+
+const resolveBarberForMediaOwner = async (userId) => barberRepository.findByUserId(userId);
+
+const incrementGalleryUploadCounter = async (userId, media) => {
+    if (media.purpose !== MEDIA_PURPOSE.GALLERY) {
+        return { hiddenBySubscriptionLimit: false };
+    }
+
+    const barber = await resolveBarberForMediaOwner(userId);
+    if (!barber) {
+        return { hiddenBySubscriptionLimit: false };
+    }
+
+    const subscription = await subscriptionRepository.findByBarberId(barber._id)
+        || await subscriptionRepository.upsertDefaultForBarber(barber._id, 'UPLOAD_ENFORCEMENT');
+
+    const incremented = media.type === MEDIA_TYPE.VIDEO
+        ? await subscriptionRepository.incrementVideoCounter(barber._id)
+        : await subscriptionRepository.incrementPhotoCounter(barber._id);
+
+    const planId = incremented?.planId || subscription?.planId || PLAN_IDS.BASIC;
+    const capabilities = getPlanCapabilities(planId);
+    const current = media.type === MEDIA_TYPE.VIDEO
+        ? incremented?.totalVideosUploaded || 0
+        : incremented?.totalPhotosUploaded || 0;
+    const limit = media.type === MEDIA_TYPE.VIDEO
+        ? capabilities.maxVideos
+        : capabilities.maxPhotos;
+
+    if (current <= limit) {
+        return { hiddenBySubscriptionLimit: false };
+    }
+
+    logger.warn('Upload counter exceeded subscription limit after increment', {
+        mediaId: media._id,
+        barberId: barber._id,
+        mediaType: media.type,
+        current,
+        limit,
+    });
+
+    await mediaRepository.updateById(media._id, { status: MEDIA_STATUS.HIDDEN });
+    return {
+        hiddenBySubscriptionLimit: true,
+        quota: { current, limit },
+    };
 };
 
 export const requestUploadUrl = async (userId, { contentType, sizeBytes, purpose }) => {
@@ -124,12 +173,22 @@ export const confirmUpload = async (userId, mediaId) => {
         confirmedAt: new Date(),
     });
 
+    const subscriptionResult = await incrementGalleryUploadCounter(userId, {
+        ...media,
+        ...updated,
+        _id: updated._id || media._id,
+        type: updated.type || media.type,
+        purpose: updated.purpose || media.purpose,
+    });
+
     return {
         mediaId: updated._id.toString(),
         cdnUrl: buildMediaUrl(updated.r2Key),
         r2Key: updated.r2Key,
         contentType: updated.contentType,
         fileSize: updated.actualSize,
+        hiddenBySubscriptionLimit: subscriptionResult.hiddenBySubscriptionLimit,
+        quota: subscriptionResult.quota,
     };
 };
 
@@ -140,11 +199,29 @@ export const getMediaById = async (userId, mediaId) => {
 };
 
 export const deleteMedia = async (userId, mediaId) => {
+    const existing = await mediaRepository.findByIdAndUser(mediaId, userId, { status: { $ne: MEDIA_STATUS.DELETED } });
+    if (!existing) throw new NotFoundError('Media');
     const media = await mediaRepository.softDeleteByIdAndUser(mediaId, userId);
-    if (!media) throw new NotFoundError('Media');
     storageProvider.deleteObject(media.r2Key).catch((err) => {
         logger.warn('Deferred R2 delete failed', { mediaId, error: err.message });
     });
+
+    if (existing.status === MEDIA_STATUS.HIDDEN && existing.purpose === MEDIA_PURPOSE.GALLERY) {
+        const barber = await resolveBarberForMediaOwner(userId);
+        const subscription = barber
+            ? await subscriptionRepository.findByBarberId(barber._id)
+            : null;
+        if (barber && subscription && existing.entityId) {
+            const lifecycle = await import('../subscription/subscription-lifecycle.service.js');
+            await lifecycle.default.maybeReactivateOneAfterDelete(
+                barber._id,
+                existing.entityId,
+                existing.type,
+                subscription.planId,
+            );
+        }
+    }
+
     return { message: 'Media deleted' };
 };
 
@@ -155,20 +232,42 @@ export const attachGalleryMedia = async (ownerId, mediaIds) => {
         throw new BadRequestError('No media IDs provided');
     }
 
-    const currentCount = await mediaRepository.countByEntity(shop._id, MEDIA_ENTITY_TYPE.SHOP, { purpose: MEDIA_PURPOSE.GALLERY });
-    if (currentCount + mediaIds.length > config.media.maxGalleryPerShop) {
-        throw new BadRequestError(`Gallery limit exceeded. Maximum ${config.media.maxGalleryPerShop} items allowed.`);
+    const candidateMedia = [];
+    for (const mediaId of mediaIds) {
+        const media = await mediaRepository.findReadyByIdAndUser(mediaId, ownerId);
+        if (!media) throw new BadRequestError(`Media ${mediaId} not found, unconfirmed, or already attached`);
+        candidateMedia.push(media);
+    }
+
+    const barber = await barberRepository.findByUserId(ownerId);
+    if (barber) {
+        const subscription = await subscriptionRepository.findByBarberId(barber._id)
+            || await subscriptionRepository.upsertDefaultForBarber(barber._id, 'GALLERY_ENFORCEMENT');
+        const capabilities = getPlanCapabilities(subscription.planId);
+        const newPhotos = candidateMedia.filter((media) => media.type === MEDIA_TYPE.IMAGE).length;
+        const newVideos = candidateMedia.filter((media) => media.type === MEDIA_TYPE.VIDEO).length;
+        const [activePhotos, activeVideos] = await Promise.all([
+            mediaRepository.countActiveGalleryMedia(shop._id, MEDIA_TYPE.IMAGE),
+            mediaRepository.countActiveGalleryMedia(shop._id, MEDIA_TYPE.VIDEO),
+        ]);
+
+        if (activePhotos + newPhotos > capabilities.maxPhotos) {
+            throw new BadRequestError(`Photo gallery limit exceeded. Maximum ${capabilities.maxPhotos} active photos allowed.`);
+        }
+        if (activeVideos + newVideos > capabilities.maxVideos) {
+            throw new BadRequestError(`Video gallery limit exceeded. Maximum ${capabilities.maxVideos} active videos allowed.`);
+        }
     }
 
     const attached = [];
-    for (const mediaId of mediaIds) {
-        const media = await mediaRepository.attachReadyMedia(mediaId, ownerId, {
+    for (const media of candidateMedia) {
+        const attachedMedia = await mediaRepository.attachReadyMedia(media._id, ownerId, {
             entityId: shop._id,
             entityType: MEDIA_ENTITY_TYPE.SHOP,
             purpose: MEDIA_PURPOSE.GALLERY,
         });
-        if (!media) throw new BadRequestError(`Media ${mediaId} not found, unconfirmed, or already attached`);
-        attached.push(media);
+        if (!attachedMedia) throw new BadRequestError(`Media ${media._id} not found, unconfirmed, or already attached`);
+        attached.push(attachedMedia);
     }
 
     return serializeMediaList(attached);

@@ -5,7 +5,6 @@ import bookingRepository from '../../repositories/booking.repository.js';
 import customerRepository from '../../repositories/customer.repository.js';
 import ratingRepository from '../../repositories/rating.repository.js';
 import shopRepository from '../../repositories/shop.repository.js';
-import { buildMediaUrl } from '../media/media-url.service.js';
 import * as ratingService from '../rating.service.js';
 
 test('addRating translates duplicate-key writes and normalizes blank reviews', async (t) => {
@@ -181,11 +180,12 @@ test('upsertReplyToRating updates an existing reply without sending a duplicate 
         replyText: 'Updated reply',
         repliedBy: 'owner-1',
     });
-    assert.deepEqual(result.user, {
-        firstName: 'Ava',
-        lastName: 'Customer',
-        photoUrl: buildMediaUrl('images/avatars/customer-1/profile.jpg'),
-    });
+    assert.equal(result.user.firstName, 'Ava');
+    assert.equal(result.user.lastName, 'Customer');
+    assert.match(
+        result.user.photoUrl,
+        /^https:\/\/evercut-media-worker-dev\.quantneural-evercut\.workers\.dev\/images\/avatars\/customer-1\/profile\.jpg\?exp=\d+&token=[a-f0-9]{64}$/,
+    );
     assert.equal('email' in result.user, false);
     assert.deepEqual(result.reply, {
         text: 'Updated reply',

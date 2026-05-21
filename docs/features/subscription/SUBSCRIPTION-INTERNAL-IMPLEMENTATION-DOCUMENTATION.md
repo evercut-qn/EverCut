@@ -58,6 +58,19 @@ The subscription system is built on four non-negotiable principles:
 
 ---
 
+### 1.5 Implementation Alignment Notes
+
+The production implementation in `server/` follows this architecture with these repository-specific path decisions:
+
+- Runtime plan configuration lives in `server/src/config/subscription.config.js`; the reusable pure plan catalog lives in `server/src/config/subscription-plan-definitions.js` so `server/scripts/create-razorpay-plans.mjs` and runtime config share the same billing definitions without importing full environment config.
+- Scheduled subscription maintenance lives in `server/src/jobs/subscription.cron.js`, matching the existing server job pattern.
+- The default-subscription migration lives in `server/scripts/migrate-subscription-defaults.mjs`, is dry-run by default, and requires `--execute` to write data.
+- Webhook raw body capture is installed before global JSON parsing in `server/src/app.js`; `server/src/middleware/raw-body.middleware.js` then normalizes access to `req.rawBody` for the route.
+- The Postman generator emits `server/postman-collections/17-subscriptions.json` from `server/scripts/regenerate-postman-collections.mjs`; generated collections should not be hand-patched.
+- Upload quota enforcement is applied to authenticated barber gallery uploads while keeping the existing media upload endpoint available to other owned media workflows.
+
+---
+
 ## 2. Architecture Overview
 
 ### 2.1 High-Level Domain Architecture
@@ -1323,6 +1336,7 @@ export const SUBSCRIPTION_TRANSACTION_TYPES = Object.freeze({
   DOWNGRADE: 'DOWNGRADE',         // Plan downgraded
   CANCELLATION: 'CANCELLATION',   // Barber cancelled
   EXPIRY: 'EXPIRY',               // Subscription expired (failed billing or end-of-cycle)
+  PAYMENT_FAILED: 'PAYMENT_FAILED', // Payment attempt failed; recorded for audit/idempotency
   PAUSE: 'PAUSE',                 // UPI mandate paused
   RESUME: 'RESUME',               // UPI mandate resumed
   REACTIVATION: 'REACTIVATION',   // Re-subscribed after expiry/cancellation
@@ -1387,6 +1401,16 @@ New Razorpay configuration section to be added to the existing centralized confi
 ```javascript
 // ─── Additions to server/src/config/index.js ────────────────────
 
+const requireEnumEnv = (key, allowedValues) => {
+  const value = requireEnv(key);
+  if (!allowedValues.includes(value)) {
+    throw new Error(`${key} must be ${allowedValues.join(' or ')}`);
+  }
+  return value;
+};
+
+const PROVIDER_ENVIRONMENTS = Object.freeze(['SANDBOX', 'PRODUCTION']);
+
 // Inside the exported config object, add:
 
 razorpay: {
@@ -1395,7 +1419,7 @@ razorpay: {
   webhookSecret: requireEnv('RAZORPAY_WEBHOOK_SECRET'),
   planIdPopular: requireEnv('RAZORPAY_PLAN_ID_POPULAR'),
   planIdAdvanced: requireEnv('RAZORPAY_PLAN_ID_ADVANCED'),
-  env: optionalEnv('RAZORPAY_ENV', 'SANDBOX'),
+  env: requireEnumEnv('RAZORPAY_ENV', PROVIDER_ENVIRONMENTS),
 },
 
 // Inside the `subscription` config section (new):
@@ -3789,31 +3813,32 @@ Modified Existing Routes:
 ---
 ## 10. File-by-File Implementation Plan
 
-### 10.1 New Files (19 Files)
+### 10.1 New Files (Core + Tests)
 
 | # | File Path | Purpose | Lines (est.) |
 |---|---|---|---|
-| 1 | `server/src/config/subscription.config.js` | Plan definitions, capabilities, helpers | ~200 |
-| 2 | `server/src/models/subscription.model.js` | Subscription Mongoose schema | ~180 |
-| 3 | `server/src/models/subscription-transaction.model.js` | Transaction audit trail schema | ~120 |
-| 4 | `server/src/repositories/subscription.repository.js` | Subscription DB operations | ~120 |
-| 5 | `server/src/repositories/subscription-transaction.repository.js` | Transaction DB operations | ~60 |
-| 6 | `server/src/services/subscription/subscription.service.js` | Core CRUD + billing orchestration | ~280 |
-| 7 | `server/src/services/subscription/entitlement.service.js` | Centralized entitlement resolver | ~200 |
-| 8 | `server/src/services/subscription/subscription-lifecycle.service.js` | Lifecycle side-effects (hidden media) | ~220 |
-| 9 | `server/src/services/subscription/subscription-webhook.service.js` | Webhook processing + idempotency | ~300 |
-| 10 | `server/src/adapters/razorpay/razorpay-subscription.adapter.js` | Razorpay SDK wrapper | ~160 |
-| 11 | `server/src/controllers/subscription.controller.js` | HTTP request handling | ~130 |
-| 12 | `server/src/routes/subscription.routes.js` | Route definitions | ~70 |
-| 13 | `server/src/validators/subscription.validator.js` | Joi validation schemas | ~50 |
-| 14 | `server/src/serializers/subscription.serializer.js` | Response formatting | ~120 |
-| 15 | `server/src/middleware/entitlement.middleware.js` | Upload/statement quota gates | ~100 |
-| 16 | `server/src/middleware/raw-body.middleware.js` | Raw body capture for HMAC | ~20 |
-| 17 | `server/src/cron/subscription.cron.js` | Scheduled jobs (expiry, reconciliation) | ~150 |
-| 18 | `server/src/scripts/migrate-subscription-defaults.js` | One-time migration script | ~80 |
-| 19 | `server/src/__tests__/subscription/` | Test directory (multiple test files) | ~800+ |
+| 1 | `server/src/config/subscription-plan-definitions.js` | Pure shared plan catalog for runtime config and Razorpay provisioning | ~150 |
+| 2 | `server/src/config/subscription.config.js` | Plan definitions, capabilities, helpers | ~200 |
+| 3 | `server/src/models/subscription.model.js` | Subscription Mongoose schema | ~180 |
+| 4 | `server/src/models/subscription-transaction.model.js` | Transaction audit trail schema | ~120 |
+| 5 | `server/src/repositories/subscription.repository.js` | Subscription DB operations | ~120 |
+| 6 | `server/src/repositories/subscription-transaction.repository.js` | Transaction DB operations | ~60 |
+| 7 | `server/src/services/subscription/subscription.service.js` | Core CRUD + billing orchestration | ~280 |
+| 8 | `server/src/services/subscription/entitlement.service.js` | Centralized entitlement resolver | ~200 |
+| 9 | `server/src/services/subscription/subscription-lifecycle.service.js` | Lifecycle side-effects (hidden media) | ~220 |
+| 10 | `server/src/services/subscription/subscription-webhook.service.js` | Webhook processing + idempotency | ~300 |
+| 11 | `server/src/adapters/razorpay/razorpay-subscription.adapter.js` | Razorpay SDK wrapper | ~160 |
+| 12 | `server/src/controllers/subscription.controller.js` | HTTP request handling | ~130 |
+| 13 | `server/src/routes/subscription.routes.js` | Route definitions | ~70 |
+| 14 | `server/src/validators/subscription.validator.js` | Joi validation schemas | ~50 |
+| 15 | `server/src/serializers/subscription.serializer.js` | Response formatting | ~120 |
+| 16 | `server/src/middleware/entitlement.middleware.js` | Upload/statement quota gates | ~100 |
+| 17 | `server/src/middleware/raw-body.middleware.js` | Raw body access helper for HMAC | ~20 |
+| 18 | `server/src/jobs/subscription.cron.js` | Scheduled jobs (expiry, reconciliation, media reconciliation) | ~150 |
+| 19 | `server/scripts/migrate-subscription-defaults.mjs` | One-time idempotent dry-run/execute migration script | ~120 |
+| 20 | `server/src/services/subscription/__tests__/`, `server/src/services/media/__tests__/`, `server/src/routes/__tests__/` | Subscription, media enforcement, webhook, routing, and Postman generator tests | ~800+ |
 
-### 10.2 Modified Files (9 Files)
+### 10.2 Modified Files (Core Integration Points)
 
 | # | File Path | Change Description | Impact |
 |---|---|---|---|
@@ -3821,11 +3846,18 @@ Modified Existing Routes:
 | 2 | `server/src/config/index.js` | Add `razorpay` and `subscription` config sections | Additive only |
 | 3 | `server/src/routes/index.js` | Register `/subscriptions` route | One line addition |
 | 4 | `server/src/services/media/media.service.js` | Add upload counter increment in `confirmUpload()` + hidden media deletion handling | ~20 lines in existing methods |
-| 5 | `server/src/services/earnings/earnings.service.js` | Add statement counter increment after PDF generation | ~5 lines |
-| 6 | `server/src/services/shop/shop.service.js` | Add badge + visibility enrichment in profile response | ~15 lines |
-| 7 | `server/src/services/onboarding/onboarding.service.js` | Create default Subscription on barber registration | ~10 lines |
+| 5 | `server/src/services/earnings.service.js` | Add statement counter increment after PDF generation | ~5 lines |
+| 6 | `server/src/services/shop.service.js` | Add badge + visibility enrichment in profile and listing responses | ~15 lines |
+| 7 | `server/src/services/onboarding.service.js` | Create default Subscription on barber registration | ~10 lines |
 | 8 | `server/src/routes/media.routes.js` | Add `checkUploadQuota()` middleware to upload routes | ~3 lines |
 | 9 | `server/src/routes/earnings.routes.js` | Add `checkStatementQuota()` middleware to statement route | ~2 lines |
+| 10 | `server/src/app.js` | Register raw parser for the Razorpay subscription webhook before JSON parsing | Additive |
+| 11 | `server/src/server.js` | Start and stop subscription maintenance jobs with the server lifecycle | Additive |
+| 12 | `server/src/models/media.model.js` and `server/src/repositories/media.repository.js` | Add hidden media status/index support and active/hidden gallery queries | Additive |
+| 13 | `server/src/serializers/shop.serializer.js` | Expose derived badge, visibility, support tier, and priority listing metadata | Additive |
+| 14 | `server/scripts/create-razorpay-plans.mjs` | Reuse shared plan definitions and keep idempotent Razorpay provisioning | Refactor |
+| 15 | `server/scripts/regenerate-postman-collections.mjs` | Generate the subscription collection and webhook examples | Additive |
+| 16 | `server/.env.example`, `server/package.json`, `server/package-lock.json` | Document subscription env vars and add the Razorpay SDK dependency | Additive |
 
 ### 10.3 Environment Variable Additions
 
@@ -3931,7 +3963,7 @@ Recommended implementation sequence:
 
 6. **Phase 6 — Cron + Migration (Day 5)**
    - `subscription.cron.js`
-   - `migrate-subscription-defaults.js`
+   - `scripts/migrate-subscription-defaults.mjs`
 
 7. **Phase 7 — Testing (Day 5-7)**
    - Unit tests for each service
@@ -3955,17 +3987,17 @@ The subscription system introduces **new collections** and **adds one enum value
 | Create default Subscription docs for existing barbers | New docs | Low | Delete created docs |
 | Add `HIDDEN` to MEDIA_STATUS enum | Code-level | None (additive) | Remove from code |
 
-### 11.2 Migration Script: `scripts/migrate-subscription-defaults.js`
+### 11.2 Migration Script: `scripts/migrate-subscription-defaults.mjs`
 
 This one-time script creates a default `PLAN_BASIC` subscription for every existing barber who doesn't have one.
 
 ```javascript
-// server/src/scripts/migrate-subscription-defaults.js
+// server/scripts/migrate-subscription-defaults.mjs
 
 /**
  * One-time migration: Create default Subscription records for existing barbers.
  * 
- * Usage: node src/scripts/migrate-subscription-defaults.js
+ * Usage: node scripts/migrate-subscription-defaults.mjs [--execute]
  * 
  * This script is idempotent — running it multiple times is safe.
  * It only creates Subscription documents for barbers who don't have one.
@@ -4140,7 +4172,7 @@ If the subscription deployment needs to be rolled back:
 ### 13.1 Cron Job Architecture: `cron/subscription.cron.js`
 
 ```javascript
-// server/src/cron/subscription.cron.js
+// server/src/jobs/subscription.cron.js
 
 import cron from 'node-cron';
 import subscriptionRepository from '../repositories/subscription.repository.js';

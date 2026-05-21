@@ -2,6 +2,7 @@ import bookingRepository from '../repositories/booking.repository.js';
 import shopRepository from '../repositories/shop.repository.js';
 import barberRepository from '../repositories/barber.repository.js';
 import paymentRepository from '../repositories/payment.repository.js';
+import subscriptionRepository from '../repositories/subscription.repository.js';
 import { NotFoundError, ForbiddenError } from '../utils/api-error.js';
 import { buildPagination } from '../utils/pagination.utils.js';
 import { PAYMENT_TRANSACTION_STATUS } from '../utils/constants.js';
@@ -358,6 +359,7 @@ export const generateStatement = async (ownerId, query) => {
     });
     
     const filename = `transactions_${query.startDate}_to_${query.endDate}.pdf`;
+    await subscriptionRepository.incrementStatementCounter(shop.barberId);
     
     return {
         stream: pdfDoc,

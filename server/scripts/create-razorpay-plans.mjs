@@ -8,9 +8,9 @@
  * Creates Razorpay billing plans that map to EverCut's subscription tiers.
  *
  * ── Architecture ────────────────────────────────────────────────────────────
- * This script reads plan definitions from `config/subscription.config.js`
- * (the single source of truth) and provisions the corresponding plans on
- * Razorpay. It is IDEMPOTENT — running it multiple times will NOT create
+ * This script reads plan definitions from `src/config/subscription-plan-definitions.js`
+ * (shared by runtime config and plan provisioning) and provisions the corresponding
+ * plans on Razorpay. It is IDEMPOTENT — running it multiple times will NOT create
  * duplicate plans. It detects existing plans by name and skips them.
  *
  * ── Plan Mapping ────────────────────────────────────────────────────────────
@@ -46,6 +46,7 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import Razorpay from 'razorpay';
+import { getRazorpayProvisioningPlans } from '../src/config/subscription-plan-definitions.js';
 
 // ─── Load Environment ───────────────────────────────────────────────────────
 
@@ -56,55 +57,11 @@ dotenv.config({ path: path.resolve(__dirname, '../.env') });
 // ─── Constants ──────────────────────────────────────────────────────────────
 
 /**
- * Plan definitions for Razorpay provisioning.
- *
- * These mirror `subscription.config.js` but are defined inline here because:
- * 1. The config file uses `import config from './index.js'` which requires
- *    the full server config (MongoDB URI, Firebase, etc.) — not available
- *    in a standalone script context.
- * 2. This script is a one-time operational tool, not runtime code.
- * 3. The Razorpay-specific fields (period, interval, item name/description)
- *    are provisioning concerns, not business logic.
- *
- * IMPORTANT: If you change plan pricing in `subscription.config.js`, update
- * the amounts here as well. But do NOT re-run this script for price changes —
- * Razorpay plans are immutable. Create new plans instead and update the
- * plan IDs in your .env file.
+ * Plan definitions are shared with runtime subscription config through
+ * src/config/subscription-plan-definitions.js. Razorpay plans are immutable;
+ * price changes require creating new gateway plans and updating env plan IDs.
  */
-const EVERCUT_PLANS = [
-  {
-    // Internal EverCut plan ID
-    planId: 'PLAN_POPULAR',
-    envVar: 'RAZORPAY_PLAN_ID_POPULAR',
-
-    // Razorpay plan creation payload
-    razorpay: {
-      period: 'monthly',
-      interval: 1,
-      item: {
-        name: 'EverCut - Popular',
-        amount: 29900, // ₹299.00 in paise
-        currency: 'INR',
-        description: 'Enhanced reach & local visibility for growing salons. 30 photos, 10 videos, blue badge.',
-      },
-    },
-  },
-  {
-    planId: 'PLAN_ADVANCED',
-    envVar: 'RAZORPAY_PLAN_ID_ADVANCED',
-
-    razorpay: {
-      period: 'monthly',
-      interval: 1,
-      item: {
-        name: 'EverCut - Advanced',
-        amount: 49900, // ₹499.00 in paise
-        currency: 'INR',
-        description: 'Maximum exposure & priority reach for top salons. 50 photos, 15 videos, yellow badge.',
-      },
-    },
-  },
-];
+const EVERCUT_PLANS = getRazorpayProvisioningPlans();
 
 // ─── Razorpay Client ────────────────────────────────────────────────────────
 
@@ -126,13 +83,33 @@ function createRazorpayClient() {
   return new Razorpay({ key_id: keyId, key_secret: keySecret });
 }
 
-// ─── Detect Environment ─────────────────────────────────────────────────────
+// ─── Environment Validation ─────────────────────────────────────────────────
 
-function detectRazorpayEnvironment() {
+function requireRazorpayEnvironment() {
+  const env = process.env.RAZORPAY_ENV;
+  if (!env) {
+    throw new Error('Missing required environment variable: RAZORPAY_ENV');
+  }
+  if (['SANDBOX', 'PRODUCTION'].includes(env)) return env;
+  throw new Error('RAZORPAY_ENV must be SANDBOX or PRODUCTION');
+}
+
+function assertRazorpayKeyMatchesEnvironment(env) {
   const keyId = process.env.RAZORPAY_KEY_ID || '';
-  if (keyId.startsWith('rzp_live_')) return 'LIVE';
-  if (keyId.startsWith('rzp_test_')) return 'TEST';
-  return 'UNKNOWN';
+
+  if (keyId.startsWith('rzp_test_') && env === 'PRODUCTION') {
+    throw new Error('RAZORPAY_KEY_ID is a test key but RAZORPAY_ENV is PRODUCTION');
+  }
+
+  if (keyId.startsWith('rzp_live_') && env === 'SANDBOX') {
+    throw new Error('RAZORPAY_KEY_ID is a live key but RAZORPAY_ENV is SANDBOX');
+  }
+}
+
+function formatRazorpayEnvironment(env) {
+  if (env === 'PRODUCTION') return '🔴 PRODUCTION';
+  if (env === 'SANDBOX') return '🟢 SANDBOX';
+  return '⚠️  UNKNOWN';
 }
 
 // ─── Fetch Existing Plans ───────────────────────────────────────────────────
@@ -302,28 +279,29 @@ async function commandDryRun(rzp) {
  * EXECUTE — Actually create plans on Razorpay.
  */
 async function commandExecute(rzp) {
-  const env = detectRazorpayEnvironment();
+  const env = requireRazorpayEnvironment();
+  assertRazorpayKeyMatchesEnvironment(env);
 
   console.log('');
   console.log('  ╔═══════════════════════════════════════════════════════════╗');
   console.log('  ║  EverCut — Razorpay Plan Provisioning                     ║');
   console.log('  ╚═══════════════════════════════════════════════════════════╝');
   console.log('');
-  console.log(`  Environment:  ${env === 'LIVE' ? '🔴 LIVE (PRODUCTION)' : env === 'TEST' ? '🟢 TEST (Sandbox)' : '⚠️  UNKNOWN'}`);
+  console.log(`  Environment:  ${formatRazorpayEnvironment(env)}`);
   console.log(`  Key ID:       ${(process.env.RAZORPAY_KEY_ID || '').substring(0, 16)}...`);
   console.log('');
 
   // Safety gate for production
-  if (env === 'LIVE') {
-    console.log('  ⚠️  WARNING: You are about to create plans in LIVE (production) mode!');
+  if (env === 'PRODUCTION') {
+    console.log('  ⚠️  WARNING: You are about to create plans in PRODUCTION mode!');
     console.log('  This will create real billing plans that can charge real money.');
     console.log('');
     console.log('  To proceed, set the environment variable:');
-    console.log('  RAZORPAY_CONFIRM_LIVE=true');
+    console.log('  RAZORPAY_CONFIRM_PRODUCTION=true');
     console.log('');
 
-    if (process.env.RAZORPAY_CONFIRM_LIVE !== 'true') {
-      console.log('  Aborting. Set RAZORPAY_CONFIRM_LIVE=true to proceed.');
+    if (process.env.RAZORPAY_CONFIRM_PRODUCTION !== 'true') {
+      console.log('  Aborting. Set RAZORPAY_CONFIRM_PRODUCTION=true to proceed.');
       console.log('');
       process.exit(1);
     }
@@ -440,7 +418,8 @@ async function main() {
   const args = process.argv.slice(2);
   const command = args[0] || '';
 
-  const env = detectRazorpayEnvironment();
+  const env = requireRazorpayEnvironment();
+  assertRazorpayKeyMatchesEnvironment(env);
 
   // Header
   console.log('');
@@ -448,7 +427,7 @@ async function main() {
   console.log('  ║  EverCut — Razorpay Plan Provisioning                     ║');
   console.log('  ╚═══════════════════════════════════════════════════════════╝');
   console.log('');
-  console.log(`  Environment: ${env === 'LIVE' ? '🔴 LIVE' : env === 'TEST' ? '🟢 TEST' : '⚠️  UNKNOWN'}`);
+  console.log(`  Environment: ${formatRazorpayEnvironment(env)}`);
   console.log(`  Plans to provision: ${EVERCUT_PLANS.length} (Popular, Advanced)`);
   console.log(`  Basic plan: Free — no Razorpay plan needed`);
   console.log('');
@@ -486,8 +465,8 @@ function printHelp() {
   console.log('  The script is idempotent — running --execute multiple times');
   console.log('  will NOT create duplicate plans.');
   console.log('');
-  console.log('  For LIVE (production) mode, you must also set:');
-  console.log('    RAZORPAY_CONFIRM_LIVE=true');
+  console.log('  For PRODUCTION mode, you must also set:');
+  console.log('    RAZORPAY_CONFIRM_PRODUCTION=true');
   console.log('');
 }
 

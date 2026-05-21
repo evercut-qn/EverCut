@@ -87,6 +87,9 @@ export const serializeShopSummary = (shop) => {
         isOpen: plain.isOpen,
         workingDays: plain.availableDays,
         workingHours: toWorkingHours(plain),
+        badge: plain.badge,
+        visibilityTier: plain.visibilityTier,
+        priorityListingBoost: plain.priorityListingBoost,
     });
 };
 
@@ -119,17 +122,22 @@ export const serializeShopProfile = (shop, options = {}) => {
             count: plain.missedConfirmationCount || 0,
             lastMissedAt: plain.lastMissedConfirmationAt || null,
         },
+        badge: options.entitlements?.badge ?? plain.badge,
+        visibilityTier: options.entitlements?.visibilityTier ?? plain.visibilityTier,
+        supportTier: options.entitlements?.supportTier ?? plain.supportTier,
+        priorityListingBoost: options.entitlements?.priorityListingBoost ?? plain.priorityListingBoost,
         photos: options.photos ? serializeMediaList(options.photos) : undefined,
         createdAt: plain.createdAt,
         updatedAt: plain.updatedAt,
     });
 };
 
-export const serializeBarberProfile = ({ barber, shop, user, photos } = {}) => {
+export const serializeBarberProfile = ({ barber, shop, user, photos, entitlements } = {}) => {
     const profile = serializeShopProfile(shop, {
         barber,
         userContext: user,
         photos,
+        entitlements,
         privateView: true,
     });
     if (!profile) return null;

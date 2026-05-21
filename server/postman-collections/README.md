@@ -41,6 +41,7 @@ All collections now assume the backend returns the same JSON envelope for both s
 | `14-operational-analytics.json` | EverCut - Operational Analytics | Booking, employee, and earnings analytics through resource-owned endpoints |
 | `15-payments-payouts.json` | EverCut - Payments & Payouts | Native PhonePe SDK payment initiation/verification/status/refunds and Cashfree payout retry |
 | `16-notifications.json` | EverCut - Notifications | FCM token management, notification history, summary, and read-state updates |
+| `17-subscriptions.json` | EverCut - Subscriptions | Razorpay subscription lifecycle, plan changes, transaction history, and signed webhook simulation |
 | `EverCut.postman_environment.json` | — | Active environment with OTP/JWT variables for local testing |
 | `assets/sample-upload.png` | — | Sample image for direct R2 PUT requests |
 
@@ -229,6 +230,19 @@ Employee `workingHours.start` and `workingHours.end` remain `HH:MM` 24-hour valu
 | 5 | PATCH | `/api/v1/notifications` | Mark all notifications read |
 | 6 | DELETE | `/api/v1/notifications/tokens` | Revoke the authenticated user's FCM token |
 
+### `17-subscriptions.json`
+
+| # | Method | Endpoint | Description |
+|---|---|---|---|
+| 1 | GET | `/api/v1/subscriptions/plans` | List Basic, Popular, and Advanced plan capabilities |
+| 2 | GET | `/api/v1/subscriptions/me` | Read current barber subscription, usage, and entitlements |
+| 3 | POST | `/api/v1/subscriptions/subscribe` | Create a Razorpay subscription for `PLAN_POPULAR` or `PLAN_ADVANCED` |
+| 4 | POST | `/api/v1/subscriptions/upgrade` | Upgrade an active paid subscription immediately |
+| 5 | POST | `/api/v1/subscriptions/downgrade` | Schedule a paid downgrade at next renewal, or cancel when downgrading to Basic |
+| 6 | POST | `/api/v1/subscriptions/cancel` | Cancel the paid subscription at cycle end |
+| 7 | GET | `/api/v1/subscriptions/transactions?page=1&limit=20` | List immutable subscription lifecycle/audit records |
+| 8 | POST | `/api/v1/subscriptions/webhook` | Simulate a signed Razorpay subscription webhook |
+
 ---
 
 ### Prerequisites
@@ -279,6 +293,12 @@ No manual token generation needed - the authentication and onboarding collection
 | `merchant_refund_id` | Auto-set by `15-payments-payouts.json` request 5 |
 | `refund_id` | Auto-set by `15-payments-payouts.json` request 5 |
 | `payout_id` | Manual payout transaction ID for retry tests |
+| `subscription_plan_id` | `PLAN_POPULAR` by default; set to `PLAN_ADVANCED` to test Advanced checkout |
+| `subscription_upgrade_plan_id` | `PLAN_ADVANCED` |
+| `subscription_downgrade_plan_id` | `PLAN_POPULAR` |
+| `razorpay_subscription_id` | Auto-set by `17-subscriptions.json` request 3, or manually copied from Razorpay |
+| `razorpay_plan_id_popular` | Razorpay gateway plan ID from `RAZORPAY_PLAN_ID_POPULAR` |
+| `razorpay_webhook_secret` | Local/test Razorpay webhook secret used by the signed webhook simulation |
 
 ### Auth Collection Requests
 
@@ -308,6 +328,7 @@ No manual token generation needed - the authentication and onboarding collection
 2. `02-onboarding.json` → **1. Complete Customer** *(first run only)*
 3. Continue with customer collections in order.
 4. Run `15-payments-payouts.json` after a pending booking has been created. Request 1 captures the payment references needed by the status, refund, and webhook requests.
+5. Run `17-subscriptions.json` after barber onboarding. Request 3 captures `razorpay_subscription_id`; request 8 signs its body with `razorpay_webhook_secret` before calling the webhook endpoint.
 
 > Requests marked ***(Terminal)*** are destructive. Run them last within their collection and avoid them if you still need the related account or data for later requests.
 
@@ -325,6 +346,7 @@ Collections capture and share the following Postman globals automatically:
 | `shared_booking_id` | `04-customer-bookings.json` requests 1 and 3 | Booking detail requests |
 | `shared_media_id` | `11-barber-media.json` requests 1 and 5 | Media attachment, detail, and delete |
 | `shared_barber_pin` | `07-barber-profile-shop.json` request 8 | Future PIN-gated requests |
+| `razorpay_subscription_id` | `17-subscriptions.json` request 3 | Subscription status and webhook simulation |
 
 ---
 

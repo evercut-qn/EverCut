@@ -34,6 +34,29 @@ const providerEnv = (key, fallback) => {
   return value || fallback;
 };
 
+const requireEnumEnv = (key, allowedValues) => {
+  const value = requireEnv(key);
+  if (!allowedValues.includes(value)) {
+    throw new Error(`${key} must be ${allowedValues.join(' or ')}`);
+  }
+  return value;
+};
+
+const assertRazorpayKeyMatchesEnvironment = (keyId, env) => {
+  if (keyId.startsWith('rzp_test_') && env === 'PRODUCTION') {
+    throw new Error('RAZORPAY_KEY_ID is a test key but RAZORPAY_ENV is PRODUCTION');
+  }
+
+  if (keyId.startsWith('rzp_live_') && env === 'SANDBOX') {
+    throw new Error('RAZORPAY_KEY_ID is a live key but RAZORPAY_ENV is SANDBOX');
+  }
+};
+
+const PROVIDER_ENVIRONMENTS = Object.freeze(['SANDBOX', 'PRODUCTION']);
+const razorpayEnv = requireEnumEnv('RAZORPAY_ENV', PROVIDER_ENVIRONMENTS);
+const razorpayKeyId = providerEnv('RAZORPAY_KEY_ID', 'rzp_test_key');
+assertRazorpayKeyMatchesEnvironment(razorpayKeyId, razorpayEnv);
+
 // ---------------------------------------------------------------------------
 // Config Object
 // ---------------------------------------------------------------------------
@@ -160,6 +183,25 @@ const config = Object.freeze({
       ? 'https://api.cashfree.com/payout'
       : 'https://sandbox.cashfree.com/payout',
     payoutApiVersion: '2024-01-01',
+  }),
+
+  /** Razorpay subscription billing */
+  razorpay: Object.freeze({
+    keyId: razorpayKeyId,
+    keySecret: providerEnv('RAZORPAY_KEY_SECRET', 'test-razorpay-secret'),
+    webhookSecret: providerEnv('RAZORPAY_WEBHOOK_SECRET', 'test-razorpay-webhook-secret'),
+    planIdPopular: providerEnv('RAZORPAY_PLAN_ID_POPULAR', 'plan_test_popular'),
+    planIdAdvanced: providerEnv('RAZORPAY_PLAN_ID_ADVANCED', 'plan_test_advanced'),
+    env: razorpayEnv,
+  }),
+
+  /** Subscription business rules */
+  subscription: Object.freeze({
+    expiryCheckIntervalMs: 5 * 60 * 1000,
+    reconciliationCronSchedule: '0 2 * * *',
+    mediaReconciliationCronSchedule: '0 3 * * *',
+    cronTimezone: 'Asia/Kolkata',
+    webhookTimestampToleranceSec: 300,
   }),
 
   /** Booking business rules */

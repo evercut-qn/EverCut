@@ -153,8 +153,9 @@ EverCut uses a dedicated provisioning script to create Razorpay plans programmat
 
 #### Prerequisites
 
-1. `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET` must be set in `server/.env`
-2. Install the Razorpay SDK: `npm install razorpay`
+1. `RAZORPAY_ENV` must be set explicitly to `SANDBOX` or `PRODUCTION` in `server/.env`
+2. `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET` must be set in `server/.env`
+3. Install server dependencies so the committed Razorpay SDK dependency is present: `npm install`
 
 #### Step 1: Dry Run (Default, Safe)
 
@@ -168,7 +169,7 @@ node scripts/create-razorpay-plans.mjs
 This shows:
 - Which plans need to be created
 - Which plans already exist on Razorpay (skipped)
-- The environment being used (🟢 TEST or 🔴 LIVE)
+- The environment being used (`SANDBOX` or `PRODUCTION`)
 - No plans are actually created
 
 #### Step 2: Execute
@@ -211,23 +212,23 @@ If a matching plan already exists, it is **skipped** and its existing Razorpay p
 
 #### Production Safety
 
-For **LIVE** (production) keys (`rzp_live_*`), the script requires an explicit confirmation:
+For **PRODUCTION** keys (`rzp_live_*`), the script requires an explicit confirmation:
 
 ```bash
-RAZORPAY_CONFIRM_LIVE=true node scripts/create-razorpay-plans.mjs --execute
+RAZORPAY_CONFIRM_PRODUCTION=true node scripts/create-razorpay-plans.mjs --execute
 ```
 
-Without `RAZORPAY_CONFIRM_LIVE=true`, the script refuses to create plans in production. This prevents accidental creation of real billing plans.
+Without `RAZORPAY_CONFIRM_PRODUCTION=true`, the script refuses to create plans in `PRODUCTION`. This prevents accidental creation of real billing plans.
 
 #### Dev / Staging / Production Usage
 
 | Environment | Keys | Command | Notes |
 |---|---|---|---|
 | Development | `rzp_test_*` | `node scripts/create-razorpay-plans.mjs --execute` | Creates test plans; safe to experiment |
-| Staging | `rzp_test_*` | Same as development | Uses same test mode; separate plan IDs in staging .env |
-| Production | `rzp_live_*` | `RAZORPAY_CONFIRM_LIVE=true node scripts/create-razorpay-plans.mjs --execute` | Creates real billing plans; requires explicit confirmation |
+| Staging | `rzp_test_*` | Same as development | Uses `SANDBOX`; separate plan IDs in staging .env |
+| Production | `rzp_live_*` | `RAZORPAY_CONFIRM_PRODUCTION=true node scripts/create-razorpay-plans.mjs --execute` | Creates real billing plans; requires explicit confirmation |
 
-> **Each environment gets its own plan IDs.** Test-mode plans and live-mode plans are completely separate in Razorpay. You must run the script once per environment.
+> **Each environment gets its own plan IDs.** Razorpay test-key plans and production-key plans are completely separate. You must set `RAZORPAY_ENV` explicitly to `SANDBOX` or `PRODUCTION` before running the script; it is never inferred from the key prefix.
 
 #### Retry Safety
 
@@ -260,7 +261,7 @@ Razorpay plans are **immutable** — you cannot change the amount, period, or na
 
 | Step | Action |
 |---|---|
-| 1 | Update `EVERCUT_PLANS` in `create-razorpay-plans.mjs` with new amounts/names |
+| 1 | Update `PLAN_DEFINITIONS` in `server/src/config/subscription-plan-definitions.js` with new amounts/names |
 | 2 | Update `PLANS` in `subscription.config.js` with new pricing |
 | 3 | Run `node scripts/create-razorpay-plans.mjs --execute` — creates NEW plans (old plans are not matched due to different amounts) |
 | 4 | Update `RAZORPAY_PLAN_ID_POPULAR` and `RAZORPAY_PLAN_ID_ADVANCED` in `.env` with the new plan IDs |
@@ -279,7 +280,7 @@ The script-driven approach is preferred over manual creation because:
 | **Idempotency** | No protection against duplicates | Detects and skips existing plans |
 | **Auditability** | No record of what was created or when | Script is version-controlled |
 | **Multi-environment** | Must remember to do it in each environment | Same script, different `.env` |
-| **Production safety** | One wrong click can create a live plan | Requires `RAZORPAY_CONFIRM_LIVE=true` |
+| **Production safety** | One wrong click can create a production plan | Requires `RAZORPAY_CONFIRM_PRODUCTION=true` |
 | **Onboarding** | New developer must know exact plan specs | New developer runs one command |
 
 ---
@@ -675,11 +676,40 @@ Razorpay sandbox uses the **same API base URL** (`https://api.razorpay.com`) but
 
 ### 10.4 Webhook Testing
 
-1. Use a public URL for your dev environment (ngrok, Cloudflare Tunnel)
+1. Use a public URL for your dev environment (Hookdeck, ngrok, Cloudflare Tunnel)
 2. Set webhook URL in Razorpay dashboard to your public dev URL
 3. Monitor webhook delivery in dashboard: Settings → Webhooks → Recent Deliveries
 4. Verify signature validation in your handler
 5. Test each event type listed in Section 7.2
+
+For the documented Hookdeck development flow:
+
+```bash
+hookdeck listen 5000 razorpay-webhooks --path /api/v1/subscriptions/webhook
+```
+
+Use the Hookdeck forwarding URL as the Razorpay webhook URL while testing locally.
+
+### 10.4.1 Local Migration and Collection Tooling
+
+After deploying the subscription code to a local or staging environment, initialize existing barbers with default Basic subscriptions:
+
+```bash
+cd server
+node scripts/migrate-subscription-defaults.mjs
+node scripts/migrate-subscription-defaults.mjs --execute
+```
+
+The first command is a dry run. The `--execute` run is idempotent and skips barbers that already have a subscription record.
+
+Regenerate Postman collections whenever subscription routes or examples change:
+
+```bash
+cd server
+node scripts/regenerate-postman-collections.mjs
+```
+
+The generator emits `postman-collections/17-subscriptions.json` with plan, lifecycle, transaction, and signed Razorpay webhook requests.
 
 ### 10.5 Test Scenarios Checklist
 
@@ -702,8 +732,10 @@ Razorpay sandbox uses the **same API base URL** (`https://api.razorpay.com`) but
 - [ ] UPI AutoPay activation confirmed
 - [ ] Live API keys generated and stored in production secrets manager
 - [ ] Live webhook secret generated and stored
-- [ ] Plans provisioned in live mode via `RAZORPAY_CONFIRM_LIVE=true node scripts/create-razorpay-plans.mjs --execute`
+- [ ] Plans provisioned in `PRODUCTION` mode via `RAZORPAY_CONFIRM_PRODUCTION=true node scripts/create-razorpay-plans.mjs --execute`
 - [ ] Plan IDs verified via `node scripts/create-razorpay-plans.mjs --list` and updated in production environment variables
+- [ ] Subscription defaults migration dry-run reviewed via `node scripts/migrate-subscription-defaults.mjs`
+- [ ] Subscription defaults migration executed after deploy via `node scripts/migrate-subscription-defaults.mjs --execute`
 - [ ] Webhook URL set to production API endpoint (`https://api.evercut.com/api/v1/subscriptions/webhook`)
 - [ ] SSL certificate valid on webhook endpoint
 - [ ] Webhook signature verification tested with live keys
@@ -711,7 +743,7 @@ Razorpay sandbox uses the **same API base URL** (`https://api.razorpay.com`) but
 - [ ] Reconciliation job scheduled (Section 14)
 - [ ] Alerting configured for payment failures and webhook issues
 - [ ] `RAZORPAY_ENV=PRODUCTION` set in production environment
-- [ ] First test subscription created and verified in live mode (using a team member's UPI ID)
+- [ ] First production subscription created and verified in Razorpay `PRODUCTION` mode (using a team member's UPI ID)
 
 ### 11.2 DNS & SSL Requirements
 

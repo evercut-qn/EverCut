@@ -4,6 +4,7 @@ import * as mediaController from '../controllers/media.controller.js';
 import authenticate, { authenticateOnboarding } from '../middleware/authenticate.middleware.js';
 import { authorize } from '../middleware/authorize.middleware.js';
 import { validate } from '../middleware/validate.middleware.js';
+import { checkUploadQuota } from '../middleware/entitlement.middleware.js';
 import {
     attachGallerySchema,
     confirmUploadSchema,
@@ -19,7 +20,7 @@ router.post('/onboarding/confirm', authenticateOnboarding, validate(confirmUploa
 
 router.use(authenticate);
 
-router.post('/upload-url', validate(uploadUrlSchema, 'body'), mediaController.requestUploadUrl);
+router.post('/upload-url', validate(uploadUrlSchema, 'body'), checkUploadQuota(), mediaController.requestUploadUrl);
 router.post('/confirm', validate(confirmUploadSchema, 'body'), mediaController.confirmUpload);
 router.post('/gallery', authorize(ROLES.BARBER), validate(attachGallerySchema, 'body'), mediaController.attachGallery);
 router.get('/gallery', authorize(ROLES.BARBER), mediaController.getGallery);

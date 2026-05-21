@@ -39,6 +39,7 @@ const shopRepository = (await import('../../repositories/shop.repository.js')).d
 const barberRepository = (await import('../../repositories/barber.repository.js')).default;
 const userRepository = (await import('../../repositories/user.repository.js')).default;
 const mediaRepository = (await import('../../repositories/media.repository.js')).default;
+const subscriptionRepository = (await import('../../repositories/subscription.repository.js')).default;
 const onboardingService = await import('../onboarding.service.js');
 
 test('createBarberOnboarding links media as COVER and does NOT return photos array', async (t) => {
@@ -87,6 +88,12 @@ test('createBarberOnboarding links media as COVER and does NOT return photos arr
     t.mock.method(mediaRepository, 'findByEntity', async () => [mockMedia]);
     t.mock.method(userRepository, 'updateById', async () => ({}));
 
+    let defaultSubscriptionBarberId = null;
+    t.mock.method(subscriptionRepository, 'upsertDefaultForBarber', async (barberId) => {
+        defaultSubscriptionBarberId = barberId;
+        return { _id: 'subscription-1', barberId };
+    });
+
     const shopData = {
         email: 'test@example.com',
         firstName: 'John',
@@ -113,5 +120,6 @@ test('createBarberOnboarding links media as COVER and does NOT return photos arr
     const result = await onboardingService.createBarberOnboarding('+919876543210', shopData);
 
     assert.strictEqual(linkedPurpose, 'cover'); // Verified fix
+    assert.strictEqual(defaultSubscriptionBarberId, 'barber-1');
     assert.strictEqual(result.shop.photos, undefined); // Verified sanitization
 });

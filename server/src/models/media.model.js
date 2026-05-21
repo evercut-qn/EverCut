@@ -87,6 +87,10 @@ mediaSchema.index({ entityId: 1, entityType: 1, status: 1 });
 mediaSchema.index({ userId: 1, status: 1 });
 mediaSchema.index({ status: 1, createdAt: 1 });
 mediaSchema.index(
+    { entityId: 1, purpose: 1, status: 1, type: 1, createdAt: -1 },
+    { name: 'idx_media_entity_purpose_status_type_created' },
+);
+mediaSchema.index(
     { uploadExpiresAt: 1 },
     {
         expireAfterSeconds: 0,

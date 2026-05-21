@@ -12,6 +12,7 @@ import { buildPagination } from '../utils/pagination.utils.js';
 import { normalizeServicePricing } from '../utils/service-pricing.utils.js';
 import { normalizeShopSchedule } from '../utils/shop-schedule.utils.js';
 import notificationEvents from './notification-events.service.js';
+import entitlementService from './subscription/entitlement.service.js';
 import * as mediaService from './media/media.service.js';
 import * as serviceCatalogService from './service-catalog.service.js';
 import { serializeEmployee } from '../serializers/employee.serializer.js';
@@ -40,8 +41,11 @@ const paginateArray = (items, query = {}) => {
 export const getShopByOwner = async (ownerId, userContext) => {
     const [barber, shop] = await loadBarberShop(ownerId);
 
-    const photos = await mediaService.getGalleryByShopId(shop._id);
-    return serializeBarberProfile({ barber, shop, user: userContext, photos });
+    const [photos, entitlements] = await Promise.all([
+        mediaService.getGalleryByShopId(shop._id),
+        entitlementService.resolveEntitlements(barber._id),
+    ]);
+    return serializeBarberProfile({ barber, shop, user: userContext, photos, entitlements });
 };
 
 const SHOP_UPDATE_FIELDS = [
@@ -405,8 +409,10 @@ export const getShopInfoForCustomer = async (shopId) => {
     const ratings = await ratingRepository.findByShop(shopId);
     const formattedRatings = ratings.map(serializeRating);
 
+    const entitlements = await entitlementService.resolveEntitlements(shop.barberId);
+
     return {
-        shop: serializeShopProfile(shop, { privateView: false, photos }),
+        shop: serializeShopProfile(shop, { privateView: false, photos, entitlements }),
         services: {
             single: serializeServices(singleServices.map(normalizeServicePricing)),
             bundled: serializeServices(bundledServices.map(normalizeServicePricing)),
@@ -495,10 +501,10 @@ export const getShops = async (query = {}) => {
     }
 
     if (query.category) {
-        return (await shopRepository.findByCategory(
+        return enrichAndSortShopSummaries(await shopRepository.findByCategory(
             query.category,
-            'shopName location coverR2Key address',
-        )).map(serializeShopSummary).filter(Boolean);
+            'shopName location coverR2Key address barberId',
+        ));
     }
 
     if (query.longitude !== undefined && query.latitude !== undefined) {
@@ -509,18 +515,18 @@ export const getShops = async (query = {}) => {
 };
 
 export const getNearbyShops = async (coordinates) => {
-    return (await shopRepository.findNearby(
+    return enrichAndSortShopSummaries(await shopRepository.findNearby(
         coordinates,
         config.shop.nearbyDistanceMeters,
-        'shopName address coverR2Key facilities',
-    )).map(serializeShopSummary).filter(Boolean);
+        'shopName address coverR2Key facilities barberId',
+    ));
 };
 
 export const getNearbyServicesByGender = async (coordinates, gender, searchTerm) => {
     const nearbyShops = await shopRepository.findNearby(
         coordinates,
         config.shop.nearbyDistanceMeters,
-        'shopName address coverR2Key',
+        'shopName address coverR2Key barberId',
     );
 
     if (!nearbyShops.length) return { shops: [], services: [] };
@@ -536,7 +542,24 @@ export const getNearbyServicesByGender = async (coordinates, gender, searchTerm)
     );
 
     return {
-        shops: nearbyShops.map(serializeShopSummary).filter(Boolean),
+        shops: await enrichAndSortShopSummaries(nearbyShops),
         services: serializeServices(services, { includeShop: true }),
     };
 };
+
+async function enrichAndSortShopSummaries(shops = []) {
+    const enriched = await Promise.all(shops.map(async (shop) => {
+        const entitlements = await entitlementService.resolveEntitlements(shop.barberId);
+        const plainShop = {
+            ...shop,
+            badge: entitlements.badge,
+            visibilityTier: entitlements.visibilityTier,
+            priorityListingBoost: entitlements.priorityListingBoost,
+        };
+        return serializeShopSummary(plainShop);
+    }));
+
+    return enriched
+        .filter(Boolean)
+        .sort((a, b) => (b.priorityListingBoost || 0) - (a.priorityListingBoost || 0));
+}

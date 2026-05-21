@@ -13,6 +13,7 @@ import servicesRoutes from './services.routes.js';
 import shopsRoutes from './shops.routes.js';
 import accountRoutes from './account.routes.js';
 import notificationsRoutes from './notifications.routes.js';
+import subscriptionRoutes from './subscription.routes.js';
 import { ApiResponse } from '../utils/api-response.js';
 
 const router = Router();
@@ -31,6 +32,7 @@ router.use('/earnings', earningsRoutes);
 router.use('/payments', paymentRoutes);
 router.use('/payouts', payoutRoutes);
 router.use('/notifications', notificationsRoutes);
+router.use('/subscriptions', subscriptionRoutes);
 
 // Health check
 router.get('/health', (_req, res) => {

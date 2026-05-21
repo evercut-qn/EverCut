@@ -5,6 +5,7 @@ import { createCorsOptions } from './config/cors.config.js';
 import routes from './routes/index.js';
 import requestLogger from './middleware/request-logger.middleware.js';
 import errorHandler from './middleware/error-handler.middleware.js';
+import { configureWebhookRawBodyParsers } from './middleware/webhook-raw-body.middleware.js';
 import { ApiResponse } from './utils/api-response.js';
 
 /**
@@ -28,19 +29,7 @@ const createApp = () => {
     app.use(cors(createCorsOptions()));
 
     // ── 3. Body parsing ────────────────────────────────────────────────────
-    app.use(
-        `${config.apiPrefix}/payouts/webhook`,
-        express.raw({ type: 'application/json' }),
-        (req, _res, next) => {
-            try {
-                req.rawBody = req.body.toString('utf8');
-                req.body = JSON.parse(req.rawBody);
-                next();
-            } catch (error) {
-                next(error);
-            }
-        },
-    );
+    configureWebhookRawBodyParsers(app);
 
     app.use(express.json({ limit: '10mb' }));
     app.use(express.urlencoded({ extended: true, limit: '10mb' }));

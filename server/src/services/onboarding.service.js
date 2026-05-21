@@ -2,6 +2,7 @@ import customerRepository from '../repositories/customer.repository.js';
 import shopRepository from '../repositories/shop.repository.js';
 import barberRepository from '../repositories/barber.repository.js';
 import userRepository from '../repositories/user.repository.js';
+import subscriptionRepository from '../repositories/subscription.repository.js';
 import { serializeBarberProfile } from '../utils/barber-profile.utils.js';
 import {
     ALL_SERVICE_FOR,
@@ -356,6 +357,7 @@ export const createBarberOnboarding = async (phoneNumber, shopData) => {
 
     const createdShop = await shopRepository.create(shopCreateData);
     await mediaService.linkMediaToEntity(shopData.photoMediaId, createdShop._id, MEDIA_ENTITY_TYPE.SHOP, MEDIA_PURPOSE.COVER);
+    await subscriptionRepository.upsertDefaultForBarber(barber._id, 'ONBOARDING');
 
     const tokens = await issueAuthenticationTokens(user);
 

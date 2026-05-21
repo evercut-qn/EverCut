@@ -42,6 +42,63 @@ class MediaRepository {
         }));
     }
 
+    async countActiveGalleryMedia(shopId, mediaType) {
+        return Media.countDocuments({
+            entityId: shopId,
+            entityType: 'Shop',
+            purpose: 'gallery',
+            type: mediaType,
+            status: MEDIA_STATUS.READY,
+        });
+    }
+
+    async countHiddenGalleryMedia(shopId, mediaType) {
+        return Media.countDocuments({
+            entityId: shopId,
+            entityType: 'Shop',
+            purpose: 'gallery',
+            type: mediaType,
+            status: MEDIA_STATUS.HIDDEN,
+        });
+    }
+
+    async findActiveGalleryMedia(shopId, mediaType, { sort, limit } = {}) {
+        let query = Media.find({
+            entityId: shopId,
+            entityType: 'Shop',
+            purpose: 'gallery',
+            type: mediaType,
+            status: MEDIA_STATUS.READY,
+        });
+        if (sort) query = query.sort(sort);
+        if (limit !== undefined) query = query.limit(limit);
+        return query.lean();
+    }
+
+    async findHiddenGalleryMedia(shopId, mediaType, { sort, limit } = {}) {
+        let query = Media.find({
+            entityId: shopId,
+            entityType: 'Shop',
+            purpose: 'gallery',
+            type: mediaType,
+            status: MEDIA_STATUS.HIDDEN,
+        });
+        if (sort) query = query.sort(sort);
+        if (limit !== undefined) query = query.limit(limit);
+        return query.lean();
+    }
+
+    async bulkUpdateStatus(mediaIds, newStatus) {
+        if (!Array.isArray(mediaIds) || mediaIds.length === 0) {
+            return { matchedCount: 0, modifiedCount: 0 };
+        }
+
+        return Media.updateMany(
+            { _id: { $in: mediaIds } },
+            { $set: { status: newStatus } },
+        );
+    }
+
     async updateById(id, update, options = {}) {
         return Media.findByIdAndUpdate(id, { $set: update }, { returnDocument: 'after', runValidators: true, ...options });
     }
