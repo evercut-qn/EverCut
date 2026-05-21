@@ -308,7 +308,7 @@ payment: Object.freeze({
     // ─── Business Constants (hardcoded, NOT from .env) ───
     // These are fixed pricing rules per Payment-Payout-Logic.md.
     // Change here if business pricing changes — no deploy-time env override needed.
-    platformFeeSingle: 3,             // ₹3 platform fee for single service
+    platformFeeSingle: 4,             // ₹4 platform fee for single service
     platformFeeBundle: 10,            // ₹10 platform fee for bundle
     refundFeeSingle: 7,               // ₹7 refund processing fee (single)
     refundFeeBundle: 15,              // ₹15 refund processing fee (bundle)
@@ -431,7 +431,7 @@ const paymentTransactionSchema = new mongoose.Schema(
         // ─── Settlement ───
         settlement: {
             serviceAmount: Number,        // Service amount in paisa (barber's price)
-            platformFee: Number,          // Fixed platform fee in paisa (₹3 or ₹10)
+            platformFee: Number,          // Fixed platform fee in paisa (₹4 or ₹10)
             barberPayout: Number,         // = serviceAmount (barber gets 100%)
             isBundle: Boolean,            // true if bundle (affects fee tiers)
             settled: { type: Boolean, default: false },
@@ -760,11 +760,11 @@ export const PAYOUT_MODES = Object.freeze({
 
 // ─── Platform & Refund Fees — centralized in config/index.js ───
 // All fee and bundle-rule values are defined in config.payment:
-//   config.payment.platformFeeSingle  = 3   (₹3 fixed fee for single service)
+//   config.payment.platformFeeSingle  = 4   (₹4 fixed fee for single service)
 //   config.payment.platformFeeBundle  = 10  (₹10 fixed fee for bundle)
 //   config.payment.refundFeeSingle    = 7   (₹7 refund processing fee)
 //   config.payment.refundFeeBundle    = 15  (₹15 refund processing fee)
-//   config.payment.minBundleServiceAmount = 300 (₹300 minimum for bundles)
+//   config.payment.minBundleServiceAmount = 299 (₹299 minimum for bundles)
 // Do NOT re-create PLATFORM_FEES / REFUND_FEES / BUNDLE_RULES in constants.js.
 ```
 
@@ -1621,7 +1621,7 @@ const generateMerchantRefundId = ({ merchantOrderId, bookingId }) => {
 
 // ─── Helper: Calculate settlement split (fixed platform fee model) ───
 // Per Payment-Payout-Logic.md:
-//   - Single service: platform fee = ₹3, refund fee = ₹7
+//   - Single service: platform fee = ₹4, refund fee = ₹7
 //   - Bundle (≥2 services): platform fee = ₹10, refund fee = ₹15
 //   - Barber always gets 100% of service amount
 //   - Customer pays: serviceAmount + platformFee
@@ -3319,7 +3319,7 @@ IF payoutStatus === 'not_initiated':
     → Refund ALLOWED
     → Refund amount = totalPaid - refundFee - platformFee
     → refundFee: ₹7 (single) / ₹15 (bundle)
-    → platformFee: ₹3 (single) / ₹10 (bundle) — non-refundable
+    → platformFee: ₹4 (single) / ₹10 (bundle) — non-refundable
 
 IF payoutStatus === 'initiated' OR 'pending' OR 'completed':
     → Refund NOT ALLOWED automatically

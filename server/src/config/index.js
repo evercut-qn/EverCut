@@ -182,10 +182,11 @@ const config = Object.freeze({
 
   /** Payment business rules */
   payment: Object.freeze({
-    platformFeeSingle: 3,
+    platformFeeSingle: 4,
     platformFeeBundle: 10,
     refundFeeSingle: 7,
     refundFeeBundle: 15,
+    feeWaiverQuota: 2,
     minBundleServiceAmount: 299,
     minSingleServiceAmount: 69,
     sessionExpirySeconds: 1200,

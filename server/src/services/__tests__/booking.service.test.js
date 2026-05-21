@@ -35,12 +35,18 @@ const ensureRequiredEnv = () => {
 
 ensureRequiredEnv();
 
+const config = (await import('../../config/index.js')).default;
 const bookingRepository = (await import('../../repositories/booking.repository.js')).default;
 const employeeRepository = (await import('../../repositories/employee.repository.js')).default;
 const shopRepository = (await import('../../repositories/shop.repository.js')).default;
 const customerRepository = (await import('../../repositories/customer.repository.js')).default;
 const serviceRepository = (await import('../../repositories/service.repository.js')).default;
+const paymentRepository = (await import('../../repositories/payment.repository.js')).default;
 const bookingService = await import('../booking.service.js');
+
+test.beforeEach((t) => {
+    t.mock.method(paymentRepository, 'countActiveWaiverReservations', async () => 0);
+});
 
 const getInWindowBookingDate = (daysFromNow = 1) => {
     const date = new Date();
@@ -323,7 +329,10 @@ test('getBookingAnalytics returns summary, milestones, today pulse, and both que
 });
 
 test('createBooking creates a pending booking that requires payment before confirmation', async (t) => {
-    t.mock.method(customerRepository, 'findByUserId', async () => ({ _id: 'customer-1' }));
+    t.mock.method(customerRepository, 'findByUserId', async () => ({
+        _id: 'customer-1',
+        feeWaiverBookingsUsed: config.payment.feeWaiverQuota,
+    }));
 
     t.mock.method(shopRepository, 'findByIdWithFields', async () => ({
         _id: 'shop-1',
@@ -424,6 +433,12 @@ test('createBooking creates a pending booking that requires payment before confi
     assert.equal(createdBookingPayload.startMinute, 600);
     assert.equal(createdBookingPayload.endMinute, 630);
     assert.equal(createdBookingPayload.totalAmount, 120);
+    assert.equal(Object.hasOwn(createdBookingPayload, 'bookingAmount'), false);
+    assert.equal(Object.hasOwn(createdBookingPayload, 'platformFee'), false);
+    assert.equal(Object.hasOwn(createdBookingPayload, 'standardPlatformFee'), false);
+    assert.equal(Object.hasOwn(createdBookingPayload, 'totalCharged'), false);
+    assert.equal(Object.hasOwn(createdBookingPayload, 'waiverApplied'), false);
+    assert.equal(Object.hasOwn(createdBookingPayload, 'bookingFeeType'), false);
     assert.equal(createdBookingPayload.durationMinutes, 30);
     assert.deepEqual(createdBookingPayload.slotLockTimes, ['10:00']);
     assert.equal(createdBookingPayload.status, 'pending');
@@ -433,6 +448,65 @@ test('createBooking creates a pending booking that requires payment before confi
     assert.equal(result.paymentRequired, true);
     assert.equal(result.paymentStatus, 'pending');
     assert.equal(result.payoutStatus, 'not_initiated');
+    assert.equal(result.serviceAmount, 120);
+    assert.equal(result.platformFee, config.payment.platformFeeSingle);
+    assert.equal(result.totalAmount, 120 + config.payment.platformFeeSingle);
+    assert.equal(Object.hasOwn(result, 'bookingAmount'), false);
+    assert.equal(Object.hasOwn(result, 'totalCharged'), false);
+    assert.equal(Object.hasOwn(result, 'waiverApplied'), false);
+});
+
+test('createBooking returns payable total including platform fee without persisting fee snapshots', async (t) => {
+    const serviceAmount = 199;
+    const platformFee = config.payment.platformFeeSingle;
+
+    t.mock.method(customerRepository, 'findByUserId', async () => ({
+        _id: 'customer-1',
+        feeWaiverBookingsUsed: config.payment.feeWaiverQuota,
+    }));
+
+    t.mock.method(shopRepository, 'findByIdWithFields', async () => ({
+        _id: 'shop-1',
+        isOpen: true,
+        openTime: '09:00',
+        closeTime: '21:00',
+        availableDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
+        breakTimes: [],
+    }));
+
+    t.mock.method(serviceRepository, 'findByIds', async () => ([{
+        _id: 'service-1',
+        shopId: 'shop-1',
+        finalPrice: serviceAmount,
+        serviceType: 'single',
+        duration: 30,
+    }]));
+
+    t.mock.method(employeeRepository, 'findByIdLean', async () => ({
+        _id: 'employee-1',
+        shopId: 'shop-1',
+        isActive: true,
+        workingHours: { start: '09:00', end: '21:00' },
+        blockedDates: [],
+    }));
+
+    t.mock.method(employeeRepository, 'claimTimeRange', async (employeeId) => ({ _id: employeeId }));
+    t.mock.method(bookingRepository, 'create', async (payload) => ({
+        _id: 'booking-1',
+        ...payload,
+    }));
+
+    const result = await bookingService.createBooking('user-1', {
+        shopId: 'shop-1',
+        employeeId: 'employee-1',
+        serviceIds: ['service-1'],
+        date: getInWindowBookingDate(),
+        time: '10:00 AM',
+    });
+
+    assert.equal(result.serviceAmount, serviceAmount);
+    assert.equal(result.platformFee, platformFee);
+    assert.equal(result.totalAmount, serviceAmount + platformFee);
 });
 
 test('createBooking claims every slot marker covered by the selected service duration', async (t) => {
@@ -720,7 +794,8 @@ test('updateBookingSchedule rejects paid bookings before releasing the existing 
     assert.equal(releaseMock.mock.calls.length, 0);
 });
 
-test('createBooking rejects bundle bookings below the documented minimum service amount', async (t) => {
+test('createBooking rejects bundle bookings below the platform-fee minimum service amount', async (t) => {
+    const bundleMinimum = config.payment.minBundleServiceAmount;
     t.mock.method(customerRepository, 'findByUserId', async () => ({ _id: 'customer-1' }));
 
     t.mock.method(shopRepository, 'findByIdWithFields', async () => ({
@@ -735,8 +810,8 @@ test('createBooking rejects bundle bookings below the documented minimum service
         {
             _id: 'bundle-1',
             shopId: 'shop-1',
-            finalPrice: 250,
-            totalPrice: 250,
+            finalPrice: bundleMinimum - 1,
+            totalPrice: bundleMinimum - 1,
             serviceType: 'bundled',
             totalDuration: 90,
         },
@@ -759,11 +834,12 @@ test('createBooking rejects bundle bookings below the documented minimum service
             date: getInWindowBookingDate(),
             time: '10:00 AM',
         }),
-        /at least ₹299/,
+        new RegExp(`Minimum bundle booking amount is .${bundleMinimum}`),
     );
 });
 
-test('createBooking rejects single service bookings below the documented minimum service amount', async (t) => {
+test('createBooking rejects single service bookings below the platform-fee minimum service amount', async (t) => {
+    const singleMinimum = config.payment.minSingleServiceAmount;
     t.mock.method(customerRepository, 'findByUserId', async () => ({ _id: 'customer-1' }));
 
     t.mock.method(shopRepository, 'findByIdWithFields', async () => ({
@@ -778,8 +854,8 @@ test('createBooking rejects single service bookings below the documented minimum
         {
             _id: 'single-1',
             shopId: 'shop-1',
-            finalPrice: 50,
-            actualPrice: 50,
+            finalPrice: singleMinimum - 1,
+            actualPrice: singleMinimum - 1,
             offerPrice: 0,
             serviceType: 'single',
             duration: 30,
@@ -803,7 +879,7 @@ test('createBooking rejects single service bookings below the documented minimum
             date: getInWindowBookingDate(),
             time: '10:00 AM',
         }),
-        /at least ₹69/,
+        new RegExp(`Minimum single service booking amount is .${singleMinimum}`),
     );
 });
 

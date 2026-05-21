@@ -51,6 +51,15 @@ test('payment config defaults expose native PhonePe SDK auth URLs without redire
         const config = await loadFreshConfig();
 
         assert.equal(config.port, 5000);
+        assert.equal(typeof config.payment.platformFeeSingle, 'number');
+        assert.equal(typeof config.payment.platformFeeBundle, 'number');
+        assert.equal(typeof config.payment.refundFeeSingle, 'number');
+        assert.equal(typeof config.payment.refundFeeBundle, 'number');
+        assert.equal(typeof config.payment.minSingleServiceAmount, 'number');
+        assert.equal(typeof config.payment.minBundleServiceAmount, 'number');
+        assert.equal(typeof config.payment.feeWaiverQuota, 'number');
+        assert.equal(Object.hasOwn(config.payment, 'platformFeeRules'), false);
+        assert.equal(Object.hasOwn(config.payment, 'minimumServiceAmount'), false);
         assert.equal(
             config.phonepe.authUrl,
             'https://api-preprod.phonepe.com/apis/pg-sandbox/v1/oauth/token',

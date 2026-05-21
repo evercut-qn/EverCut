@@ -86,6 +86,19 @@ class PaymentRepository {
         return PaymentTransaction.countDocuments(trustQueryOperators(filter));
     }
 
+    async countActiveWaiverReservations(customerId) {
+        return PaymentTransaction.countDocuments(trustQueryOperators({
+            customerId,
+            waiverApplied: true,
+            status: {
+                $in: [
+                    PAYMENT_TRANSACTION_STATUS.INITIATED,
+                    PAYMENT_TRANSACTION_STATUS.PENDING,
+                ],
+            },
+        }));
+    }
+
     async findPendingByBookingId(bookingId) {
         return PaymentTransaction.findOne(trustQueryOperators({
             bookingId,

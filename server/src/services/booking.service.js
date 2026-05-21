@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import config from '../config/index.js';
 import bookingRepository from '../repositories/booking.repository.js';
 import employeeRepository from '../repositories/employee.repository.js';
+import paymentRepository from '../repositories/payment.repository.js';
 import serviceRepository from '../repositories/service.repository.js';
 import shopRepository from '../repositories/shop.repository.js';
 import customerRepository from '../repositories/customer.repository.js';
@@ -29,6 +30,11 @@ import {
     SERVICE_TYPE,
 } from '../utils/constants.js';
 import { getEffectiveServicePrice, normalizeServicePricing } from '../utils/service-pricing.utils.js';
+import {
+    assertMinimumServiceAmount,
+    classifyBookingFeeType,
+    resolveCustomerPlatformFee,
+} from '../utils/platform-fee.utils.js';
 import { buildSlotLockTimes, toDateOnlyString } from '../utils/slot-lock.utils.js';
 import { calculateAvailableSlots, getAvailableSlotTimes, normalizeBookedRanges } from '../utils/slot-calculator.utils.js';
 import logger from '../utils/logger.js';
@@ -189,19 +195,6 @@ const isBundleSelection = (services = []) => (
     services.length > 1
     || services.some((service) => service.serviceType === SERVICE_TYPE.BUNDLED)
 );
-const assertBundleMinimum = (services = [], totalAmount = 0) => {
-    if (!isBundleSelection(services)) return;
-    if (totalAmount >= config.payment.minBundleServiceAmount) return;
-
-    throw new BadRequestError(`Bundle service amount must be at least ₹${config.payment.minBundleServiceAmount}`);
-};
-const assertSingleMinimum = (services = [], totalAmount = 0) => {
-    if (isBundleSelection(services)) return;
-    if (services.length === 0) return;
-    if (totalAmount >= config.payment.minSingleServiceAmount) return;
-
-    throw new BadRequestError(`Single service amount must be at least ₹${config.payment.minSingleServiceAmount}`);
-};
 const assertShopAcceptsDate = (shop, date) => {
     if (!shop.isOpen) throw new BadRequestError('Shop is currently closed');
 
@@ -339,6 +332,63 @@ const buildBookingPersistencePayload = ({
     payoutStatus: PAYOUT_STATUS.NOT_INITIATED,
     ...(idempotencyKey && { idempotencyKey }),
 });
+
+const buildPayableAmountSummary = async ({ customer, bookingFeeType, serviceAmount }) => {
+    const activeWaiverReservations = await paymentRepository.countActiveWaiverReservations(customer._id);
+    const feeSummary = resolveCustomerPlatformFee({
+        customer,
+        bookingFeeType,
+        activeWaiverReservations,
+    });
+
+    return {
+        serviceAmount,
+        platformFee: feeSummary.platformFee,
+        totalAmount: serviceAmount + feeSummary.platformFee,
+    };
+};
+
+const hasPaymentAmountSnapshot = (booking) => (
+    booking?.paymentTransactionId
+    && typeof booking.paymentTransactionId === 'object'
+    && (
+        booking.paymentTransactionId.amount !== undefined
+        || booking.paymentTransactionId.amountInRupees !== undefined
+        || booking.paymentTransactionId.settlement?.platformFee !== undefined
+    )
+);
+
+const withPayableAmountSummary = async (booking, customer = null) => {
+    if (!booking || hasPaymentAmountSnapshot(booking)) return booking;
+
+    const services = normalizeBookedServices(
+        Array.isArray(booking.serviceIds)
+            ? booking.serviceIds.filter((service) => service && typeof service === 'object')
+            : [],
+    );
+    if (!services.length) return booking;
+
+    const bookingCustomer = customer || (
+        booking.customerId && typeof booking.customerId === 'object'
+            ? booking.customerId
+            : null
+    );
+    if (!bookingCustomer?._id) return booking;
+
+    const serviceAmount = Number(booking.totalAmount || sumServicePrices(services) || 0);
+    const bookingFeeType = classifyBookingFeeType(services);
+    const amountSummary = await buildPayableAmountSummary({
+        customer: bookingCustomer,
+        bookingFeeType,
+        serviceAmount,
+    });
+
+    return {
+        ...booking,
+        ...amountSummary,
+    };
+};
+
 const MONTH_LABEL_FORMATTER = new Intl.DateTimeFormat('en-US', {
     month: 'long',
     year: 'numeric',
@@ -374,10 +424,6 @@ const buildBookingDetailsPayload = async (booking) => {
     );
     const totalAmount = sumServicePrices(services);
 
-    // Calculate platform fee
-    const isBundled = isBundleSelection(services);
-    const platformFee = isBundled ? config.payment.platformFeeBundle : config.payment.platformFeeSingle;
-
     return serializeBookingDetails({
         bookingId: booking._id,
         customer: booking.customerId,
@@ -387,9 +433,8 @@ const buildBookingDetailsPayload = async (booking) => {
         time: booking.time,
         endTime: booking.endTime,
         services,
-        subTotal: totalAmount,
-        platformFee,
-        totalAmount: totalAmount + platformFee,
+        serviceAmount: totalAmount,
+        totalAmount: booking.totalAmount ?? totalAmount,
         totalServices: services.length,
         status: booking.status,
         paymentStatus: booking.paymentStatus,
@@ -485,9 +530,14 @@ export const createBooking = async (userId, data) => {
 
     const totalAmount = sumServicePrices(services);
     const durationMinutes = sumServiceDurations(services);
+    const bookingFeeType = classifyBookingFeeType(services);
     assertValidServiceDuration(durationMinutes);
-    assertBundleMinimum(services, totalAmount);
-    assertSingleMinimum(services, totalAmount);
+    assertMinimumServiceAmount(totalAmount, bookingFeeType);
+    const amountSummary = await buildPayableAmountSummary({
+        customer,
+        bookingFeeType,
+        serviceAmount: totalAmount,
+    });
 
     // Validate: Maximum duration limit
     if (durationMinutes > config.booking.maxDurationMinutes) {
@@ -553,7 +603,7 @@ export const createBooking = async (userId, data) => {
         date,
         time: schedulePlan.startTime,
         endTime: schedulePlan.endTime,
-        totalAmount,
+        ...amountSummary,
         durationMinutes,
         slotLockTimes: schedulePlan.slotLockTimes,
         startMinute: schedulePlan.startMinute,
@@ -576,7 +626,7 @@ const getBookingDetailsForCustomer = async (bookingId, userId) => {
         throw new ForbiddenError('You can only access your own bookings');
     }
 
-    return buildBookingDetailsPayload(booking);
+    return buildBookingDetailsPayload(await withPayableAmountSummary(booking, customer));
 };
 
 const getBookingDetailsForShopOwner = async (bookingId, ownerId) => {
@@ -591,7 +641,7 @@ const getBookingDetailsForShopOwner = async (bookingId, ownerId) => {
         throw new ForbiddenError('You can only access bookings for your own shop');
     }
 
-    return buildBookingDetailsPayload(booking);
+    return buildBookingDetailsPayload(await withPayableAmountSummary(booking));
 };
 
 export const getBookingDetailsForUser = async (bookingId, user) => {
@@ -709,9 +759,14 @@ const reorderBooking = async (userId, bookingId, newDate, newTime) => {
     );
     const totalAmount = sumServicePrices(services);
     const durationMinutes = sumServiceDurations(services);
+    const bookingFeeType = classifyBookingFeeType(services);
     assertValidServiceDuration(durationMinutes);
-    assertBundleMinimum(services, totalAmount);
-    assertSingleMinimum(services, totalAmount);
+    assertMinimumServiceAmount(totalAmount, bookingFeeType);
+    const amountSummary = await buildPayableAmountSummary({
+        customer,
+        bookingFeeType,
+        serviceAmount: totalAmount,
+    });
     if (durationMinutes > config.booking.maxDurationMinutes) {
         throw new BadRequestError(
             `Total booking duration cannot exceed ${config.booking.maxDurationMinutes / 60} hours`,
@@ -772,7 +827,7 @@ const reorderBooking = async (userId, bookingId, newDate, newTime) => {
         bookingId: newBooking._id,
         employee,
         services,
-        totalAmount,
+        ...amountSummary,
         durationMinutes,
         time: schedulePlan.startTime,
         endTime: schedulePlan.endTime,
@@ -804,7 +859,11 @@ export const getCustomerBookings = async (userId, query = {}) => {
 
     const total = await bookingRepository.countAll({ customerId, ...filters });
     const { skip, limit, pagination } = buildPagination(query, total);
-    const items = (await bookingRepository.findByCustomer(customerId, filters, { skip, limit }))
+    const bookings = await Promise.all(
+        (await bookingRepository.findByCustomer(customerId, filters, { skip, limit }))
+            .map((booking) => withPayableAmountSummary(booking, customer)),
+    );
+    const items = bookings
         .map(serializeBooking)
         .filter(Boolean);
     return { items, pagination };
@@ -1255,7 +1314,9 @@ export const getBookingsByShop = async (ownerId, query = {}) => {
     ]);
 
     return {
-        items: bookings.map(serializeBooking).filter(Boolean),
+        items: (await Promise.all(bookings.map((booking) => withPayableAmountSummary(booking))))
+            .map(serializeBooking)
+            .filter(Boolean),
         pagination,
         numberOfEmployees,
         numberOfCustomers: numCustomers,

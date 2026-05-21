@@ -31,6 +31,55 @@ const serializeBookingRef = (value, serializer) => (
     isPopulatedRef(value) ? serializer(value) : undefined
 );
 
+const toNumberOrUndefined = (value) => {
+    const numericValue = Number(value);
+    return Number.isFinite(numericValue) ? numericValue : undefined;
+};
+
+const paisaToRupees = (value) => {
+    const numericValue = toNumberOrUndefined(value);
+    return numericValue === undefined ? undefined : numericValue / 100;
+};
+
+const sumServiceAmounts = (services = []) => {
+    const amount = services.reduce(
+        (sum, service) => sum + (getEffectiveServicePrice(service) || 0),
+        0,
+    );
+    return amount || undefined;
+};
+
+const resolvePaymentSnapshot = (raw, plain) => {
+    const payment = raw.paymentTransactionId || raw.paymentTransaction || raw.payment;
+    if (isPopulatedRef(payment)) return toPlainObject(payment);
+
+    const plainPayment = plain.paymentTransactionId || plain.paymentTransaction || plain.payment;
+    return isPopulatedRef(plainPayment) ? plainPayment : null;
+};
+
+const resolveAmountSummary = ({ raw, plain, services }) => {
+    const payment = resolvePaymentSnapshot(raw, plain);
+    const paymentAmount = toNumberOrUndefined(payment?.amountInRupees)
+        ?? paisaToRupees(payment?.amount);
+    const serviceAmount = toNumberOrUndefined(plain.serviceAmount)
+        ?? paisaToRupees(payment?.settlement?.serviceAmount)
+        ?? toNumberOrUndefined(plain.totalAmount)
+        ?? sumServiceAmounts(services)
+        ?? 0;
+    const platformFee = toNumberOrUndefined(plain.platformFee)
+        ?? paisaToRupees(payment?.settlement?.platformFee);
+    const totalAmount = toNumberOrUndefined(plain.payableAmount)
+        ?? toNumberOrUndefined(plain.totalCharged)
+        ?? paymentAmount
+        ?? (platformFee !== undefined ? serviceAmount + platformFee : serviceAmount);
+
+    return {
+        serviceAmount,
+        platformFee,
+        totalAmount,
+    };
+};
+
 const toDateOnlyString = (value) => {
     if (!value) return null;
     if (value instanceof Date && !Number.isNaN(value.getTime())) {
@@ -67,6 +116,7 @@ export const serializeBooking = (booking, options = {}) => {
                 : []
         );
     const services = serializeServices(rawServices);
+    const amountSummary = resolveAmountSummary({ raw, plain, services });
 
     const customer = serializeBookingRef(raw.customerId || raw.customer, serializeCustomerSummary);
     const employee = serializeBookingRef(
@@ -92,7 +142,9 @@ export const serializeBooking = (booking, options = {}) => {
         endTime: plain.endTime ?? null,
         startMinute: plain.startMinute,
         endMinute: plain.endMinute,
-        totalAmount: plain.totalAmount ?? 0,
+        serviceAmount: amountSummary.serviceAmount,
+        platformFee: amountSummary.platformFee,
+        totalAmount: amountSummary.totalAmount,
         durationMinutes: plain.durationMinutes ?? 0,
         slotLockTimes: plain.slotLockTimes ?? [],
         status: plain.status ?? BOOKING_STATUS.PENDING,
@@ -133,10 +185,7 @@ export const serializeBookingCreation = (booking) => {
                 : []
         );
     const services = serializeServices(rawServices);
-    const serviceAmount = services.reduce(
-        (sum, service) => sum + (getEffectiveServicePrice(service) || 0),
-        0,
-    );
+    const amountSummary = resolveAmountSummary({ raw, plain, services });
 
     return compact({
         id: plain.id || toIdString(plain.bookingId),
@@ -151,7 +200,9 @@ export const serializeBookingCreation = (booking) => {
         date: plain.date,
         time: plain.time,
         endTime: plain.endTime,
-        totalAmount: plain.totalAmount ?? serviceAmount,
+        serviceAmount: amountSummary.serviceAmount,
+        platformFee: amountSummary.platformFee,
+        totalAmount: amountSummary.totalAmount,
         durationMinutes: plain.durationMinutes,
         slotLockTimes: plain.slotLockTimes ?? [],
         startMinute: plain.startMinute,
@@ -168,6 +219,8 @@ export const serializeBookingDetails = (details) => {
     const raw = toPlainObject(details);
     const plain = sanitizeForResponse(raw);
     if (!plain) return null;
+    const services = serializeServices(raw.services || []);
+    const amountSummary = resolveAmountSummary({ raw, plain, services });
 
     return compact({
         id: plain.id || toIdString(plain.bookingId),
@@ -179,10 +232,10 @@ export const serializeBookingDetails = (details) => {
         date: plain.date,
         time: plain.time,
         endTime: plain.endTime,
-        services: serializeServices(raw.services || []),
-        subTotal: plain.subTotal,
-        platformFee: plain.platformFee,
-        totalAmount: plain.totalAmount,
+        services,
+        serviceAmount: amountSummary.serviceAmount,
+        platformFee: amountSummary.platformFee,
+        totalAmount: amountSummary.totalAmount,
         totalServices: plain.totalServices,
         status: plain.status,
         paymentStatus: plain.paymentStatus,

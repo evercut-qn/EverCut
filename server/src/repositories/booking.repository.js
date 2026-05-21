@@ -34,8 +34,12 @@ const BOOKING_SERVICE_CARD_FIELDS = [
     'bundledServices',
 ].join(' ');
 
-const CUSTOMER_SUMMARY_FIELDS = 'firstName lastName photoR2Key userId';
+const CUSTOMER_SUMMARY_FIELDS = 'firstName lastName photoR2Key userId feeWaiverBookingsUsed';
 const CUSTOMER_NAME_FIELDS = 'firstName lastName photoR2Key';
+const PAYMENT_SUMMARY_POPULATE = {
+    path: 'paymentTransactionId',
+    select: 'amount amountInRupees waiverApplied settlement',
+};
 
 class BookingRepository {
     async create(data, options = {}) {
@@ -69,6 +73,7 @@ class BookingRepository {
         return Booking.findById(id)
             .populate('shopId', 'shopName coverR2Key address openTime closeTime')
             .populate(EMPLOYEE_POPULATE)
+            .populate(PAYMENT_SUMMARY_POPULATE)
             .populate({
                 path: 'customerId',
                 select: CUSTOMER_SUMMARY_FIELDS,
@@ -104,6 +109,7 @@ class BookingRepository {
             .populate('serviceIds')
             .populate(EMPLOYEE_POPULATE)
             .populate('shopId', 'shopName address coverR2Key')
+            .populate(PAYMENT_SUMMARY_POPULATE)
             .sort({ date: -1 });
 
         if (options.skip !== undefined) query.skip(options.skip);
@@ -119,6 +125,7 @@ class BookingRepository {
             .populate('serviceIds')
             .populate(EMPLOYEE_POPULATE)
             .populate('shopId', 'shopName address coverR2Key')
+            .populate(PAYMENT_SUMMARY_POPULATE)
             .sort({ date: 1 });
 
         if (options.skip !== undefined) query.skip(options.skip);
@@ -138,6 +145,7 @@ class BookingRepository {
             .populate('serviceIds')
             .populate(EMPLOYEE_POPULATE)
             .populate('shopId', 'shopName address coverR2Key')
+            .populate(PAYMENT_SUMMARY_POPULATE)
             .sort({ date: -1 });
 
         if (options.skip !== undefined) query.skip(options.skip);
@@ -157,7 +165,8 @@ class BookingRepository {
                 populate: { path: 'userId', select: 'phoneNumber' },
             })
             .populate(EMPLOYEE_NAME_POPULATE)
-            .populate('serviceIds', BOOKING_SERVICE_CARD_FIELDS);
+            .populate('serviceIds', BOOKING_SERVICE_CARD_FIELDS)
+            .populate(PAYMENT_SUMMARY_POPULATE);
 
         if (options.skip !== undefined) query.skip(options.skip);
         if (options.limit !== undefined) query.limit(options.limit);
@@ -173,6 +182,7 @@ class BookingRepository {
             })
             .populate(EMPLOYEE_NAME_POPULATE)
             .populate('serviceIds', BOOKING_SERVICE_CARD_FIELDS)
+            .populate(PAYMENT_SUMMARY_POPULATE)
             .sort({ date: -1, createdAt: -1 });
 
         if (options.skip !== undefined) query.skip(options.skip);
@@ -309,6 +319,7 @@ class BookingRepository {
             .populate('serviceIds', BOOKING_SERVICE_CARD_FIELDS)
             .populate(EMPLOYEE_NAME_POPULATE)
             .populate('shopId', 'shopName address coverR2Key')
+            .populate(PAYMENT_SUMMARY_POPULATE)
             .lean();
     }
 

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test, { describe, it } from 'node:test';
-import { barberOnboardingSchema } from '../../validators/onboarding.validator.js';
+import { barberOnboardingSchema, customerOnboardingSchema } from '../../validators/onboarding.validator.js';
 import { addServiceSchema } from '../../validators/service.validator.js';
 import { servicesByGenderQuerySchema } from '../../validators/shop.validator.js';
 import { SERVICE_FOR, GENDER } from '../../utils/constants.js';
@@ -39,7 +39,7 @@ describe('Target Customer Standardization (Lowercase Slugs)', () => {
             });
         });
 
-        it('should REJECT capitalized "Men", "Women", "Unisex" in barber onboarding', () => {
+        it('should ACCEPT capitalized "Men", "Women", "Unisex" and normalize them in barber onboarding', () => {
              const basePayload = {
                 firstName: 'John',
                 lastName: 'Doe',
@@ -64,13 +64,31 @@ describe('Target Customer Standardization (Lowercase Slugs)', () => {
             };
 
             ['Men', 'Women', 'Unisex'].forEach(value => {
-                const { error } = barberOnboardingSchema.validate({ ...basePayload, targetCustomers: value });
-                assert.ok(error, `Should REJECT capitalized "${value}"`);
-                assert.match(error.message, /targetCustomers/);
+                const { error, value: validatedValue } = barberOnboardingSchema.validate({ ...basePayload, targetCustomers: value });
+                assert.equal(error, undefined, `Should accept capitalized "${value}"`);
+                assert.equal(validatedValue.targetCustomers, value.toLowerCase(), `Should normalize "${value}" to lowercase`);
             });
         });
 
-        it('should accept lowercase in service creation', () => {
+        it('should ACCEPT capitalized "Male", "Female", "Transgender" and normalize them in customer onboarding', () => {
+            const basePayload = {
+                email: 'jane@example.com',
+                firstName: 'Jane',
+                lastName: 'Doe',
+                dateOfBirth: '1995-05-15',
+                address: 'Test Address',
+                location: { type: 'Point', coordinates: [0, 0] },
+                photoMediaId: 'media-2'
+            };
+
+            ['Male', 'Female', 'Transgender'].forEach(value => {
+                const { error, value: validatedValue } = customerOnboardingSchema.validate({ ...basePayload, gender: value });
+                assert.equal(error, undefined, `Should accept capitalized gender "${value}"`);
+                assert.equal(validatedValue.gender, value.toLowerCase(), `Should normalize gender "${value}" to lowercase`);
+            });
+        });
+
+        it('should accept lowercase and capitalized in service creation', () => {
             const baseService = {
                 serviceName: 'Fade Cut',
                 serviceType: 'single',
@@ -78,20 +96,22 @@ describe('Target Customer Standardization (Lowercase Slugs)', () => {
                 duration: 30
             };
 
-            ['men', 'women', 'unisex'].forEach(value => {
-                const { error } = addServiceSchema.validate({ ...baseService, serviceFor: value });
-                assert.equal(error, undefined, `Should accept lowercase "${value}" in serviceFor`);
+            ['men', 'women', 'unisex', 'Men', 'WOMEN'].forEach(value => {
+                const { error, value: validatedValue } = addServiceSchema.validate({ ...baseService, serviceFor: value });
+                assert.equal(error, undefined, `Should accept "${value}" in serviceFor`);
+                assert.equal(validatedValue.serviceFor, value.toLowerCase(), `Should normalize "${value}" to lowercase`);
             });
         });
 
-        it('should accept lowercase in nearby services query', () => {
-            ['men', 'women', 'unisex'].forEach(value => {
-                const { error } = servicesByGenderQuerySchema.validate({ 
+        it('should accept lowercase and capitalized in nearby services query', () => {
+            ['men', 'women', 'unisex', 'Men', 'WOMEN'].forEach(value => {
+                const { error, value: validatedValue } = servicesByGenderQuerySchema.validate({ 
                     longitude: 0, 
                     latitude: 0, 
                     gender: value 
                 });
-                assert.equal(error, undefined, `Should accept lowercase "${value}" in query`);
+                assert.equal(error, undefined, `Should accept "${value}" in query`);
+                assert.equal(validatedValue.gender, value.toLowerCase(), `Should normalize "${value}" to lowercase`);
             });
         });
     });

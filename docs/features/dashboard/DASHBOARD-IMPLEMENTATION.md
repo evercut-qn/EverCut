@@ -180,7 +180,7 @@ This document describes the comprehensive dashboard implementation for the EverC
 The booking details endpoint now includes:
 - **Sub-Total:** Sum of all service prices
 - **Platform Fee:** 
-  - ₹3 for single service
+  - ₹4 for single service
   - ₹10 for bundled services
 - **Total Amount:** Sub-total + Platform Fee
 
@@ -214,7 +214,7 @@ Customer and employee objects expose public `id` plus the whitelisted display fi
       "duration": 15
     }
   ],
-  "subTotal": 65,
+  "serviceAmount": 65,
   "platformFee": 10,
   "totalAmount": 75,
   "durationMinutes": 45,

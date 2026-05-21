@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import config from '../../config/index.js';
 import { serializeBooking } from '../booking.serializer.js';
 import { serializeCustomerProfile, serializeCustomerSummary } from '../customer.serializer.js';
 import { serializeEmployee } from '../employee.serializer.js';
@@ -252,6 +253,30 @@ test('booking serializer keeps bare ObjectId refs as ids instead of empty relati
     assert.equal('customer' in booking, false);
     assert.equal('shop' in booking, false);
     assert.equal('employee' in booking, false);
+});
+
+test('booking serializer exposes service amount and payable total when payment is populated', () => {
+    const serviceAmount = 199;
+    const platformFee = config.payment.platformFeeSingle;
+    const booking = serializeBooking({
+        _id: '507f1f77bcf86cd799439011',
+        totalAmount: serviceAmount,
+        paymentTransactionId: {
+            _id: '507f1f77bcf86cd799439022',
+            amount: (serviceAmount + platformFee) * 100,
+            amountInRupees: serviceAmount + platformFee,
+            settlement: {
+                serviceAmount: serviceAmount * 100,
+                platformFee: platformFee * 100,
+                barberPayout: serviceAmount * 100,
+                isBundle: false,
+            },
+        },
+    });
+
+    assert.equal(booking.serviceAmount, serviceAmount);
+    assert.equal(booking.platformFee, platformFee);
+    assert.equal(booking.totalAmount, serviceAmount + platformFee);
 });
 
 test('serializers no longer export deprecated API aliases', async () => {

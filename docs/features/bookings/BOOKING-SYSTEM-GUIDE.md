@@ -403,7 +403,9 @@ Content-Type: application/json
   "endMinute": 630,
   "durationMinutes": 30,
   "slotLockTimes": ["10:00"],
-  "totalAmount": 300
+  "serviceAmount": 300,
+  "platformFee": 4,
+  "totalAmount": 304
 }
 ```
 
@@ -439,8 +441,8 @@ Content-Type: application/json
     "orderId": "OMO123456789",
     "token": "eyJhbGci...",
     "merchantId": "MERCHANT_ID",
-    "amountInPaisa": 30300,
-    "amountInRupees": 303,
+    "amountInPaisa": 30400,
+    "amountInRupees": 304,
     "state": "PENDING",
     "expiresAt": 1234567890000,
     "gateway": "phonepe",
@@ -629,7 +631,9 @@ Authorization: Bearer <customer_token>
         "time": "10:00",
         "endTime": "11:00",
         "durationMinutes": 60,
-        "totalAmount": 303,
+        "serviceAmount": 303,
+        "platformFee": 10,
+        "totalAmount": 313,
         "status": "confirmed",
         "paymentStatus": "success",
         "createdAt": "2026-05-01T08:30:00Z"
@@ -716,7 +720,9 @@ Authorization: Bearer <barber_token>
         "time": "10:00",
         "endTime": "10:30",
         "durationMinutes": 30,
-        "totalAmount": 250,
+        "serviceAmount": 250,
+        "platformFee": 4,
+        "totalAmount": 254,
         "status": "confirmed",
         "paymentStatus": "success",
         "payoutStatus": "not_initiated",
@@ -904,11 +910,11 @@ Platform Keeps: ₹25 (₹10 platform fee + ₹15 refund fee)
 
 ### Rule 6: Full Refund on Auto-Cancel
 ```
-Total Paid: ₹303
-Refund: ₹303 (full amount)
+Total Paid: ₹304
+Refund: ₹304 (full amount)
 
-Customer Receives: ₹303
-Platform Loses: ₹3 (platform fee) + gateway fees
+Customer Receives: ₹304
+Platform Loses: ₹4 (platform fee) + gateway fees
 ```
 
 **Why full refund?** Barber didn't respond, so customer shouldn't pay any fees.
@@ -975,7 +981,7 @@ Barber can only cancel PENDING (unpaid) bookings. After payment, only auto-cance
 2. Customer pays → AWAITING_CONFIRMATION
 3. Barber confirms → CONFIRMED
 4. Customer cancels (>2h before) → CANCELLED
-5. Customer receives partial refund (₹293 from ₹303)
+5. Customer receives partial refund (₹293 from ₹304)
 6. Slot released
 ```
 
@@ -1090,9 +1096,9 @@ Barber can only cancel PENDING (unpaid) bookings. After payment, only auto-cance
 **Problem:** Booking created with service price ₹299, shop owner changes price to ₹400.
 
 **Handling:**
-- Booking stores totalAmount at creation time
+- Booking stores the service amount at creation time
 - Price changes don't affect existing bookings
-- Customer pays original price
+- Customer pays original service price plus the applicable platform fee
 
 **Reason:** Price locked at booking time
 

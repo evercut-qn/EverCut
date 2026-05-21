@@ -68,6 +68,11 @@ const customerSchema = new mongoose.Schema(
                 ref: 'Shop',
             },
         ],
+        feeWaiverBookingsUsed: {
+            type: Number,
+            default: 0,
+            min: 0,
+        },
     },
     { timestamps: true },
 );

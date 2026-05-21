@@ -296,6 +296,9 @@
               "  pm.expect(data).to.have.property('endTime');",
               "  pm.expect(data).to.have.property('startMinute');",
               "  pm.expect(data).to.have.property('endMinute');",
+              "  pm.expect(data).to.have.property('serviceAmount');",
+              "  pm.expect(data).to.have.property('platformFee');",
+              "  pm.expect(data).to.have.property('totalAmount');",
               "});"
             ]
           }
@@ -336,6 +339,10 @@
               "pm.test('booking detail includes employee availability flag', function () {",
               "  pm.expect(booking.employee).to.have.property('isAvailableOnBookingDate');",
               "  pm.expect(booking.employee.isAvailableOnBookingDate).to.be.a('boolean');",
+              "});",
+              "pm.test('booking detail exposes clear amount semantics', function () {",
+              "  pm.expect(booking).to.have.property('serviceAmount');",
+              "  pm.expect(booking).to.have.property('totalAmount');",
               "});"
             ]
           }

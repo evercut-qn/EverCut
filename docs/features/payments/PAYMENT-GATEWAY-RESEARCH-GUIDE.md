@@ -57,7 +57,7 @@ Customer ──[pays serviceAmount + platformFee]──▶ PhonePe PG ──[set
                                                                           ┌────────────┴────────────┐
                                                                           │                         │
                                                                    Platform Fee              Barber Payout
-                                                                   (₹3 single /             (exact service
+                                                                   (₹4 single /             (exact service
                                                                     ₹10 bundle)               amount)
                                                                                                     │
                                                                           Cashfree Payouts ◀────────┘
@@ -730,7 +730,7 @@ EverCut operates as a **marketplace platform** connecting customers with barber 
                                    ┌──────▼──────┐        ┌──────▼──────┐
                                    │  Platform    │        │  Cashfree   │
                                    │  Fee         │        │  Payouts    │
-                                   │  (₹3 / ₹10) │        │  Wallet     │
+                                   │  (₹4 / ₹10) │        │  Wallet     │
                                    └─────────────┘        └──────┬──────┘
                                                                   │
                                                            ┌──────▼──────┐
@@ -751,8 +751,8 @@ EverCut uses a **fixed platform fee** model (NOT a percentage-based commission).
 | Component | Amount | Notes |
 |---|---|---|
 | Service Amount (barber's price) | ₹99 *(example)* | Set by barber; varies per service |
-| Platform Fee | **₹3** (fixed) | Added on top of service amount |
-| **Total Paid by Customer** | **₹102** | `serviceAmount + platformFee` |
+| Platform Fee | **₹4** (fixed) | Added on top of service amount |
+| **Total Paid by Customer** | **₹103** | `serviceAmount + platformFee` |
 | Barber Payout | ₹99 | Exact service amount |
 | Cashfree Payout Fee (UPI) | ₹6 + ₹1.08 GST = ₹7.08 | Deducted from **platform account**, NOT from barber. Per-barber aggregation reduces to 1 fee/barber/day. |
 | PhonePe MDR (UPI) | ₹0 | Government mandate — zero MDR |
@@ -772,12 +772,12 @@ EverCut uses a **fixed platform fee** model (NOT a percentage-based commission).
 
 - **Minimum bundle service amount:** ₹299 (enforced by platform)
 - **Minimum single service amount:** ₹69 (enforced by platform)
-- **Platform fee:** ₹3 for single service, ₹10 for bundle
+- **Platform fee:** ₹4 for single service, ₹10 for bundle
 - **Barber always receives 100% of the service amount** — platform fee and payout charges are borne by the platform
 - **Cashfree charges (₹6 + 18% GST = ₹7.08 for UPI ≤₹1,000)** are deducted from the platform's Cashfree wallet, separate from the barber's payout
 - **Per-barber aggregation:** The end-of-day batch groups all bookings by barber and sends ONE transfer per barber. This means the ₹7.08 fee applies once per barber per day, not once per booking.
 
-> **Revenue Clarification (per-booking, before aggregation):** EverCut's net revenue per transaction = `platformFee - (cashfreePayoutFee ÷ avgBookingsPerBarberPerDay)`. With per-barber aggregation, the Cashfree fee is amortized across all bookings for that barber. At 3 bookings/barber/day: effective fee = ₹7.08 ÷ 3 = **₹2.36/booking**. Single service: ₹3 - ₹2.36 = **₹0.64** (profitable). Bundle: ₹10 - ₹2.36 = **₹7.64** (highly profitable).
+> **Revenue Clarification (per-booking, before aggregation):** EverCut's net revenue per transaction = `platformFee - (cashfreePayoutFee ÷ avgBookingsPerBarberPerDay)`. With per-barber aggregation, the Cashfree fee is amortized across all bookings for that barber. At 3 bookings/barber/day: effective fee = ₹7.08 ÷ 3 = **₹2.36/booking**. Single service: ₹4 - ₹2.36 = **₹1.64** (profitable). Bundle: ₹10 - ₹2.36 = **₹7.64** (highly profitable).
 
 ### 10.3 Refund Model
 
@@ -787,9 +787,9 @@ Refunds are only permitted **before payout is processed**. Once the end-of-day p
 
 | Component | Amount |
 |---|---|
-| Total Paid | ₹102 |
+| Total Paid | ₹103 |
 | Refund Fee (fixed) | -₹7 |
-| Platform Fee (non-refundable) | -₹3 |
+| Platform Fee (non-refundable) | -₹4 |
 | **Refund to Customer** | **₹92** |
 
 #### B. Bundle Refund
@@ -1784,7 +1784,7 @@ if (existingPayout && existingPayout.status !== 'FAILED') {
 
 **Assumptions (per Payment-Payout-Logic.md):**
 - Booking mix: 40% single service (avg ₹150), 60% bundles (avg ₹400)
-- Platform fee: ₹3 (single) / ₹10 (bundle)
+- Platform fee: ₹4 (single) / ₹10 (bundle)
 - Barber payout: 100% of service amount
 - Cashfree payout fee: ₹6 + ₹1.08 GST = ₹7.08 per UPI transfer (≤₹1,000 slab)
 - **Per-barber aggregation:** avg 3 bookings/barber/day → 1 Cashfree fee per barber
@@ -1812,11 +1812,11 @@ if (existingPayout && existingPayout.status !== 'FAILED') {
 | **Total Infrastructure Cost** | | **₹2,786** |
 | **Per Booking** | ₹2,786 ÷ 1,000 | **₹2.79** |
 | | | |
-| **Platform Fee Revenue** | 400 × ₹3 + 600 × ₹10 | **₹7,200** |
-| **Net Platform Revenue** | ₹7,200 - ₹2,786 | **₹4,414** |
+| **Platform Fee Revenue** | 400 × ₹4 + 600 × ₹10 | **₹7,600** |
+| **Net Platform Revenue** | ₹7,600 - ₹2,786 | **₹4,814** |
 | **Savings from Aggregation** | ₹7,530 - ₹2,786 | **₹4,744/month (63% reduction)** |
 
-> **Key Insight:** Per-barber aggregation is critical for profitability. Without it, payout fees alone (₹7,080) would nearly consume the entire platform fee revenue (₹7,200). With aggregation, net revenue improves to **₹4.41/booking**, making even single-service bookings viable.
+> **Key Insight:** Per-barber aggregation is critical for profitability. Without it, payout fees alone (₹7,080) would consume most of the platform fee revenue (₹7,600). With aggregation, net revenue improves to **₹4.81/booking**, making even single-service bookings viable.
 
 ---
 

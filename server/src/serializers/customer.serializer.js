@@ -1,6 +1,7 @@
 import { sanitizeForResponse, toIdString, toPlainObject } from './core.serializer.js';
 import { serializeUser } from './user.serializer.js';
 import { buildMediaUrl } from '../services/media/media-url.service.js';
+import config from '../config/index.js';
 
 const compact = (value) => Object.fromEntries(
     Object.entries(value).filter(([, nestedValue]) => nestedValue !== undefined),
@@ -29,6 +30,8 @@ export const serializeCustomerProfile = (customer) => {
     const raw = toPlainObject(customer);
     const plain = sanitizeForResponse(raw);
     if (!plain) return null;
+    const feeWaiverBookingsUsed = plain.feeWaiverBookingsUsed ?? 0;
+    const feeWaiverQuota = config.payment.feeWaiverQuota;
 
     return compact({
         id: plain.id,
@@ -43,6 +46,9 @@ export const serializeCustomerProfile = (customer) => {
         location: plain.location ?? null,
         favoriteBookingIds: serializeIdList(plain.favoriteBookings),
         favoriteShopIds: serializeIdList(plain.favoriteShops),
+        feeWaiverBookingsUsed,
+        feeWaiverQuota,
+        feeWaiverExhausted: feeWaiverBookingsUsed >= feeWaiverQuota,
         createdAt: plain.createdAt,
         updatedAt: plain.updatedAt,
     });

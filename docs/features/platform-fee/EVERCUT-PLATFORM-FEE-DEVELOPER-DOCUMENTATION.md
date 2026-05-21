@@ -5,7 +5,28 @@
 **Platform:** Evercut (by Quantneural)  
 **Source:** Evercut Professional Report — Storage, Subscription & Platform Cost Analysis; Gap Solutions Document  
 **Scope:** Customer platform fee system only — fee structure, introductory waiver, booking validation, booking flow, cancellation and refund logic  
-**Status:** All core business rules confirmed. See Section 8 for remaining open items.
+**Status:** Implemented in the Node.js backend. All core business rules confirmed. See Section 7 for the remaining anti-abuse open item.
+
+---
+
+## Implementation Alignment Note (Backend)
+
+This document is implemented in `server/` with the repository's existing pending-booking reservation architecture. The original no-pre-payment-persistence wording is superseded by this compatibility rule:
+
+- A booking is first persisted as an unpaid `pending` slot reservation so the employee time range can be held and idempotent creation can work.
+- Payment initiation calculates platform-fee values from `config.payment` and stores the charged settlement on the payment transaction.
+- Payment failure, amount mismatch, or checkout expiry cancels the unpaid booking and releases the slot.
+- The customer waiver counter is incremented only after PhonePe confirms payment success.
+
+Backend field names use the established camelCase API and Mongo schema style:
+
+- Customer persists only `feeWaiverBookingsUsed` for this feature. API responses derive `feeWaiverQuota` and `feeWaiverExhausted` from `config.payment`.
+- Booking does not persist platform-fee snapshots or refund audit fields. Existing booking storage keeps the service amount for booking/payout logic; booking API responses derive `serviceAmount`, `platformFee`, and payable `totalAmount` from config or the linked payment transaction.
+- Payment transaction persists top-level `waiverApplied`. Payment settlement persists `serviceAmount`, `platformFee`, `barberPayout`, and `isBundle`.
+
+Fee and refund amounts that need financial audit are stored on the payment transaction in paisa. Booking records stay intentionally lean and do not duplicate payment financial snapshots.
+
+Active platform-fee business values live in one place: the existing `payment` object in `server/src/config/index.js`. Services, repositories, serializers, models, Postman generation, and tests must read from those existing keys rather than duplicating rule values. `server/src/utils/platform-fee.utils.js` owns reusable fee logic, not separate configuration.
 
 ---
 
@@ -75,11 +96,12 @@ The ₹10 cap for combined bookings must be **explicitly enforced in code** rath
 
 ### 1.5 Minimum Booking Amount Constraint
 
-- The minimum booking amount threshold of **₹70 applies to the service amount only** — the total cost of selected services or bundles, before the platform fee is added. The platform fee is never included in this threshold calculation.
-- A service amount of ₹70 with a ₹4 platform fee (total ₹74 charged) is valid. The ₹70 check is on the service amount alone.
-- If the service amount falls below ₹70, the booking must be **rejected at creation time**.
+- Minimum booking amount thresholds apply to the **service amount only** — the total cost of selected services or bundles, before the platform fee is added. The platform fee is never included in this threshold calculation.
+- Single-service bookings require a minimum service amount of **₹69**. A service amount of ₹69 with a ₹4 platform fee (total ₹73 charged) is valid.
+- Bundle and combined bookings require a minimum service amount of **₹299**. A bundle service amount of ₹299 with a ₹10 platform fee (total ₹309 charged) is valid.
+- If the service amount falls below the threshold for its booking type, the booking must be **rejected at creation time**.
 - This validation applies to **all customers**, including those within the introductory fee waiver period.
-- This validation must occur **before** any platform fee calculation or waiver check.
+- This validation must occur after deriving the booking fee type and **before** any platform fee calculation or waiver check.
 
 ### 1.6 Cancellation & Refund Fee Structure
 
@@ -160,8 +182,10 @@ function calculateRefundAmount(payment, isBarberCancellation):
 | `platformFeeBundle` | ₹10 | Platform fee for bundle and combined bookings |
 | `refundFeeSingle` | ₹7 | Refund processing fee on customer cancellation of a single booking |
 | `refundFeeBundle` | ₹15 | Refund processing fee on customer cancellation of a bundle or combined booking |
+| `minSingleServiceAmount` | ₹69 | Minimum service amount for single-service bookings |
+| `minBundleServiceAmount` | ₹299 | Minimum service amount for bundle and combined bookings |
 
-> **Note on config:** The value `platformFeeSingle: 3` present in `config/index.js` is **outdated and incorrect**. The correct and canonical value is **₹4**, as confirmed by the business. All implementation must use ₹4. The config must be updated to reflect this.
+> **Implementation note on config:** The existing `server/src/config/index.js` `payment` object is the single active source for platform-fee values: `platformFeeSingle`, `platformFeeBundle`, `refundFeeSingle`, `refundFeeBundle`, `feeWaiverQuota`, `minSingleServiceAmount`, and `minBundleServiceAmount`. There is no separate platform-fee config module and no unified minimum-service-amount config key; code must validate against the booking-type-specific threshold.
 
 ---
 
@@ -188,9 +212,9 @@ The system must maintain a dedicated counter per **Customer document** to track 
 
 | Field | Type | Description |
 |---|---|---|
-| `fee_waiver_bookings_used` | Integer | Number of fee-waived bookings consumed (range: 0–2) |
-| `fee_waiver_quota` | Integer | Total fee-waived bookings allowed (constant value: 2) |
-| `fee_waiver_exhausted` | Boolean | Derived: `true` when `fee_waiver_bookings_used >= fee_waiver_quota` |
+| `fee_waiver_bookings_used` | Integer | Persisted number of fee-waived bookings consumed |
+| `fee_waiver_quota` | Integer | Derived response value from `config.payment.feeWaiverQuota`; not persisted on Customer |
+| `fee_waiver_exhausted` | Boolean | Derived response value: `true` when `fee_waiver_bookings_used >= config.payment.feeWaiverQuota`; not persisted on Customer |
 
 ### 2.3 Fee Waiver Application Logic
 
@@ -198,9 +222,9 @@ The system must maintain a dedicated counter per **Customer document** to track 
 function resolveCustomerPlatformFee(customer, booking_type):
   platform_fee = calculatePlatformFee(booking_type)   // Returns ₹4 or ₹10
 
-  IF customer.fee_waiver_exhausted == false:
+  IF customer.fee_waiver_bookings_used < config.payment.feeWaiverQuota:
     // Do not increment here — only increment AFTER successful payment
-    // Pass waiver_applied = true to booking creation context
+    // Store waiver_applied = true on the payment transaction
     return ₹0
 
   ELSE:
@@ -213,10 +237,10 @@ function resolveCustomerPlatformFee(customer, booking_type):
 
 | Scenario | Behaviour |
 |---|---|
-| Customer's 1st booking (any type, service amount ≥ ₹70) | Platform fee = ₹0. Counter increments to 1 after payment success. Service amount charged in full. |
-| Customer's 2nd booking (any type, service amount ≥ ₹70) | Platform fee = ₹0. Counter increments to 2 after payment success. `fee_waiver_exhausted` becomes `true`. |
+| Customer's 1st booking (single service amount ≥ ₹69, or bundle/combined service amount ≥ ₹299) | Platform fee = ₹0. Counter increments to 1 after payment success. Service amount charged in full. |
+| Customer's 2nd booking (single service amount ≥ ₹69, or bundle/combined service amount ≥ ₹299) | Platform fee = ₹0. Counter increments to 2 after payment success. `fee_waiver_exhausted` becomes `true`. |
 | Customer's 3rd booking onwards | Standard platform fee applies (₹4 or ₹10). |
-| Service amount below ₹70 during waiver period | Booking rejected. Counter must NOT increment. |
+| Service amount below the booking-type threshold during waiver period | Booking rejected. Counter must NOT increment. |
 | Payment fails on a waiver-eligible booking | Counter must NOT increment. Waiver slot is preserved for the customer's next successful booking. |
 | Customer cancels a waiver-covered booking after payment | The waiver counter does **not** decrement — the fee waiver slot is permanently used regardless of cancellation. Additionally: since the platform fee on this booking was ₹0 (waived), there is no platform fee component to withhold. However, the refund fee (₹7 for single / ₹15 for bundle or combined) **is still deducted** from the service amount on customer cancellation. The waiver covered only the platform fee — it never applied to the refund processing fee. See Section 1.6. |
 | Customer re-registers with a new account to reset waiver | The waiver must be tied to a persistent identifier beyond just the account (e.g., verified phone number) to prevent gaming. Anti-abuse mechanism must be confirmed — see Section 7, Open Question 1. |
@@ -235,7 +259,7 @@ All validations must pass in this order before a booking is persisted. Validatio
 | 1 | Customer account is active and authenticated | Reject; prompt login or account resolution |
 | 2 | Target barber exists and is active on the platform | Reject; return "Barber unavailable" error |
 | 3 | Booking type is a valid value (`SINGLE`, `BUNDLE`, or `COMBINED`) | Reject; return invalid type error |
-| 4 | Service amount ≥ ₹70 | Reject; return "Minimum booking amount is ₹70" |
+| 4 | Service amount meets the booking-type threshold (`SINGLE` ≥ ₹69; `BUNDLE`/`COMBINED` ≥ ₹299) | Reject; return "Minimum single service booking amount is ₹69" or "Minimum bundle booking amount is ₹299" |
 
 ### 3.2 Complete Booking Creation Flow
 
@@ -246,22 +270,26 @@ Customer initiates booking:
   Step 2:  Validate barber exists and is active
   Step 3:  Validate booking type
   Step 4:  Calculate booking_amount (sum of selected services/bundles)
-  Step 5:  IF booking_amount < ₹70 → reject; STOP. Do not proceed to fee logic.
-  Step 6:  Determine platform_fee:
+  Step 5:  IF booking_amount is below the booking-type threshold
+             (SINGLE < ₹69, BUNDLE/COMBINED < ₹299) → reject; STOP.
+             Do not proceed to fee logic.
+  Step 6:  Persist the pending unpaid booking reservation using existing booking fields.
+  Step 7:  During payment initiation, determine platform_fee:
              platform_fee = resolveCustomerPlatformFee(customer, booking_type)
              Note whether waiver_applied = true or false
-  Step 7:  Calculate total_charged = booking_amount + platform_fee
-  Step 8:  Initiate payment via payment gateway for total_charged
-  Step 9:  On payment success:
+  Step 8:  Calculate total_charged = booking_amount + platform_fee
+  Step 9:  Create the PhonePe payment transaction for total_charged.
+             Store serviceAmount, platformFee, barberPayout, isBundle, and waiverApplied on the payment transaction.
+  Step 10: On payment success:
              - IF waiver_applied: increment customer.fee_waiver_bookings_used by 1
-             - Persist booking record with all fields
-  Step 10: On payment failure:
-             - Do NOT persist booking record
+             - Mark booking payment state as paid/awaiting confirmation
+  Step 11: On payment failure, amount mismatch, or checkout expiry:
+             - Cancel the unpaid pending booking and release the slot
              - Do NOT increment waiver counter
              - Return payment failure error to customer
 ```
 
-> **Atomicity Requirement:** The booking record must only be persisted and the waiver counter only incremented after confirmed payment success from the payment gateway's webhook or callback. A payment failure must leave no side effects on the customer's waiver counter or on any booking record.
+> **Atomicity Requirement:** The waiver counter must only increment after confirmed payment success from the payment gateway's webhook or verification flow. A payment failure must not consume a waiver. Pending unpaid bookings may exist only as slot reservations and must be cancelled/released on failed, mismatched, or expired checkout sessions.
 
 ### 3.3 Booking Record Fields
 
@@ -270,16 +298,27 @@ Customer initiates booking:
 | `booking_id` | UUID | Unique booking identifier |
 | `customer_id` | Ref → Customer | Customer who made the booking |
 | `barber_id` | Ref → Barber | Barber receiving the booking |
-| `booking_type` | Enum | `SINGLE`, `BUNDLE`, `COMBINED` |
-| `booking_amount` | Decimal | Total service cost before platform fee (≥ ₹70) |
-| `platform_fee` | Decimal | Platform fee charged: ₹0, ₹4, or ₹10 |
-| `total_charged` | Decimal | `booking_amount + platform_fee` |
-| `waiver_applied` | Boolean | Whether the fee waiver was used for this booking |
+| `total_amount` | Decimal | Existing service cost before platform fee (single ≥ ₹69; bundle/combined ≥ ₹299) |
+| `payment_transaction_id` | Ref → PaymentTransaction / Null | Payment transaction created during payment initiation |
+| `merchant_order_id` | String / Null | PhonePe merchant order id when payment is initiated |
+| `payment_status` | Enum | Existing booking payment lifecycle state |
 | `status` | Enum | `PENDING`, `CONFIRMED`, `CANCELLED`, `COMPLETED` |
-| `cancellation_type` | Enum / Null | `CUSTOMER`, `BARBER`, `AUTO` — null if not cancelled |
-| `refund_fee` | Decimal / Null | Refund processing fee deducted on customer cancellation: ₹7 (single) / ₹15 (bundle or combined); ₹0 on barber or auto-cancel; null if not cancelled |
-| `refund_amount` | Decimal / Null | Actual amount returned to the customer on cancellation: `serviceAmount − refundFee` (customer cancel) or full `payment.amount` (barber/auto cancel); null if not cancelled |
 | `created_at` | Timestamp | Booking creation datetime |
+
+Booking intentionally does not persist `booking_amount`, `booking_fee_type`, `platform_fee`, `standard_platform_fee`, `total_charged`, `waiver_applied`, `cancellation_type`, `refund_fee`, or `refund_amount`. Those values are either derivable from selected services and config or stored on the payment transaction where financial audit belongs.
+
+### 3.4 Amount Response Semantics
+
+All booking and payment responses use these amount meanings:
+
+| Field | Meaning |
+|---|---|
+| `serviceAmount` | Service/bundle price before platform fee |
+| `platformFee` | Platform fee currently payable or actually charged; `0` when waived |
+| `totalAmount` | Final customer payable/charged amount: `serviceAmount + platformFee` |
+| `amountInRupees` / `amountInPaisa` | Payment transaction charged amount; same concept as payable `totalAmount`, expressed in payment units |
+
+When a payment transaction exists, booking responses use the payment transaction amount as the authoritative charged total. Before payment exists, booking responses show the current payable preview from `config.payment` and the customer's current waiver usage.
 
 ---
 
@@ -290,7 +329,7 @@ These scenarios illustrate correct system behaviour across different booking and
 ### Scenario A — Customer's 1st Booking (Single Service, ₹200)
 
 ```
-booking_amount           = ₹200   ✓ passes ₹70 minimum (service amount)
+booking_amount           = ₹200   ✓ passes ₹69 single minimum (service amount)
 fee_waiver_bookings_used = 0/2    → waiver applies
 platform_fee             = ₹0     (waived)
 total_charged            = ₹200   (booking amount only)
@@ -301,19 +340,19 @@ fee_waiver_bookings_used → incremented to 1/2
 ### Scenario B — Customer's 2nd Booking (Bundle, ₹500)
 
 ```
-booking_amount           = ₹500   ✓ passes ₹70 minimum (service amount)
+booking_amount           = ₹500   ✓ passes ₹299 bundle minimum (service amount)
 fee_waiver_bookings_used = 1/2    → waiver still applies
 platform_fee             = ₹0     (waived)
 total_charged            = ₹500
 [on payment success]
 fee_waiver_bookings_used → incremented to 2/2
-fee_waiver_exhausted     → now true
+fee_waiver_exhausted     → derived as true in API responses
 ```
 
 ### Scenario C — Customer's 3rd Booking (Single Service, ₹150)
 
 ```
-booking_amount           = ₹150   ✓ passes ₹70 minimum (service amount)
+booking_amount           = ₹150   ✓ passes ₹69 single minimum (service amount)
 fee_waiver_exhausted     = true   → no waiver applies
 booking_type             = SINGLE
 platform_fee             = ₹4
@@ -323,30 +362,30 @@ total_charged            = ₹154
 ### Scenario D — Customer's 4th Booking (Bundle + Single Combined, ₹350)
 
 ```
-booking_amount           = ₹350   ✓ passes ₹70 minimum (service amount)
+booking_amount           = ₹350   ✓ passes ₹299 combined minimum (service amount)
 fee_waiver_exhausted     = true   → no waiver applies
 booking_type             = COMBINED
 platform_fee             = ₹10    (cap applies; not ₹4 + ₹10 = ₹14)
 total_charged            = ₹360
 ```
 
-### Scenario E — Booking Below ₹70 (During Waiver Period)
+### Scenario E — Single Booking Below ₹69 (During Waiver Period)
 
 ```
-booking_amount           = ₹60    ✗ fails ₹70 minimum (service amount)
+booking_amount           = ₹68    ✗ fails ₹69 single minimum (service amount)
 Result                   → Booking rejected
-                         → "Minimum booking amount is ₹70"
+                         → "Minimum single service booking amount is ₹69"
 fee_waiver_bookings_used → NOT incremented (booking was never created)
 ```
 
 ### Scenario F — Payment Fails on Waiver-Eligible Booking
 
 ```
-booking_amount           = ₹300   ✓ passes ₹70 minimum (service amount)
+booking_amount           = ₹300   ✓ passes ₹299 bundle/combined minimum when applicable (service amount)
 fee_waiver_bookings_used = 1/2    → waiver eligible
 platform_fee             = ₹0
 [payment fails]
-Result                   → Booking NOT persisted
+Result                   → Pending unpaid booking is cancelled/released
 fee_waiver_bookings_used → NOT incremented; stays at 1/2
                          → Customer's second waiver slot is preserved
 ```
@@ -419,9 +458,9 @@ Customer receives back:    ₹410  (complete restoration)
 | Field | Type | Description |
 |---|---|---|
 | `customer_id` | UUID | Unique identifier |
-| `fee_waiver_bookings_used` | Integer | Fee-waived bookings consumed (0, 1, or 2) |
-| `fee_waiver_quota` | Integer | Total waiver-eligible bookings (constant: 2) |
-| `fee_waiver_exhausted` | Boolean | `true` when `fee_waiver_bookings_used >= fee_waiver_quota` |
+| `fee_waiver_bookings_used` | Integer | Persisted fee-waived bookings consumed |
+| `fee_waiver_quota` | Integer | Derived API response value from `config.payment.feeWaiverQuota`; not persisted |
+| `fee_waiver_exhausted` | Boolean | Derived API response value; not persisted |
 
 ### 5.2 Booking Document (MongoDB)
 
@@ -430,51 +469,65 @@ Customer receives back:    ₹410  (complete restoration)
 | `booking_id` | UUID | Unique identifier |
 | `customer_id` | Ref → Customer | Booking initiator |
 | `barber_id` | Ref → Barber | Booking recipient |
-| `booking_type` | Enum | `SINGLE`, `BUNDLE`, `COMBINED` |
-| `booking_amount` | Decimal | Service cost before platform fee (must be ≥ ₹70) |
-| `platform_fee` | Decimal | ₹0 (waived), ₹4, or ₹10 |
-| `total_charged` | Decimal | `booking_amount + platform_fee` |
-| `waiver_applied` | Boolean | Whether the introductory fee waiver was used for this booking |
+| `total_amount` | Decimal | Existing service cost before platform fee (single ≥ ₹69; bundle/combined ≥ ₹299) |
+| `payment_transaction_id` | Ref → PaymentTransaction / Null | Payment transaction created during payment initiation |
+| `merchant_order_id` | String / Null | PhonePe merchant order id when payment is initiated |
+| `payment_status` | Enum | Existing booking payment lifecycle state |
 | `status` | Enum | `PENDING`, `CONFIRMED`, `CANCELLED`, `COMPLETED` |
-| `cancellation_type` | Enum / Null | `CUSTOMER`, `BARBER`, `AUTO` — null if booking has not been cancelled |
-| `refund_fee` | Decimal / Null | Refund processing fee deducted on customer cancellation: ₹7 (single) / ₹15 (bundle or combined); ₹0 on barber or auto-cancel; null if not cancelled |
-| `refund_amount` | Decimal / Null | Actual amount returned to the customer on cancellation: `serviceAmount − refundFee` (customer cancel) or full `payment.amount` (barber/auto cancel); null if not cancelled |
 | `created_at` | Timestamp | Booking creation datetime |
+
+### 5.3 Payment Transaction Document (MongoDB)
+
+| Field | Type | Description |
+|---|---|---|
+| `waiver_applied` | Boolean | Persisted flag showing whether the introductory platform-fee waiver was applied to this payment |
+| `settlement.service_amount` | Integer (paisa) | Service amount before platform fee |
+| `settlement.platform_fee` | Integer (paisa) | Actual platform fee charged; `0` when waived |
+| `settlement.barber_payout` | Integer (paisa) | Amount payable to the barber |
+| `settlement.is_bundle` | Boolean | Whether the payment used the bundle/combined fee path |
+| `refund.amount` | Integer (paisa) / Null | Actual refund amount when refund is initiated |
+| `refund.refund_fee` | Integer (paisa) / Null | Refund processing fee deducted on customer cancellation |
+| `refund.platform_fee` | Integer (paisa) / Null | Platform fee retained or returned according to cancellation path |
 
 ---
 
 ## 6. Implementation Checklist
 
+> **Backend status:** The checklist below reflects the simplified production implementation. Platform-fee rules, waiver tracking, minimum amount validation, payment transaction settlement, refund paths, and centralized config are implemented in `server/`. The only non-code open item remains the anti-abuse identity policy in Section 7.
+
 ### Platform Fees & Waiver
 
-- [ ] Add `fee_waiver_bookings_used` and related fields to Customer document
-- [ ] Implement `resolveCustomerPlatformFee()` with waiver check
-- [ ] Implement platform fee calculation by booking type (Single: ₹4, Bundle/Combined: ₹10)
-- [ ] Enforce ₹10 cap for combined bookings explicitly in code (not via fee summation)
-- [ ] Enforce minimum service amount of ₹70 before any fee or waiver logic runs
-- [ ] Increment waiver counter **only** after confirmed payment success
-- [ ] Ensure waiver counter is never incremented on payment failure or booking rejection
+- [x] Add `fee_waiver_bookings_used` to the Customer document
+- [x] Derive `fee_waiver_quota` and `fee_waiver_exhausted` from `config.payment` at response time instead of persisting them
+- [x] Implement `resolveCustomerPlatformFee()` with waiver check
+- [x] Implement platform fee calculation by booking type (Single: ₹4, Bundle/Combined: ₹10)
+- [x] Enforce ₹10 cap for combined bookings explicitly in code (not via fee summation)
+- [x] Enforce booking-type-specific minimum service amounts (single: ₹69; bundle/combined: ₹299) before any fee or waiver logic runs
+- [x] Keep platform-fee amounts, refund fees, waiver quota, and minimum service amount rules centralized under existing `config.payment` keys
+- [x] Increment waiver counter **only** after confirmed payment success
+- [x] Ensure waiver counter is never incremented on payment failure or booking rejection
 
 ### Booking Flow
 
-- [ ] Implement full booking validation sequence (Steps 1–4 in Section 3.1)
-- [ ] Implement atomic booking persistence — only after payment confirmation
-- [ ] Persist all fee fields on booking record (`booking_amount`, `platform_fee`, `total_charged`, `waiver_applied`)
+- [x] Implement full booking validation sequence (Steps 1–4 in Section 3.1)
+- [x] Preserve the existing pending unpaid booking reservation flow for slot locking and idempotency
+- [x] Store platform-fee financial audit on `PaymentTransaction`, not duplicated on `Booking`
+- [x] Persist `waiverApplied` on `PaymentTransaction`
 
 ### Cancellation & Refund
 
-- [ ] Implement `initiateRefund` with two distinct paths, controlled by the `isBarberCancellation` flag
-- [ ] **Customer cancellation path** (`isBarberCancellation = false`):
-  - [ ] Base refund amount on `payment.settlement.serviceAmount` (service amount only — platform fee excluded from base)
-  - [ ] Determine refund fee by booking type: ₹7 for `SINGLE`; ₹15 for `BUNDLE` or `COMBINED`
-  - [ ] Calculate `refund_amount = serviceAmount − refundFee`
-  - [ ] Withhold platform fee — record it as a platform deduction; do not include in refund
-  - [ ] Persist `cancellation_type = CUSTOMER`, `refund_fee`, and `refund_amount` on the booking record
-- [ ] **Barber / auto-cancel path** (`isBarberCancellation = true`):
-  - [ ] Refund the full `payment.amount` (service amount + platform fee combined) with zero deductions
-  - [ ] Persist `cancellation_type = BARBER` or `AUTO`, `refund_fee = 0`, and `refund_amount = payment.amount`
-- [ ] Ensure waiver slot is **never reinstated** on customer cancellation of a waiver-covered booking
-- [ ] **Fix config:** Update `platformFeeSingle` from `3` to `4` in `config/index.js`. The value `3` is outdated and incorrect; canonical value is ₹4 (see Section 1.6)
+- [x] Implement `initiateRefund` with two distinct paths, controlled by the `isBarberCancellation` flag
+- [x] **Customer cancellation path** (`isBarberCancellation = false`):
+  - [x] Base refund amount on `payment.settlement.serviceAmount` (service amount only — platform fee excluded from base)
+  - [x] Determine refund fee by booking type: ₹7 for `SINGLE`; ₹15 for `BUNDLE` or `COMBINED`
+  - [x] Calculate `refund_amount = serviceAmount − refundFee`
+  - [x] Withhold platform fee — record it as a platform deduction; do not include in refund
+  - [x] Persist refund financial audit on `PaymentTransaction.refund`
+- [x] **Barber / auto-cancel path** (`isBarberCancellation = true`):
+  - [x] Refund the full `payment.amount` (service amount + platform fee combined) with zero deductions
+  - [x] Persist refund financial audit on `PaymentTransaction.refund`
+- [x] Ensure waiver slot is **never reinstated** on customer cancellation of a waiver-covered booking
+- [x] **Fix config:** `platformFeeSingle` is `4` in `config/index.js`; canonical value is ₹4 (see Section 1.6)
 
 ---
 

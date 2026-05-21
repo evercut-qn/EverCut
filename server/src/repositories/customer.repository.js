@@ -1,4 +1,5 @@
 import Customer from '../models/customer.model.js';
+import config from '../config/index.js';
 
 class CustomerRepository {
     async create(data) {
@@ -11,6 +12,27 @@ class CustomerRepository {
 
     async findById(id) {
         return Customer.findById(id);
+    }
+
+    async consumeFeeWaiverSlot(customerId) {
+        const quota = config.payment.feeWaiverQuota;
+        if (quota <= 0) return null;
+
+        const customer = await Customer.findOneAndUpdate(
+            {
+                _id: customerId,
+                $or: [
+                    { feeWaiverBookingsUsed: { $exists: false } },
+                    { feeWaiverBookingsUsed: { $lt: quota } },
+                ],
+            },
+            {
+                $inc: { feeWaiverBookingsUsed: 1 },
+            },
+            { returnDocument: 'after', runValidators: true },
+        );
+
+        return customer || null;
     }
 
     async updateByUserId(userId, data) {

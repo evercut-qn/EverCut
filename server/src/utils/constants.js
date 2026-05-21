@@ -105,6 +105,12 @@ export const REFUND_TYPE = Object.freeze({
     MANUAL: 'manual',
 });
 
+export const CANCELLATION_TYPE = Object.freeze({
+    CUSTOMER: 'customer',
+    BARBER: 'barber',
+    AUTO: 'auto',
+});
+
 export const PAYOUT_MODES = Object.freeze({
     UPI: 'upi',
     IMPS: 'imps',
