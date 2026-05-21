@@ -32,13 +32,13 @@ const breakTimesSchema = Joi.alternatives().try(
     Joi.string().trim(),
 );
 
-const targetCustomersSchema = Joi.string().valid(...ALL_SERVICE_FOR);
+const targetCustomersSchema = Joi.string().lowercase().valid(...ALL_SERVICE_FOR);
 
 export const customerOnboardingSchema = Joi.object({
     email: Joi.string().email().required(),
     firstName: Joi.string().trim().min(1).max(50).required(),
     lastName: Joi.string().trim().min(1).max(50).required(),
-    gender: Joi.string().valid(...ALL_GENDERS).required(),
+    gender: Joi.string().lowercase().valid(...ALL_GENDERS).required(),
     dateOfBirth: Joi.date().required(),
     address: Joi.string().trim().required(),
     location: Joi.alternatives().try(locationSchema, Joi.string()).required(),
@@ -49,7 +49,7 @@ export const barberOnboardingSchema = Joi.object({
     email: Joi.string().email(),
     firstName: Joi.string().trim().min(1).max(50),
     lastName: Joi.string().trim().min(1).max(50),
-    gender: Joi.string().valid(...ALL_GENDERS),
+    gender: Joi.string().lowercase().valid(...ALL_GENDERS),
     dateOfBirth: Joi.date(),
     ownerFirstName: Joi.forbidden(),
     ownerLastName: Joi.forbidden(),

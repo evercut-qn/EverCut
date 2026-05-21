@@ -71,12 +71,12 @@ const breakTimesSchema = Joi.alternatives().try(
     Joi.string().trim(),
 );
 
-const targetCustomersSchema = Joi.string().valid(...ALL_SERVICE_FOR);
+const targetCustomersSchema = Joi.string().lowercase().valid(...ALL_SERVICE_FOR);
 export const updateBusinessSchema = Joi.object({
     shopName: Joi.string().trim().min(1).max(100),
     firstName: Joi.string().trim().min(1).max(50),
     lastName: Joi.string().trim().min(1).max(50),
-    gender: Joi.string().valid(...ALL_GENDERS),
+    gender: Joi.string().lowercase().valid(...ALL_GENDERS),
     dateOfBirth: Joi.date(),
     shopOwner: Joi.forbidden(),
     ownerFirstName: Joi.forbidden(),
@@ -230,7 +230,7 @@ export const servicesByGenderQuerySchema = Joi.object({
     longitude: Joi.number().min(-180).max(180),
     latitude: Joi.number().min(-90).max(90),
     coordinates: Joi.string().pattern(coordinatesPattern),
-    gender: Joi.string().valid(...ALL_SERVICE_FOR).default('unisex'),
+    gender: Joi.string().lowercase().valid(...ALL_SERVICE_FOR).default('unisex'),
     search: Joi.string().trim().max(100).allow(''),
 })
     .custom(normalizeCoordinates, 'coordinates normalization')
@@ -238,13 +238,13 @@ export const servicesByGenderQuerySchema = Joi.object({
 
 export const searchServicesQuerySchema = Joi.object({
     query: Joi.string().trim().min(1).max(100).required(),
-    gender: Joi.string().valid(...ALL_SERVICE_FOR),
+    gender: Joi.string().lowercase().valid(...ALL_SERVICE_FOR),
 });
 
 export const shopServicesQuerySchema = paginationSchema.keys({
     query: Joi.string().trim().max(100).allow(''),
     serviceType: Joi.string().valid(...ALL_SERVICE_TYPES),
-    serviceFor: Joi.string().valid(...ALL_SERVICE_FOR),
+    serviceFor: Joi.string().lowercase().valid(...ALL_SERVICE_FOR),
 });
 
 export const shopAvailabilityQuerySchema = Joi.object({

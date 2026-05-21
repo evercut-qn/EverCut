@@ -12,7 +12,7 @@ const bundledServicesSchema = Joi.array()
 export const addServiceSchema = Joi.object({
     serviceName: serviceNameSchema.required(),
     serviceType: Joi.string().valid(...ALL_SERVICE_TYPES).required(),
-    serviceFor: Joi.string().valid(...ALL_SERVICE_FOR).default('unisex'),
+    serviceFor: Joi.string().lowercase().valid(...ALL_SERVICE_FOR).default('unisex'),
     actualPrice: priceSchema.required(),
     offerPrice: priceSchema.max(Joi.ref('actualPrice')).default(0),
     imageMediaId: Joi.string().optional(),
@@ -35,7 +35,7 @@ export const addServiceSchema = Joi.object({
 
 export const updateServiceSchema = Joi.object({
     serviceName: serviceNameSchema,
-    serviceFor: Joi.string().valid(...ALL_SERVICE_FOR),
+    serviceFor: Joi.string().lowercase().valid(...ALL_SERVICE_FOR),
     actualPrice: priceSchema,
     offerPrice: priceSchema,
     imageMediaId: Joi.string().optional(),
@@ -61,5 +61,5 @@ export const updateServiceSchema = Joi.object({
 
 export const serviceListQuerySchema = paginationSchema.keys({
     serviceType: Joi.string().valid(...ALL_SERVICE_TYPES),
-    serviceFor: Joi.string().valid(...ALL_SERVICE_FOR),
+    serviceFor: Joi.string().lowercase().valid(...ALL_SERVICE_FOR),
 });
