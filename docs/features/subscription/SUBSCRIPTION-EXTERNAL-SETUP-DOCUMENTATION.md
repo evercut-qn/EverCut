@@ -145,68 +145,142 @@ EverCut requires **two** Razorpay plans. The Basic plan is free and has **no Raz
 
 > **Amount in paise:** Razorpay uses the smallest currency unit. ₹299 = 29,900 paise. ₹499 = 49,900 paise.
 
-### 4.2 Creating Plans via API
+### 4.2 Creating Plans via Provisioning Script (Canonical Method)
+
+EverCut uses a dedicated provisioning script to create Razorpay plans programmatically. This is the **canonical approach** — do NOT create plans manually via curl, the Razorpay API, or the Razorpay dashboard.
+
+**Script location:** `server/scripts/create-razorpay-plans.mjs`
+
+#### Prerequisites
+
+1. `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET` must be set in `server/.env`
+2. Install the Razorpay SDK: `npm install razorpay`
+
+#### Step 1: Dry Run (Default, Safe)
+
+Always start with a dry run to see what the script will do:
 
 ```bash
-# Create Popular Plan
-curl -X POST https://api.razorpay.com/v1/plans \
-  -u $RAZORPAY_KEY_ID:$RAZORPAY_KEY_SECRET \
-  -H "Content-Type: application/json" \
-  -d '{
-    "period": "monthly",
-    "interval": 1,
-    "item": {
-      "name": "EverCut Popular Plan",
-      "amount": 29900,
-      "currency": "INR",
-      "description": "Enhanced Reach & Local Visibility — 30 Photos, 10 Videos, Blue Badge"
-    },
-    "notes": {
-      "plan_id": "PLAN_POPULAR",
-      "internal_label": "Most Recommended"
-    }
-  }'
-
-# Create Advanced Plan
-curl -X POST https://api.razorpay.com/v1/plans \
-  -u $RAZORPAY_KEY_ID:$RAZORPAY_KEY_SECRET \
-  -H "Content-Type: application/json" \
-  -d '{
-    "period": "monthly",
-    "interval": 1,
-    "item": {
-      "name": "EverCut Advanced Plan",
-      "amount": 49900,
-      "currency": "INR",
-      "description": "Maximum Exposure & Priority Reach — 50 Photos, 15 Videos, Yellow Badge"
-    },
-    "notes": {
-      "plan_id": "PLAN_ADVANCED",
-      "internal_label": "Premium Growth"
-    }
-  }'
+# From server/ directory
+node scripts/create-razorpay-plans.mjs
 ```
 
-### 4.3 Plan ID Management
+This shows:
+- Which plans need to be created
+- Which plans already exist on Razorpay (skipped)
+- The environment being used (🟢 TEST or 🔴 LIVE)
+- No plans are actually created
 
-After creating plans, Razorpay returns a `plan_id` (e.g., `plan_ABC123`). These must be stored as environment variables:
+#### Step 2: Execute
+
+```bash
+# Actually create plans on Razorpay
+node scripts/create-razorpay-plans.mjs --execute
+```
+
+#### Step 3: Verify
+
+```bash
+# List all plans on Razorpay and verify mapping
+node scripts/create-razorpay-plans.mjs --list
+```
+
+#### Step 4: Copy Plan IDs to .env
+
+The script outputs the plan IDs — copy them into `server/.env`:
+
+```env
+RAZORPAY_PLAN_ID_POPULAR=plan_xxxxxxxxxxxxxxxx
+RAZORPAY_PLAN_ID_ADVANCED=plan_xxxxxxxxxxxxxxxx
+```
+
+> **Note:** The script intentionally does NOT auto-edit your `.env` file. Outputting plan IDs for manual copy is safer and prevents accidental corruption of other environment variables.
+
+#### Idempotency & Duplicate Prevention
+
+The script is **fully idempotent**. It detects existing plans on Razorpay by matching:
+- Plan name (`EverCut - Popular` / `EverCut - Advanced`)
+- Amount (29900 / 49900 paise)
+- Currency (INR)
+- Period (monthly)
+- Interval (1)
+
+If a matching plan already exists, it is **skipped** and its existing Razorpay plan ID is output. Running the script multiple times will never create duplicate plans.
+
+> **Why this matters:** Razorpay plans **cannot be deleted** via their API. Duplicate plans would remain permanently in your Razorpay account. The idempotency check prevents this.
+
+#### Production Safety
+
+For **LIVE** (production) keys (`rzp_live_*`), the script requires an explicit confirmation:
+
+```bash
+RAZORPAY_CONFIRM_LIVE=true node scripts/create-razorpay-plans.mjs --execute
+```
+
+Without `RAZORPAY_CONFIRM_LIVE=true`, the script refuses to create plans in production. This prevents accidental creation of real billing plans.
+
+#### Dev / Staging / Production Usage
+
+| Environment | Keys | Command | Notes |
+|---|---|---|---|
+| Development | `rzp_test_*` | `node scripts/create-razorpay-plans.mjs --execute` | Creates test plans; safe to experiment |
+| Staging | `rzp_test_*` | Same as development | Uses same test mode; separate plan IDs in staging .env |
+| Production | `rzp_live_*` | `RAZORPAY_CONFIRM_LIVE=true node scripts/create-razorpay-plans.mjs --execute` | Creates real billing plans; requires explicit confirmation |
+
+> **Each environment gets its own plan IDs.** Test-mode plans and live-mode plans are completely separate in Razorpay. You must run the script once per environment.
+
+#### Retry Safety
+
+If the script fails mid-execution (e.g., network error after creating the Popular plan but before creating the Advanced plan):
+1. Re-run with `--execute`
+2. The successfully created Popular plan is **detected and skipped**
+3. Only the Advanced plan is created
+4. Both plan IDs are output
+
+### 4.3 Plan ID Storage & Management
+
+Razorpay plan IDs are stored as environment variables and mapped to internal plan IDs in `subscription.config.js`:
 
 ```
-RAZORPAY_PLAN_ID_POPULAR=plan_ABC123
-RAZORPAY_PLAN_ID_ADVANCED=plan_DEF456
+server/.env                          subscription.config.js
+─────────────────────────            ──────────────────────────────────
+RAZORPAY_PLAN_ID_POPULAR=plan_xxx → PLANS[PLAN_POPULAR].razorpayPlanId
+RAZORPAY_PLAN_ID_ADVANCED=plan_xxx → PLANS[PLAN_ADVANCED].razorpayPlanId
 ```
 
-> **Plans are immutable** in Razorpay. To change pricing, create a new plan and migrate existing subscribers. See Section 18 for plan migration strategy.
+The mapping flow:
+1. The provisioning script creates plans on Razorpay → outputs plan IDs
+2. Plan IDs are set in `.env` → loaded by `config/index.js`
+3. `subscription.config.js` references `config.razorpay.planIdPopular` / `config.razorpay.planIdAdvanced`
+4. At runtime, `resolveRazorpayPlanId()` maps a Razorpay plan ID back to an internal plan ID (used in webhook processing)
 
-### 4.4 Creating Plans via Dashboard
+### 4.4 Handling Future Pricing Changes
 
-1. Navigate to: Dashboard → Subscriptions → Plans → Create Plan
-2. Fill in:
-   - **Plan Name:** EverCut Popular Plan / EverCut Advanced Plan
-   - **Billing Amount:** ₹299 / ₹499
-   - **Billing Frequency:** Monthly
-   - **Description:** (as above)
-3. Save and note the Plan ID
+Razorpay plans are **immutable** — you cannot change the amount, period, or name of an existing plan. If pricing needs to change:
+
+| Step | Action |
+|---|---|
+| 1 | Update `EVERCUT_PLANS` in `create-razorpay-plans.mjs` with new amounts/names |
+| 2 | Update `PLANS` in `subscription.config.js` with new pricing |
+| 3 | Run `node scripts/create-razorpay-plans.mjs --execute` — creates NEW plans (old plans are not matched due to different amounts) |
+| 4 | Update `RAZORPAY_PLAN_ID_POPULAR` and `RAZORPAY_PLAN_ID_ADVANCED` in `.env` with the new plan IDs |
+| 5 | Deploy — new subscriptions use the new plans |
+| 6 | Existing subscribers remain on their current Razorpay plan until they cancel or the subscription is migrated via Razorpay's Update Subscription API |
+
+> **Rollback:** If a pricing change needs to be reverted, simply revert the `.env` plan IDs to the previous values. The old Razorpay plans still exist and are unchanged.
+
+### 4.5 Why Not Dashboard / Manual API Creation?
+
+The script-driven approach is preferred over manual creation because:
+
+| Concern | Dashboard/curl | Provisioning Script |
+|---|---|---|
+| **Repeatability** | Error-prone (typos in amounts, wrong periods) | Deterministic from code |
+| **Idempotency** | No protection against duplicates | Detects and skips existing plans |
+| **Auditability** | No record of what was created or when | Script is version-controlled |
+| **Multi-environment** | Must remember to do it in each environment | Same script, different `.env` |
+| **Production safety** | One wrong click can create a live plan | Requires `RAZORPAY_CONFIRM_LIVE=true` |
+| **Onboarding** | New developer must know exact plan specs | New developer runs one command |
 
 ---
 
@@ -547,7 +621,7 @@ RAZORPAY_KEY_SECRET=XXXXXXXXXXXXXXXXXXXXXXXX        # Key secret from Razorpay d
 # Webhook security
 RAZORPAY_WEBHOOK_SECRET=XXXXXXXXXXXXXXXXXXXXXXXX    # Webhook signing secret
 
-# Plan IDs (created via Razorpay API/dashboard)
+# Plan IDs (created via: node scripts/create-razorpay-plans.mjs --execute)
 RAZORPAY_PLAN_ID_POPULAR=plan_XXXXXXXXXXXXXX        # Popular plan (₹299/month)
 RAZORPAY_PLAN_ID_ADVANCED=plan_XXXXXXXXXXXXXX       # Advanced plan (₹499/month)
 
@@ -628,8 +702,8 @@ Razorpay sandbox uses the **same API base URL** (`https://api.razorpay.com`) but
 - [ ] UPI AutoPay activation confirmed
 - [ ] Live API keys generated and stored in production secrets manager
 - [ ] Live webhook secret generated and stored
-- [ ] Plans created in live mode with correct pricing
-- [ ] Plan IDs updated in production environment variables
+- [ ] Plans provisioned in live mode via `RAZORPAY_CONFIRM_LIVE=true node scripts/create-razorpay-plans.mjs --execute`
+- [ ] Plan IDs verified via `node scripts/create-razorpay-plans.mjs --list` and updated in production environment variables
 - [ ] Webhook URL set to production API endpoint (`https://api.evercut.com/api/v1/subscriptions/webhook`)
 - [ ] SSL certificate valid on webhook endpoint
 - [ ] Webhook signature verification tested with live keys

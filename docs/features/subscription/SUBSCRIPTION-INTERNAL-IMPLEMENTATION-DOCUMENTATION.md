@@ -3838,7 +3838,7 @@ RAZORPAY_KEY_SECRET=xxxxxxxxxxxxxxxxxxxxxxxx
 RAZORPAY_WEBHOOK_SECRET=xxxxxxxxxxxxxxxxxxxxxxxx
 RAZORPAY_ENV=SANDBOX
 
-# Razorpay Plan IDs (created via Razorpay Dashboard or API)
+# Razorpay Plan IDs (created via: node scripts/create-razorpay-plans.mjs --execute)
 RAZORPAY_PLAN_ID_POPULAR=plan_xxxxxxxxxxxxxxxx
 RAZORPAY_PLAN_ID_ADVANCED=plan_xxxxxxxxxxxxxxxx
 ```
