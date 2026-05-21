@@ -204,6 +204,52 @@ node scripts/cleanup-orphaned-fields.mjs --write
 
 ---
 
+## `create-razorpay-plans.mjs`
+
+Provisions EverCut's subscription plans (Popular, Advanced) on Razorpay. The Basic plan is free and does not require a Razorpay plan.
+
+**Key design properties:**
+
+| Property | Details |
+|---|---|
+| **Idempotent** | Detects existing plans by name + amount + period. Running twice will NOT create duplicates. |
+| **Safe by default** | Default mode is dry run — shows what would be created without actually creating anything. |
+| **Production guard** | Refuses to create plans in LIVE mode unless `RAZORPAY_CONFIRM_LIVE=true` is set. |
+| **ESM format** | Uses `import/export` matching the EverCut codebase convention. |
+
+**Usage:**
+
+```bash
+# Dry run — show what would be created (default, safe)
+node scripts/create-razorpay-plans.mjs
+
+# Actually create plans on Razorpay
+node scripts/create-razorpay-plans.mjs --execute
+
+# List all existing plans on Razorpay (verification)
+node scripts/create-razorpay-plans.mjs --list
+
+# Help
+node scripts/create-razorpay-plans.mjs --help
+```
+
+**Prerequisites:**
+- `RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET` in `.env`
+- `npm install razorpay` (if not already installed)
+
+**After running:** Copy the output plan IDs into your `.env`:
+```env
+RAZORPAY_PLAN_ID_POPULAR=plan_xxxxxxxxxxxxxxxx
+RAZORPAY_PLAN_ID_ADVANCED=plan_xxxxxxxxxxxxxxxx
+```
+
+**Plan pricing changes:** Razorpay plans are immutable once created. If you change pricing, create new plans (with new names/amounts) and update the plan IDs in `.env`. Old plans remain on Razorpay but are simply unused.
+
+**For LIVE (production) mode:**
+```bash
+RAZORPAY_CONFIRM_LIVE=true node scripts/create-razorpay-plans.mjs --execute
+```
+
 ## Generated files *(gitignored)*
 
 | File | Created by | Purpose |
