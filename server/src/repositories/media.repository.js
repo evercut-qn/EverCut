@@ -148,6 +148,25 @@ class MediaRepository {
         })).limit(limit);
     }
 
+    async findDeletedMedia(cutoffDate, limit = 100) {
+        return Media.find({
+            status: MEDIA_STATUS.DELETED,
+            updatedAt: { $lt: cutoffDate },
+        }).limit(limit);
+    }
+
+    async findByR2Key(r2Key) {
+        return Media.findOne({ r2Key }).lean();
+    }
+
+    async softDeleteById(id) {
+        return Media.findByIdAndUpdate(
+            id,
+            { $set: { status: MEDIA_STATUS.DELETED } },
+            { returnDocument: 'after' }
+        );
+    }
+
     async deleteById(id) {
         return Media.findByIdAndDelete(id);
     }

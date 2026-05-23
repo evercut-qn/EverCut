@@ -387,7 +387,75 @@
       ]
     },
     {
-      "name": "8. Update PIN",
+      "name": "8. Remove Profile Picture",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": "{{base_url}}/{{api_prefix}}/shops/me/media/picture",
+        "description": "Removes the barber profile picture."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
+              "});",
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "9. Remove Cover Image",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": "{{base_url}}/{{api_prefix}}/shops/me/media/cover",
+        "description": "Removes the shop cover image."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
+              "});",
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "10. Update PIN",
       "request": {
         "method": "PATCH",
         "header": [
@@ -449,7 +517,7 @@
       ]
     },
     {
-      "name": "9. Sign-Out Everywhere (Terminal)",
+      "name": "11. Sign-Out Everywhere (Terminal)",
       "request": {
         "method": "DELETE",
         "header": [],
@@ -483,7 +551,7 @@
       ]
     },
     {
-      "name": "10. Delete Account (Terminal)",
+      "name": "12. Delete Account (Terminal)",
       "request": {
         "method": "DELETE",
         "header": [

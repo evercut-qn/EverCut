@@ -483,7 +483,27 @@ const customerCollection = {
       }),
     },
     {
-      name: '3. Get Services By Gender And Capture IDs',
+      name: '3. Update Profile Picture',
+      ...request({
+        method: 'PATCH',
+        url: '{{base_url}}/{{api_prefix}}/customers/me/media/picture',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "mediaId": "{{shared_media_id}}"\n}`),
+        description: 'Replaces the customer profile picture with a confirmed R2 media object.',
+        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
+      }),
+    },
+    {
+      name: '4. Remove Profile Picture',
+      ...request({
+        method: 'DELETE',
+        url: '{{base_url}}/{{api_prefix}}/customers/me/media/picture',
+        description: 'Removes the customer profile picture and deletes the associated R2 object.',
+        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
+      }),
+    },
+    {
+      name: '5. Get Services By Gender And Capture IDs',
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/shops/services?gender=men&coordinates={{coordinates}}',
@@ -1067,7 +1087,25 @@ const barberProfileCollection = {
       }),
     },
     {
-      name: '8. Update PIN',
+      name: '8. Remove Profile Picture',
+      ...request({
+        method: 'DELETE',
+        url: '{{base_url}}/{{api_prefix}}/shops/me/media/picture',
+        description: 'Removes the barber profile picture.',
+        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
+      }),
+    },
+    {
+      name: '9. Remove Cover Image',
+      ...request({
+        method: 'DELETE',
+        url: '{{base_url}}/{{api_prefix}}/shops/me/media/cover',
+        description: 'Removes the shop cover image.',
+        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
+      }),
+    },
+    {
+      name: '10. Update PIN',
       ...request({
         method: 'PATCH',
         url: '{{base_url}}/{{api_prefix}}/shops/me/security',
@@ -1090,7 +1128,7 @@ const barberProfileCollection = {
       }),
     },
     {
-      name: '9. Sign-Out Everywhere (Terminal)',
+      name: '11. Sign-Out Everywhere (Terminal)',
       ...request({
         method: 'DELETE',
         url: '{{base_url}}/{{api_prefix}}/account/sessions',
@@ -1099,7 +1137,7 @@ const barberProfileCollection = {
       }),
     },
     {
-      name: '10. Delete Account (Terminal)',
+      name: '12. Delete Account (Terminal)',
       ...request({
         method: 'DELETE',
         url: '{{base_url}}/{{api_prefix}}/account',
@@ -1440,7 +1478,7 @@ const barberBookingsCollection = {
       }),
     },
     {
-      name: '4. Get Pending Confirmations',
+      name: '3. Get Pending Confirmations',
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/bookings?status=awaiting_confirmation&paymentStatus=success',
@@ -1449,7 +1487,7 @@ const barberBookingsCollection = {
       }),
     },
     {
-      name: '5. Get Confirmed Bookings',
+      name: '4. Get Confirmed Bookings',
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/bookings?status=confirmed',
@@ -1458,7 +1496,7 @@ const barberBookingsCollection = {
       }),
     },
     {
-      name: '6. Get Bookings By Employee',
+      name: '5. Get Bookings By Employee',
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/bookings?employeeId={{employee_id}}',
@@ -1477,7 +1515,7 @@ const barberBookingsCollection = {
       }),
     },
     {
-      name: '7. Get Bookings By Date Range',
+      name: '6. Get Bookings By Date Range',
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/bookings?dateFrom={{booking_date}}&dateTo={{booking_date}}',
@@ -1486,7 +1524,7 @@ const barberBookingsCollection = {
       }),
     },
     {
-      name: '8. Get Employee Bookings In Date Range',
+      name: '7. Get Employee Bookings In Date Range',
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/bookings?employeeId={{employee_id}}&dateFrom={{booking_date}}&dateTo={{booking_date}}',
@@ -1495,7 +1533,7 @@ const barberBookingsCollection = {
       }),
     },
     {
-      name: '9. Get Employee Bookings With Status Filter',
+      name: '8. Get Employee Bookings With Status Filter',
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/bookings?employeeId={{employee_id}}&status=confirmed,awaiting_confirmation',
@@ -1504,7 +1542,7 @@ const barberBookingsCollection = {
       }),
     },
     {
-      name: '10. Confirm Booking',
+      name: '9. Confirm Booking',
       ...request({
         method: 'PATCH',
         url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id_status}}',
@@ -1515,7 +1553,7 @@ const barberBookingsCollection = {
       }),
     },
     {
-      name: '11. Update Booking Status',
+      name: '10. Update Booking Status',
       ...request({
         method: 'PATCH',
         url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id_status}}',
@@ -1526,7 +1564,7 @@ const barberBookingsCollection = {
       }),
     },
     {
-      name: '12. Cancel Paid Booking (Terminal)',
+      name: '11. Cancel Paid Booking (Terminal)',
       ...request({
         method: 'PATCH',
         url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id_delete}}',

@@ -511,6 +511,12 @@ Future<void> attachToGallery(List<String> mediaIds) async {
 | 7 | `GET` | `/api/v1/media/gallery/stats` | `Access` | `BARBER` | — | Get gallery stats (count, size) |
 | 8 | `GET` | `/api/v1/media/:id` | `Access` | Owner | — | Get media by ID |
 | 9 | `DELETE` | `/api/v1/media/:id` | `Access` | Owner | — | Soft-delete media + R2 object |
+| 10 | `PATCH` | `/api/v1/customers/me/media/picture` | `Access` | Customer | `application/json` | Set customer profile picture |
+| 11 | `DELETE` | `/api/v1/customers/me/media/picture` | `Access` | Customer | — | Remove customer profile picture |
+| 12 | `PATCH` | `/api/v1/shops/me/media/picture` | `Access` | Barber | `application/json` | Set barber profile picture |
+| 13 | `DELETE` | `/api/v1/shops/me/media/picture` | `Access` | Barber | — | Remove barber profile picture |
+| 14 | `PATCH` | `/api/v1/shops/me/media/cover` | `Access` | Barber | `application/json` | Set shop cover image |
+| 15 | `DELETE` | `/api/v1/shops/me/media/cover` | `Access` | Barber | — | Remove shop cover image |
 
 ---
 

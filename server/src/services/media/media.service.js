@@ -335,6 +335,80 @@ export const updateBarberProfilePicture = async (ownerId, mediaId) => {
     return { photoUrl, profilePhotoUrl: photoUrl, ownerPhotoUrl: photoUrl };
 };
 
+export const updateCustomerProfilePicture = async (ownerId, mediaId) => {
+    if (!mediaId) throw new BadRequestError('No profile picture media ID provided');
+    const { default: customerRepository } = await import('../../repositories/customer.repository.js');
+    const customer = await customerRepository.findByUserId(ownerId);
+    if (!customer) throw new NotFoundError('Customer profile');
+
+    const media = await mediaRepository.findReadyByIdAndUser(mediaId, ownerId);
+    if (!media) throw new BadRequestError('Invalid or unconfirmed photo');
+
+    const oldR2Key = customer.photoR2Key;
+    const updated = await customerRepository.updateByUserId(ownerId, { photoR2Key: media.r2Key });
+    await mediaRepository.updateById(mediaId, {
+        entityId: customer._id,
+        entityType: MEDIA_ENTITY_TYPE.CUSTOMER,
+        purpose: MEDIA_PURPOSE.PROFILE,
+    });
+    if (oldR2Key && oldR2Key !== media.r2Key) {
+        storageProvider.deleteObject(oldR2Key).catch(() => {});
+        const oldMedia = await mediaRepository.findByR2Key(oldR2Key);
+        if (oldMedia) await mediaRepository.softDeleteById(oldMedia._id);
+    }
+
+    return { photoUrl: buildMediaUrl(updated.photoR2Key) };
+};
+
+export const removeShopCover = async (ownerId) => {
+    const shop = await shopRepository.findByBarberUserId(ownerId);
+    if (!shop) throw new NotFoundError('Shop profile');
+
+    const oldR2Key = shop.coverR2Key;
+    if (!oldR2Key) return { message: 'No cover photo to remove' };
+
+    await shopRepository.updateByBarberUserId(ownerId, { coverR2Key: null });
+
+    storageProvider.deleteObject(oldR2Key).catch(() => {});
+    const oldMedia = await mediaRepository.findByR2Key(oldR2Key);
+    if (oldMedia) await mediaRepository.softDeleteById(oldMedia._id);
+
+    return { message: 'Cover photo removed successfully' };
+};
+
+export const removeBarberProfilePicture = async (ownerId) => {
+    const barber = await barberRepository.findByUserId(ownerId);
+    if (!barber) throw new NotFoundError('Barber profile');
+
+    const oldR2Key = barber.photoR2Key;
+    if (!oldR2Key) return { message: 'No profile picture to remove' };
+
+    await barberRepository.updateByUserId(ownerId, { photoR2Key: null });
+
+    storageProvider.deleteObject(oldR2Key).catch(() => {});
+    const oldMedia = await mediaRepository.findByR2Key(oldR2Key);
+    if (oldMedia) await mediaRepository.softDeleteById(oldMedia._id);
+
+    return { message: 'Profile picture removed successfully' };
+};
+
+export const removeCustomerProfilePicture = async (ownerId) => {
+    const { default: customerRepository } = await import('../../repositories/customer.repository.js');
+    const customer = await customerRepository.findByUserId(ownerId);
+    if (!customer) throw new NotFoundError('Customer profile');
+
+    const oldR2Key = customer.photoR2Key;
+    if (!oldR2Key) return { message: 'No profile picture to remove' };
+
+    await customerRepository.updateByUserId(ownerId, { photoR2Key: null });
+
+    storageProvider.deleteObject(oldR2Key).catch(() => {});
+    const oldMedia = await mediaRepository.findByR2Key(oldR2Key);
+    if (oldMedia) await mediaRepository.softDeleteById(oldMedia._id);
+
+    return { message: 'Profile picture removed successfully' };
+};
+
 export const resolveMediaForEntity = async (userId, mediaId) => {
     if (!mediaId) return null;
     const media = await mediaRepository.findReadyByIdAndUser(mediaId, userId);

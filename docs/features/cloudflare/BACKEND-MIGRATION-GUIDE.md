@@ -385,7 +385,11 @@ server/src/
 | Route | Change |
 |-------|--------|
 | `PATCH /shops/me/media/cover` | No longer accepts file upload; accepts `{ mediaId }` in JSON body |
+| `DELETE /shops/me/media/cover` | Removes shop cover image and triggers R2 soft delete |
 | `PATCH /shops/me/media/picture` | No longer accepts file upload; accepts `{ mediaId }` in JSON body |
+| `DELETE /shops/me/media/picture` | Removes barber profile picture and triggers R2 soft delete |
+| `PATCH /customers/me/media/picture` | Sets customer profile picture using a confirmed `{ mediaId }` |
+| `DELETE /customers/me/media/picture` | Removes customer profile picture and triggers R2 soft delete |
 | `POST /employees` | `photo` field becomes `photoMediaId` in JSON body |
 | `PATCH /employees/:id` | Same — `photoMediaId` replaces file field |
 | `PATCH /customers/me` | Same — `photoMediaId` replaces file field |
@@ -2318,8 +2322,6 @@ The `updateBarberProfilePicture` function previously in `account.service.js` is 
 
 
 ## 14. Implementation Guide — Serializer Updates
-
-### 14.1 Core Serializer Update
 
 ```diff
 // serializers/core.serializer.js — UPDATE SENSITIVE_KEYS

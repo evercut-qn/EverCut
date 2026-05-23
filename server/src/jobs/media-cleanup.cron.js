@@ -25,6 +25,23 @@ export const cleanupOrphanedUploads = async () => {
         }
     }
 
+    const deletedCutoff = new Date(Date.now() - 3600_000); // 1 hour ago
+    const deletedMedia = await mediaRepository.findDeletedMedia(deletedCutoff, 100);
+    
+    for (const media of deletedMedia) {
+        try {
+            await storageProvider.deleteObject(media.r2Key);
+            await mediaRepository.deleteById(media._id);
+            cleaned += 1;
+        } catch (err) {
+            logger.warn('Deleted media cleanup failed', {
+                mediaId: media._id?.toString(),
+                r2Key: media.r2Key,
+                error: err.message,
+            });
+        }
+    }
+
     logger.info('Orphan media cleanup complete', { cleaned });
     return { cleaned };
 };

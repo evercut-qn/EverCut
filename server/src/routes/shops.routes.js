@@ -38,7 +38,9 @@ router.get('/me/payout-details', authenticate, authorize(ROLES.BARBER), shopCont
 router.patch('/me/payout-details', authenticate, authorize(ROLES.BARBER), validate(updatePayoutDetailsSchema, 'body'), shopController.updatePayoutDetails);
 router.patch('/me/security', authenticate, authorize(ROLES.BARBER), validate(updatePinSchema, 'body'), shopController.updateMyPin);
 router.patch('/me/media/picture', authenticate, authorize(ROLES.BARBER), validate(mediaIdBodySchema, 'body'), shopController.updateMyPicture);
+router.delete('/me/media/picture', authenticate, authorize(ROLES.BARBER), shopController.removeMyPicture);
 router.patch('/me/media/cover', authenticate, authorize(ROLES.BARBER), validate(mediaIdBodySchema, 'body'), shopController.updateMyCover);
+router.delete('/me/media/cover', authenticate, authorize(ROLES.BARBER), shopController.removeMyCover);
 
 // ============================================================================
 // Resource Routes (with :id parameter)

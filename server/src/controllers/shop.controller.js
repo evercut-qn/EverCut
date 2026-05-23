@@ -87,6 +87,24 @@ export const updateMyPicture = async (req, res, next) => {
     }
 };
 
+export const removeMyCover = async (req, res, next) => {
+    try {
+        const result = await mediaService.removeShopCover(req.user._id);
+        return res.status(200).json(ApiResponse.success(result, 'Cover image removed'));
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const removeMyPicture = async (req, res, next) => {
+    try {
+        const result = await mediaService.removeBarberProfilePicture(req.user._id);
+        return res.status(200).json(ApiResponse.success(result, 'Profile picture removed'));
+    } catch (err) {
+        next(err);
+    }
+};
+
 export const getShopById = async (req, res, next) => {
     try {
         const params = getValidatedRequestData(req, 'params');

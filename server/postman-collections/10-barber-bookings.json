@@ -190,7 +190,7 @@
       ]
     },
     {
-      "name": "4. Get Pending Confirmations",
+      "name": "3. Get Pending Confirmations",
       "request": {
         "method": "GET",
         "header": [],
@@ -224,7 +224,7 @@
       ]
     },
     {
-      "name": "5. Get Confirmed Bookings",
+      "name": "4. Get Confirmed Bookings",
       "request": {
         "method": "GET",
         "header": [],
@@ -258,7 +258,7 @@
       ]
     },
     {
-      "name": "6. Get Bookings By Employee",
+      "name": "5. Get Bookings By Employee",
       "request": {
         "method": "GET",
         "header": [],
@@ -300,7 +300,7 @@
       ]
     },
     {
-      "name": "7. Get Bookings By Date Range",
+      "name": "6. Get Bookings By Date Range",
       "request": {
         "method": "GET",
         "header": [],
@@ -334,7 +334,7 @@
       ]
     },
     {
-      "name": "8. Get Employee Bookings In Date Range",
+      "name": "7. Get Employee Bookings In Date Range",
       "request": {
         "method": "GET",
         "header": [],
@@ -368,7 +368,7 @@
       ]
     },
     {
-      "name": "9. Get Employee Bookings With Status Filter",
+      "name": "8. Get Employee Bookings With Status Filter",
       "request": {
         "method": "GET",
         "header": [],
@@ -402,7 +402,7 @@
       ]
     },
     {
-      "name": "10. Confirm Booking",
+      "name": "9. Confirm Booking",
       "request": {
         "method": "PATCH",
         "header": [
@@ -450,7 +450,7 @@
       ]
     },
     {
-      "name": "11. Update Booking Status",
+      "name": "10. Update Booking Status",
       "request": {
         "method": "PATCH",
         "header": [
@@ -498,7 +498,7 @@
       ]
     },
     {
-      "name": "12. Cancel Paid Booking (Terminal)",
+      "name": "11. Cancel Paid Booking (Terminal)",
       "request": {
         "method": "PATCH",
         "header": [
