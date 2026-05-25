@@ -338,10 +338,24 @@
     {
       "name": "6. Add Favorite Shop",
       "request": {
-        "method": "PUT",
-        "header": [],
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
         "url": "{{base_url}}/{{api_prefix}}/shops/{{shop_id}}/favorite",
-        "description": "Adds the captured shop to the authenticated customer favorite shops list through the shop discovery flow."
+        "description": "Adds the captured shop to the authenticated customer favorite shops list through the shop discovery flow.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"favorite\": true\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
       },
       "event": [
         {
@@ -406,10 +420,24 @@
     {
       "name": "8. Remove Favorite Shop",
       "request": {
-        "method": "DELETE",
-        "header": [],
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
         "url": "{{base_url}}/{{api_prefix}}/shops/{{shop_id}}/favorite",
-        "description": "Removes the captured shop from the authenticated customer favorite shops list."
+        "description": "Removes the captured shop from the authenticated customer favorite shops list.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"favorite\": false\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
       },
       "event": [
         {
@@ -476,7 +504,7 @@
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/services/search?query={{service_search_query}}&gender=male",
+        "url": "{{base_url}}/{{api_prefix}}/services/search?query={{service_search_query}}&gender=men",
         "description": "Searches the customer-visible service catalogue for the services created by the barber service collection."
       },
       "event": [

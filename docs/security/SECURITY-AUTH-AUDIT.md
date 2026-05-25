@@ -153,7 +153,7 @@ The strict rule: **User identity MUST always come from `req.user` (set by auth m
 | Controller | Function | Identity Source | Status |
 |---|---|---|---|
 | `barber-booking.controller` | `getBookings` | `req.user._id` | ✅ |
-| `barber-booking.controller` | `getBookingStats` | `req.user._id` | ✅ |
+| `barber-booking.controller` | `getBookingAnalytics` | `req.user._id` | ✅ |
 | `barber-booking.controller` | `updateBookingStatus` | `req.user._id` | ✅ |
 | `barber-booking.controller` | `deleteBooking` | `req.user._id` | ✅ |
 | `barber-booking.controller` | `getBookingsByStatus` | `req.user._id` | ✅ |
@@ -186,7 +186,7 @@ The strict rule: **User identity MUST always come from `req.user` (set by auth m
 | `barber-shop.controller` | `updateBusinessInfo` | `req.user._id` | ✅ |
 | `barber-shop.controller` | `getUpiDetails` | `req.user._id` | ✅ |
 | `barber-shop.controller` | `updateUpiDetails` | `req.user._id` | ✅ |
-| `barber-shop.controller` | `toggleShopStatus` | `req.user._id` | ✅ |
+| `barber-shop.controller` | `updateBusinessInfo isOpen handling` | `req.user._id` | ✅ |
 | `customer-booking.controller` | `bookSalon` | `req.user._id` | ✅ |
 | `customer-booking.controller` | `getBookings` | `req.user._id` | ✅ |
 | `customer-booking.controller` | `getBookingDetails` | `req.user._id` | ✅ |
@@ -222,8 +222,8 @@ The strict rule: **User identity MUST always come from `req.user` (set by auth m
 | `photo.getPhotoById` | scoped by `shopId` via ownerId | ✅ |
 | `photo.deletePhoto` | scoped by `shopId` via ownerId | ✅ |
 | `rating.removeRating` | `rating.shopId === shop._id` | ✅ |
-| `rating.addReplyToRating` | `rating.shopId === shop._id` | ✅ |
-| `rating.updateReplyToRating` | `rating.shopId === shop._id` | ✅ |
+| `rating.upsertReplyToRating` | `rating.shopId === shop._id` | ✅ |
+| `rating.upsertReplyToRating` | `rating.shopId === shop._id` | ✅ |
 | `rating.deleteReplyFromRating` | `rating.shopId === shop._id` | ✅ |
 | `serviceCatalog.updateService` | scoped by `shopId` | ✅ |
 | `serviceCatalog.deleteService` | scoped by `shopId` | ✅ |
@@ -372,8 +372,8 @@ if (updateData.phoneNumber) {
     }
 }
 
-// shop.service.js L316-323
-const updated = await shopRepository.updateByOwnerId(ownerId, updateData);
+// shop.service.js
+const updated = await shopRepository.updateByBarberUserId(ownerId, updateData);
 const userUpdates = {};
 if (updateData.email) userUpdates.email = updateData.email;
 if (updateData.phoneNumber) userUpdates.phoneNumber = updateData.phoneNumber;
@@ -656,12 +656,13 @@ export const getServicesByGender = async (gender) => {
 **Code:**
 ```javascript
 import shopRepository from '../../repositories/shop.repository.js';
+import barberRepository from '../../repositories/barber.repository.js';
 
 // In updatePin:
-const shop = await shopRepository.findByOwnerId(req.user._id);
-if (!shop) throw new NotFoundError('Shop profile');
+const barber = await barberRepository.findByUserId(req.user._id);
+if (!barber) throw new NotFoundError('Barber profile');
 // ...
-await shopRepository.updateByOwnerId(req.user._id, { pinHash: newHash });
+await barberRepository.updateById(barber._id, { pinHash: newHash });
 ```
 
 **Issue:** The controller directly imports and calls `shopRepository`, bypassing the service layer. PIN update logic should be in a service function.

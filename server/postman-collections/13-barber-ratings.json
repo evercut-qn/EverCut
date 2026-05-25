@@ -105,7 +105,7 @@
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/ratings/summary",
+        "url": "{{base_url}}/{{api_prefix}}/ratings/analytics",
         "description": "Returns aggregate rating metrics for the authenticated barber shop."
       },
       "event": [
@@ -137,7 +137,7 @@
     {
       "name": "3. Add Reply",
       "request": {
-        "method": "POST",
+        "method": "PUT",
         "header": [
           {
             "key": "Content-Type",

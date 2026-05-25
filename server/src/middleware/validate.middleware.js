@@ -1,6 +1,5 @@
 import { BadRequestError } from '../utils/api-error.js';
 import { storeValidatedRequestData } from '../utils/request-validation.utils.js';
-import { cleanupUploadedAssets } from '../utils/upload-cleanup.utils.js';
 
 /**
  * Generic validation middleware factory.
@@ -26,7 +25,6 @@ export const validate = (schema, source = 'body') => {
 
         if (error) {
             const errors = error.details.map((d) => d.message);
-            await cleanupUploadedAssets(req, `validate:${source}`);
             return next(new BadRequestError('Validation failed', errors));
         }
 

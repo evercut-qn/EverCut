@@ -1,0 +1,728 @@
+{
+  "info": {
+    "name": "EverCut - Barber Media",
+    "description": "Cloudflare R2 media workflow: presign, direct upload, confirm, attach to gallery, read, stats, and delete. Also includes onboarding media uploads and validation scenarios.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{barber_access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Automatically pull IDs from Globals ONLY if user hasn't manually set them in Collection Variables.",
+          "const syncGlobalToCollection = (globalKey, collectionKey = globalKey) => {",
+          "  const globalVal = pm.globals.get(globalKey);",
+          "  const collVal = pm.collectionVariables.get(collectionKey);",
+          "  if (globalVal && !collVal) {",
+          "    pm.collectionVariables.set(collectionKey, globalVal);",
+          "  }",
+          "};",
+          "syncGlobalToCollection('shared_media_id', 'media_id');"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:5000",
+      "type": "string",
+      "description": "Default local API server"
+    },
+    {
+      "key": "api_prefix",
+      "value": "api/v1",
+      "type": "string",
+      "description": "API prefix used by every request"
+    },
+    {
+      "key": "media_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "media_upload_url",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "media_upload_content_type",
+      "value": "image/png",
+      "type": "string"
+    },
+    {
+      "key": "media_upload_content_length",
+      "value": "406926",
+      "type": "string"
+    },
+    {
+      "key": "onboarding_media_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "onboarding_media_upload_url",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "onboarding_media_upload_content_type",
+      "value": "image/png",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Request Upload URL",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/{{api_prefix}}/media/upload-url",
+        "description": "Creates a pending Media record and returns a presigned R2 PUT URL. Keep sizeBytes equal to the binary file size used in the direct PUT. The Content-Type header for the PUT must match the contentType declared in this request.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"contentType\": \"{{media_upload_content_type}}\",\n  \"sizeBytes\": {{media_upload_content_length}},\n  \"purpose\": \"gallery\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
+              "});",
+              "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
+              "const response = pm.response.json();",
+              "const data = response.data || {};",
+              "if (data.mediaId) { pm.collectionVariables.set('media_id', data.mediaId); pm.globals.set('shared_media_id', data.mediaId); }",
+              "if (data.uploadUrl) pm.collectionVariables.set('media_upload_url', data.uploadUrl);",
+              "pm.collectionVariables.set('media_upload_content_type', 'image/png');",
+              "pm.test('upload URL includes SigV4 date', function () { pm.expect(data.uploadUrl).to.include('X-Amz-Date='); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Direct PUT To R2",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "{{media_upload_content_type}}"
+          }
+        ],
+        "url": "{{media_upload_url}}",
+        "description": "Uploads the binary file directly to Cloudflare R2 using the presigned URL. This request is sent to R2, not the EverCut API. Keep Authorization set to No Auth and preserve the full query string in media_upload_url.",
+        "body": {
+          "mode": "file",
+          "file": {
+            "src": "assets/sample-upload.png"
+          }
+        },
+        "auth": {
+          "type": "noauth"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200 or 201', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+              "pm.test('request does not send Authorization to R2', function () { pm.expect(pm.request.headers.has('Authorization')).to.equal(false); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Confirm Upload",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/{{api_prefix}}/media/confirm",
+        "description": "Verifies the uploaded object in R2, checks content metadata, and marks the Media record ready.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"mediaId\": \"{{media_id}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
+              "});",
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Attach To Gallery",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/{{api_prefix}}/media/gallery",
+        "description": "Attaches a confirmed media object to the authenticated barber shop gallery.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"mediaIds\": [\"{{media_id}}\"]\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
+              "});",
+              "pm.test('status is 201', function () { pm.response.to.have.status(201); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Get Gallery And Capture Existing ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/{{api_prefix}}/media/gallery",
+        "description": "Lists the current gallery and captures the first media ID."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
+              "});",
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "const response = pm.response.json();",
+              "const media = Array.isArray(response.data) ? response.data : [];",
+              "const firstMedia = media[0];",
+              "if (firstMedia && firstMedia.id) { pm.collectionVariables.set('media_id', firstMedia.id); pm.globals.set('shared_media_id', firstMedia.id); }"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Get Gallery Stats",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/{{api_prefix}}/media/gallery/stats",
+        "description": "Returns gallery media counts and storage totals."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
+              "});",
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Get Media By ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/{{api_prefix}}/media/{{media_id}}",
+        "description": "Reads the currently captured media record."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
+              "});",
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Delete Media (Terminal)",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": "{{base_url}}/{{api_prefix}}/media/{{media_id}}",
+        "description": "Soft-deletes the captured Media record and requests R2 object deletion. Run this last if later requests still need the shared media ID."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
+              "});",
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "pm.collectionVariables.unset('media_id');",
+              "pm.globals.unset('shared_media_id');"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "9. Request Onboarding Upload URL",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/{{api_prefix}}/media/onboarding/upload-url",
+        "description": "Creates a temporary pending Media record for onboarding sessions. Requires an onboarding token from OTP verification for a new phone number. The Content-Type header for the PUT must match the contentType declared in this request.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"contentType\": \"{{media_upload_content_type}}\",\n  \"sizeBytes\": {{media_upload_content_length}},\n  \"purpose\": \"onboarding\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{barber_onboarding_token}}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
+              "});",
+              "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
+              "const response = pm.response.json();",
+              "const data = response.data || {};",
+              "if (data.mediaId) pm.collectionVariables.set('onboarding_media_id', data.mediaId);",
+              "if (data.uploadUrl) pm.collectionVariables.set('onboarding_media_upload_url', data.uploadUrl);",
+              "pm.collectionVariables.set('onboarding_media_upload_content_type', 'image/png');",
+              "pm.test('upload URL includes SigV4 date', function () { pm.expect(data.uploadUrl).to.include('X-Amz-Date='); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "10. Direct PUT Onboarding File To R2",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "{{onboarding_media_upload_content_type}}"
+          }
+        ],
+        "url": "{{onboarding_media_upload_url}}",
+        "description": "Uploads the onboarding binary file directly to Cloudflare R2 using the presigned URL. This request does not call the EverCut API.",
+        "body": {
+          "mode": "file",
+          "file": {
+            "src": "assets/sample-upload.png"
+          }
+        },
+        "auth": {
+          "type": "noauth"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('status is 200 or 201', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+              "pm.test('request does not send Authorization to R2', function () { pm.expect(pm.request.headers.has('Authorization')).to.equal(false); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "11. Confirm Onboarding Upload",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/{{api_prefix}}/media/onboarding/confirm",
+        "description": "Confirms an onboarding upload before it is consumed by POST /onboarding/customers or POST /onboarding/barbers as photoMediaId.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"mediaId\": \"{{onboarding_media_id}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{barber_onboarding_token}}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
+              "});",
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "12. Upload URL Requires Authentication",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/{{api_prefix}}/media/upload-url",
+        "description": "Negative test: regular upload URL creation requires a user JWT.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"contentType\": \"image/png\",\n  \"sizeBytes\": 100,\n  \"purpose\": \"gallery\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "auth": {
+          "type": "noauth"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
+              "});",
+              "pm.test('status is 401', function () { pm.response.to.have.status(401); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "13. Unsupported MIME Is Rejected",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/{{api_prefix}}/media/upload-url",
+        "description": "Negative test: the upload URL validator accepts only configured image/video MIME types.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"contentType\": \"application/pdf\",\n  \"sizeBytes\": 100,\n  \"purpose\": \"gallery\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
+              "});",
+              "pm.test('status is 400', function () { pm.response.to.have.status(400); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "14. Customer Cannot Attach Barber Gallery",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/{{api_prefix}}/media/gallery",
+        "description": "Negative test: gallery attachment is restricted to BARBER users.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"mediaIds\": [\"{{media_id}}\"]\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{customer_access_token}}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
+              "});",
+              "pm.test('status is 403', function () { pm.response.to.have.status(403); });"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

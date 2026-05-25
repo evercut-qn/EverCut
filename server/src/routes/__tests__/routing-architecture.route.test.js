@@ -31,7 +31,7 @@ test('route index mounts feature-oriented resources instead of legacy role prefi
         '/employees',
         '/services',
         '/bookings',
-        '/photos',
+        '/media',
         '/ratings',
         '/earnings',
         '/payments',
@@ -59,7 +59,6 @@ test('legacy role-prefixed route and controller files are removed after the migr
         'controllers/barber/barber-employee.controller.js',
         'controllers/barber/barber-service.controller.js',
         'controllers/barber/barber-booking.controller.js',
-        'controllers/barber/barber-photo.controller.js',
         'controllers/barber/barber-earnings.controller.js',
         'controllers/barber/barber-rating.controller.js',
     ];
@@ -93,7 +92,7 @@ test('feature routes and controllers use simple direct files instead of module i
         'routes/onboarding.routes.js',
         'routes/payment.routes.js',
         'routes/payout.routes.js',
-        'routes/photos.routes.js',
+        'routes/media.routes.js',
         'routes/ratings.routes.js',
         'routes/notifications.routes.js',
         'routes/services.routes.js',
@@ -106,7 +105,7 @@ test('feature routes and controllers use simple direct files instead of module i
         'controllers/onboarding.controller.js',
         'controllers/payment.controller.js',
         'controllers/payout.controller.js',
-        'controllers/photo.controller.js',
+        'controllers/media.controller.js',
         'controllers/rating.controller.js',
         'controllers/notification.controller.js',
         'controllers/service.controller.js',
@@ -123,7 +122,7 @@ test('feature routes and controllers use simple direct files instead of module i
         'routes/onboarding/index.js',
         'routes/payments/index.js',
         'routes/payouts/index.js',
-        'routes/photos/index.js',
+        'routes/media/index.js',
         'routes/ratings/index.js',
         'routes/services/index.js',
         'routes/shops/index.js',
@@ -136,7 +135,7 @@ test('feature routes and controllers use simple direct files instead of module i
         'controllers/onboarding/index.js',
         'controllers/payments/index.js',
         'controllers/payouts/index.js',
-        'controllers/photos/index.js',
+        'controllers/media/index.js',
         'controllers/ratings/index.js',
         'controllers/services/index.js',
         'controllers/shops/index.js',
@@ -197,6 +196,8 @@ test('booking discovery and payment routes use final resource-oriented URLs', as
 
     assert.match(shopRoutes, /router\.get\('\/:id\/employees'/);
     assert.match(shopRoutes, /router\.get\('\/:id\/availability'/);
+    assert.match(shopRoutes, /router\.get\('\/:id\/ratings'/);
+    assert.match(shopRoutes, /router\.get\('\/:id\/ratings\/analytics'/);
     assert.doesNotMatch(bookingRoutes, /\/shops\/:id\/availability/);
     assert.doesNotMatch(bookingRoutes, /\/shops\/:id\/employees/);
 
@@ -215,8 +216,20 @@ test('booking discovery and payment routes use final resource-oriented URLs', as
     assert.doesNotMatch(bookingRoutes, /\/:id\/reschedule/);
     assert.doesNotMatch(bookingRoutes, /\/:id\/reorder/);
     assert.doesNotMatch(bookingRoutes, /\/status/);
+    assert.doesNotMatch(bookingRoutes, /analytics\/summary/);
+    assert.doesNotMatch(bookingRoutes, /analytics\/milestones/);
+    assert.doesNotMatch(bookingRoutes, /analytics\/today/);
+    assert.doesNotMatch(bookingRoutes, /analytics\/queue/);
+    assert.match(bookingRoutes, /router\.get\('\/analytics'/);
+    assert.match(bookingRoutes, /router\.patch\('\/:id\/favorite'/);
+    assert.doesNotMatch(bookingRoutes, /router\.put\('\/:id\/favorite'/);
+    assert.doesNotMatch(bookingRoutes, /router\.delete\('\/:id\/favorite'/);
     assert.doesNotMatch(bookingRoutes, /\/pending-confirmations/);
     assert.doesNotMatch(bookingRoutes, /router\.delete\('\/:id'/);
+    assert.doesNotMatch(postmanSource, /analytics\/summary/);
+    assert.doesNotMatch(postmanSource, /analytics\/milestones/);
+    assert.doesNotMatch(postmanSource, /analytics\/today/);
+    assert.doesNotMatch(postmanSource, /analytics\/queue/);
 
     assert.doesNotMatch(postmanSource, /\/bookings\/shops/);
     assert.doesNotMatch(postmanSource, /\/payments\/initiate/);
@@ -242,14 +255,14 @@ test('favorite behavior is grouped by booking and shop flow, not a favorites mod
     assert.equal(await exists('controllers/favorite.controller.js'), false);
     assert.equal(await exists('services/favorites.service.js'), false);
 
-    assert.match(bookingRoutes, /router\.put\('\/:id\/favorite'/);
-    assert.match(bookingRoutes, /router\.delete\('\/:id\/favorite'/);
-    assert.doesNotMatch(bookingRoutes, /router\.patch\('\/:id\/favorite'/);
+    assert.match(bookingRoutes, /router\.patch\('\/:id\/favorite'/);
+    assert.doesNotMatch(bookingRoutes, /router\.put\('\/:id\/favorite'/);
+    assert.doesNotMatch(bookingRoutes, /router\.delete\('\/:id\/favorite'/);
 
     assert.match(shopRoutes, /router\.get\('\/favorites'/);
-    assert.match(shopRoutes, /router\.put\('\/:id\/favorite'/);
-    assert.match(shopRoutes, /router\.delete\('\/:id\/favorite'/);
-    assert.doesNotMatch(shopRoutes, /router\.patch\('\/:id\/favorite'/);
+    assert.match(shopRoutes, /router\.patch\('\/:id\/favorite'/);
+    assert.doesNotMatch(shopRoutes, /router\.put\('\/:id\/favorite'/);
+    assert.doesNotMatch(shopRoutes, /router\.delete\('\/:id\/favorite'/);
     assert.ok(
         shopRoutes.indexOf("router.get('/favorites'") < shopRoutes.indexOf("router.get('/:id'"),
         'GET /shops/favorites must be registered before GET /shops/:id',
@@ -272,24 +285,36 @@ test('shops and employees expose the normalized me, payout, availability, and an
     );
 
     assert.match(shopRoutes, /router\.get\('\/me'/);
+    assert.ok(
+        shopRoutes.indexOf("router.get('/me'") < shopRoutes.indexOf("router.get('/:id'"),
+        'GET /shops/me must be registered before GET /shops/:id',
+    );
     assert.match(shopRoutes, /router\.patch\('\/me'/);
     assert.match(shopRoutes, /\/me\/payout-details/);
+    assert.match(shopRoutes, /\/me\/security/);
+    assert.match(shopRoutes, /\/me\/media\/picture/);
+    assert.match(shopRoutes, /\/me\/media\/cover/);
     assert.doesNotMatch(shopRoutes, /\/upi/);
     assert.doesNotMatch(shopRoutes, /\/bank-details/);
+    assert.doesNotMatch(shopRoutes, /\/me\/status/);
+    assert.doesNotMatch(shopRoutes, /\/me\/pin/);
+    assert.doesNotMatch(shopRoutes, /\/me\/picture/);
+    assert.doesNotMatch(shopRoutes, /\/me\/cover/);
     assert.doesNotMatch(shopRoutes, /sign-out-everywhere/);
 
     assert.match(accountRoutes, /router\.delete\(\s*'\/sessions'/);
     assert.match(accountRoutes, /router\.delete\(\s*'\/'/);
 
     assert.match(employeeRoutes, /\/:id\/availability/);
-    assert.match(employeeRoutes, /\/analytics\/availability/);
+    assert.match(employeeRoutes, /\/analytics/);
+    assert.match(employeeRoutes, /\/:id\/blocked-dates/);
     assert.ok(
-        employeeRoutes.indexOf("router.get('/analytics/availability'") < employeeRoutes.indexOf("router.get(\n    '/:id/availability'"),
-        'GET /employees/analytics/availability must be registered before GET /employees/:id/availability',
+        employeeRoutes.indexOf("router.get('/analytics'") < employeeRoutes.indexOf("router.get(\n    '/:id/availability'"),
+        'GET /employees/analytics must be registered before GET /employees/:id/availability',
     );
     assert.doesNotMatch(employeeRoutes, /available-slots/);
     assert.doesNotMatch(employeeRoutes, /\/:id\/calendar/);
-    assert.doesNotMatch(employeeRoutes, /router\.put/);
+    assert.doesNotMatch(employeeRoutes, /\/:id\/status/);
 
     assert.match(postmanSource, /\/shops\/me/);
     assert.doesNotMatch(postmanSource, /\/employees\/\{\{employee_id\}\}\/available-slots/);
@@ -307,4 +332,51 @@ test('payments expose a collection list before the payment-id route', async () =
         paymentRoutes.indexOf("router.get(\n    '/',") < paymentRoutes.indexOf("router.get(\n    '/:id'"),
         'GET /payments must be registered before GET /payments/:id',
     );
+});
+
+test('changed resource routes require the expected authentication and role guards', async () => {
+    const bookingRoutes = await readSource('routes/bookings.routes.js');
+    const shopRoutes = await readSource('routes/shops.routes.js');
+    const ratingRoutes = await readSource('routes/ratings.routes.js');
+    const employeeRoutes = await readSource('routes/employees.routes.js');
+    const notificationRoutes = await readSource('routes/notifications.routes.js');
+    const paymentRoutes = await readSource('routes/payment.routes.js');
+    const payoutRoutes = await readSource('routes/payout.routes.js');
+
+    assert.match(bookingRoutes, /router\.use\(authenticate\)/);
+    assert.match(bookingRoutes, /router\.post\('\/', authorize\(ROLES\.CUSTOMER\)/);
+    assert.match(bookingRoutes, /router\.get\('\/', authorize\(ROLES\.CUSTOMER, ROLES\.BARBER\)/);
+    assert.match(bookingRoutes, /router\.get\('\/analytics', authorize\(ROLES\.BARBER\)/);
+    assert.match(bookingRoutes, /router\.patch\('\/:id\/favorite', authorize\(ROLES\.CUSTOMER\)/);
+    assert.match(bookingRoutes, /router\.post\('\/:id\/refunds', authorize\(ROLES\.ADMIN, ROLES\.BARBER\)/);
+
+    assert.match(shopRoutes, /router\.get\('\/favorites', authenticate, authorize\(ROLES\.CUSTOMER\)/);
+    assert.match(shopRoutes, /router\.patch\('\/me', authenticate, authorize\(ROLES\.BARBER\)/);
+    assert.match(shopRoutes, /router\.patch\('\/me\/security', authenticate, authorize\(ROLES\.BARBER\)/);
+    assert.match(shopRoutes, /router\.patch\('\/me\/media\/picture', authenticate, authorize\(ROLES\.BARBER\)/);
+    assert.match(shopRoutes, /router\.patch\('\/me\/media\/cover', authenticate, authorize\(ROLES\.BARBER\)/);
+    assert.match(shopRoutes, /router\.get\('\/:id\/availability', authenticate, authorize\(ROLES\.CUSTOMER, ROLES\.BARBER\)/);
+    assert.match(shopRoutes, /router\.patch\('\/:id\/favorite', authenticate, authorize\(ROLES\.CUSTOMER\)/);
+
+    assert.match(ratingRoutes, /router\.use\(authenticate\)/);
+    assert.match(ratingRoutes, /router\.get\('\/analytics', authorize\(ROLES\.BARBER\)/);
+    assert.match(ratingRoutes, /router\.get\('\/', authorize\(ROLES\.BARBER\)/);
+    assert.match(ratingRoutes, /router\.post\('\/', authorize\(ROLES\.CUSTOMER\)/);
+    assert.match(ratingRoutes, /router\.put\('\/:id\/reply', authorize\(ROLES\.BARBER\)/);
+    assert.match(ratingRoutes, /router\.delete\('\/:id\/reply', authorize\(ROLES\.BARBER\)/);
+    assert.match(ratingRoutes, /router\.delete\('\/:id', authorize\(ROLES\.BARBER\)/);
+
+    assert.match(employeeRoutes, /router\.use\(authenticate\)/);
+    assert.match(employeeRoutes, /router\.get\('\/analytics', authorize\(ROLES\.BARBER\)/);
+    assert.match(employeeRoutes, /router\.get\(\s*'\/:id\/availability',\s*authorize\(ROLES\.CUSTOMER, ROLES\.BARBER\)/);
+    assert.match(employeeRoutes, /router\.use\(authorize\(ROLES\.BARBER\)\)/);
+
+    assert.match(notificationRoutes, /router\.use\(authenticate\)/);
+    assert.doesNotMatch(notificationRoutes, /authorize\(ROLES\./);
+
+    assert.match(paymentRoutes, /router\.post\('\/webhook', paymentController\.handleWebhook\)/);
+    assert.match(paymentRoutes, /authorize\(ROLES\.CUSTOMER, ROLES\.BARBER, ROLES\.ADMIN\)/);
+    assert.match(paymentRoutes, /authorize\(ROLES\.CUSTOMER\)/);
+    assert.match(payoutRoutes, /router\.post\('\/webhook', payoutController\.handlePayoutWebhook\)/);
+    assert.match(payoutRoutes, /authorize\(ROLES\.ADMIN\)/);
 });

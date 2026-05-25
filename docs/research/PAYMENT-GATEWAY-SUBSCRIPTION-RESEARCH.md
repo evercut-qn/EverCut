@@ -515,7 +515,7 @@ POST   /api/v1/orders/{orderId}/refunds     → Initiate refund
 Register your webhook URL in the Cashfree dashboard (self-serve):
 
 ```
-https://api.evercut.com/webhooks/cashfree
+https://api.evercut.in/webhooks/cashfree
 ```
 
 **Critical webhook events to handle:**
@@ -702,8 +702,8 @@ CASHFREE_API_URL=https://api.cashfree.com   # production
 CASHFREE_WEBHOOK_SECRET=your_webhook_secret
 
 # App Config
-BASE_URL=https://api.evercut.com
-SUBSCRIPTION_REDIRECT_URL=https://api.evercut.com/subscription/callback
+BASE_URL=https://api.evercut.in
+SUBSCRIPTION_REDIRECT_URL=https://api.evercut.in/subscription/callback
 ```
 
 ---

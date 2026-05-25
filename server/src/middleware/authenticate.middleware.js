@@ -1,7 +1,6 @@
 import * as authService from '../services/auth.service.js';
 import userRepository from '../repositories/user.repository.js';
 import { AppError, ConflictError, UnauthorizedError } from '../utils/api-error.js';
-import { TOKEN_TYPE } from '../utils/constants.js';
 import logger from '../utils/logger.js';
 
 const extractBearerToken = (req, missingMessage) => {
@@ -30,11 +29,7 @@ const loadActiveUser = async (userId) => {
 export const authenticate = async (req, _res, next) => {
     try {
         const token = extractBearerToken(req, 'No token provided');
-        const decoded = authService.verifyBearerToken(token);
-
-        if (decoded.type !== TOKEN_TYPE.ACCESS) {
-            throw new UnauthorizedError('Standard account access token required');
-        }
+        const decoded = authService.verifyAccessToken(token);
 
         const user = await loadActiveUser(decoded.sub);
 
@@ -60,11 +55,7 @@ export const authenticate = async (req, _res, next) => {
 export const authenticateOnboarding = async (req, _res, next) => {
     try {
         const token = extractBearerToken(req, 'No token provided');
-        const decoded = authService.verifyBearerToken(token);
-
-        if (decoded.type !== TOKEN_TYPE.ONBOARDING) {
-            throw new UnauthorizedError('Onboarding token required');
-        }
+        const decoded = authService.verifyOnboardingToken(token);
 
         const existingUser = await userRepository.findByPhone(decoded.sub);
         if (existingUser) {

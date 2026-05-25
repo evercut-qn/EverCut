@@ -19,19 +19,24 @@ import {
 } from '../utils/api-error.js';
 import {
     BOOKING_STATUS,
-    BUNDLE_RULES,
     PAYMENT_GATEWAYS,
+    REFUND_TYPE,
     PAYMENT_STATUS,
     PAYMENT_TRANSACTION_STATUS,
     PHONEPE_WEBHOOK_EVENTS,
-    REFUND_FEES,
     ROLES,
-    SERVICE_TYPE,
 } from '../utils/constants.js';
 import {
     getEffectiveServicePrice,
     normalizeServicePricing,
 } from '../utils/service-pricing.utils.js';
+import {
+    assertMinimumServiceAmount,
+    BOOKING_FEE_TYPE,
+    classifyBookingFeeType,
+    getRefundFee,
+    resolveCustomerPlatformFee,
+} from '../utils/platform-fee.utils.js';
 import { buildPagination } from '../utils/pagination.utils.js';
 import { toDateOnlyString } from '../utils/slot-lock.utils.js';
 import {
@@ -55,10 +60,6 @@ const generateMerchantOrderId = (bookingId) => {
     return `EC-${bookingId}-${Date.now()}-${random}`;
 };
 
-const REFUND_TYPE = Object.freeze({
-    CANCELLATION: 'cancellation',
-    MANUAL: 'manual',
-});
 
 const REFUND_MANUAL_MESSAGE = 'Refund could not be initiated. Please request a manual refund.';
 
@@ -81,9 +82,11 @@ const generateMerchantRefundId = ({ merchantOrderId, bookingId }) => {
     return `RF-${seed}-${random}`;
 };
 
-const getRefundFeeInPaisa = (payment) => (
-    payment.settlement?.isBundle ? REFUND_FEES.BUNDLE : REFUND_FEES.SINGLE_SERVICE
-) * 100;
+const getSettlementBookingFeeType = (payment) => (
+    payment.settlement?.isBundle ? BOOKING_FEE_TYPE.BUNDLE : BOOKING_FEE_TYPE.SINGLE
+);
+
+const getRefundFeeInPaisa = (payment) => getRefundFee(getSettlementBookingFeeType(payment)) * 100;
 
 const toPositivePaisa = (value) => {
     const numericValue = Number(value);
@@ -139,6 +142,14 @@ const createRefundRecord = ({
     }
 
     return record;
+};
+
+const normalizeCancellationContext = (context) => {
+    if (context && typeof context === 'object') {
+        return Boolean(context.isBarberCancellation);
+    }
+
+    return Boolean(context);
 };
 
 const sumServiceAmounts = (services = []) => services.reduce(
@@ -211,7 +222,7 @@ const buildPaymentListFilter = async (actorOrUserId, query = {}) => {
     }
 
     if (actor.roleType === ROLES.BARBER) {
-        const shop = await shopRepository.findByOwnerId(actor.userId);
+        const shop = await shopRepository.findByBarberUserId(actor.userId);
         if (!shop) throw new NotFoundError('Shop profile');
         filter.shopId = shop._id;
         return applyPaymentQueryFilters(filter, query);
@@ -230,7 +241,7 @@ const assertPaymentAccess = async (actorOrUserId, payment) => {
     if (actor.roleType === ROLES.ADMIN) return;
 
     if (actor.roleType === ROLES.BARBER) {
-        const shop = await shopRepository.findByOwnerId(actor.userId);
+        const shop = await shopRepository.findByBarberUserId(actor.userId);
         if (!shop || toObjectIdString(payment.shopId) !== toObjectIdString(shop._id)) {
             throw new ForbiddenError('You can only access payments for your own shop');
         }
@@ -263,28 +274,29 @@ const loadBookedServices = async (booking) => {
     return services.map(normalizeServicePricing);
 };
 
-const calculateSettlement = async (booking) => {
+const calculateSettlement = async (booking, customer) => {
     const services = await loadBookedServices(booking);
-    const isBundle = booking.serviceIds.length > 1
-        || services.some((service) => service.serviceType === SERVICE_TYPE.BUNDLED);
+    const bookingFeeType = classifyBookingFeeType(services);
+    const isBundle = bookingFeeType !== 'SINGLE';
     const serviceAmountInRupees = Number(booking.totalAmount || sumServiceAmounts(services) || 0);
 
-    if (isBundle && serviceAmountInRupees < BUNDLE_RULES.MIN_SERVICE_AMOUNT) {
-        throw new BadRequestError(`Bundle service amount must be at least ₹${BUNDLE_RULES.MIN_SERVICE_AMOUNT}`);
-    }
-
-    const platformFeeInRupees = isBundle
-        ? config.payment.platformFeeBundle
-        : config.payment.platformFeeSingle;
+    assertMinimumServiceAmount(serviceAmountInRupees, bookingFeeType);
+    const activeWaiverReservations = await paymentRepository.countActiveWaiverReservations(customer._id);
+    const feeSummary = resolveCustomerPlatformFee({
+        customer,
+        bookingFeeType,
+        activeWaiverReservations,
+    });
 
     const serviceAmount = Math.round(serviceAmountInRupees * 100);
-    const platformFee = Math.round(platformFeeInRupees * 100);
+    const platformFee = Math.round(feeSummary.platformFee * 100);
 
     return {
         serviceAmount,
         platformFee,
         barberPayout: serviceAmount,
         isBundle,
+        waiverApplied: feeSummary.waiverApplied,
         totalAmountInPaisa: serviceAmount + platformFee,
         totalAmountInRupees: (serviceAmount + platformFee) / 100,
     };
@@ -431,7 +443,7 @@ const assertRefundPermission = async (actor, booking) => {
         throw new ForbiddenError('You are not allowed to initiate refunds');
     }
 
-    const actorShop = await shopRepository.findByOwnerId(actor.userId || actor._id);
+    const actorShop = await shopRepository.findByBarberUserId(actor.userId || actor._id);
     if (!actorShop || toObjectIdString(actorShop._id) !== toObjectIdString(booking.shopId)) {
         throw new ForbiddenError('Barbers can only refund bookings for their own shop');
     }
@@ -549,7 +561,7 @@ export const initiatePayment = async (userId, bookingId) => {
         });
     }
 
-    const settlement = await calculateSettlement(booking);
+    const settlement = await calculateSettlement(booking, customer);
     if (settlement.totalAmountInPaisa <= 0) {
         throw new BadRequestError('Booking amount must be greater than zero');
     }
@@ -563,6 +575,7 @@ export const initiatePayment = async (userId, bookingId) => {
         amount: settlement.totalAmountInPaisa,
         amountInRupees: settlement.totalAmountInRupees,
         status: PAYMENT_TRANSACTION_STATUS.INITIATED,
+        waiverApplied: settlement.waiverApplied,
         settlement: {
             serviceAmount: settlement.serviceAmount,
             platformFee: settlement.platformFee,
@@ -813,6 +826,17 @@ async function handlePaymentSuccess(webhookData) {
         webhookProcessed: true,
     });
 
+    if (payment.waiverApplied) {
+        const waiverUpdate = await customerRepository.consumeFeeWaiverSlot(payment.customerId);
+        if (!waiverUpdate) {
+            logger.error('[PaymentService] Waiver payment completed but no waiver slot could be consumed', {
+                paymentId: payment._id,
+                bookingId: payment.bookingId,
+                customerId: payment.customerId,
+            });
+        }
+    }
+
     await bookingRepository.updateById(payment.bookingId, {
         paymentStatus: PAYMENT_STATUS.SUCCESS,
         status: BOOKING_STATUS.AWAITING_CONFIRMATION,
@@ -1011,6 +1035,8 @@ async function handleRefundFailure(webhookData) {
 }
 
 export const initiateRefund = async (bookingId, reason, actor = null, isBarberCancellation = false) => {
+    isBarberCancellation = normalizeCancellationContext(isBarberCancellation);
+
     const payment = await paymentRepository.findCompletedByBookingId(bookingId);
     if (!payment) {
         throw new NotFoundError('Completed payment for this booking');
@@ -1162,14 +1188,14 @@ export const initiateRefund = async (bookingId, reason, actor = null, isBarberCa
 
 export const pollPendingPayments = async () => {
     const now = Date.now();
-    const thirtyMinutesAgo = new Date(now - 30 * 60 * 1000);
-    const twentyFourHoursAgo = new Date(now - 24 * 60 * 60 * 1000);
+    const staleCutoff = new Date(now - config.payment.stalePaymentThresholdMs);
+    const maxAgeCutoff = new Date(now - config.payment.maxPaymentAgeMs);
     const expiresBefore = new Date(now);
     const fallbackCreatedBefore = new Date(now - config.payment.sessionExpirySeconds * 1000);
 
     const pendingPayments = await paymentRepository.findStalePayments(
-        thirtyMinutesAgo,
-        twentyFourHoursAgo,
+        staleCutoff,
+        maxAgeCutoff,
         config.payment.maxPollAttempts,
     );
 

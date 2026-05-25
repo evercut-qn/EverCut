@@ -28,7 +28,7 @@ All phone and email updates are now centralized under the `/account` endpoint. T
 
 ### After (Centralized Updates)
 ```
-✅ PUT /account/email { newEmail: "new@email.com" }
+✅ PATCH /account/email { newEmail: "new@email.com" }
 ✅ POST /account/phone/send-otp { newMobile: "9876543299" }
 ✅ POST /account/phone/verify-otp { newMobile: "9876543299", otp: "123456" }
 ✅ Single location, consistent security
@@ -102,16 +102,19 @@ Content-Type: application/json
 ```http
 PUT /api/v1/customers/me
 Authorization: Bearer {accessToken}
-Content-Type: multipart/form-data
+Content-Type: application/json
 
-firstName: Test
-lastName: Customer
-address: Church Street, Bengaluru
-location: {"type":"Point","coordinates":[77.5946,12.9716]}
-photo: [file]
+{
+  "firstName": "Test",
+  "lastName": "Customer",
+  "address": "Church Street, Bengaluru",
+  "location": {"type":"Point","coordinates":[77.5946,12.9716]},
+  "photoMediaId": "01HXMEDIAEXAMPLE"
+}
 ```
 
 **Removed**: `email` field (use `/account/email` instead)
+**Media**: upload and confirm the image through `/media/upload-url` and `/media/confirm` first, then pass the confirmed `photoMediaId`.
 
 ### Barber Profile Update
 ```http

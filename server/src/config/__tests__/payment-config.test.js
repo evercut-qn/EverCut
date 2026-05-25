@@ -21,13 +21,17 @@ const applyRequiredEnv = () => {
         FIREBASE_PROJECT_ID: 'evercut-test',
         FIREBASE_CLIENT_EMAIL: 'firebase@example.com',
         FIREBASE_PRIVATE_KEY: '-----BEGIN PRIVATE KEY-----\\nabc\\n-----END PRIVATE KEY-----',
-        CLOUDINARY_CLOUD_NAME: 'evercut',
-        CLOUDINARY_API_KEY: 'cloudinary-key',
-        CLOUDINARY_API_SECRET: 'cloudinary-secret',
+        CF_ACCOUNT_ID: 'test-account',
+        R2_ACCESS_KEY_ID: 'test-access-key',
+        R2_SECRET_ACCESS_KEY: 'test-secret-key',
+        R2_BUCKET: 'evercut-media-test',
+        CDN_BASE_URL: 'https://media.evercut.test',
+        MEDIA_TOKEN_SECRET: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
         MSG91_AUTH_KEY: 'msg91-auth',
         MSG91_OTP_TEMPLATE_ID: 'msg91-template',
         JWT_ACCESS_SECRET: 'access-secret',
         JWT_REFRESH_SECRET: 'refresh-secret',
+        JWT_ONBOARDING_SECRET: 'onboarding-secret',
     };
 
     for (const [key, value] of Object.entries(defaults)) {
@@ -47,6 +51,15 @@ test('payment config defaults expose native PhonePe SDK auth URLs without redire
         const config = await loadFreshConfig();
 
         assert.equal(config.port, 5000);
+        assert.equal(typeof config.payment.platformFeeSingle, 'number');
+        assert.equal(typeof config.payment.platformFeeBundle, 'number');
+        assert.equal(typeof config.payment.refundFeeSingle, 'number');
+        assert.equal(typeof config.payment.refundFeeBundle, 'number');
+        assert.equal(typeof config.payment.minSingleServiceAmount, 'number');
+        assert.equal(typeof config.payment.minBundleServiceAmount, 'number');
+        assert.equal(typeof config.payment.feeWaiverQuota, 'number');
+        assert.equal(Object.hasOwn(config.payment, 'platformFeeRules'), false);
+        assert.equal(Object.hasOwn(config.payment, 'minimumServiceAmount'), false);
         assert.equal(
             config.phonepe.authUrl,
             'https://api-preprod.phonepe.com/apis/pg-sandbox/v1/oauth/token',

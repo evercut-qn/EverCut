@@ -1,19 +1,46 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import cloudinary from '../../config/cloudinary.config.js';
-import bookingRepository from '../../repositories/booking.repository.js';
-import employeeRepository from '../../repositories/employee.repository.js';
-import shopRepository from '../../repositories/shop.repository.js';
-import notificationEvents from '../notification-events.service.js';
-import * as employeeService from '../employee.service.js';
+const ensureRequiredEnv = () => {
+    const defaults = {
+        MONGODB_URI: 'mongodb://localhost:27017/evercut-test',
+        FIREBASE_PROJECT_ID: 'evercut-test',
+        FIREBASE_CLIENT_EMAIL: 'firebase@example.com',
+        FIREBASE_PRIVATE_KEY: '-----BEGIN PRIVATE KEY-----\\nabc\\n-----END PRIVATE KEY-----',
+        CF_ACCOUNT_ID: 'test-account',
+        R2_ACCESS_KEY_ID: 'test-access-key',
+        R2_SECRET_ACCESS_KEY: 'test-secret-key',
+        R2_BUCKET: 'evercut-media-test',
+        CDN_BASE_URL: 'https://media.evercut.test',
+        MEDIA_TOKEN_SECRET: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+        MSG91_AUTH_KEY: 'msg91-auth',
+        MSG91_OTP_TEMPLATE_ID: 'msg91-template',
+        JWT_ACCESS_SECRET: 'access-secret',
+        JWT_REFRESH_SECRET: 'refresh-secret',
+        JWT_ONBOARDING_SECRET: 'onboarding-secret',
+    };
+
+    for (const [key, value] of Object.entries(defaults)) {
+        process.env[key] ??= value;
+    }
+};
+
+ensureRequiredEnv();
+
+const bookingRepository = (await import('../../repositories/booking.repository.js')).default;
+const employeeRepository = (await import('../../repositories/employee.repository.js')).default;
+const mediaRepository = (await import('../../repositories/media.repository.js')).default;
+const shopRepository = (await import('../../repositories/shop.repository.js')).default;
+const storageProvider = (await import('../media/storage-provider.service.js')).default;
+const notificationEvents = (await import('../notification-events.service.js')).default;
+const employeeService = await import('../employee.service.js');
 
 test('deleteEmployee blocks unresolved bookings for that employee', async (t) => {
-    t.mock.method(shopRepository, 'findByOwnerId', async () => ({ _id: 'shop-1' }));
+    t.mock.method(shopRepository, 'findByBarberUserId', async () => ({ _id: 'shop-1' }));
     t.mock.method(employeeRepository, 'findById', async () => ({
         _id: 'employee-1',
         shopId: 'shop-1',
-        cloudinaryId: 'employee-photo-1',
+        photoR2Key: 'images/employees/shop-1/employee-photo-1.jpg',
     }));
     t.mock.method(bookingRepository, 'hasActiveBookingsForEmployee', async () => true);
 
@@ -35,7 +62,7 @@ test('deleteEmployee blocks unresolved bookings for that employee', async (t) =>
 });
 
 test('addEmployee cleans up uploaded photo when a duplicate write slips past the pre-check', async (t) => {
-    t.mock.method(shopRepository, 'findByOwnerId', async () => ({
+    t.mock.method(shopRepository, 'findByBarberUserId', async () => ({
         _id: 'shop-1',
         openTime: '09:00',
         closeTime: '18:00',
@@ -47,10 +74,14 @@ test('addEmployee cleans up uploaded photo when a duplicate write slips past the
         throw error;
     });
 
-    let destroyedPublicId = null;
-    t.mock.method(cloudinary.uploader, 'destroy', async (publicId) => {
-        destroyedPublicId = publicId;
-        return { result: 'ok' };
+    t.mock.method(mediaRepository, 'findReadyByIdAndUser', async () => ({
+        _id: 'media-1',
+        r2Key: 'images/employees/shop-1/employee-photo-1.jpg',
+    }));
+
+    let deletedR2Key = null;
+    t.mock.method(storageProvider, 'deleteObject', async (r2Key) => {
+        deletedR2Key = r2Key;
     });
 
     await assert.rejects(
@@ -60,13 +91,10 @@ test('addEmployee cleans up uploaded photo when a duplicate write slips past the
                 firstName: 'Alex',
                 lastName: 'Stylist',
                 phoneNumber: '+15551234567',
-                gender: 'Male',
+                gender: 'male',
                 dateOfBirth: '1994-04-12',
                 workingHours: { start: '09:00', end: '18:00' },
-            },
-            {
-                path: 'https://example.com/photo.jpg',
-                public_id: 'employee-photo-1',
+                photoMediaId: 'media-1',
             },
         ),
         {
@@ -75,11 +103,11 @@ test('addEmployee cleans up uploaded photo when a duplicate write slips past the
         },
     );
 
-    assert.equal(destroyedPublicId, 'employee-photo-1');
+    assert.equal(deletedR2Key, 'images/employees/shop-1/employee-photo-1.jpg');
 });
 
 test('addEmployee accepts 24-hour employee hours when legacy shop hours are stored in AM/PM format', async (t) => {
-    t.mock.method(shopRepository, 'findByOwnerId', async () => ({
+    t.mock.method(shopRepository, 'findByBarberUserId', async () => ({
         _id: 'shop-1',
         openTime: '09:00 AM',
         closeTime: '08:00 PM',
@@ -98,7 +126,7 @@ test('addEmployee accepts 24-hour employee hours when legacy shop hours are stor
             firstName: 'Alex',
             lastName: 'Stylist',
             phoneNumber: '+15551234567',
-            gender: 'Male',
+            gender: 'male',
             dateOfBirth: '1994-04-12',
             workingHours: { start: '09:00', end: '18:00' },
         },
@@ -110,7 +138,7 @@ test('addEmployee accepts 24-hour employee hours when legacy shop hours are stor
 });
 
 test('addEmployee defaults working hours to normalized 24-hour shop hours', async (t) => {
-    t.mock.method(shopRepository, 'findByOwnerId', async () => ({
+    t.mock.method(shopRepository, 'findByBarberUserId', async () => ({
         _id: 'shop-1',
         openTime: '09:00 AM',
         closeTime: '08:00 PM',
@@ -129,7 +157,7 @@ test('addEmployee defaults working hours to normalized 24-hour shop hours', asyn
             firstName: 'Alex',
             lastName: 'Stylist',
             phoneNumber: '+15551234567',
-            gender: 'Male',
+            gender: 'male',
             dateOfBirth: '1994-04-12',
         },
         null,
@@ -138,8 +166,46 @@ test('addEmployee defaults working hours to normalized 24-hour shop hours', asyn
     assert.deepEqual(createdPayload.workingHours, { start: '09:00', end: '20:00' });
 });
 
+test('updateEmployee persists desired active state through the employee resource update', async (t) => {
+    t.mock.method(shopRepository, 'findByBarberUserId', async () => ({
+        _id: 'shop-1',
+        openTime: '09:00',
+        closeTime: '18:00',
+    }));
+    t.mock.method(employeeRepository, 'findById', async () => ({
+        _id: 'employee-1',
+        shopId: 'shop-1',
+        firstName: 'Mina',
+        lastName: 'Stylist',
+        phoneNumber: '+15551234567',
+        isActive: true,
+    }));
+
+    let updateArgs = null;
+    t.mock.method(employeeRepository, 'updateById', async (employeeId, shopId, updateData) => {
+        updateArgs = { employeeId, shopId, updateData };
+        return {
+            _id: employeeId,
+            shopId,
+            firstName: 'Mina',
+            lastName: 'Stylist',
+            phoneNumber: '+15551234567',
+            isActive: updateData.isActive,
+        };
+    });
+
+    const result = await employeeService.updateEmployee('owner-1', 'employee-1', { isActive: false });
+
+    assert.deepEqual(updateArgs, {
+        employeeId: 'employee-1',
+        shopId: 'shop-1',
+        updateData: { isActive: false },
+    });
+    assert.equal(result.isActive, false);
+});
+
 test('updateEmployeeAvailability blocks only new leave dates and notifies affected bookings', async (t) => {
-    t.mock.method(shopRepository, 'findByOwnerId', async () => ({ _id: 'shop-1' }));
+    t.mock.method(shopRepository, 'findByBarberUserId', async () => ({ _id: 'shop-1' }));
     t.mock.method(employeeRepository, 'findById', async () => ({
         _id: 'employee-1',
         shopId: 'shop-1',
@@ -223,7 +289,7 @@ test('updateEmployeeAvailability blocks only new leave dates and notifies affect
 });
 
 test('updateEmployeeAvailability removes blocked dates without notifying customers', async (t) => {
-    t.mock.method(shopRepository, 'findByOwnerId', async () => ({ _id: 'shop-1' }));
+    t.mock.method(shopRepository, 'findByBarberUserId', async () => ({ _id: 'shop-1' }));
     t.mock.method(employeeRepository, 'findById', async () => ({
         _id: 'employee-1',
         shopId: 'shop-1',

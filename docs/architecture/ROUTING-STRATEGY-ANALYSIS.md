@@ -9,7 +9,7 @@ EverCut now uses a **feature-based, resource-oriented routing architecture with 
 
 This decision was derived from the backend code, not from preference alone:
 
-- Shared business logic was already concentrated in feature services such as `booking.service.js`, `rating.service.js`, `shop.service.js`, `service-catalog.service.js`, `photo.service.js`, `earnings.service.js`, and `payment.service.js`.
+- Shared business logic is concentrated in feature services such as `booking.service.js`, `rating.service.js`, `shop.service.js`, `service-catalog.service.js`, `media.service.js`, `earnings.service.js`, and `payment.service.js`.
 - The largest duplication existed at the HTTP layer, where customer-facing and barber-facing route groups exposed the same underlying resources through separate URL prefixes and separate controller files.
 - Router-level role prefixes made public-safe discovery endpoints harder to place cleanly and encouraged inconsistent authorization patterns.
 - The payment refund flow exposed a real security bug because authorization assumptions were split between route role checks and service ownership checks. The controller passed `req.user.role` while auth middleware populated `req.user.roleType`; as a result, barber ownership verification could be skipped until this migration fixed it.
@@ -64,7 +64,7 @@ Cons in this codebase:
 - encourages controller duplication while services remain shared
 - weak REST alignment because URLs describe caller identity before resource identity
 
-Verdict: inferior for EverCut because roles are an access concern, while the domain is centered on resources such as shops, bookings, services, ratings, photos, payments, and payouts.
+Verdict: inferior for EverCut because roles are an access concern, while the domain is centered on resources such as shops, bookings, services, ratings, media, payments, and payouts.
 
 ### 2. Feature-based routing
 
@@ -104,7 +104,7 @@ All current API routes are mounted from `server/src/routes/index.js`:
 - `/employees`
 - `/services`
 - `/bookings`
-- `/photos`
+- `/media`
 - `/ratings`
 - `/earnings`
 - `/payments`
@@ -123,7 +123,7 @@ All current API routes are mounted from `server/src/routes/index.js`:
 - `bookings`: shared resource with role-aware behavior
   - customer: list/create/update/reschedule/reorder/favorite/confirmation/cancel own bookings
   - barber: list shop bookings, stats, progress, status updates, booking cancellation/refund flows
-- `photos`: barber-only
+- `media`: barber-only gallery media plus authenticated presigned upload and confirm flows
 - `ratings`: public shop reads, customer create, barber owner reads/replies/deletes
 - `earnings`: barber-only
 - `payments`: customer payment initiation, authenticated payment reads, barber/admin refunds, public webhook callbacks

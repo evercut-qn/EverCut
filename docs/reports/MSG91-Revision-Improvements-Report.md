@@ -1,4 +1,4 @@
-﻿# Msg91 Revision Improvements Report
+# Msg91 Revision Improvements Report
 
 > Legacy snapshot: This document records findings against the pre-2026-04-24 role-prefixed routing layout and removed `controllers/customer/*` / `controllers/barber/*` files. Treat route and file references here as historical unless explicitly updated. For the current API surface, see [ROUTING-STRATEGY-ANALYSIS](../architecture/ROUTING-STRATEGY-ANALYSIS.md).
 
@@ -285,13 +285,16 @@ if (phoneOwner)  → throw ConflictError  // race condition: two simultaneous on
 
 ### 4.1 Token Verification Unified — Type Enforcement Moved to Middleware
 
-The previous guide had separate `verifyAccessToken` and `verifyRefreshToken` functions. `verifyAccessToken` only accepted `type: 'access'` tokens, meaning a new function would need to be added or modified to handle onboarding tokens (which are also signed with the access secret).
+The previous guide had separate `verifyAccessToken` and `verifyRefreshToken` functions. `verifyAccessToken` only accepted `type: 'access'` tokens, meaning a new function would need to be added or modified to handle onboarding tokens (which at the time were also signed with the access secret).
 
-The revised guide replaces `verifyAccessToken` with a unified `verifyBearerToken` function that accepts any token signed with the access secret. Type enforcement is moved to the middleware layer — the correct place for route-level contract checks:
+The revised guide replaced `verifyAccessToken` with a unified `verifyBearerToken` function, with type enforcement moved to the middleware layer. This was subsequently evolved once a dedicated onboarding secret was introduced (see note below):
 
-- `verifyBearerToken` — cryptographic verification and structural validity only.
-- `authenticate` — calls `verifyBearerToken`, then asserts `decoded.type === TOKEN_TYPE.ACCESS`.
-- `authenticateOnboarding` — calls `verifyBearerToken`, then asserts `decoded.type === TOKEN_TYPE.ONBOARDING`.
+- `verifyAccessToken` — verifies with `accessSecret`; enforces `type === TOKEN_TYPE.ACCESS` internally.
+- `verifyOnboardingToken` — verifies with `onboardingSecret`; enforces `type === TOKEN_TYPE.ONBOARDING` internally.
+- `authenticate` — calls `verifyAccessToken` (type is enforced inside the service function).
+- `authenticateOnboarding` — calls `verifyOnboardingToken` (type is enforced inside the service function).
+
+> **Subsequent update (May 2026):** With the introduction of `JWT_ONBOARDING_SECRET` (a dedicated secret for onboarding tokens), the onboarding token is now signed with a *different* secret from access tokens. A single unified verification function can no longer verify both — each type requires its own secret. The naming has reverted to `verifyAccessToken` alongside the new `verifyOnboardingToken`. To ensure robustness and symmetry, type enforcement has been centralized back into the service functions, eliminating redundant checks in the middleware. See `docs/security/TOKEN-FLOW-GUIDE.md` for the current design.
 
 ---
 
@@ -491,7 +494,7 @@ A developer landing on the document for the first time immediately has a map of 
 | 3.2 | Upload middleware `resolveActorKey` fixed for onboarding context | Bug Fix | Critical |
 | 3.3 | `serializeBarberProfile` called with correct arguments | Bug Fix | High |
 | 3.4 | `ensureUniqueUserIdentity` logic corrected for the new flow | Bug Fix | High |
-| 4.1 | Token verification unified — type enforcement moved to middleware | Design | High |
+| 4.1 | Token verification unified — type enforcement moved to middleware (subsequently evolved, see note) | Design | High |
 | 4.2 | OTP service is now stateless and purely business logic | Design | High |
 | 4.3 | Authenticate middleware split into two explicit exports | Design | High |
 | 4.4 | OTP length and expiry moved from `.env` to config constants | Design | Medium |

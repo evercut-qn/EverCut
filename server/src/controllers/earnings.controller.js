@@ -12,19 +12,6 @@ export const getEarnings = async (req, res, next) => {
 };
 
 /**
- * Get comprehensive dashboard overview (moved from dashboard)
- * Aggregates pulse, staff, and queue data
- */
-export const getDashboardOverview = async (req, res, next) => {
-    try {
-        const dashboard = await earningsService.getDashboardOverview(req.user._id);
-        return res.status(200).json(ApiResponse.success(dashboard, 'Dashboard overview fetched'));
-    } catch (err) {
-        next(err);
-    }
-};
-
-/**
  * Get transaction history for barber
  * Includes monthly revenue summary and paginated transaction list
  */

@@ -12,13 +12,13 @@ const INTERNAL_KEYS = new Set([
 const SENSITIVE_KEYS = new Set([
     'pinHash',
     'refreshTokenHash',
-    'cloudinaryId',
-    'coverCloudinaryId',
-    'ownerPhotoCloudinaryId',
+    'r2Key',
+    'r2Bucket',
+    'coverR2Key',
+    'photoR2Key',
     'sdkOrderToken',
     'gatewayResponse',
     'webhookEventId',
-    'bankAccount',
 ]);
 
 const isObjectIdLike = (value) => (
@@ -106,7 +106,3 @@ export const sanitizeForResponse = (value, seen = new WeakSet()) => {
 
     return output;
 };
-
-export const serializeList = (items = [], serializer = sanitizeForResponse) => (
-    Array.isArray(items) ? items.map((item) => serializer(item)) : []
-);

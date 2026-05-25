@@ -35,7 +35,7 @@ test('updateBusinessSchema rejects invalid shop-hour strings', () => {
 test('updateBusinessSchema rejects deprecated shop update aliases', () => {
     const result = updateBusinessSchema.validate({
         shopOwner: 'Postman Barber',
-        businessCategory: 'Barber',
+        businessCategory: 'Barber Shop',
         shopLocation: 'MG Road',
         breakTimings: '[{"start":"13:00","end":"14:00"}]',
     }, {
@@ -53,7 +53,6 @@ test('updatePayoutDetailsSchema strips provider-managed beneficiary identifiers'
         bankName: 'HDFC Bank',
         bankAccount: '12345678901234',
         ifsc: 'HDFC0001234',
-        upiId: 'barber@upi',
         beneficiaryId: 'beneficiary-1',
     }, {
         abortEarly: false,
@@ -63,4 +62,20 @@ test('updatePayoutDetailsSchema strips provider-managed beneficiary identifiers'
 
     assert.equal(result.error, undefined);
     assert.equal(Object.hasOwn(result.value, 'beneficiaryId'), false);
+    assert.equal(Object.hasOwn(result.value, 'upiId'), false);
+});
+
+test('updatePayoutDetailsSchema allows optional upiId', () => {
+    const result = updatePayoutDetailsSchema.validate({
+        accountHolderName: 'Postman Barber',
+        bankName: 'HDFC Bank',
+        bankAccount: '12345678901234',
+        ifsc: 'HDFC0001234',
+    }, {
+        abortEarly: false,
+        allowUnknown: false,
+        stripUnknown: true,
+    });
+
+    assert.equal(result.error, undefined);
 });

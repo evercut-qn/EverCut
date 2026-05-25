@@ -58,9 +58,9 @@ Authorization: Bearer <jwt_token>
       "firstName": "Ram",
       "lastName": "Kumar",
       "phoneNumber": "+919876543210",
-      "gender": "Male",
+      "gender": "male",
       "dateOfBirth": "1990-05-15T00:00:00.000Z",
-      "photoUrl": "https://res.cloudinary.com/...",
+      "photoUrl": "https://media.evercut.in/images/employees/...",
       "workingHours": {
         "start": "09:00",
         "end": "18:00"
@@ -142,9 +142,9 @@ Authorization: Bearer <jwt_token>
 | `firstName` | String | Employee first name |
 | `lastName` | String | Employee last name |
 | `phoneNumber` | String | Contact phone number |
-| `gender` | String | Gender (Male/Female/Other) |
+| `gender` | String | Gender (male/female/transgender) |
 | `dateOfBirth` | Date | Date of birth |
-| `photoUrl` | String | Profile photo URL (Cloudinary) |
+| `photoUrl` | String | Signed CDN URL generated from the employee R2 media key |
 | `workingHours` | Object | Working hours (start/end times) |
 | `blockedDates` | Array | List of blocked dates |
 | `isActive` | Boolean | Whether employee is active/available |
@@ -387,7 +387,7 @@ const fetchEmployeeDetails = async (employeeId) => {
 - `GET /api/employees` - List all employees
 - `POST /api/employees` - Add new employee
 - `PATCH /api/employees/:id` - Update employee
-- `PATCH /api/employees/:id/status` - Toggle employee availability status
+- `PATCH /api/employees/:id` - Toggle employee availability status
 - `DELETE /api/employees/:id` - Delete employee
 - `GET /api/employees/:id/availability` - Employee availability
 - `PATCH /api/v1/employees/:id/availability` - Mark employee available/unavailable for date(s)

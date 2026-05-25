@@ -144,6 +144,11 @@ const paymentTransactionSchema = new mongoose.Schema(
             type: refundRecordSchema,
             default: null,
         },
+        waiverApplied: {
+            type: Boolean,
+            default: false,
+            index: true,
+        },
         settlement: {
             serviceAmount: {
                 type: Number,

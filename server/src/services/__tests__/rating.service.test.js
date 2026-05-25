@@ -66,7 +66,7 @@ test('getRatingsByShop returns 404 when the shop does not exist', async (t) => {
 test('getRatingSummaryForBarber resolves the owned shop before aggregating ratings', async (t) => {
     const shopId = '64b7f4c2a9d3f1b2c8e4d001';
 
-    t.mock.method(shopRepository, 'findByOwnerId', async () => ({ _id: shopId }));
+    t.mock.method(shopRepository, 'findByBarberUserId', async () => ({ _id: shopId }));
     t.mock.method(shopRepository, 'findById', async () => ({ _id: shopId }));
     t.mock.method(ratingRepository, 'getShopSummary', async (shopId) => ({
         shopId,
@@ -85,24 +85,55 @@ test('getRatingSummaryForBarber resolves the owned shop before aggregating ratin
     });
 });
 
-test('addReplyToRating rejects duplicate replies instead of silently overwriting them', async (t) => {
+test('upsertReplyToRating creates a first reply and notifies the customer', async (t) => {
+    const repliedAt = new Date('2026-03-20T08:30:00.000Z');
+
     t.mock.method(ratingRepository, 'findById', async () => ({
         _id: 'rating-1',
         shopId: 'shop-1',
-        reply: { text: 'Existing reply' },
     }));
-    t.mock.method(shopRepository, 'findByOwnerId', async () => ({ _id: 'shop-1' }));
+    t.mock.method(shopRepository, 'findByBarberUserId', async () => ({ _id: 'shop-1' }));
 
-    await assert.rejects(
-        () => ratingService.addReplyToRating('rating-1', 'Thanks for visiting', 'owner-1'),
-        {
-            name: 'ConflictError',
-            message: 'Reply already exists for this rating',
-        },
-    );
+    let addArgs = null;
+    t.mock.method(ratingRepository, 'addReply', async (ratingId, replyText, repliedBy) => {
+        addArgs = { ratingId, replyText, repliedBy };
+        return {
+            _id: 'rating-1',
+            rating: 5,
+            review: 'Great service',
+            customerId: {
+                firstName: 'Ava',
+                lastName: 'Customer',
+                photoR2Key: 'images/avatars/customer-1/profile.jpg',
+            },
+            reply: {
+                text: replyText,
+                repliedAt,
+            },
+        };
+    });
+
+    const notificationEvents = await import('../notification-events.service.js');
+    let notifyArgs = null;
+    t.mock.method(notificationEvents.default, 'notifyRatingReply', async (payload) => {
+        notifyArgs = payload;
+    });
+
+    const result = await ratingService.upsertReplyToRating('rating-1', '  Thanks for visiting  ', 'owner-1');
+
+    assert.deepEqual(addArgs, {
+        ratingId: 'rating-1',
+        replyText: 'Thanks for visiting',
+        repliedBy: 'owner-1',
+    });
+    assert.deepEqual(notifyArgs, {
+        ratingId: 'rating-1',
+        actorUserId: 'owner-1',
+    });
+    assert.equal(result.reply.text, 'Thanks for visiting');
 });
 
-test('updateReplyToRating trims reply text and omits customer email from the response payload', async (t) => {
+test('upsertReplyToRating updates an existing reply without sending a duplicate notification', async (t) => {
     const repliedAt = new Date('2026-03-20T08:30:00.000Z');
     const createdAt = new Date('2026-03-19T08:30:00.000Z');
     const updatedAt = new Date('2026-03-20T08:30:00.000Z');
@@ -112,7 +143,7 @@ test('updateReplyToRating trims reply text and omits customer email from the res
         shopId: 'shop-1',
         reply: { text: 'Old reply' },
     }));
-    t.mock.method(shopRepository, 'findByOwnerId', async () => ({ _id: 'shop-1' }));
+    t.mock.method(shopRepository, 'findByBarberUserId', async () => ({ _id: 'shop-1' }));
 
     let updateArgs = null;
     t.mock.method(ratingRepository, 'updateReply', async (ratingId, replyText, repliedBy) => {
@@ -124,7 +155,7 @@ test('updateReplyToRating trims reply text and omits customer email from the res
             customerId: {
                 firstName: 'Ava',
                 lastName: 'Customer',
-                photoUrl: 'https://example.com/customer.jpg',
+                photoR2Key: 'images/avatars/customer-1/profile.jpg',
                 userId: { email: 'should-not-leak@example.com' },
             },
             reply: {
@@ -136,23 +167,31 @@ test('updateReplyToRating trims reply text and omits customer email from the res
         };
     });
 
-    const result = await ratingService.updateReplyToRating('rating-1', '  Updated reply  ', 'owner-1');
+    const notificationEvents = await import('../notification-events.service.js');
+    let notified = false;
+    t.mock.method(notificationEvents.default, 'notifyRatingReply', async () => {
+        notified = true;
+    });
+
+    const result = await ratingService.upsertReplyToRating('rating-1', '  Updated reply  ', 'owner-1');
 
     assert.deepEqual(updateArgs, {
         ratingId: 'rating-1',
         replyText: 'Updated reply',
         repliedBy: 'owner-1',
     });
-    assert.deepEqual(result.user, {
-        firstName: 'Ava',
-        lastName: 'Customer',
-        photoUrl: 'https://example.com/customer.jpg',
-    });
+    assert.equal(result.user.firstName, 'Ava');
+    assert.equal(result.user.lastName, 'Customer');
+    assert.match(
+        result.user.photoUrl,
+        /^https:\/\/evercut-media-worker-dev\.quantneural-evercut\.workers\.dev\/images\/avatars\/customer-1\/profile\.jpg\?exp=\d+&token=[a-f0-9]{64}$/,
+    );
     assert.equal('email' in result.user, false);
     assert.deepEqual(result.reply, {
         text: 'Updated reply',
         repliedAt,
     });
+    assert.equal(notified, false);
 });
 
 test('removeRating uses ForbiddenError when the rating belongs to a different shop', async (t) => {
@@ -160,7 +199,7 @@ test('removeRating uses ForbiddenError when the rating belongs to a different sh
         _id: 'rating-1',
         shopId: 'shop-2',
     }));
-    t.mock.method(shopRepository, 'findByOwnerId', async () => ({ _id: 'shop-1' }));
+    t.mock.method(shopRepository, 'findByBarberUserId', async () => ({ _id: 'shop-1' }));
 
     await assert.rejects(
         () => ratingService.removeRating('rating-1', 'owner-1'),

@@ -139,20 +139,23 @@ export const addEmployeeSchema = Joi.object({
     firstName: Joi.string().trim().min(1).max(50).required(),
     lastName: Joi.string().trim().min(1).max(50).required(),
     phoneNumber: phoneNumberSchema.required(),
-    gender: Joi.string().valid(...ALL_GENDERS).required(),
+    gender: Joi.string().lowercase().valid(...ALL_GENDERS).required(),
     dateOfBirth: Joi.date().max('now').required(),
     workingHours: workingHoursSchema,
     blockedDates: blockedDatesSchema.default([]),
+    photoMediaId: Joi.string(),
 });
 
 export const updateEmployeeSchema = Joi.object({
     firstName: Joi.string().trim().min(1).max(50),
     lastName: Joi.string().trim().min(1).max(50),
     phoneNumber: phoneNumberSchema,
-    gender: Joi.string().valid(...ALL_GENDERS),
+    gender: Joi.string().lowercase().valid(...ALL_GENDERS),
     dateOfBirth: Joi.date().max('now'),
     workingHours: workingHoursSchema,
     blockedDates: blockedDatesSchema,
+    isActive: Joi.boolean(),
+    photoMediaId: Joi.string(),
 });
 
 export const employeeIdParamSchema = Joi.object({
@@ -167,18 +170,6 @@ export const employeeAvailabilityQuerySchema = Joi.object({
         objectId,
         Joi.array().items(objectId).min(1),
     ).required(),
-});
-
-export const toggleEmployeeStatusSchema = Joi.object({
-    status: Joi.alternatives()
-        .try(
-            Joi.boolean(),
-            Joi.string().valid('true', 'false', 'yes', 'no', 'on', 'off'),
-        )
-        .optional()
-        .messages({
-            'any.only': 'status must be a boolean or one of: true, false, yes, no, on, off',
-        }),
 });
 
 export const updateEmployeeAvailabilitySchema = Joi.object({

@@ -1,7 +1,6 @@
 import bcrypt from 'bcryptjs';
 import config from '../config/index.js';
 import logger from '../utils/logger.js';
-import { SECURITY_PIN_LENGTH } from '../utils/constants.js';
 
 /**
  * PIN service — all PIN-related operations for barbers.
@@ -12,11 +11,11 @@ import { SECURITY_PIN_LENGTH } from '../utils/constants.js';
  *   - PIN format is validated before hashing
  */
 
-const PIN_REGEX = new RegExp(`^\\d{${SECURITY_PIN_LENGTH}}$`);
+const PIN_REGEX = new RegExp(`^\\d{${config.security.pinLength}}$`);
 
 export const validatePinFormat = (pin) => {
     if (!pin) return { isValid: false, message: 'PIN is required' };
-    if (!PIN_REGEX.test(pin)) return { isValid: false, message: `PIN must be exactly ${SECURITY_PIN_LENGTH} digits` };
+    if (!PIN_REGEX.test(pin)) return { isValid: false, message: `PIN must be exactly ${config.security.pinLength} digits` };
     return { isValid: true };
 };
 

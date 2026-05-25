@@ -83,6 +83,7 @@ export const serializePayment = (payment) => {
         currency: plain.currency || 'INR',
         paymentMode: plain.paymentMode ?? null,
         transactionId: plain.gatewayTransactionId ?? null,
+        waiverApplied: plain.waiverApplied ?? false,
         refund: serializeRefund(plain.refund),
         settlement: serializeSettlement(plain.settlement),
         expiresAt: plain.expiresAt ?? null,

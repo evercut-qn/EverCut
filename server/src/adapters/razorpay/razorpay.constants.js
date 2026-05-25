@@ -1,0 +1,3 @@
+export const RAZORPAY_WEBHOOK_SIGNATURE_HEADER = 'x-razorpay-signature';
+
+export const DEFAULT_RAZORPAY_SUBSCRIPTION_TOTAL_COUNT = 120;

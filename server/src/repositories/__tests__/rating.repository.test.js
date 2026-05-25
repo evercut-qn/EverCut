@@ -25,7 +25,7 @@ test('addReply requests the updated document, runs validators, and populates cus
     assert.deepEqual(updateArgs[2], { returnDocument: 'after', runValidators: true });
     assert.deepEqual(populateArg, {
         path: 'customerId',
-        select: 'firstName lastName photoUrl',
+        select: 'firstName lastName photoR2Key',
     });
 });
 

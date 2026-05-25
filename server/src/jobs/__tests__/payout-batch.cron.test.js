@@ -7,13 +7,17 @@ const ensureRequiredEnv = () => {
         FIREBASE_PROJECT_ID: 'evercut-test',
         FIREBASE_CLIENT_EMAIL: 'firebase@example.com',
         FIREBASE_PRIVATE_KEY: '-----BEGIN PRIVATE KEY-----\\nabc\\n-----END PRIVATE KEY-----',
-        CLOUDINARY_CLOUD_NAME: 'evercut',
-        CLOUDINARY_API_KEY: 'cloudinary-key',
-        CLOUDINARY_API_SECRET: 'cloudinary-secret',
+        CF_ACCOUNT_ID: 'test-account',
+        R2_ACCESS_KEY_ID: 'test-access-key',
+        R2_SECRET_ACCESS_KEY: 'test-secret-key',
+        R2_BUCKET: 'evercut-media-test',
+        CDN_BASE_URL: 'https://media.evercut.test',
+        MEDIA_TOKEN_SECRET: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
         MSG91_AUTH_KEY: 'msg91-auth',
         MSG91_OTP_TEMPLATE_ID: 'msg91-template',
         JWT_ACCESS_SECRET: 'access-secret',
         JWT_REFRESH_SECRET: 'refresh-secret',
+        JWT_ONBOARDING_SECRET: 'onboarding-secret',
         PHONEPE_CLIENT_ID: 'phonepe-client',
         PHONEPE_CLIENT_SECRET: 'phonepe-secret',
         PHONEPE_CLIENT_VERSION: '1',
@@ -37,9 +41,9 @@ const payoutBatchJob = await import('../payout-batch.cron.js');
 
 test('runPayoutBatchNow groups completed bookings by barber and creates one payout per barber', async (t) => {
     t.mock.method(bookingRepository, 'findCompletedWithPendingPayout', async () => ([
-        { _id: 'booking-1', shopId: { _id: 'shop-1', ownerId: 'barber-1' } },
-        { _id: 'booking-2', shopId: { _id: 'shop-1', ownerId: 'barber-1' } },
-        { _id: 'booking-3', shopId: { _id: 'shop-2', ownerId: 'barber-2' } },
+        { _id: 'booking-1', shopId: { _id: 'shop-1', barberId: 'barber-1' } },
+        { _id: 'booking-2', shopId: { _id: 'shop-1', barberId: 'barber-1' } },
+        { _id: 'booking-3', shopId: { _id: 'shop-2', barberId: 'barber-2' } },
     ]));
 
     t.mock.method(paymentRepository, 'findCompletedByBookingIds', async () => ([
@@ -78,7 +82,7 @@ test('runPayoutBatchNow groups completed bookings by barber and creates one payo
 
 test('runPayoutBatchNow prefers barberPayout when settlement values diverge from serviceAmount', async (t) => {
     t.mock.method(bookingRepository, 'findCompletedWithPendingPayout', async () => ([
-        { _id: 'booking-1', shopId: { _id: 'shop-1', ownerId: 'barber-1' } },
+        { _id: 'booking-1', shopId: { _id: 'shop-1', barberId: 'barber-1' } },
     ]));
 
     t.mock.method(paymentRepository, 'findCompletedByBookingIds', async () => ([

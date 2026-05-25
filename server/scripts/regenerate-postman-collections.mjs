@@ -46,19 +46,6 @@ const request = ({ method, url, description, headers = [], body, auth, event }) 
 };
 
 const jsonBody = (raw) => ({ mode: 'raw', raw, options: { raw: { language: 'json' } } });
-const formDataBody = (formdata) => ({ mode: 'formdata', formdata });
-
-const fileField = (key, description) => {
-  const field = { key, type: 'file' };
-  if (description) field.description = description;
-  return field;
-};
-
-const textField = (key, value, description) => {
-  const field = { key, value, type: 'text' };
-  if (description) field.description = description;
-  return field;
-};
 
 const standardEnvelopeAssertions = [
   "pm.test('response uses the standard envelope', function () {",
@@ -78,6 +65,7 @@ const standardEnvelopeAssertions = [
 ];
 
 const testEvent = (...exec) => [{ listen: 'test', script: { type: 'text/javascript', exec: [...standardEnvelopeAssertions, ...exec] } }];
+const rawTestEvent = (...exec) => [{ listen: 'test', script: { type: 'text/javascript', exec } }];
 const preRequestEvent = (...exec) => [{ listen: 'prerequest', script: { type: 'text/javascript', exec } }];
 const mergedEvents = (preRequestExec, testExec) => [
   { listen: 'prerequest', script: { type: 'text/javascript', exec: preRequestExec } },
@@ -211,10 +199,14 @@ const authenticationCollection = {
           "  pm.environment.set('customer_onboarding_token', data.onboardingToken);",
           "  pm.environment.unset('customer_access_token');",
           "  pm.environment.unset('customer_refresh_token');",
+          "  pm.test('onboarding token has expiresIn of 86400s', function () { pm.expect(data.onboardingExpiresIn).to.equal(86400); });",
           "} else {",
           "  pm.environment.unset('customer_onboarding_token');",
           "  if (data.accessToken) pm.environment.set('customer_access_token', data.accessToken);",
           "  if (data.refreshToken) pm.environment.set('customer_refresh_token', data.refreshToken);",
+          "  pm.test('tokenType is Bearer', function () { pm.expect(data.tokenType).to.equal('Bearer'); });",
+          "  pm.test('expiresIn is a positive number', function () { pm.expect(data.expiresIn).to.be.a('number').and.to.be.above(0); });",
+          "  pm.test('refreshExpiresIn is a positive number', function () { pm.expect(data.refreshExpiresIn).to.be.a('number').and.to.be.above(0); });",
           "}",
           "pm.collectionVariables.set('last_session_role', 'CUSTOMER');",
           "pm.collectionVariables.set('last_session_is_new_user', String(Boolean(data.isNewUser)));"
@@ -250,10 +242,14 @@ const authenticationCollection = {
           "  pm.environment.set('barber_onboarding_token', data.onboardingToken);",
           "  pm.environment.unset('barber_access_token');",
           "  pm.environment.unset('barber_refresh_token');",
+          "  pm.test('onboarding token has expiresIn of 86400s', function () { pm.expect(data.onboardingExpiresIn).to.equal(86400); });",
           "} else {",
           "  pm.environment.unset('barber_onboarding_token');",
           "  if (data.accessToken) pm.environment.set('barber_access_token', data.accessToken);",
           "  if (data.refreshToken) pm.environment.set('barber_refresh_token', data.refreshToken);",
+          "  pm.test('tokenType is Bearer', function () { pm.expect(data.tokenType).to.equal('Bearer'); });",
+          "  pm.test('expiresIn is a positive number', function () { pm.expect(data.expiresIn).to.be.a('number').and.to.be.above(0); });",
+          "  pm.test('refreshExpiresIn is a positive number', function () { pm.expect(data.refreshExpiresIn).to.be.a('number').and.to.be.above(0); });",
           "}",
           "pm.collectionVariables.set('last_session_role', 'BARBER');",
           "pm.collectionVariables.set('last_session_is_new_user', String(Boolean(data.isNewUser)));"
@@ -274,7 +270,10 @@ const authenticationCollection = {
           "const response = pm.response.json();",
           "const data = response.data || {};",
           "if (data.accessToken) pm.environment.set('customer_access_token', data.accessToken);",
-          "if (data.refreshToken) pm.environment.set('customer_refresh_token', data.refreshToken);"
+          "if (data.refreshToken) pm.environment.set('customer_refresh_token', data.refreshToken);",
+          "pm.test('tokenType is Bearer', function () { pm.expect(data.tokenType).to.equal('Bearer'); });",
+          "pm.test('expiresIn is a positive number', function () { pm.expect(data.expiresIn).to.be.a('number').and.to.be.above(0); });",
+          "pm.test('refreshExpiresIn is a positive number', function () { pm.expect(data.refreshExpiresIn).to.be.a('number').and.to.be.above(0); });"
         ),
       }),
     },
@@ -292,7 +291,10 @@ const authenticationCollection = {
           "const response = pm.response.json();",
           "const data = response.data || {};",
           "if (data.accessToken) pm.environment.set('barber_access_token', data.accessToken);",
-          "if (data.refreshToken) pm.environment.set('barber_refresh_token', data.refreshToken);"
+          "if (data.refreshToken) pm.environment.set('barber_refresh_token', data.refreshToken);",
+          "pm.test('tokenType is Bearer', function () { pm.expect(data.tokenType).to.equal('Bearer'); });",
+          "pm.test('expiresIn is a positive number', function () { pm.expect(data.expiresIn).to.be.a('number').and.to.be.above(0); });",
+          "pm.test('refreshExpiresIn is a positive number', function () { pm.expect(data.refreshExpiresIn).to.be.a('number').and.to.be.above(0); });"
         ),
       }),
     },
@@ -354,7 +356,7 @@ const authenticationCollection = {
     {
       name: '11. Update Email (Customer)',
       ...request({
-        method: 'PUT',
+        method: 'PATCH',
         url: '{{base_url}}/{{api_prefix}}/account/email',
         auth: bearerAuth('customer_access_token'),
         headers: [{ key: 'Content-Type', value: 'application/json' }],
@@ -398,18 +400,9 @@ const onboardingCollection = {
         method: 'POST',
         url: '{{base_url}}/{{api_prefix}}/onboarding/customers',
         auth: bearerAuth('customer_onboarding_token'),
-        body: formDataBody([
-          textField('firstName', 'Test'),
-          textField('lastName', 'Customer'),
-          textField('phoneNumber', '9876543210'),
-          textField('email', 'test.customer@example.com'),
-          textField('gender', 'Male'),
-          textField('dateOfBirth', '1994-06-15'),
-          textField('address', customerLocationText),
-          textField('location', customerLocationGeoJson, 'GeoJSON point near the barber test shop'),
-          fileField('photo', 'Attach customer photo file manually in Postman'),
-        ]),
-        description: 'Creates the customer for the OTP-verified customer test user. A rerun returns 409 because onboarding only succeeds once per account.',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "firstName": "Test",\n  "lastName": "Customer",\n  "email": "test.customer@example.com",\n  "gender": "male",\n  "dateOfBirth": "1994-06-15",\n  "address": "${customerLocationText}",\n  "location": ${customerLocationGeoJson},\n  "photoMediaId": "{{shared_media_id}}"\n}`),
+        description: 'Creates the customer for the OTP-verified customer test user using a confirmed R2 mediaId. Run the media upload flow first if shared_media_id is empty. A rerun returns 409 because onboarding only succeeds once per account.',
         event: testEvent(
           "pm.test('status is 201 or 409', function () { pm.expect(pm.response.code).to.be.oneOf([201, 409]); });",
           "if (pm.response.code === 201) {",
@@ -417,6 +410,9 @@ const onboardingCollection = {
           "  if (data.accessToken) pm.environment.set('customer_access_token', data.accessToken);",
           "  if (data.refreshToken) pm.environment.set('customer_refresh_token', data.refreshToken);",
           "  pm.environment.unset('customer_onboarding_token');",
+          "  pm.test('tokenType is Bearer', function () { pm.expect(data.tokenType).to.equal('Bearer'); });",
+          "  pm.test('expiresIn is a positive number', function () { pm.expect(data.expiresIn).to.be.a('number').and.to.be.above(0); });",
+          "  pm.test('refreshExpiresIn is a positive number', function () { pm.expect(data.refreshExpiresIn).to.be.a('number').and.to.be.above(0); });",
           "}"
         ),
       }),
@@ -427,31 +423,9 @@ const onboardingCollection = {
         method: 'POST',
         url: '{{base_url}}/{{api_prefix}}/onboarding/barbers',
         auth: bearerAuth('barber_onboarding_token'),
-        body: formDataBody([
-          textField('firstName', 'Test'),
-          textField('lastName', 'Barber'),
-          textField('email', 'test.barber@example.com'),
-          textField('dateOfBirth', '1991-01-12'),
-          textField('gender', 'Male'),
-          textField('shopName', 'Postman Test Barber Studio'),
-          textField('category', 'Barber'),
-          textField('targetCustomers', 'male'),
-          textField('address', barberLocationText),
-          textField('location', barberLocationGeoJson, 'Matches the customer discovery coordinates'),
-          textField('amenities', '["Air Conditioning","Waiting Area","Drinking Water","Washrooms","Parking Area","Wi-Fi","Charging Points"]'),
-          textField('workingDays', '["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"]'),
-          textField('workingHours', '{"openTime":"09:00","closeTime":"20:00"}'),
-          textField('breakTimes', '[{"start":"13:00","end":"14:00"}]'),
-          textField('accountHolderName', 'Test Barber'),
-          textField('bankName', 'HDFC Bank'),
-          textField('upiId', 'test.barber@upi'),
-          textField('pin', '1234'),
-          textField('confirmPin', '1234'),
-          fileField('photos', 'Attach shop image 1 of 3 manually in Postman'),
-          fileField('photos', 'Attach shop image 2 of 3 manually in Postman'),
-          fileField('photos', 'Attach shop image 3 of 3 manually in Postman'),
-        ]),
-        description: 'Creates the barber shop for the OTP-verified barber test user. Shop schedule values can be sent in HH:MM or hh:mm AM/PM format and are normalized by the backend. The three shop image fields already point to the local sample file.',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "firstName": "Test",\n  "lastName": "Barber",\n  "email": "test.barber@example.com",\n  "dateOfBirth": "1991-01-12",\n  "gender": "male",\n  "shopName": "Postman Test Barber Studio",\n  "category": "Barber Shop",\n  "targetCustomers": "men",\n  "address": "${barberLocationText}",\n  "location": ${barberLocationGeoJson},\n  "amenities": ["Air Conditioning","Waiting Area","Drinking Water","Washrooms","Parking Area","Wi-Fi","Charging Points"],\n  "workingDays": ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"],\n  "workingHours": {"openTime":"09:00","closeTime":"20:00"},\n  "accountHolderName": "Test Barber",\n  "bankName": "HDFC Bank",\n  "bankAccount": "12345678901234",\n  "ifsc": "HDFC0001234",\n  "pin": "1234",\n  "confirmPin": "1234",\n  "photoMediaId": "{{shared_media_id}}"\n}`),
+        description: 'Creates the barber shop for the OTP-verified barber test user using a confirmed R2 mediaId. Shop schedule values can be sent in HH:MM or hh:mm AM/PM format and are normalized by the backend.',
         event: testEvent(
           "pm.test('status is 201 or 409', function () { pm.expect(pm.response.code).to.be.oneOf([201, 409]); });",
           "if (pm.response.code === 201) {",
@@ -462,6 +436,9 @@ const onboardingCollection = {
           "  if (data.refreshToken) pm.environment.set('barber_refresh_token', data.refreshToken);",
           "  pm.environment.unset('barber_onboarding_token');",
           "  pm.globals.set('shared_barber_pin', '1234');",
+          "  pm.test('tokenType is Bearer', function () { pm.expect(data.tokenType).to.equal('Bearer'); });",
+          "  pm.test('expiresIn is a positive number', function () { pm.expect(data.expiresIn).to.be.a('number').and.to.be.above(0); });",
+          "  pm.test('refreshExpiresIn is a positive number', function () { pm.expect(data.refreshExpiresIn).to.be.a('number').and.to.be.above(0); });",
           "}"
         ),
       }),
@@ -497,24 +474,39 @@ const customerCollection = {
     {
       name: '2. Update Profile',
       ...request({
-        method: 'PUT',
+        method: 'PATCH',
         url: '{{base_url}}/{{api_prefix}}/customers/me',
-        description: 'Updates the customer data and reuses the sample image as an optional replacement photo. NOTE: Email updates must use PUT /account/email endpoint.',
-        body: formDataBody([
-          textField('firstName', 'Test'),
-          textField('lastName', 'Customer'),
-          textField('address', `${customerLocationText}, India`),
-          textField('location', customerLocationGeoJson),
-          fileField('photo', 'Attach replacement photo file manually in Postman (optional)'),
-        ]),
+        description: 'Updates customer data. To replace the profile photo, include a confirmed R2 photoMediaId from the media upload flow. NOTE: Email updates must use PATCH /account/email endpoint.',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "firstName": "Test",\n  "lastName": "Customer",\n  "address": "${customerLocationText}, India",\n  "location": ${customerLocationGeoJson},\n  "photoMediaId": "{{shared_media_id}}"\n}`),
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
     },
     {
-      name: '3. Get Services By Gender And Capture IDs',
+      name: '3. Update Profile Picture',
+      ...request({
+        method: 'PATCH',
+        url: '{{base_url}}/{{api_prefix}}/customers/me/media/picture',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "mediaId": "{{shared_media_id}}"\n}`),
+        description: 'Replaces the customer profile picture with a confirmed R2 media object.',
+        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
+      }),
+    },
+    {
+      name: '4. Remove Profile Picture',
+      ...request({
+        method: 'DELETE',
+        url: '{{base_url}}/{{api_prefix}}/customers/me/media/picture',
+        description: 'Removes the customer profile picture and deletes the associated R2 object.',
+        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
+      }),
+    },
+    {
+      name: '5. Get Services By Gender And Capture IDs',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/shops/services?gender=male&coordinates={{coordinates}}',
+        url: '{{base_url}}/{{api_prefix}}/shops/services?gender=men&coordinates={{coordinates}}',
         description: 'Uses the shared Bengaluru coordinates so the response includes the barber shop created by onboarding. The script captures the first nearby Postman shop and service IDs.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
@@ -577,8 +569,8 @@ const customerBookingsCollection = {
       name: '1. Get Upcoming Bookings And Capture IDs',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/bookings?timeframe=upcoming',
-        description: 'Lists upcoming bookings and captures the first booking ID and first service ID when they already exist.',
+        url: '{{base_url}}/{{api_prefix}}/bookings?dateFrom={{booking_date}}',
+        description: 'Lists bookings from the generated booking date onward and captures the first booking ID and first service ID when they already exist.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           "const response = pm.response.json();",
@@ -630,6 +622,9 @@ const customerBookingsCollection = {
             "  pm.expect(data).to.have.property('endTime');",
             "  pm.expect(data).to.have.property('startMinute');",
             "  pm.expect(data).to.have.property('endMinute');",
+            "  pm.expect(data).to.have.property('serviceAmount');",
+            "  pm.expect(data).to.have.property('platformFee');",
+            "  pm.expect(data).to.have.property('totalAmount');",
             "});"
           ]
         ),
@@ -648,6 +643,10 @@ const customerBookingsCollection = {
           "pm.test('booking detail includes employee availability flag', function () {",
           "  pm.expect(booking.employee).to.have.property('isAvailableOnBookingDate');",
           "  pm.expect(booking.employee.isAvailableOnBookingDate).to.be.a('boolean');",
+          "});",
+          "pm.test('booking detail exposes clear amount semantics', function () {",
+          "  pm.expect(booking).to.have.property('serviceAmount');",
+          "  pm.expect(booking).to.have.property('totalAmount');",
           "});"
         ),
       }),
@@ -655,8 +654,10 @@ const customerBookingsCollection = {
     {
       name: '5. Add Booking Favorite',
       ...request({
-        method: 'PUT',
+        method: 'PATCH',
         url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id}}/favorite',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "favorite": true\n}`),
         description: 'Adds the current booking to the customer favorites list through the booking resource.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -700,8 +701,10 @@ const customerBookingsCollection = {
     {
       name: '9. Remove Booking Favorite',
       ...request({
-        method: 'DELETE',
+        method: 'PATCH',
         url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id}}/favorite',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "favorite": false\n}`),
         description: 'Removes the current booking from the customer favorites list.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -848,8 +851,10 @@ const customerShopDiscoveryCollection = {
     {
       name: '6. Add Favorite Shop',
       ...request({
-        method: 'PUT',
+        method: 'PATCH',
         url: '{{base_url}}/{{api_prefix}}/shops/{{shop_id}}/favorite',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "favorite": true\n}`),
         description: 'Adds the captured shop to the authenticated customer favorite shops list through the shop discovery flow.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -866,8 +871,10 @@ const customerShopDiscoveryCollection = {
     {
       name: '8. Remove Favorite Shop',
       ...request({
-        method: 'DELETE',
+        method: 'PATCH',
         url: '{{base_url}}/{{api_prefix}}/shops/{{shop_id}}/favorite',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "favorite": false\n}`),
         description: 'Removes the captured shop from the authenticated customer favorite shops list.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -885,7 +892,7 @@ const customerShopDiscoveryCollection = {
       name: '10. Search Services',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/services/search?query={{service_search_query}}&gender=male',
+        url: '{{base_url}}/{{api_prefix}}/services/search?query={{service_search_query}}&gender=men',
         description: 'Searches the customer-visible service catalogue for the services created by the barber service collection.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -920,7 +927,7 @@ const customerRatingsCollection = {
       name: '1. Get Past Bookings And Capture Completed Shop ID',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/bookings?timeframe=past&limit=100',
+        url: '{{base_url}}/{{api_prefix}}/bookings?dateTo={{booking_date}}&status=completed&limit=100',
         description: 'Captures a shop ID from the authenticated customer\'s completed past bookings. This request fails the collection clearly when no eligible booking exists for rating.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
@@ -948,7 +955,7 @@ const customerRatingsCollection = {
       name: '3. Get Shop Ratings',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/ratings/shop/{{shop_id}}',
+        url: '{{base_url}}/{{api_prefix}}/shops/{{shop_id}}/ratings',
         description: 'Lists all ratings for the captured shop, including barber replies.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -957,7 +964,7 @@ const customerRatingsCollection = {
       name: '4. Get Rating Summary',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/ratings/shop/{{shop_id}}/summary',
+        url: '{{base_url}}/{{api_prefix}}/shops/{{shop_id}}/ratings/analytics',
         description: 'Returns the rating summary payload for the captured shop.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -1006,8 +1013,8 @@ const barberProfileCollection = {
         method: 'PATCH',
         url: '{{base_url}}/{{api_prefix}}/shops/me',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody(`{\n  "firstName": "Test",\n  "lastName": "Barber",\n  "dateOfBirth": "1991-01-12",\n  "gender": "Male",\n  "shopName": "Postman Test Barber Studio",\n  "category": "Barber",\n  "targetCustomers": "male",\n  "address": "${barberLocationText}",\n  "location": ${barberLocationGeoJson},\n  "amenities": ["Air Conditioning", "Waiting Area", "Parking Area", "Wi-Fi"],\n  "workingDays": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],\n  "workingHours": {\n    "openTime": "09:00",\n    "closeTime": "20:00"\n  },\n  "breakTimes": [\n    {\n      "start": "13:00",\n      "end": "14:00"\n    }\n  ],\n  "bio": "Updated from the automated Postman profile collection."\n}`),
-        description: 'Updates only barber profile and business fields. Payout details are managed through /shops/me/payout-details. NOTE: Email updates must use PUT /account/email endpoint.',
+        body: jsonBody(`{\n  "firstName": "Test",\n  "lastName": "Barber",\n  "dateOfBirth": "1991-01-12",\n  "gender": "male",\n  "shopName": "Postman Test Barber Studio",\n  "category": "Barber Shop",\n  "targetCustomers": "men",\n  "address": "${barberLocationText}",\n  "location": ${barberLocationGeoJson},\n  "amenities": ["Air Conditioning", "Waiting Area", "Parking Area", "Wi-Fi"],\n  "workingDays": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],\n  "workingHours": {\n    "openTime": "09:00",\n    "closeTime": "20:00"\n  },\n  "breakTimes": [\n    {\n      "start": "13:00",\n      "end": "14:00"\n    }\n  ],\n  "bio": "Updated from the automated Postman profile collection."\n}`),
+        description: 'Updates only barber profile and business fields. Payout details are managed through /shops/me/payout-details. NOTE: Email updates must use PATCH /account/email endpoint.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
     },
@@ -1016,13 +1023,13 @@ const barberProfileCollection = {
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/shops/me/payout-details',
-        description: 'Reads the complete payout account details with verification status. Account number is masked for security.',
+        description: 'Reads the complete payout account details with verification status. Account number is displayed in full.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           "const response = pm.response.json();",
           "const data = response.data || {};",
           "pm.test('response includes accountHolderName', function () { pm.expect(data).to.have.property('accountHolderName'); });",
-          "pm.test('response includes bankAccountLast4', function () { pm.expect(data).to.have.property('bankAccountLast4'); });",
+          "pm.test('response includes bankAccount', function () { pm.expect(data).to.have.property('bankAccount'); });",
           "pm.test('response includes ifsc', function () { pm.expect(data).to.have.property('ifsc'); });",
           "pm.test('response includes verificationStatus', function () { pm.expect(data).to.have.property('verificationStatus'); });",
           "pm.test('response includes canReceivePayouts', function () { pm.expect(data).to.have.property('canReceivePayouts'); });"
@@ -1035,13 +1042,13 @@ const barberProfileCollection = {
         method: 'PATCH',
         url: '{{base_url}}/{{api_prefix}}/shops/me/payout-details',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody(`{\n  "accountHolderName": "Test Barber",\n  "bankName": "HDFC Bank",\n  "bankAccount": "12345678901234",\n  "ifsc": "HDFC0001234",\n  "upiId": "test.barber@upi"\n}`),
+        body: jsonBody(`{\n  "accountHolderName": "Test Barber",\n  "bankName": "HDFC Bank",\n  "bankAccount": "12345678901234",\n  "ifsc": "HDFC0001234"\n}`),
         description: 'Updates complete payout account details including account number and IFSC. Verification status resets to pending on change.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           "const response = pm.response.json();",
           "const data = response.data || {};",
-          "pm.test('bankAccountLast4 is present', function () { pm.expect(data.bankAccountLast4).to.match(/^\\d{4}$/); });",
+          "pm.test('bankAccount is present and unmasked', function () { pm.expect(data.bankAccount).to.equal('12345678901234'); });",
           "pm.test('verificationStatus is pending after update', function () { pm.expect(data.verificationStatus).to.equal('pending'); });"
         ),
       }),
@@ -1050,10 +1057,10 @@ const barberProfileCollection = {
       name: '5. Ensure Shop Is Open',
       ...request({
         method: 'PATCH',
-        url: '{{base_url}}/{{api_prefix}}/shops/me/status',
+        url: '{{base_url}}/{{api_prefix}}/shops/me',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody(`{\n  "status": true\n}`),
-        description: 'Explicitly opens the shop so customer discovery and bookings can run immediately after this collection.',
+        body: jsonBody(`{\n  "isOpen": true\n}`),
+        description: 'Explicitly opens the shop through the shop resource so customer discovery and bookings can run immediately after this collection.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
     },
@@ -1061,9 +1068,10 @@ const barberProfileCollection = {
       name: '6. Update Profile Picture',
       ...request({
         method: 'PATCH',
-        url: '{{base_url}}/{{api_prefix}}/shops/me/picture',
-        body: formDataBody([fileField('photo', 'Attach profile picture file manually in Postman')]),
-        description: 'Uploads or replaces the owner profile picture.',
+        url: '{{base_url}}/{{api_prefix}}/shops/me/media/picture',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "mediaId": "{{shared_media_id}}"\n}`),
+        description: 'Replaces the owner profile picture with a confirmed R2 media object.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
     },
@@ -1071,17 +1079,36 @@ const barberProfileCollection = {
       name: '7. Update Cover Image',
       ...request({
         method: 'PATCH',
-        url: '{{base_url}}/{{api_prefix}}/shops/me/cover',
-        body: formDataBody([fileField('cover', 'Attach cover image file manually in Postman')]),
-        description: 'Uploads or replaces the shop cover image.',
+        url: '{{base_url}}/{{api_prefix}}/shops/me/media/cover',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "mediaId": "{{shared_media_id}}"\n}`),
+        description: 'Replaces the shop cover image with a confirmed R2 media object.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
     },
     {
-      name: '8. Update PIN',
+      name: '8. Remove Profile Picture',
+      ...request({
+        method: 'DELETE',
+        url: '{{base_url}}/{{api_prefix}}/shops/me/media/picture',
+        description: 'Removes the barber profile picture.',
+        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
+      }),
+    },
+    {
+      name: '9. Remove Cover Image',
+      ...request({
+        method: 'DELETE',
+        url: '{{base_url}}/{{api_prefix}}/shops/me/media/cover',
+        description: 'Removes the shop cover image.',
+        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
+      }),
+    },
+    {
+      name: '10. Update PIN',
       ...request({
         method: 'PATCH',
-        url: '{{base_url}}/{{api_prefix}}/shops/me/pin',
+        url: '{{base_url}}/{{api_prefix}}/shops/me/security',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
         body: jsonBody(`{\n  "currentPin": "{{barber_active_pin}}",\n  "newPin": "{{barber_next_pin}}",\n  "confirmNewPin": "{{barber_next_pin}}"\n}`),
         description: 'Flips the barber PIN between 1234 and 5678 so the request stays rerunnable.',
@@ -1101,7 +1128,7 @@ const barberProfileCollection = {
       }),
     },
     {
-      name: '9. Sign-Out Everywhere (Terminal)',
+      name: '11. Sign-Out Everywhere (Terminal)',
       ...request({
         method: 'DELETE',
         url: '{{base_url}}/{{api_prefix}}/account/sessions',
@@ -1110,7 +1137,7 @@ const barberProfileCollection = {
       }),
     },
     {
-      name: '10. Delete Account (Terminal)',
+      name: '12. Delete Account (Terminal)',
       ...request({
         method: 'DELETE',
         url: '{{base_url}}/{{api_prefix}}/account',
@@ -1186,16 +1213,9 @@ const barberEmployeesCollection = {
       ...request({
         method: 'POST',
         url: '{{base_url}}/{{api_prefix}}/employees',
-        body: formDataBody([
-          textField('firstName', 'Postman'),
-          textField('lastName', 'Automation'),
-          textField('phoneNumber', '{{employee_phone}}'),
-          textField('gender', 'Female'),
-          textField('dateOfBirth', '1995-05-15'),
-          textField('workingHours', '{"start":"09:00","end":"18:00"}'),
-          fileField('photo', 'Attach employee photo file manually in Postman (optional)'),
-        ]),
-        description: 'Creates a new employee with a generated phone number so the request stays rerunnable. Employee working hours remain HH:MM 24-hour values even when the shop was originally created with AM/PM schedule input.',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "firstName": "Postman",\n  "lastName": "Automation",\n  "phoneNumber": "{{employee_phone}}",\n  "gender": "Female",\n  "dateOfBirth": "1995-05-15",\n  "workingHours": {"start":"09:00","end":"18:00"},\n  "photoMediaId": "{{shared_media_id}}"\n}`),
+        description: 'Creates a new employee with a generated phone number and an optional confirmed R2 mediaId. Employee working hours remain HH:MM 24-hour values even when the shop was originally created with AM/PM schedule input.',
         event: mergedEvents(
           [
             "const suffix = Date.now().toString().slice(-7);",
@@ -1215,13 +1235,8 @@ const barberEmployeesCollection = {
       ...request({
         method: 'PATCH',
         url: '{{base_url}}/{{api_prefix}}/employees/{{employee_id}}',
-        body: formDataBody([
-          textField('firstName', 'Postman'),
-          textField('lastName', 'Automation Updated'),
-          textField('workingHours', '{"start":"10:00","end":"19:00"}'),
-          textField('blockedDates', '[]'),
-          fileField('photo', 'Attach employee photo file manually in Postman (optional)'),
-        ]),
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "firstName": "Postman",\n  "lastName": "Automation Updated",\n  "workingHours": {"start":"10:00","end":"19:00"},\n  "blockedDates": [],\n  "photoMediaId": "{{shared_media_id}}"\n}`),
         description: 'Updates the captured employee with only fields that the validator supports.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -1230,10 +1245,10 @@ const barberEmployeesCollection = {
       name: '5. Toggle Employee Status',
       ...request({
         method: 'PATCH',
-        url: '{{base_url}}/{{api_prefix}}/employees/{{employee_id}}/status',
+        url: '{{base_url}}/{{api_prefix}}/employees/{{employee_id}}',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody(`{\n  "status": false\n}`),
-        description: 'Toggles employee availability status. Accepts boolean (true/false) or string values (yes/no, on/off). Omit status field to toggle current state.',
+        body: jsonBody(`{\n  "isActive": false\n}`),
+        description: 'Marks the employee inactive through the employee resource.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           "const response = pm.response.json();",
@@ -1246,8 +1261,8 @@ const barberEmployeesCollection = {
     {
       name: '6. Mark Employee Unavailable For Date',
       ...request({
-        method: 'PATCH',
-        url: '{{base_url}}/{{api_prefix}}/employees/{{employee_id}}/availability',
+        method: 'PUT',
+        url: '{{base_url}}/{{api_prefix}}/employees/{{employee_id}}/blocked-dates',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
         body: jsonBody(`{\n  "dates": ["{{employee_leave_date}}"],\n  "available": false\n}`),
         description: 'Marks the captured employee unavailable for a generated future date. Existing bookings remain unchanged and affected customers receive booking.employee_unavailable notifications.',
@@ -1350,7 +1365,7 @@ const barberServicesCollection = {
         method: 'POST',
         url: '{{base_url}}/{{api_prefix}}/services',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody(`{\n  "serviceName": "{{single_service_name}}",\n  "serviceType": "single",\n  "serviceFor": "male",\n  "duration": 30,\n  "actualPrice": 500,\n  "offerPrice": 50\n}`),
+        body: jsonBody(`{\n  "serviceName": "{{single_service_name}}",\n  "serviceType": "single",\n  "serviceFor": "men",\n  "duration": 30,\n  "actualPrice": 500,\n  "offerPrice": 50\n}`),
         description: 'Creates a single service using only fields that the API validator accepts.',
         event: mergedEvents(
           ["pm.collectionVariables.set('single_service_name', `Postman Express Cut ${Date.now().toString().slice(-6)}`);"],
@@ -1369,7 +1384,7 @@ const barberServicesCollection = {
         method: 'POST',
         url: '{{base_url}}/{{api_prefix}}/services',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody(`{\n  "serviceName": "{{bundled_service_name}}",\n  "serviceType": "bundled",\n  "serviceFor": "male",\n  "actualPrice": 900,\n  "offerPrice": 100,\n  "bundledServices": ["Haircut", "Beard Trim", "Head Massage"],\n  "totalDuration": 75\n}`),
+        body: jsonBody(`{\n  "serviceName": "{{bundled_service_name}}",\n  "serviceType": "bundled",\n  "serviceFor": "men",\n  "actualPrice": 900,\n  "offerPrice": 100,\n  "bundledServices": ["Haircut", "Beard Trim", "Head Massage"],\n  "totalDuration": 75\n}`),
         description: 'Creates a bundled service using the fields required by the backend validator.',
         event: mergedEvents(
           ["pm.collectionVariables.set('bundled_service_name', `Postman Grooming Combo ${Date.now().toString().slice(-6)}`);"],
@@ -1380,7 +1395,7 @@ const barberServicesCollection = {
     {
       name: '4. Update Service',
       ...request({
-        method: 'PUT',
+        method: 'PATCH',
         url: '{{base_url}}/{{api_prefix}}/services/{{service_id}}',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
         body: jsonBody(`{\n  "serviceFor": "unisex"\n}`),
@@ -1407,7 +1422,7 @@ const barberServicesCollection = {
 const barberBookingsCollection = {
   info: {
     name: 'EverCut - Barber Bookings',
-    description: 'Barber booking administration collection covering list with role-specific filters (employeeId, dateFrom, dateTo), status stats, monthly milestone progress, status updates, and explicit booking cancellation. Enhanced with employee and date range filtering for leave management and scheduling.',
+    description: 'Barber booking administration collection covering list filters, combined analytics, status updates, and explicit booking cancellation.',
     schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
   },
   auth: bearerAuth('barber_access_token'),
@@ -1433,7 +1448,7 @@ const barberBookingsCollection = {
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/bookings',
-        description: 'Reads the barber booking dashboard payload and captures one ID for status updates plus one paid booking ID for the cancellation route when available.',
+        description: 'Reads the barber booking administration payload and captures one ID for status updates plus one paid booking ID for the cancellation route when available.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           "const response = pm.response.json();",
@@ -1454,25 +1469,16 @@ const barberBookingsCollection = {
       }),
     },
     {
-      name: '2. Get Booking Stats',
+      name: '2. Get Booking Analytics',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/bookings/analytics/summary',
-        description: 'Returns booking counts grouped by status.',
+        url: '{{base_url}}/{{api_prefix}}/bookings/analytics',
+        description: 'Returns booking summary, monthly milestone progress, today pulse metrics, and both active/upcoming queue buckets.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
     },
     {
-      name: '3. Get Booking Milestone Progress',
-      ...request({
-        method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/bookings/analytics/milestones',
-        description: 'Returns the current month completed-booking milestone progress card data, including the active status, completed count, visible targets, and next reward gap.',
-        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
-      }),
-    },
-    {
-      name: '4. Get Pending Confirmations',
+      name: '3. Get Pending Confirmations',
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/bookings?status=awaiting_confirmation&paymentStatus=success',
@@ -1481,7 +1487,7 @@ const barberBookingsCollection = {
       }),
     },
     {
-      name: '5. Get Confirmed Bookings',
+      name: '4. Get Confirmed Bookings',
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/bookings?status=confirmed',
@@ -1490,7 +1496,7 @@ const barberBookingsCollection = {
       }),
     },
     {
-      name: '6. Get Bookings By Employee',
+      name: '5. Get Bookings By Employee',
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/bookings?employeeId={{employee_id}}',
@@ -1509,7 +1515,7 @@ const barberBookingsCollection = {
       }),
     },
     {
-      name: '7. Get Bookings By Date Range',
+      name: '6. Get Bookings By Date Range',
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/bookings?dateFrom={{booking_date}}&dateTo={{booking_date}}',
@@ -1518,7 +1524,7 @@ const barberBookingsCollection = {
       }),
     },
     {
-      name: '8. Get Employee Bookings In Date Range',
+      name: '7. Get Employee Bookings In Date Range',
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/bookings?employeeId={{employee_id}}&dateFrom={{booking_date}}&dateTo={{booking_date}}',
@@ -1527,7 +1533,7 @@ const barberBookingsCollection = {
       }),
     },
     {
-      name: '9. Get Employee Bookings With Status Filter',
+      name: '8. Get Employee Bookings With Status Filter',
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/bookings?employeeId={{employee_id}}&status=confirmed,awaiting_confirmation',
@@ -1536,7 +1542,7 @@ const barberBookingsCollection = {
       }),
     },
     {
-      name: '10. Confirm Booking',
+      name: '9. Confirm Booking',
       ...request({
         method: 'PATCH',
         url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id_status}}',
@@ -1547,7 +1553,7 @@ const barberBookingsCollection = {
       }),
     },
     {
-      name: '11. Update Booking Status',
+      name: '10. Update Booking Status',
       ...request({
         method: 'PATCH',
         url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id_status}}',
@@ -1558,7 +1564,7 @@ const barberBookingsCollection = {
       }),
     },
     {
-      name: '12. Cancel Paid Booking (Terminal)',
+      name: '11. Cancel Paid Booking (Terminal)',
       ...request({
         method: 'PATCH',
         url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id_delete}}',
@@ -1574,94 +1580,214 @@ const barberBookingsCollection = {
   ],
 };
 
-const barberPhotosCollection = {
+const barberMediaCollection = {
   info: {
-    name: 'EverCut - Barber Photos',
-    description: 'Shop gallery management collection with ID capture and a prewired local sample upload file.',
+    name: 'EverCut - Barber Media',
+    description: 'Cloudflare R2 media workflow: presign, direct upload, confirm, attach to gallery, read, stats, and delete. Also includes onboarding media uploads and validation scenarios.',
     schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
   },
   auth: bearerAuth('barber_access_token'),
   event: collectionPreRequest({
-    syncPairs: [['shared_photo_id', 'photo_id']],
+    syncPairs: [['shared_media_id', 'media_id']],
   }),
   variable: [
     ...baseVariables(
-      textVariable('photo_id', ''),
+      textVariable('media_id', ''),
+      textVariable('media_upload_url', ''),
+      textVariable('media_upload_content_type', 'image/png'),
+      textVariable('media_upload_content_length', '406926'),
+      textVariable('onboarding_media_id', ''),
+      textVariable('onboarding_media_upload_url', ''),
+      textVariable('onboarding_media_upload_content_type', 'image/png'),
     ),
   ],
   item: [
     {
-      name: '1. Get All Photos And Capture Existing ID',
-      ...request({
-        method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/photos',
-        description: 'Lists the current gallery and captures the first photo ID. Barber onboarding already creates three gallery photos.',
-        event: testEvent(
-          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
-          "const response = pm.response.json();",
-          "const photos = Array.isArray(response.data) ? response.data : [];",
-          "const firstPhoto = photos[0];",
-          "if (firstPhoto && firstPhoto.id) {",
-          "  const photoId = firstPhoto.id;",
-          "  pm.collectionVariables.set('photo_id', photoId);",
-          "  pm.globals.set('shared_photo_id', photoId);",
-          "}"
-        ),
-      }),
-    },
-    {
-      name: '2. Upload Photos',
+      name: '1. Request Upload URL',
       ...request({
         method: 'POST',
-        url: '{{base_url}}/{{api_prefix}}/photos',
-        body: formDataBody([
-          fileField('photos', 'Attach photo file manually in Postman'),
-          textField('photoType', 'shop_interior'),
-          textField('description', 'Uploaded from the automated Postman photo collection'),
-        ]),
-        description: 'Uploads one gallery image using the local sample file and captures the new photo ID.',
+        url: '{{base_url}}/{{api_prefix}}/media/upload-url',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "contentType": "{{media_upload_content_type}}",\n  "sizeBytes": {{media_upload_content_length}},\n  "purpose": "gallery"\n}`),
+        description: 'Creates a pending Media record and returns a presigned R2 PUT URL. Keep sizeBytes equal to the binary file size used in the direct PUT. The Content-Type header for the PUT must match the contentType declared in this request.',
         event: testEvent(
           "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
           "const response = pm.response.json();",
-          "const photos = Array.isArray(response.data) ? response.data : [];",
-          "const firstPhoto = photos[0];",
-          "if (firstPhoto && firstPhoto.id) {",
-          "  const photoId = firstPhoto.id;",
-          "  pm.collectionVariables.set('photo_id', photoId);",
-          "  pm.globals.set('shared_photo_id', photoId);",
-          "}"
+          "const data = response.data || {};",
+          "if (data.mediaId) { pm.collectionVariables.set('media_id', data.mediaId); pm.globals.set('shared_media_id', data.mediaId); }",
+          "if (data.uploadUrl) pm.collectionVariables.set('media_upload_url', data.uploadUrl);",
+          "pm.collectionVariables.set('media_upload_content_type', 'image/png');",
+          "pm.test('upload URL includes SigV4 date', function () { pm.expect(data.uploadUrl).to.include('X-Amz-Date='); });"
         ),
       }),
     },
     {
-      name: '3. Get Photo Stats',
+      name: '2. Direct PUT To R2',
       ...request({
-        method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/photos/stats',
-        description: 'Returns photo counts and storage totals.',
+        method: 'PUT',
+        url: '{{media_upload_url}}',
+        auth: { type: 'noauth' },
+        headers: [
+          { key: 'Content-Type', value: '{{media_upload_content_type}}' },
+        ],
+        body: { mode: 'file', file: { src: 'assets/sample-upload.png' } },
+        description: 'Uploads the binary file directly to Cloudflare R2 using the presigned URL. This request is sent to R2, not the EverCut API. Keep Authorization set to No Auth and preserve the full query string in media_upload_url.',
+        event: rawTestEvent(
+          "pm.test('status is 200 or 201', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+          "pm.test('request does not send Authorization to R2', function () { pm.expect(pm.request.headers.has('Authorization')).to.equal(false); });"
+        ),
+      }),
+    },
+    {
+      name: '3. Confirm Upload',
+      ...request({
+        method: 'POST',
+        url: '{{base_url}}/{{api_prefix}}/media/confirm',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "mediaId": "{{media_id}}"\n}`),
+        description: 'Verifies the uploaded object in R2, checks content metadata, and marks the Media record ready.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
     },
     {
-      name: '4. Get Photo By ID',
+      name: '4. Attach To Gallery',
       ...request({
-        method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/photos/{{photo_id}}',
-        description: 'Reads the currently captured photo record.',
-        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
+        method: 'POST',
+        url: '{{base_url}}/{{api_prefix}}/media/gallery',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "mediaIds": ["{{media_id}}"]\n}`),
+        description: 'Attaches a confirmed media object to the authenticated barber shop gallery.',
+        event: testEvent("pm.test('status is 201', function () { pm.response.to.have.status(201); });"),
       }),
     },
     {
-      name: '5. Delete Photo (Terminal)',
+      name: '5. Get Gallery And Capture Existing ID',
       ...request({
-        method: 'DELETE',
-        url: '{{base_url}}/{{api_prefix}}/photos/{{photo_id}}',
-        description: 'Deletes the captured photo from both MongoDB and Cloudinary. Run this last if later requests still need the shared photo ID.',
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/media/gallery',
+        description: 'Lists the current gallery and captures the first media ID.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
-          "pm.collectionVariables.unset('photo_id');",
-          "pm.globals.unset('shared_photo_id');"
+          "const response = pm.response.json();",
+          "const media = Array.isArray(response.data) ? response.data : [];",
+          "const firstMedia = media[0];",
+          "if (firstMedia && firstMedia.id) { pm.collectionVariables.set('media_id', firstMedia.id); pm.globals.set('shared_media_id', firstMedia.id); }"
         ),
+      }),
+    },
+    {
+      name: '6. Get Gallery Stats',
+      ...request({
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/media/gallery/stats',
+        description: 'Returns gallery media counts and storage totals.',
+        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
+      }),
+    },
+    {
+      name: '7. Get Media By ID',
+      ...request({
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/media/{{media_id}}',
+        description: 'Reads the currently captured media record.',
+        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
+      }),
+    },
+    {
+      name: '8. Delete Media (Terminal)',
+      ...request({
+        method: 'DELETE',
+        url: '{{base_url}}/{{api_prefix}}/media/{{media_id}}',
+        description: 'Soft-deletes the captured Media record and requests R2 object deletion. Run this last if later requests still need the shared media ID.',
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          "pm.collectionVariables.unset('media_id');",
+          "pm.globals.unset('shared_media_id');"
+        ),
+      }),
+    },
+    {
+      name: '9. Request Onboarding Upload URL',
+      ...request({
+        method: 'POST',
+        url: '{{base_url}}/{{api_prefix}}/media/onboarding/upload-url',
+        auth: bearerAuth('barber_onboarding_token'),
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "contentType": "{{media_upload_content_type}}",\n  "sizeBytes": {{media_upload_content_length}},\n  "purpose": "onboarding"\n}`),
+        description: 'Creates a temporary pending Media record for onboarding sessions. Requires an onboarding token from OTP verification for a new phone number. The Content-Type header for the PUT must match the contentType declared in this request.',
+        event: testEvent(
+          "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
+          "const response = pm.response.json();",
+          "const data = response.data || {};",
+          "if (data.mediaId) pm.collectionVariables.set('onboarding_media_id', data.mediaId);",
+          "if (data.uploadUrl) pm.collectionVariables.set('onboarding_media_upload_url', data.uploadUrl);",
+          "pm.collectionVariables.set('onboarding_media_upload_content_type', 'image/png');",
+          "pm.test('upload URL includes SigV4 date', function () { pm.expect(data.uploadUrl).to.include('X-Amz-Date='); });"
+        ),
+      }),
+    },
+    {
+      name: '10. Direct PUT Onboarding File To R2',
+      ...request({
+        method: 'PUT',
+        url: '{{onboarding_media_upload_url}}',
+        auth: { type: 'noauth' },
+        headers: [
+          { key: 'Content-Type', value: '{{onboarding_media_upload_content_type}}' },
+        ],
+        body: { mode: 'file', file: { src: 'assets/sample-upload.png' } },
+        description: 'Uploads the onboarding binary file directly to Cloudflare R2 using the presigned URL. This request does not call the EverCut API.',
+        event: rawTestEvent(
+          "pm.test('status is 200 or 201', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+          "pm.test('request does not send Authorization to R2', function () { pm.expect(pm.request.headers.has('Authorization')).to.equal(false); });"
+        ),
+      }),
+    },
+    {
+      name: '11. Confirm Onboarding Upload',
+      ...request({
+        method: 'POST',
+        url: '{{base_url}}/{{api_prefix}}/media/onboarding/confirm',
+        auth: bearerAuth('barber_onboarding_token'),
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "mediaId": "{{onboarding_media_id}}"\n}`),
+        description: 'Confirms an onboarding upload before it is consumed by POST /onboarding/customers or POST /onboarding/barbers as photoMediaId.',
+        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
+      }),
+    },
+    {
+      name: '12. Upload URL Requires Authentication',
+      ...request({
+        method: 'POST',
+        url: '{{base_url}}/{{api_prefix}}/media/upload-url',
+        auth: { type: 'noauth' },
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "contentType": "image/png",\n  "sizeBytes": 100,\n  "purpose": "gallery"\n}`),
+        description: 'Negative test: regular upload URL creation requires a user JWT.',
+        event: testEvent("pm.test('status is 401', function () { pm.response.to.have.status(401); });"),
+      }),
+    },
+    {
+      name: '13. Unsupported MIME Is Rejected',
+      ...request({
+        method: 'POST',
+        url: '{{base_url}}/{{api_prefix}}/media/upload-url',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "contentType": "application/pdf",\n  "sizeBytes": 100,\n  "purpose": "gallery"\n}`),
+        description: 'Negative test: the upload URL validator accepts only configured image/video MIME types.',
+        event: testEvent("pm.test('status is 400', function () { pm.response.to.have.status(400); });"),
+      }),
+    },
+    {
+      name: '14. Customer Cannot Attach Barber Gallery',
+      ...request({
+        method: 'POST',
+        url: '{{base_url}}/{{api_prefix}}/media/gallery',
+        auth: bearerAuth('customer_access_token'),
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "mediaIds": ["{{media_id}}"]\n}`),
+        description: 'Negative test: gallery attachment is restricted to BARBER users.',
+        event: testEvent("pm.test('status is 403', function () { pm.response.to.have.status(403); });"),
       }),
     },
   ],
@@ -1834,7 +1960,7 @@ const barberRatingsCollection = {
       name: '2. Get Rating Summary',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/ratings/summary',
+        url: '{{base_url}}/{{api_prefix}}/ratings/analytics',
         description: 'Returns aggregate rating metrics for the authenticated barber shop.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -1842,7 +1968,7 @@ const barberRatingsCollection = {
     {
       name: '3. Add Reply',
       ...request({
-        method: 'POST',
+        method: 'PUT',
         url: '{{base_url}}/{{api_prefix}}/ratings/{{rating_id_add_reply}}/reply',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
         body: jsonBody(`{\n  "replyText": "Thanks for the feedback. We appreciate your visit."\n}`),
@@ -1941,6 +2067,8 @@ const paymentsPayoutsCollection = {
           "  pm.expect(response.data).to.have.property('orderId');",
           "  pm.expect(response.data).to.have.property('token');",
           "  pm.expect(response.data).to.have.property('merchantId');",
+          "  pm.expect(response.data).to.have.property('amountInPaisa');",
+          "  pm.expect(response.data).to.have.property('amountInRupees');",
           "  pm.expect(response.data).to.not.have.property('redirectUrl');",
           "  pm.collectionVariables.set('payment_id', response.data.id);",
           "  pm.collectionVariables.set('merchant_order_id', response.data.merchantOrderId);",
@@ -1956,8 +2084,23 @@ const paymentsPayoutsCollection = {
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/payments/{{payment_id}}',
         auth: bearerAuth('customer_access_token'),
-        description: 'Reads payment details and polls PhonePe once when the payment is still pending. Use this for manual status checks or post-failure support.',
-        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
+        description: 'Reads payment details and polls PhonePe once when the payment is still pending. Settlement includes serviceAmount, platformFee, barberPayout, and isBundle; the top-level payment response includes waiverApplied.',
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          "pm.test('payment exposes platform-fee fields when payment exists', function () {",
+          "  const response = pm.response.json();",
+          "  const settlement = response.data && response.data.settlement;",
+          "  if (response.data) {",
+          "    pm.expect(response.data).to.have.property('waiverApplied');",
+          "  }",
+          "  if (settlement) {",
+          "    pm.expect(settlement).to.have.property('serviceAmount');",
+          "    pm.expect(settlement).to.have.property('platformFee');",
+          "    pm.expect(settlement).to.have.property('barberPayout');",
+          "    pm.expect(settlement).to.have.property('isBundle');",
+          "  }",
+          "});"
+        ),
       }),
     },
     {
@@ -2041,10 +2184,10 @@ const paymentsPayoutsCollection = {
   ],
 };
 
-const dashboardCollection = {
+const analyticsCollection = {
   info: {
-    name: 'EverCut - Dashboard Analytics',
-    description: 'Dashboard analytics collection for barber shop owners. Provides real-time occupancy metrics, staff availability, and today\'s queue through resource-based endpoints. All endpoints require BARBER role authentication. NOTE: Endpoints have been refactored from /dashboard/* to resource-based routes.',
+    name: 'EverCut - Operational Analytics',
+    description: 'Operational analytics collection for barber shop owners. Provides booking analytics, employee availability analytics, and earnings through resource-owned endpoints.',
     schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
   },
   auth: bearerAuth('barber_access_token'),
@@ -2052,48 +2195,27 @@ const dashboardCollection = {
   variable: [...baseVariables()],
   item: [
     {
-      name: '1. Get Dashboard Overview (Aggregated)',
+      name: '1. Get Booking Analytics',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/earnings/overview',
-        description: 'Returns all dashboard sections in a single response: pulse metrics, staff availability, and today\'s queue. Optimized for efficient dashboard loading. NEW ENDPOINT: Moved from /dashboard/overview to /earnings/overview.',
+        url: '{{base_url}}/{{api_prefix}}/bookings/analytics',
+        description: 'Returns booking summary, monthly milestone progress, today pulse metrics, and both active/upcoming queue buckets.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           "const response = pm.response.json();",
           "const data = response.data || {};",
-          "pm.test('response includes pulse', function () { pm.expect(data).to.have.property('pulse'); });",
-          "pm.test('response includes staff', function () { pm.expect(data).to.have.property('staff'); });",
+          "pm.test('response includes summary', function () { pm.expect(data).to.have.property('summary'); });",
+          "pm.test('response includes milestones', function () { pm.expect(data).to.have.property('milestones'); });",
+          "pm.test('response includes today', function () { pm.expect(data).to.have.property('today'); });",
           "pm.test('response includes queue', function () { pm.expect(data).to.have.property('queue'); });"
         ),
       }),
     },
     {
-      name: '2. Get Today\'s Pulse (Bookings)',
+      name: '2. Get Employee Analytics',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/bookings/analytics/today',
-        description: 'Returns real-time occupancy metrics and booking status breakdown for today. Shows booked vs total capacity and counts for All, Pending, Done, and Cancelled bookings.',
-        event: testEvent(
-          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
-          "const response = pm.response.json();",
-          "const data = response.data || {};",
-          "pm.test('response includes occupancy', function () { pm.expect(data).to.have.property('occupancy'); });",
-          "pm.test('response includes statusBreakdown', function () { pm.expect(data).to.have.property('statusBreakdown'); });",
-          "if (data.occupancy) {",
-          "  pm.test('occupancy has required fields', function () {",
-          "    pm.expect(data.occupancy).to.have.property('booked');",
-          "    pm.expect(data.occupancy).to.have.property('total');",
-          "    pm.expect(data.occupancy).to.have.property('percentage');",
-          "  });",
-          "}"
-        ),
-      }),
-    },
-    {
-      name: '3. Get Staff Availability (Employees)',
-      ...request({
-        method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/employees/analytics/availability',
+        url: '{{base_url}}/{{api_prefix}}/employees/analytics',
         description: 'Returns staff availability and progress tracking for today. Shows each employee\'s completed vs total appointments with progress percentage.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
@@ -2113,36 +2235,16 @@ const dashboardCollection = {
       }),
     },
     {
-      name: '4. Get Today\'s Queue - Active (Bookings)',
+      name: '3. Get Earnings',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/bookings/analytics/queue?timeframe=active',
-        description: 'Returns today\'s active appointments near the current time. Shows customer name, employee name, time, and services.',
+        url: '{{base_url}}/{{api_prefix}}/earnings',
+        description: 'Returns financial earnings totals and monthly revenue for the authenticated barber shop.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           "const response = pm.response.json();",
           "const data = response.data || {};",
-          "pm.test('response includes timeframe', function () { pm.expect(data).to.have.property('timeframe'); });",
-          "pm.test('response includes active', function () { pm.expect(data).to.have.property('active'); });",
-          "pm.test('response includes upcoming', function () { pm.expect(data).to.have.property('upcoming'); });",
-          "pm.test('timeframe is active', function () { pm.expect(data.timeframe).to.equal('active'); });"
-        ),
-      }),
-    },
-    {
-      name: '5. Get Today\'s Queue - Upcoming (Bookings)',
-      ...request({
-        method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/bookings/analytics/queue?timeframe=upcoming',
-        description: 'Returns today\'s upcoming appointments. Shows customer name, employee name, time, and services.',
-        event: testEvent(
-          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
-          "const response = pm.response.json();",
-          "const data = response.data || {};",
-          "pm.test('response includes timeframe', function () { pm.expect(data).to.have.property('timeframe'); });",
-          "pm.test('response includes active', function () { pm.expect(data).to.have.property('active'); });",
-          "pm.test('response includes upcoming', function () { pm.expect(data).to.have.property('upcoming'); });",
-          "pm.test('timeframe is upcoming', function () { pm.expect(data.timeframe).to.equal('upcoming'); });"
+          "pm.test('response includes monthlyRevenue', function () { pm.expect(data).to.have.property('monthlyRevenue'); });"
         ),
       }),
     },
@@ -2222,10 +2324,10 @@ const notificationsCollection = {
       }),
     },
     {
-      name: '3. Get Unread Count',
+      name: '3. Get Notification Summary',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/notifications/unread-count',
+        url: '{{base_url}}/{{api_prefix}}/notifications/summary',
         description: 'Returns the unread notification count for the authenticated user.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
@@ -2240,7 +2342,9 @@ const notificationsCollection = {
       name: '4. Mark Notification Read',
       ...request({
         method: 'PATCH',
-        url: '{{base_url}}/{{api_prefix}}/notifications/{{notification_id}}/read',
+        url: '{{base_url}}/{{api_prefix}}/notifications/{{notification_id}}',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "read": true\n}`),
         description: 'Marks one notification as read. Run the list request first to capture notification_id, or set it manually.',
         event: testEvent("pm.test('status is 200 or 404', function () { pm.expect(pm.response.code).to.be.oneOf([200, 404]); });"),
       }),
@@ -2249,7 +2353,9 @@ const notificationsCollection = {
       name: '5. Mark All Notifications Read',
       ...request({
         method: 'PATCH',
-        url: '{{base_url}}/{{api_prefix}}/notifications/read-all',
+        url: '{{base_url}}/{{api_prefix}}/notifications',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "read": true\n}`),
         description: 'Marks all unread notifications for the authenticated user as read.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -2274,6 +2380,291 @@ const notificationsCollection = {
   ],
 };
 
+const subscriptionWebhookBody = `{
+  "id": "evt_subscription_activated_postman",
+  "entity": "event",
+  "event": "subscription.activated",
+  "created_at": 1770000000,
+  "payload": {
+    "subscription": {
+      "entity": {
+        "id": "{{razorpay_subscription_id}}",
+        "plan_id": "{{razorpay_plan_id_popular}}",
+        "customer_id": "cust_postman_123",
+        "status": "active",
+        "current_start": 1770000000,
+        "current_end": 1772592000,
+        "notes": {
+          "barber_id": "{{barber_profile_id}}",
+          "plan_type": "PLAN_POPULAR"
+        }
+      }
+    },
+    "payment": {
+      "entity": {
+        "id": "pay_postman_123",
+        "amount": 29900,
+        "currency": "INR",
+        "status": "captured",
+        "method": "upi"
+      }
+    }
+  }
+}`;
+
+const subscriptionRenewalWebhookBody = `{
+  "id": "evt_subscription_charged_postman",
+  "entity": "event",
+  "event": "subscription.charged",
+  "created_at": 1772592000,
+  "payload": {
+    "subscription": {
+      "entity": {
+        "id": "{{razorpay_subscription_id}}",
+        "plan_id": "{{razorpay_plan_id_popular}}",
+        "status": "active",
+        "current_start": 1772592000,
+        "current_end": 1775184000
+      }
+    },
+    "payment": {
+      "entity": {
+        "id": "pay_postman_renewal_123",
+        "amount": 29900,
+        "currency": "INR",
+        "status": "captured",
+        "invoice_id": "inv_postman_renewal_123"
+      }
+    }
+  }
+}`;
+
+const subscriptionUpdatedWebhookBody = `{
+  "id": "evt_subscription_updated_postman",
+  "entity": "event",
+  "event": "subscription.updated",
+  "created_at": 1772592000,
+  "payload": {
+    "subscription": {
+      "entity": {
+        "id": "{{razorpay_subscription_id}}",
+        "plan_id": "{{razorpay_plan_id_advanced}}",
+        "status": "active",
+        "current_start": 1772592000,
+        "current_end": 1775184000
+      }
+    }
+  }
+}`;
+
+const subscriptionPaymentFailedWebhookBody = `{
+  "id": "evt_subscription_payment_failed_postman",
+  "entity": "event",
+  "event": "payment.failed",
+  "created_at": 1772592000,
+  "payload": {
+    "payment": {
+      "entity": {
+        "id": "pay_postman_failed_123",
+        "subscription_id": "{{razorpay_subscription_id}}",
+        "amount": 29900,
+        "currency": "INR",
+        "status": "failed",
+        "error_code": "BAD_REQUEST_ERROR",
+        "error_description": "Payment failed"
+      }
+    }
+  }
+}`;
+
+const razorpayWebhookSignatureEvent = mergedEvents(
+  [
+    "const secret = pm.environment.get('razorpay_webhook_secret') || pm.collectionVariables.get('razorpay_webhook_secret');",
+    "const body = pm.request.body && pm.request.body.raw ? pm.request.body.raw : '';",
+    "if (secret && typeof CryptoJS !== 'undefined') {",
+    "  const signature = CryptoJS.HmacSHA256(body, secret).toString(CryptoJS.enc.Hex);",
+    "  pm.request.headers.upsert({ key: 'x-razorpay-signature', value: signature });",
+    "}",
+  ],
+  [
+    "pm.test('webhook is acknowledged or signature is rejected', function () { pm.expect(pm.response.code).to.be.oneOf([200, 400]); });",
+  ],
+);
+
+const subscriptionsCollection = {
+  info: {
+    name: 'EverCut - Subscriptions',
+    description: 'Barber subscription lifecycle collection covering plan listing, Razorpay subscription checkout, upgrade/downgrade, cancellation, transactions, and webhook simulation. Run authentication and onboarding first to capture barber_access_token.',
+    schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
+  },
+  auth: bearerAuth('barber_access_token'),
+  event: collectionPreRequest({
+    syncPairs: [
+      ['barber_profile_id', 'barber_profile_id'],
+      ['razorpay_subscription_id', 'razorpay_subscription_id'],
+    ],
+  }),
+  variable: [
+    ...baseVariables(
+      textVariable('subscription_plan_id', 'PLAN_POPULAR', 'Plan to subscribe to or downgrade to. Use PLAN_POPULAR or PLAN_ADVANCED for paid plans.'),
+      textVariable('subscription_upgrade_plan_id', 'PLAN_ADVANCED', 'Plan used by the upgrade request.'),
+      textVariable('subscription_downgrade_plan_id', 'PLAN_POPULAR', 'Plan used by the downgrade request.'),
+      textVariable('razorpay_subscription_id', 'sub_postman_123', 'Razorpay subscription id used in webhook examples.'),
+      textVariable('razorpay_plan_id_popular', 'plan_test_popular', 'Razorpay Popular plan id for webhook examples.'),
+      textVariable('razorpay_plan_id_advanced', 'plan_test_advanced', 'Razorpay Advanced plan id for webhook examples.'),
+      textVariable('razorpay_webhook_secret', '', 'Webhook secret configured in Razorpay dashboard and server env.'),
+      textVariable('barber_profile_id', '', 'Mongo Barber _id used in Razorpay notes for local webhook simulations.'),
+    ),
+  ],
+  item: [
+    {
+      name: '1. List Plans',
+      ...request({
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/subscriptions/plans',
+        auth: { type: 'noauth' },
+        description: 'Public plan catalog with pricing and entitlement limits.',
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          "const response = pm.response.json();",
+          "pm.test('three plans returned', function () { pm.expect(response.data.map((p) => p.id)).to.include.members(['PLAN_BASIC', 'PLAN_POPULAR', 'PLAN_ADVANCED']); });"
+        ),
+      }),
+    },
+    {
+      name: '2. Get My Subscription',
+      ...request({
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/subscriptions/me',
+        description: 'Returns current subscription state, usage counters, and resolved entitlements for the authenticated barber.',
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          "const response = pm.response.json();",
+          "pm.test('subscription response includes usage', function () { pm.expect(response.data).to.have.property('usage'); });"
+        ),
+      }),
+    },
+    {
+      name: '3. Subscribe To Paid Plan',
+      ...request({
+        method: 'POST',
+        url: '{{base_url}}/{{api_prefix}}/subscriptions/subscribe',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "planId": "{{subscription_plan_id}}"\n}`),
+        description: 'Creates a Razorpay subscription and returns checkoutUrl, razorpaySubscriptionId, and razorpayKeyId.',
+        event: testEvent(
+          "pm.test('status is 201 or conflict when already subscribed', function () { pm.expect(pm.response.code).to.be.oneOf([201, 400, 409]); });",
+          "const response = pm.response.json();",
+          "if (response.data?.razorpaySubscriptionId) {",
+          "  pm.collectionVariables.set('razorpay_subscription_id', response.data.razorpaySubscriptionId);",
+          "  pm.globals.set('razorpay_subscription_id', response.data.razorpaySubscriptionId);",
+          "}"
+        ),
+      }),
+    },
+    {
+      name: '4. Upgrade Subscription',
+      ...request({
+        method: 'POST',
+        url: '{{base_url}}/{{api_prefix}}/subscriptions/upgrade',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "planId": "{{subscription_upgrade_plan_id}}"\n}`),
+        description: 'Upgrades a paid Razorpay subscription immediately. Use subscribe first when currently on Basic.',
+        event: testEvent("pm.test('status is 200 or validation error', function () { pm.expect(pm.response.code).to.be.oneOf([200, 400, 404]); });"),
+      }),
+    },
+    {
+      name: '5. Downgrade Subscription',
+      ...request({
+        method: 'POST',
+        url: '{{base_url}}/{{api_prefix}}/subscriptions/downgrade',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "planId": "{{subscription_downgrade_plan_id}}"\n}`),
+        description: 'Schedules paid downgrades for next renewal. Downgrade to PLAN_BASIC is handled as end-of-cycle cancellation.',
+        event: testEvent("pm.test('status is 200 or validation error', function () { pm.expect(pm.response.code).to.be.oneOf([200, 400, 404]); });"),
+      }),
+    },
+    {
+      name: '6. Cancel Subscription',
+      ...request({
+        method: 'POST',
+        url: '{{base_url}}/{{api_prefix}}/subscriptions/cancel',
+        description: 'Cancels the current paid subscription at cycle end while retaining access until currentPeriodEnd.',
+        event: testEvent("pm.test('status is 200 or no active paid subscription', function () { pm.expect(pm.response.code).to.be.oneOf([200, 400, 404, 409]); });"),
+      }),
+    },
+    {
+      name: '7. Get Subscription Transactions',
+      ...request({
+        method: 'GET',
+        url: {
+          raw: '{{base_url}}/{{api_prefix}}/subscriptions/transactions?page=1&limit=20',
+          host: ['{{base_url}}'],
+          path: ['{{api_prefix}}', 'subscriptions', 'transactions'],
+          query: [
+            { key: 'page', value: '1' },
+            { key: 'limit', value: '20' },
+          ],
+        },
+        description: 'Lists immutable subscription lifecycle audit records for the authenticated barber.',
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          "const response = pm.response.json();",
+          "pm.test('paginated transaction response', function () { pm.expect(response).to.have.nested.property('meta.pagination'); });"
+        ),
+      }),
+    },
+    {
+      name: '8. Simulate Razorpay Activated Webhook',
+      ...request({
+        method: 'POST',
+        url: '{{base_url}}/{{api_prefix}}/subscriptions/webhook',
+        auth: { type: 'noauth' },
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(subscriptionWebhookBody),
+        description: 'Local Razorpay webhook simulation. The pre-request script signs the raw JSON body with razorpay_webhook_secret.',
+        event: razorpayWebhookSignatureEvent,
+      }),
+    },
+    {
+      name: '9. Simulate Razorpay Renewal Webhook',
+      ...request({
+        method: 'POST',
+        url: '{{base_url}}/{{api_prefix}}/subscriptions/webhook',
+        auth: { type: 'noauth' },
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(subscriptionRenewalWebhookBody),
+        description: 'Local subscription.charged webhook simulation for renewal and statement-counter reset validation.',
+        event: razorpayWebhookSignatureEvent,
+      }),
+    },
+    {
+      name: '10. Simulate Razorpay Plan Updated Webhook',
+      ...request({
+        method: 'POST',
+        url: '{{base_url}}/{{api_prefix}}/subscriptions/webhook',
+        auth: { type: 'noauth' },
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(subscriptionUpdatedWebhookBody),
+        description: 'Local subscription.updated webhook simulation for provider-driven upgrade or downgrade reconciliation.',
+        event: razorpayWebhookSignatureEvent,
+      }),
+    },
+    {
+      name: '11. Simulate Razorpay Payment Failed Webhook',
+      ...request({
+        method: 'POST',
+        url: '{{base_url}}/{{api_prefix}}/subscriptions/webhook',
+        auth: { type: 'noauth' },
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(subscriptionPaymentFailedWebhookBody),
+        description: 'Local payment.failed webhook simulation for retry/failure audit records.',
+        event: razorpayWebhookSignatureEvent,
+      }),
+    },
+  ],
+};
+
 const environmentTemplate = {
   id: 'evercut-local-environment',
   name: 'EverCut Local',
@@ -2291,6 +2682,11 @@ const environmentTemplate = {
     { key: 'barber_onboarding_token', value: '', enabled: true },
     { key: 'admin_access_token', value: '', enabled: true },
     { key: 'fcm_token', value: 'postman-fcm-token-{{$timestamp}}', enabled: true },
+    { key: 'razorpay_webhook_secret', value: '', enabled: true },
+    { key: 'razorpay_subscription_id', value: '', enabled: true },
+    { key: 'razorpay_plan_id_popular', value: '', enabled: true },
+    { key: 'razorpay_plan_id_advanced', value: '', enabled: true },
+    { key: 'barber_profile_id', value: '', enabled: true },
   ],
   _postman_variable_scope: 'environment',
   _postman_exported_at: new Date().toISOString(),
@@ -2307,10 +2703,11 @@ writeCollection('07-barber-profile-shop.json', barberProfileCollection);
 writeCollection('08-barber-employees.json', barberEmployeesCollection);
 writeCollection('09-barber-services.json', barberServicesCollection);
 writeCollection('10-barber-bookings.json', barberBookingsCollection);
-writeCollection('11-barber-photos.json', barberPhotosCollection);
+writeCollection('11-barber-media.json', barberMediaCollection);
 writeCollection('12-barber-earnings.json', barberEarningsCollection);
 writeCollection('13-barber-ratings.json', barberRatingsCollection);
-writeCollection('14-dashboard.json', dashboardCollection);
+writeCollection('14-operational-analytics.json', analyticsCollection);
 writeCollection('15-payments-payouts.json', paymentsPayoutsCollection);
 writeCollection('16-notifications.json', notificationsCollection);
+writeCollection('17-subscriptions.json', subscriptionsCollection);
 writeFileSync(resolve(COLLECTIONS_DIR, 'EverCut.postman_environment.json'), `${JSON.stringify(environmentTemplate, null, 2)}\n`);

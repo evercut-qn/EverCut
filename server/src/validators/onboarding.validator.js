@@ -1,11 +1,11 @@
 import Joi from 'joi';
+import config from '../config/index.js';
 import {
     ALL_GENDERS,
     ALL_SERVICE_FOR,
     ALL_SHOP_AMENITIES,
     ALL_SHOP_CATEGORIES,
     DAYS_OF_WEEK,
-    SECURITY_PIN_LENGTH,
 } from '../utils/constants.js';
 import { normalizeShopSchedule } from '../utils/shop-schedule.utils.js';
 import { locationSchema } from './common.validator.js';
@@ -32,23 +32,24 @@ const breakTimesSchema = Joi.alternatives().try(
     Joi.string().trim(),
 );
 
-const targetCustomersSchema = Joi.string().valid(...ALL_SERVICE_FOR, 'men', 'women');
+const targetCustomersSchema = Joi.string().lowercase().valid(...ALL_SERVICE_FOR);
 
 export const customerOnboardingSchema = Joi.object({
     email: Joi.string().email().required(),
     firstName: Joi.string().trim().min(1).max(50).required(),
     lastName: Joi.string().trim().min(1).max(50).required(),
-    gender: Joi.string().valid(...ALL_GENDERS).required(),
+    gender: Joi.string().lowercase().valid(...ALL_GENDERS).required(),
     dateOfBirth: Joi.date().required(),
     address: Joi.string().trim().required(),
     location: Joi.alternatives().try(locationSchema, Joi.string()).required(),
+    photoMediaId: Joi.string().required(),
 });
 
 export const barberOnboardingSchema = Joi.object({
     email: Joi.string().email(),
     firstName: Joi.string().trim().min(1).max(50),
     lastName: Joi.string().trim().min(1).max(50),
-    gender: Joi.string().valid(...ALL_GENDERS),
+    gender: Joi.string().lowercase().valid(...ALL_GENDERS),
     dateOfBirth: Joi.date(),
     ownerFirstName: Joi.forbidden(),
     ownerLastName: Joi.forbidden(),
@@ -56,7 +57,6 @@ export const barberOnboardingSchema = Joi.object({
     ownerDateOfBirth: Joi.forbidden(),
     shopName: Joi.string().trim().min(1).max(100).required(),
     shopOwner: Joi.forbidden(),
-    ownerName: Joi.forbidden(),
     shopCategory: Joi.forbidden(),
     businessCategory: Joi.forbidden(),
     category: Joi.string().valid(...ALL_SHOP_CATEGORIES),
@@ -65,8 +65,8 @@ export const barberOnboardingSchema = Joi.object({
     upiAddress: Joi.forbidden(),
     accountHolderName: Joi.string().trim().min(1).max(100).required(),
     bankName: Joi.string().trim().min(1).max(120).required(),
-    bankAccount: Joi.string().trim().pattern(/^\d{6,34}$/).optional(),
-    ifsc: Joi.string().trim().pattern(/^[A-Z]{4}0[A-Z0-9]{6}$/i).optional(),
+    bankAccount: Joi.string().trim().pattern(/^\d{6,34}$/).required(),
+    ifsc: Joi.string().trim().pattern(/^[A-Z]{4}0[A-Z0-9]{6}$/i).required(),
     bio: Joi.string().max(500).allow('').default(''),
     address: Joi.string().trim(),
     shopLocation: Joi.forbidden(),
@@ -92,7 +92,8 @@ export const barberOnboardingSchema = Joi.object({
     ),
     breakTimes: breakTimesSchema,
     breakTimings: Joi.forbidden(),
-    pin: Joi.string().pattern(new RegExp(`^\\d{${SECURITY_PIN_LENGTH}}$`)).required(),
+    photoMediaId: Joi.string().required(),
+    pin: Joi.string().pattern(new RegExp(`^\\d{${config.security.pinLength}}$`)).required(),
     confirmPin: Joi.string().required().valid(Joi.ref('pin')).messages({
         'any.only': 'confirmPin must match pin',
     }),
@@ -135,11 +136,6 @@ export const barberOnboardingSchema = Joi.object({
         if (!value.email) {
             return helpers.error('any.custom', {
                 message: 'email is required',
-            });
-        }
-        if (!value.upiId) {
-            return helpers.error('any.custom', {
-                message: 'upiId is required',
             });
         }
         if (!value.address) {

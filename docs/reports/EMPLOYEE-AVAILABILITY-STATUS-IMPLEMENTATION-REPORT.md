@@ -1,4 +1,4 @@
-# Employee Availability Status Toggle - Implementation Report
+# Employee Availability Active-State Update - Implementation Report
 
 **Date:** May 4, 2026  
 **Status:** ✅ Completed  
@@ -9,13 +9,13 @@
 
 ## Executive Summary
 
-Successfully implemented a missing API endpoint to allow barbers to toggle employee availability status (marking employees as available or unavailable). This feature mirrors the existing shop status toggle functionality and provides barbers with better control over their staff scheduling and visibility.
+Successfully implemented employee active-state updates so barbers can mark employees as available or unavailable. The active state is now handled through the standard employee resource update endpoint.
 
 ---
 
 ## Problem Statement
 
-The system had a shop-level availability toggle (`PUT /shops/me/status`) that allowed barbers to mark their entire shop as open or closed. However, there was no equivalent functionality at the employee level to mark individual staff members as available or unavailable. This gap meant:
+The system had shop-level open/closed state updates through `PATCH /shops/me`, but employee active-state updates also needed to be part of the employee resource contract. This gap meant:
 
 - Barbers couldn't temporarily mark employees as off-duty without deleting them
 - No way to handle employee sick days, vacations, or temporary unavailability
@@ -26,12 +26,12 @@ The system had a shop-level availability toggle (`PUT /shops/me/status`) that al
 
 ## Solution Overview
 
-Implemented a new API endpoint following the existing architecture patterns:
+Implemented the behavior through the employee update API:
 
-**Endpoint:** `PUT /api/v1/employees/:id/status`  
+**Endpoint:** `PATCH /api/v1/employees/:id`
 **Authentication:** Required (Bearer token)  
 **Authorization:** BARBER role only  
-**Method:** Simple toggle with flexible input formats
+**Method:** Desired-state update with `isActive`
 
 ---
 
@@ -43,7 +43,7 @@ Implemented a new API endpoint following the existing architecture patterns:
 ```javascript
 router.put('/:id/status', 
   validate(employeeIdParamSchema, 'params'), 
-  employeeController.toggleEmployeeStatus
+  employeeController.updateEmployee active-state handling
 );
 ```
 
@@ -56,11 +56,11 @@ router.put('/:id/status',
 **File:** `server/src/controllers/employee.controller.js`
 
 ```javascript
-export const toggleEmployeeStatus = async (req, res, next) => {
+export const updateEmployee active-state handling = async (req, res, next) => {
     try {
         const params = getValidatedRequestData(req, 'params');
         const body = getValidatedRequestData(req, 'body');
-        const result = await employeeService.toggleEmployeeStatus(
+        const result = await employeeService.updateEmployee active-state handling(
             req.user._id, 
             params.id, 
             body.status
@@ -83,9 +83,9 @@ export const toggleEmployeeStatus = async (req, res, next) => {
 **File:** `server/src/services/employee.service.js`
 
 ```javascript
-export const toggleEmployeeStatus = async (ownerId, employeeId, status) => {
+export const updateEmployee active-state handling = async (ownerId, employeeId, status) => {
     // 1. Verify shop ownership
-    const shop = await shopRepository.findByOwnerId(ownerId);
+    const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop profile');
 
     // 2. Verify employee belongs to shop
@@ -151,7 +151,7 @@ export const toggleEmployeeStatus = async (ownerId, employeeId, status) => {
 **File:** `server/src/validators/employee.validator.js`
 
 ```javascript
-export const toggleEmployeeStatusSchema = Joi.object({
+export const updateEmployeeSchema = Joi.object({
     status: Joi.alternatives()
         .try(
             Joi.boolean(),
@@ -177,7 +177,7 @@ Added new request to the Barber Employees collection:
 {
   name: '5. Toggle Employee Status',
   method: 'PUT',
-  url: '{{base_url}}/{{api_prefix}}/employees/{{employee_id}}/status',
+  url: '{{base_url}}/{{api_prefix}}/employees/{{employee_id}}',
   body: jsonBody(`{\n  "status": false\n}`),
   description: 'Toggles employee availability status. Accepts boolean (true/false) or string values (yes/no, on/off). Omit status field to toggle current state.',
   event: testEvent(
@@ -196,7 +196,7 @@ Added new request to the Barber Employees collection:
 
 ### Request
 
-**Endpoint:** `PUT /api/v1/employees/:id/status`
+**Endpoint:** `PUT /api/v1/employees/:id`
 
 **Headers:**
 ```
@@ -272,7 +272,7 @@ Content-Type: application/json
 
 ### Example 1: Set Employee as Unavailable
 ```bash
-curl -X PUT http://localhost:5000/api/v1/employees/507f1f77bcf86cd799439011/status \
+curl -X PUT http://localhost:5000/api/v1/employees/507f1f77bcf86cd799439011 \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{"status": false}'
@@ -280,7 +280,7 @@ curl -X PUT http://localhost:5000/api/v1/employees/507f1f77bcf86cd799439011/stat
 
 ### Example 2: Set Employee as Available
 ```bash
-curl -X PUT http://localhost:5000/api/v1/employees/507f1f77bcf86cd799439011/status \
+curl -X PUT http://localhost:5000/api/v1/employees/507f1f77bcf86cd799439011 \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{"status": true}'
@@ -288,7 +288,7 @@ curl -X PUT http://localhost:5000/api/v1/employees/507f1f77bcf86cd799439011/stat
 
 ### Example 3: Toggle Current Status
 ```bash
-curl -X PUT http://localhost:5000/api/v1/employees/507f1f77bcf86cd799439011/status \
+curl -X PUT http://localhost:5000/api/v1/employees/507f1f77bcf86cd799439011 \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{}'
@@ -296,7 +296,7 @@ curl -X PUT http://localhost:5000/api/v1/employees/507f1f77bcf86cd799439011/stat
 
 ### Example 4: Using String Values
 ```bash
-curl -X PUT http://localhost:5000/api/v1/employees/507f1f77bcf86cd799439011/status \
+curl -X PUT http://localhost:5000/api/v1/employees/507f1f77bcf86cd799439011 \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{"status": "off"}'
@@ -312,7 +312,7 @@ This implementation follows the exact same pattern as the shop status toggle:
 
 | Aspect | Shop Status | Employee Status |
 |--------|-------------|-----------------|
-| **Endpoint** | `PUT /shops/me/status` | `PUT /employees/:id/status` |
+| **Endpoint** | `PUT /shops/me` | `PUT /employees/:id` |
 | **Field** | `isOpen` | `isActive` |
 | **Input Types** | Boolean, String, Undefined | Boolean, String, Undefined |
 | **String Values** | yes/no, on/off, true/false | yes/no, on/off, true/false |
@@ -479,13 +479,13 @@ The regenerated Postman collection includes:
    - Updated imports
 
 2. **server/src/controllers/employee.controller.js**
-   - Added `toggleEmployeeStatus` controller
+   - Added `updateEmployee active-state handling` controller
 
 3. **server/src/services/employee.service.js**
-   - Added `toggleEmployeeStatus` service method
+   - Added `updateEmployee active-state handling` service method
 
 4. **server/src/validators/employee.validator.js**
-   - Added `toggleEmployeeStatusSchema` validation
+   - Added `updateEmployeeSchema` validation
 
 5. **server/scripts/regenerate-postman-collections.mjs**
    - Added new request to Barber Employees collection
@@ -590,12 +590,12 @@ The implementation is production-ready and can be deployed immediately. Frontend
 - `server/src/utils/constants.js` - Application constants
 
 ### API Endpoints
-- `PUT /api/v1/employees/:id/status` - Toggle employee status (NEW)
+- `PUT /api/v1/employees/:id` - Toggle employee status (NEW)
 - `GET /api/v1/employees` - List employees
 - `GET /api/v1/employees/:id` - Get employee details
 - `PUT /api/v1/employees/:id` - Update employee
 - `DELETE /api/v1/employees/:id` - Delete employee
-- `PUT /api/v1/shops/me/status` - Toggle shop status (reference)
+- `PUT /api/v1/shops/me` - Toggle shop status (reference)
 
 ---
 

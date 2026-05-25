@@ -3,7 +3,6 @@ import bookingRepository from '../repositories/booking.repository.js';
 import shopRepository from '../repositories/shop.repository.js';
 import logger from '../utils/logger.js';
 import { BadRequestError, NotFoundError, ConflictError } from '../utils/api-error.js';
-import cloudinary from '../config/cloudinary.config.js';
 import { buildPagination } from '../utils/pagination.utils.js';
 import { parseTimeToMinutes } from '../utils/time.utils.js';
 import { normalizeShopSchedule } from '../utils/shop-schedule.utils.js';
@@ -11,6 +10,9 @@ import { serializeEmployee, serializeEmployees } from '../serializers/employee.s
 import { toIdString } from '../serializers/core.serializer.js';
 import { toDateOnlyString } from '../utils/slot-lock.utils.js';
 import notificationEvents from './notification-events.service.js';
+import * as mediaService from './media/media.service.js';
+import storageProvider from './media/storage-provider.service.js';
+import { MEDIA_ENTITY_TYPE, MEDIA_PURPOSE } from '../utils/constants.js';
 
 /**
  * Employee service â€” CRUD operations for shop employees.
@@ -191,26 +193,18 @@ const normalizeEmployeePayload = (data = {}, shop = null) => {
     return normalized;
 };
 
-const destroyCloudinaryAsset = async (publicId, context) => {
-    if (!publicId) return;
-
+const cleanupR2Key = async (r2Key, context) => {
+    if (!r2Key) return;
     try {
-        await cloudinary.uploader.destroy(publicId);
+        await storageProvider.deleteObject(r2Key);
     } catch (err) {
-        logger.warn('Employee image cleanup failed', {
-            publicId,
-            context,
-            error: err.message,
-        });
+        logger.warn('Employee media cleanup failed', { r2Key, context, error: err.message });
     }
 };
 
-const rethrowDuplicateEmployeeWrite = async (error, uploadedCloudinaryId) => {
-    if (uploadedCloudinaryId) {
-        await destroyCloudinaryAsset(uploadedCloudinaryId, 'duplicate-write');
-    }
-
+const rethrowDuplicateEmployeeWrite = async (error, uploadedR2Key) => {
     if (error?.code === 11000) {
+        await cleanupR2Key(uploadedR2Key, 'duplicate-write');
         throw new ConflictError('Employee with this phone number already exists');
     }
 
@@ -219,14 +213,20 @@ const rethrowDuplicateEmployeeWrite = async (error, uploadedCloudinaryId) => {
 
 const buildDeletedPhoneNumber = (employeeId) => `deleted-${employeeId}-${Date.now()}`;
 
-export const addEmployee = async (ownerId, data, file) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
+export const addEmployee = async (ownerId, data) => {
+    const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop profile');
 
     const normalizedData = normalizeEmployeePayload(data, shop);
 
     const existing = await employeeRepository.findByShopIdAndPhone(shop._id, normalizedData.phoneNumber);
     if (existing) throw new ConflictError('Employee with this phone number already exists');
+
+    const photoMediaId = normalizedData.photoMediaId;
+    let media = null;
+    if (photoMediaId) {
+        media = await mediaService.resolveMediaForEntity(ownerId, photoMediaId);
+    }
 
     const employeeData = {
         shopId: shop._id,
@@ -239,21 +239,23 @@ export const addEmployee = async (ownerId, data, file) => {
         blockedDates: normalizedData.blockedDates || [],
     };
 
-    if (file) {
-        employeeData.photoUrl = file.path;
-        employeeData.cloudinaryId = file.public_id || file.filename;
+    if (media) {
+        employeeData.photoR2Key = media.r2Key;
     }
 
     try {
         const created = await employeeRepository.create(employeeData);
+        if (photoMediaId) {
+            await mediaService.linkMediaToEntity(photoMediaId, created._id, MEDIA_ENTITY_TYPE.EMPLOYEE, MEDIA_PURPOSE.EMPLOYEE);
+        }
         return serializeEmployee(created);
     } catch (error) {
-        await rethrowDuplicateEmployeeWrite(error, employeeData.cloudinaryId);
+        await rethrowDuplicateEmployeeWrite(error, employeeData.photoR2Key);
     }
 };
 
 export const getEmployees = async (ownerId, query = {}) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
+    const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop profile');
 
     const total = await employeeRepository.countByShopId(shop._id);
@@ -264,7 +266,7 @@ export const getEmployees = async (ownerId, query = {}) => {
 };
 
 export const getEmployeeById = async (ownerId, employeeId) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
+    const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop profile');
 
     const employee = await employeeRepository.findById(employeeId);
@@ -366,8 +368,8 @@ export const getEmployeeById = async (ownerId, employeeId) => {
     };
 };
 
-export const updateEmployee = async (ownerId, employeeId, data, file) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
+export const updateEmployee = async (ownerId, employeeId, data) => {
+    const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop profile');
 
     const employee = await employeeRepository.findById(employeeId);
@@ -378,15 +380,16 @@ export const updateEmployee = async (ownerId, employeeId, data, file) => {
     const normalizedData = normalizeEmployeePayload(data, shop);
     const updateData = {};
 
-    for (const field of ['firstName', 'lastName', 'phoneNumber', 'gender', 'dateOfBirth', 'workingHours', 'blockedDates']) {
+    for (const field of ['firstName', 'lastName', 'phoneNumber', 'gender', 'dateOfBirth', 'workingHours', 'blockedDates', 'isActive']) {
         if (normalizedData[field] !== undefined) {
             updateData[field] = normalizedData[field];
         }
     }
 
-    if (file) {
-        updateData.photoUrl = file.path;
-        updateData.cloudinaryId = file.public_id || file.filename;
+    const photoMediaId = normalizedData.photoMediaId;
+    if (photoMediaId) {
+        const media = await mediaService.resolveMediaForEntity(ownerId, photoMediaId);
+        updateData.photoR2Key = media.r2Key;
     }
 
     if (Object.keys(updateData).length === 0) {
@@ -396,9 +399,7 @@ export const updateEmployee = async (ownerId, employeeId, data, file) => {
     if (updateData.phoneNumber && updateData.phoneNumber !== employee.phoneNumber) {
         const existing = await employeeRepository.findByShopIdAndPhone(shop._id, updateData.phoneNumber);
         if (existing && String(existing._id) !== String(employeeId)) {
-            if (updateData.cloudinaryId) {
-                await destroyCloudinaryAsset(updateData.cloudinaryId, 'duplicate-phone');
-            }
+            await cleanupR2Key(updateData.photoR2Key, 'duplicate-phone');
             throw new ConflictError('Employee with this phone number already exists');
         }
     }
@@ -407,20 +408,24 @@ export const updateEmployee = async (ownerId, employeeId, data, file) => {
     try {
         updated = await employeeRepository.updateById(employeeId, shop._id, updateData);
     } catch (err) {
-        await rethrowDuplicateEmployeeWrite(err, updateData.cloudinaryId);
+        await rethrowDuplicateEmployeeWrite(err, updateData.photoR2Key);
     }
 
     if (!updated) throw new NotFoundError('Employee');
 
-    if (updateData.cloudinaryId && employee.cloudinaryId && employee.cloudinaryId !== updateData.cloudinaryId) {
-        await destroyCloudinaryAsset(employee.cloudinaryId, 'replace-photo');
+    if (photoMediaId) {
+        await mediaService.linkMediaToEntity(photoMediaId, employee._id, MEDIA_ENTITY_TYPE.EMPLOYEE, MEDIA_PURPOSE.EMPLOYEE);
+    }
+
+    if (updateData.photoR2Key && employee.photoR2Key && employee.photoR2Key !== updateData.photoR2Key) {
+        await cleanupR2Key(employee.photoR2Key, 'replace-photo');
     }
 
     return serializeEmployee(updated);
 };
 
 export const updateEmployeeAvailability = async (ownerId, employeeId, data) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
+    const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop profile');
 
     const employee = await employeeRepository.findById(employeeId);
@@ -493,7 +498,7 @@ export const updateEmployeeAvailability = async (ownerId, employeeId, data) => {
 };
 
 export const deleteEmployee = async (ownerId, employeeId) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
+    const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop profile');
 
     const employee = await employeeRepository.findById(employeeId);
@@ -513,21 +518,21 @@ export const deleteEmployee = async (ownerId, employeeId) => {
     );
     if (!deleted) throw new NotFoundError('Employee');
 
-    if (employee.cloudinaryId) {
-        await destroyCloudinaryAsset(employee.cloudinaryId, 'delete-employee');
+    if (employee.photoR2Key) {
+        await cleanupR2Key(employee.photoR2Key, 'delete-employee');
     }
 
     return { message: 'Employee deleted successfully' };
 };
 
-// ── Dashboard Analytics (moved from dashboard.service.js) ────────────────
+// Resource analytics
 
 /**
  * Get staff availability and progress
  * Shows each employee's daily appointment progress
  */
 export const getStaffAvailability = async (ownerId) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
+    const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop');
 
     const today = new Date();
@@ -567,7 +572,7 @@ export const getStaffAvailability = async (ownerId) => {
             return {
                 id: toIdString(employee._id),
                 name: `${employee.firstName} ${employee.lastName}`,
-                photoUrl: employee.photoUrl,
+                photoUrl: serializeEmployee(employee, { publicView: true })?.photoUrl ?? null,
                 progress: {
                     completed: completedCount,
                     total: totalCount,
@@ -581,55 +586,5 @@ export const getStaffAvailability = async (ownerId) => {
     return {
         staff: staffAvailability,
         totalStaff: activeEmployees.length,
-    };
-};
-
-/**
- * Toggle employee availability status
- * Similar to shop status toggle - allows marking employee as available/unavailable
- */
-export const toggleEmployeeStatus = async (ownerId, employeeId, status) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
-    if (!shop) throw new NotFoundError('Shop profile');
-
-    const employee = await employeeRepository.findById(employeeId);
-    if (!employee || String(employee.shopId) !== String(shop._id)) {
-        throw new NotFoundError('Employee');
-    }
-
-    // Normalize status value (similar to shop toggle)
-    let newStatus;
-    if (status === undefined) {
-        // Toggle current status
-        newStatus = !employee.isActive;
-    } else if (typeof status === 'boolean') {
-        newStatus = status;
-    } else if (typeof status === 'string') {
-        const normalized = status.toLowerCase().trim();
-        if (['true', 'yes', 'on'].includes(normalized)) {
-            newStatus = true;
-        } else if (['false', 'no', 'off'].includes(normalized)) {
-            newStatus = false;
-        } else {
-            throw new BadRequestError('status must be a boolean or one of: true, false, yes, no, on, off');
-        }
-    } else {
-        throw new BadRequestError('status must be a boolean or string');
-    }
-
-    const updated = await employeeRepository.updateById(employeeId, shop._id, { isActive: newStatus });
-    if (!updated) throw new NotFoundError('Employee');
-
-    logger.info('Employee status updated', {
-        employeeId,
-        shopId: shop._id,
-        ownerId,
-        isActive: newStatus,
-    });
-
-    return {
-        id: toIdString(updated._id),
-        name: `${updated.firstName} ${updated.lastName}`,
-        isActive: updated.isActive,
     };
 };

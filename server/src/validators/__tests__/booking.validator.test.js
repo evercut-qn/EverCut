@@ -2,11 +2,10 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+    bookingAnalyticsQuerySchema,
     bookingListQuerySchema,
-    bookingMilestoneProgressQuerySchema,
     bookingPatchSchema,
     createBookingSchema,
-    queueFilterQuerySchema,
 } from '../booking.validator.js';
 
 test('booking schemas accept availability HH:MM times and normalize AM/PM input', () => {
@@ -57,8 +56,8 @@ test('bookingPatchSchema rejects mixed schedule and status changes', () => {
     assert.match(error?.message || '', /does not match any of the allowed types/);
 });
 
-test('bookingMilestoneProgressQuerySchema accepts a complete explicit month/year period', () => {
-    const { error, value } = bookingMilestoneProgressQuerySchema.validate({
+test('bookingAnalyticsQuerySchema accepts a complete explicit month/year period', () => {
+    const { error, value } = bookingAnalyticsQuerySchema.validate({
         month: '3',
         year: '2026',
     });
@@ -70,31 +69,26 @@ test('bookingMilestoneProgressQuerySchema accepts a complete explicit month/year
     });
 });
 
-test('bookingMilestoneProgressQuerySchema rejects incomplete periods', () => {
-    const { error } = bookingMilestoneProgressQuerySchema.validate({
+test('bookingAnalyticsQuerySchema rejects incomplete periods', () => {
+    const { error } = bookingAnalyticsQuerySchema.validate({
         month: 3,
     });
 
     assert.match(error?.message || '', /contains \[month\] without its required peers \[year\]/);
 });
 
-test('booking list and queue queries use timeframe instead of overlapping period/filter names', () => {
+test('booking list queries accept explicit date and multi-status filters', () => {
     const bookingQuery = bookingListQuerySchema.validate({
-        timeframe: 'past',
+        dateFrom: '2026-05-01',
+        dateTo: '2026-05-31',
+        status: 'confirmed,awaiting_confirmation',
         page: '1',
         limit: '10',
     });
     assert.equal(bookingQuery.error, undefined);
-    assert.equal(bookingQuery.value.timeframe, 'past');
-    assert.equal('period' in bookingQuery.value, false);
-
-    const legacyBookingQuery = bookingListQuerySchema.validate({ period: 'past' });
-    assert.match(legacyBookingQuery.error?.message || '', /period/);
-
-    const queueQuery = queueFilterQuerySchema.validate({ timeframe: 'upcoming' });
-    assert.equal(queueQuery.error, undefined);
-    assert.equal(queueQuery.value.timeframe, 'upcoming');
-
-    const legacyQueueQuery = queueFilterQuerySchema.validate({ filter: 'active' });
-    assert.match(legacyQueueQuery.error?.message || '', /filter/);
+    assert.deepEqual(bookingQuery.value.status, ['confirmed', 'awaiting_confirmation']);
+    assert.equal(bookingQuery.value.dateFrom, '2026-05-01');
+    assert.equal(bookingQuery.value.dateTo, '2026-05-31');
+    const legacyPeriodQuery = bookingListQuerySchema.validate({ period: 'past' });
+    assert.match(legacyPeriodQuery.error?.message || '', /period/);
 });

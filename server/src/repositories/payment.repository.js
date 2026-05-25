@@ -44,7 +44,7 @@ class PaymentRepository {
             .sort({ createdAt: -1 })
             .populate('bookingId', 'date time status paymentStatus totalAmount')
             .populate('customerId', 'firstName lastName userId')
-            .populate('shopId', 'shopName ownerId');
+            .populate('shopId', 'shopName barberId');
 
         if (options.skip !== undefined) query.skip(options.skip);
         if (options.limit !== undefined) query.limit(options.limit);
@@ -75,7 +75,7 @@ class PaymentRepository {
                 ],
             })
             .populate('customerId', 'firstName lastName userId')
-            .populate('shopId', 'shopName ownerId');
+            .populate('shopId', 'shopName barberId');
 
         if (options.skip !== undefined) query.skip(options.skip);
         if (options.limit !== undefined) query.limit(options.limit);
@@ -84,6 +84,19 @@ class PaymentRepository {
 
     async countAll(filter = {}) {
         return PaymentTransaction.countDocuments(trustQueryOperators(filter));
+    }
+
+    async countActiveWaiverReservations(customerId) {
+        return PaymentTransaction.countDocuments(trustQueryOperators({
+            customerId,
+            waiverApplied: true,
+            status: {
+                $in: [
+                    PAYMENT_TRANSACTION_STATUS.INITIATED,
+                    PAYMENT_TRANSACTION_STATUS.PENDING,
+                ],
+            },
+        }));
     }
 
     async findPendingByBookingId(bookingId) {

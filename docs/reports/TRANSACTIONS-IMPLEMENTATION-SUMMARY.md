@@ -287,7 +287,7 @@ Professional PDF generation using **PDFKit** library with best practices:
 **Main Function:**
 ```javascript
 generateTransactionStatementPDF({
-    shop: { shopName, ownerName },
+    shop: { shopName, firstName, lastName },
     transactions: [...],
     dateRange: { startDate, endDate },
     summary: { totalTransactions, totalAmount, averageAmount }
@@ -511,7 +511,7 @@ All issues fixed:
 - ✅ Professional PDF generation implemented
 - ✅ Full transaction IDs displayed
 - ✅ Indian currency formatting (Rs. 6,150.00)
-- ✅ Owner name from shop database
+- ✅ Barber first and last name from Barber profile
 - ✅ Amount column left-aligned
 - ✅ Table with vertical separators
 - ✅ Single-page PDF output

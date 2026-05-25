@@ -326,7 +326,7 @@ const firebaseUid = req.firebaseUser?.firebaseUid || req.body.firebaseUid || "te
 
 ```js
 // Verify the barber owns the shop this rating belongs to
-const shop = await shopRepository.findByOwnerId(ownerId);
+const shop = await shopRepository.findByBarberUserId(ownerId);
 if (!shop || rating.shopId.toString() !== shop._id.toString()) {
     throw new BadRequestError('You can only manage ratings on your own shop');
 }
@@ -428,7 +428,7 @@ app.use(cors());  // Allows ALL origins
 **Fix:**
 ```js
 app.use(cors({
-  origin: ['https://evercut.com', 'https://app.evercut.com'],
+  origin: ['https://evercut.in', 'https://app.evercut.in'],
   credentials: true
 }));
 ```

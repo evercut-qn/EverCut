@@ -6,7 +6,7 @@ import { getValidatedRequestData } from '../utils/request-validation.utils.js';
 export const addEmployee = async (req, res, next) => {
     try {
         const body = getValidatedRequestData(req, 'body');
-        const employee = await employeeService.addEmployee(req.user._id, body, req.file);
+        const employee = await employeeService.addEmployee(req.user._id, body);
         return res.status(201).json(ApiResponse.success(employee, 'Employee added'));
     } catch (err) {
         next(err);
@@ -37,7 +37,7 @@ export const updateEmployee = async (req, res, next) => {
     try {
         const params = getValidatedRequestData(req, 'params');
         const body = getValidatedRequestData(req, 'body');
-        const employee = await employeeService.updateEmployee(req.user._id, params.id, body, req.file);
+        const employee = await employeeService.updateEmployee(req.user._id, params.id, body);
         return res.status(200).json(ApiResponse.success(employee, 'Employee updated'));
     } catch (err) {
         next(err);
@@ -79,27 +79,10 @@ export const getEmployeeAvailability = async (req, res, next) => {
     }
 };
 
-/**
- * Get staff availability and progress (moved from dashboard)
- */
 export const getStaffAvailability = async (req, res, next) => {
     try {
         const staff = await employeeService.getStaffAvailability(req.user._id);
         return res.status(200).json(ApiResponse.success(staff, 'Staff availability fetched'));
-    } catch (err) {
-        next(err);
-    }
-};
-
-/**
- * Toggle employee availability status
- */
-export const toggleEmployeeStatus = async (req, res, next) => {
-    try {
-        const params = getValidatedRequestData(req, 'params');
-        const body = getValidatedRequestData(req, 'body');
-        const result = await employeeService.toggleEmployeeStatus(req.user._id, params.id, body.status);
-        return res.status(200).json(ApiResponse.success(result, 'Employee status updated'));
     } catch (err) {
         next(err);
     }

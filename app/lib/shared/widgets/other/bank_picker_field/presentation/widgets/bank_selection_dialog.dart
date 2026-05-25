@@ -1,0 +1,170 @@
+// lib/shared/widgets/other/bank_picker_field/presentation/widgets/bank_selection_dialog.dart
+
+part of '../../bank_picker_field.dart';
+
+class BankSelectionDialog extends StatefulWidget {
+  const BankSelectionDialog({super.key});
+
+  @override
+  State<BankSelectionDialog> createState() => _BankSelectionDialogState();
+}
+
+class _BankSelectionDialogState extends State<BankSelectionDialog> {
+  late final BankLocalDataSource _bankLocalDataSource;
+  late final BankRepository _bankRepository;
+  late final GetAllBanksUseCase _getAllBanks;
+  late final SearchBanksUseCase _searchBanks;
+  late final TextEditingController _searchController;
+  late final List<BankGroup> _banks;
+  late final List<Bank> _filteredBanks;
+
+  bool _isTyping = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _bankLocalDataSource = BankLocalDataSourceImpl();
+    _bankRepository = BankRepositoryImpl(_bankLocalDataSource);
+    _getAllBanks = GetAllBanksUseCase(_bankRepository);
+    _searchBanks = SearchBanksUseCase(_bankRepository);
+    _searchController = TextEditingController();
+
+    _banks = _getAllBanks();
+    _filteredBanks = <Bank>[];
+
+    _searchController.addListener(_listener);
+  }
+
+  void _listener() {
+    final String text = _searchController.text.trim();
+
+    final isTyping = text.isNotEmpty;
+    if (_isTyping != isTyping) {
+      setState(() {
+        _isTyping = isTyping;
+      });
+    }
+
+    if (_isTyping) {
+      _filteredBanks.clear();
+      _filteredBanks.addAll(
+        _searchBanks(
+          text.toLowerCase(),
+        ),
+      );
+      setState(() {});
+    }
+  }
+
+  @override
+  void dispose() {
+    _searchController.removeListener(_listener);
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Widget _buildBlock(List<Bank> banks) {
+    return ListView.separated(
+      itemCount: banks.length,
+      itemBuilder: (BuildContext context, int index) {
+        final bank = banks[index];
+        return ListTile(
+          contentPadding: EdgeInsets.all(context.scale(12)),
+          horizontalTitleGap: context.scale(18),
+          minTileHeight: 0,
+          minVerticalPadding: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(context.scale(8)),
+          ),
+          title: Text(
+            bank.name,
+            style: TextStyle(
+              color: context.appColors.neutralShade850,
+              fontSize: context.scale(14),
+            ),
+          ),
+          onTap: () => context.pop<String>(bank.name),
+        );
+      },
+      padding: EdgeInsets.all(context.scale(12)),
+      physics: const ClampingScrollPhysics(),
+      separatorBuilder: (BuildContext context, int index) => SizedBox(
+        height: context.scale(6),
+      ),
+      shrinkWrap: true,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final double illustrationSize = context.screenWidth * 0.48;
+    return SafeArea(
+      child: Column(
+        children: [
+          CustomSearchBar(
+            controller: _searchController,
+            dividerColor: context.appColors.secondaryDividerColor,
+            hintText: 'Choose a bank',
+            onClear: () => setState(() {
+              _filteredBanks.clear();
+            }),
+          ),
+          Expanded(
+            child: Visibility(
+              visible: _isTyping,
+              replacement: ListView.separated(
+                itemCount: _banks.length,
+                itemBuilder: (BuildContext context, int index) {
+                  return _buildBlock(_banks[index].banks);
+                },
+                padding: EdgeInsets.all(context.scale(12)),
+                physics: const ClampingScrollPhysics(),
+                separatorBuilder: (BuildContext context, int index) => Divider(
+                  color: context.appColors.secondaryDividerColor,
+                  height: context.scale(12),
+                ),
+                shrinkWrap: true,
+              ),
+              child: Visibility(
+                visible: _filteredBanks.isEmpty,
+                replacement: _buildBlock(_filteredBanks),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  spacing: context.scale(32),
+                  children: [
+                    ThemeModeBuilder(
+                      builder: (BuildContext context, bool isDarkMode) {
+                        return SvgPicture.asset(
+                          'assets/images/error/${isDarkMode ? 'dark' : 'light'}/not_found.svg',
+                          width: illustrationSize,
+                          placeholderBuilder: (BuildContext context) {
+                            return Shimmer.fromColors(
+                              baseColor: context.appColors.backgroundShade75,
+                              highlightColor: context.appColors.backgroundShade150,
+                              child: ShimmerContainer(
+                                color: context.appColors.backgroundShade75,
+                                width: illustrationSize,
+                                height: illustrationSize,
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    ),
+                    Text(
+                      'No Results',
+                      style: TextStyle(
+                        fontSize: context.scale(14),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import config from '../config/index.js';
 import customerRepository from '../repositories/customer.repository.js';
-import photoRepository from '../repositories/photo.repository.js';
+import barberRepository from '../repositories/barber.repository.js';
 import shopRepository from '../repositories/shop.repository.js';
 import userRepository from '../repositories/user.repository.js';
 import { UnauthorizedError } from '../utils/api-error.js';
@@ -11,6 +11,27 @@ import { ROLES, TOKEN_TYPE } from '../utils/constants.js';
 import logger, { maskPhoneNumber } from '../utils/logger.js';
 import { serializeCustomerProfile } from '../serializers/customer.serializer.js';
 import { serializeUser } from '../serializers/user.serializer.js';
+import * as mediaService from './media/media.service.js';
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Parse a jwt expiry string like "15m", "180d", "3600s" into seconds.
+ * Falls back to 900 (15 min) if the format is unrecognised.
+ */
+const parseExpiryToSeconds = (expiry) => {
+    if (typeof expiry === 'number') return expiry;
+    const match = String(expiry).match(/^(\d+)(s|m|h|d)$/);
+    if (!match) return 900;
+    const value = parseInt(match[1], 10);
+    const multipliers = { s: 1, m: 60, h: 3600, d: 86400 };
+    return value * multipliers[match[2]];
+};
+
+const JWT_ISS = 'evercut-api';
+const JWT_AUD = 'evercut-mobile';
 
 const normalizePhoneNumber = (phoneNumber) => {
     const value = String(phoneNumber ?? '').trim();
@@ -39,34 +60,67 @@ const loadUserProfile = async (user) => {
     }
 
     if (user.roleType === ROLES.BARBER) {
-        const shop = await shopRepository.findByOwnerId(user._id);
+        const barber = await barberRepository.findByUserId(user._id);
+        if (!barber) return null;
+        const shop = await shopRepository.findByBarberId(barber._id);
         if (!shop) return null;
 
-        const photos = await photoRepository.findByShopId(shop._id, {});
-        return serializeBarberProfile(shop, user, { photos });
+        const photos = await mediaService.getGalleryByShopId(shop._id);
+        return serializeBarberProfile({ barber, shop, user, photos });
     }
 
     return null;
 };
 
-/** Generate a short-lived onboarding token. */
+/** Generate a short-lived onboarding token (signed with dedicated onboarding secret). */
 export const generateOnboardingToken = (phoneNumber) => jwt.sign(
     {
         sub: phoneNumber,
         type: TOKEN_TYPE.ONBOARDING,
+        iss: JWT_ISS,
+        aud: JWT_AUD,
     },
-    config.jwt.accessSecret,
-    { expiresIn: '30m' },
+    config.jwt.onboardingSecret,
+    { expiresIn: config.jwt.onboardingExpiry },
 );
 
-/** Generate a pair of access + refresh tokens. */
+/** Verify an onboarding token and return decoded payload. */
+export const verifyOnboardingToken = (token) => {
+    try {
+        const decoded = jwt.verify(token, config.jwt.onboardingSecret, {
+            issuer: JWT_ISS,
+            audience: JWT_AUD,
+        });
+        if (decoded.type !== TOKEN_TYPE.ONBOARDING) {
+            throw new UnauthorizedError('Onboarding token required');
+        }
+        return decoded;
+    } catch (err) {
+        if (err instanceof UnauthorizedError) throw err;
+        if (err instanceof jwt.TokenExpiredError) {
+            throw new UnauthorizedError('Onboarding token has expired. Please verify your OTP again.');
+        }
+        if (err instanceof jwt.JsonWebTokenError) {
+            logger.warn('Tampered onboarding token detected', { message: err.message });
+            throw new UnauthorizedError('Invalid onboarding token.');
+        }
+        throw err;
+    }
+};
+
+/** Generate a pair of access + refresh tokens with full metadata. */
 export const generateTokenPair = (userId, roleType) => {
+    const expiresIn = parseExpiryToSeconds(config.jwt.accessExpiry);
+    const refreshExpiresIn = parseExpiryToSeconds(config.jwt.refreshExpiry);
+
     const accessToken = jwt.sign(
         {
             sub: userId.toString(),
             role: roleType,
             type: TOKEN_TYPE.ACCESS,
             jti: crypto.randomUUID(),
+            iss: JWT_ISS,
+            aud: JWT_AUD,
         },
         config.jwt.accessSecret,
         { expiresIn: config.jwt.accessExpiry },
@@ -77,34 +131,67 @@ export const generateTokenPair = (userId, roleType) => {
             sub: userId.toString(),
             type: TOKEN_TYPE.REFRESH,
             jti: crypto.randomUUID(),
+            iss: JWT_ISS,
+            aud: JWT_AUD,
         },
         config.jwt.refreshSecret,
         { expiresIn: config.jwt.refreshExpiry },
     );
 
-    return { accessToken, refreshToken };
+    return {
+        tokenType: 'Bearer',
+        accessToken,
+        expiresIn,
+        refreshToken,
+        refreshExpiresIn,
+    };
 };
 
-/** Verify a bearer token signed with the access secret. */
-export const verifyBearerToken = (token) => {
+/** Verify an access token signed with the access secret. */
+export const verifyAccessToken = (token) => {
     try {
-        return jwt.verify(token, config.jwt.accessSecret);
-    } catch {
-        throw new UnauthorizedError('Invalid or expired token');
+        const decoded = jwt.verify(token, config.jwt.accessSecret, {
+            issuer: JWT_ISS,
+            audience: JWT_AUD,
+        });
+        if (decoded.type !== TOKEN_TYPE.ACCESS) {
+            throw new UnauthorizedError('Standard account access token required');
+        }
+        return decoded;
+    } catch (err) {
+        if (err instanceof UnauthorizedError) throw err;
+        if (err instanceof jwt.TokenExpiredError) {
+            throw new UnauthorizedError('Access token has expired. Please refresh your session.');
+        }
+        if (err instanceof jwt.JsonWebTokenError) {
+            logger.warn('Tampered access token detected', { message: err.message });
+            throw new UnauthorizedError('Invalid access token.');
+        }
+        throw err;
     }
 };
 
 /** Verify a refresh token and return decoded payload. */
 export const verifyRefreshToken = (token) => {
     try {
-        const decoded = jwt.verify(token, config.jwt.refreshSecret);
+        const decoded = jwt.verify(token, config.jwt.refreshSecret, {
+            issuer: JWT_ISS,
+            audience: JWT_AUD,
+        });
         if (decoded.type !== TOKEN_TYPE.REFRESH) {
             throw new UnauthorizedError('Invalid token type');
         }
-
         return decoded;
-    } catch {
-        throw new UnauthorizedError('Invalid or expired refresh token');
+    } catch (err) {
+        if (err instanceof UnauthorizedError) throw err;
+        if (err instanceof jwt.TokenExpiredError) {
+            throw new UnauthorizedError('Refresh token has expired. Please sign in again.');
+        }
+        if (err instanceof jwt.JsonWebTokenError) {
+            logger.warn('Tampered refresh token detected', { message: err.message });
+            throw new UnauthorizedError('Invalid refresh token.');
+        }
+        throw err;
     }
 };
 
@@ -124,11 +211,12 @@ export const resolveOtpSession = async (phoneNumber) => {
     if (existingUser) {
         assertAccountIsActive(existingUser);
 
-        await userRepository.updateLastLogin(existingUser._id);
-
         const tokens = generateTokenPair(existingUser._id, existingUser.roleType);
         const refreshHash = hashToken(tokens.refreshToken);
+
+        // Atomic single write: update lastLoginAt and refreshTokenHash together
         const authenticatedUser = await userRepository.updateById(existingUser._id, {
+            lastLoginAt: new Date(),
             refreshTokenHash: refreshHash,
         });
 
@@ -149,7 +237,11 @@ export const resolveOtpSession = async (phoneNumber) => {
         phone: maskPhoneNumber(formattedPhoneNumber),
     });
 
-    return { isNewUser: true, onboardingToken };
+    return {
+        isNewUser: true,
+        onboardingToken,
+        onboardingExpiresIn: parseExpiryToSeconds(config.jwt.onboardingExpiry),
+    };
 };
 
 /** Refresh an access token using a valid refresh token. */
@@ -171,6 +263,7 @@ export const refreshAccessToken = async (refreshToken) => {
     const newRefreshHash = hashToken(tokens.refreshToken);
     await userRepository.updateById(userId, { refreshTokenHash: newRefreshHash });
 
+    // tokens already includes tokenType, expiresIn, refreshExpiresIn from generateTokenPair
     return tokens;
 };
 

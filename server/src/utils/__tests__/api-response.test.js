@@ -20,7 +20,7 @@ test('success response strips internal Mongoose metadata from nested payloads', 
     const schema = new mongoose.Schema({
         firstName: String,
         pinHash: String,
-        cloudinaryId: String,
+        r2Key: String,
         refreshTokenHash: String,
     });
     const Model = mongoose.models.ApiResponseSanitizerTest
@@ -28,7 +28,7 @@ test('success response strips internal Mongoose metadata from nested payloads', 
     const document = new Model({
         firstName: 'Jane',
         pinHash: 'secret-pin',
-        cloudinaryId: 'cloudinary-secret',
+        r2Key: 'images/private/photo.jpg',
         refreshTokenHash: 'refresh-secret',
     });
 
@@ -39,7 +39,7 @@ test('success response strips internal Mongoose metadata from nested payloads', 
     });
     const keys = collectKeys(response);
 
-    for (const forbiddenKey of ['$__', '_doc', '$isNew', '__v', 'parent', 'populated', 'pinHash', 'cloudinaryId', 'refreshTokenHash']) {
+    for (const forbiddenKey of ['$__', '_doc', '$isNew', '__v', 'parent', 'populated', 'pinHash', 'r2Key', 'refreshTokenHash']) {
         assert.equal(
             keys.includes(forbiddenKey),
             false,

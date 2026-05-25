@@ -27,9 +27,9 @@ const serviceSchema = new mongoose.Schema(
             enum: ALL_SERVICE_FOR,
             default: 'unisex',
         },
-        imageUrl: {
+        imageR2Key: {
             type: String,
-            required: true,
+            default: null,
         },
 
         // Single-service fields

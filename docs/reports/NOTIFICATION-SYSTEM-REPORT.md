@@ -105,9 +105,9 @@ All endpoints require authentication.
 POST   /api/v1/notifications/tokens
 DELETE /api/v1/notifications/tokens
 GET    /api/v1/notifications
-GET    /api/v1/notifications/unread-count
-PATCH  /api/v1/notifications/:id/read
-PATCH  /api/v1/notifications/read-all
+GET    /api/v1/notifications/summary
+PATCH  /api/v1/notifications/:id
+PATCH  /api/v1/notifications
 ```
 
 ## Reliability Decisions

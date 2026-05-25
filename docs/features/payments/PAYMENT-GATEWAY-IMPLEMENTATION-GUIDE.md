@@ -308,11 +308,12 @@ payment: Object.freeze({
     // ─── Business Constants (hardcoded, NOT from .env) ───
     // These are fixed pricing rules per Payment-Payout-Logic.md.
     // Change here if business pricing changes — no deploy-time env override needed.
-    platformFeeSingle: 3,             // ₹3 platform fee for single service
+    platformFeeSingle: 4,             // ₹4 platform fee for single service
     platformFeeBundle: 10,            // ₹10 platform fee for bundle
     refundFeeSingle: 7,               // ₹7 refund processing fee (single)
     refundFeeBundle: 15,              // ₹15 refund processing fee (bundle)
-    minBundleServiceAmount: 300,      // ₹300 minimum service amount for bundles
+    minBundleServiceAmount: 299,      // ₹299 minimum service amount for bundles
+    minSingleServiceAmount: 69,       // ₹69 minimum service amount for single services
     sessionExpirySeconds: 1200,       // 20 minutes
     maxPollAttempts: 10,
     pollIntervalBaseMs: 3000,         // 3 seconds, doubles each attempt
@@ -430,7 +431,7 @@ const paymentTransactionSchema = new mongoose.Schema(
         // ─── Settlement ───
         settlement: {
             serviceAmount: Number,        // Service amount in paisa (barber's price)
-            platformFee: Number,          // Fixed platform fee in paisa (₹3 or ₹10)
+            platformFee: Number,          // Fixed platform fee in paisa (₹4 or ₹10)
             barberPayout: Number,         // = serviceAmount (barber gets 100%)
             isBundle: Boolean,            // true if bundle (affects fee tiers)
             settled: { type: Boolean, default: false },
@@ -757,25 +758,14 @@ export const PAYOUT_MODES = Object.freeze({
     RTGS: 'RTGS',
 });
 
-// ─── Fixed Platform Fees (in rupees) — per Payment-Payout-Logic.md ───
-
-export const PLATFORM_FEES = Object.freeze({
-    SINGLE_SERVICE: 3,   // ₹3 fixed fee for single service
-    BUNDLE: 10,          // ₹10 fixed fee for bundle of services
-});
-
-// ─── Fixed Refund Fees (in rupees) — per Payment-Payout-Logic.md ───
-
-export const REFUND_FEES = Object.freeze({
-    SINGLE_SERVICE: 7,   // ₹7 refund processing fee
-    BUNDLE: 15,          // ₹15 refund processing fee
-});
-
-// ─── Bundle Pricing Rules ───
-
-export const BUNDLE_RULES = Object.freeze({
-    MIN_SERVICE_AMOUNT: 300,  // Minimum total service amount for bundles (₹300)
-});
+// ─── Platform & Refund Fees — centralized in config/index.js ───
+// All fee and bundle-rule values are defined in config.payment:
+//   config.payment.platformFeeSingle  = 4   (₹4 fixed fee for single service)
+//   config.payment.platformFeeBundle  = 10  (₹10 fixed fee for bundle)
+//   config.payment.refundFeeSingle    = 7   (₹7 refund processing fee)
+//   config.payment.refundFeeBundle    = 15  (₹15 refund processing fee)
+//   config.payment.minBundleServiceAmount = 299 (₹299 minimum for bundles)
+// Do NOT re-create PLATFORM_FEES / REFUND_FEES / BUNDLE_RULES in constants.js.
 ```
 
 ---
@@ -1631,7 +1621,7 @@ const generateMerchantRefundId = ({ merchantOrderId, bookingId }) => {
 
 // ─── Helper: Calculate settlement split (fixed platform fee model) ───
 // Per Payment-Payout-Logic.md:
-//   - Single service: platform fee = ₹3, refund fee = ₹7
+//   - Single service: platform fee = ₹4, refund fee = ₹7
 //   - Bundle (≥2 services): platform fee = ₹10, refund fee = ₹15
 //   - Barber always gets 100% of service amount
 //   - Customer pays: serviceAmount + platformFee
@@ -1699,6 +1689,9 @@ export const initiatePayment = async (userId, bookingId) => {
     // 5. Validate bundle minimum
     if (settlement.isBundle && (settlement.serviceAmount / 100) < config.payment.minBundleServiceAmount) {
         throw new BadRequestError(`Bundle service amount must be at least ₹${config.payment.minBundleServiceAmount}`);
+    }
+    if (!settlement.isBundle && (settlement.serviceAmount / 100) < config.payment.minSingleServiceAmount) {
+        throw new BadRequestError(`Single service amount must be at least ₹${config.payment.minSingleServiceAmount}`);
     }
 
     // 6. Generate unique merchant order ID
@@ -2076,12 +2069,12 @@ export const initiateRefund = async (bookingId, reason) => {
  * Poll pending payments that haven't received webhooks.
  */
 export const pollPendingPayments = async () => {
-    const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000);
-    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const staleCutoff = new Date(Date.now() - 30 * 60 * 1000);
+    const maxAgeCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
     const pendingPayments = await paymentRepository.findStalePayments(
-        thirtyMinutesAgo,
-        twentyFourHoursAgo,
+        staleCutoff,
+        maxAgeCutoff,
         config.payment.maxPollAttempts,
     );
 
@@ -2120,7 +2113,7 @@ export const pollPendingPayments = async () => {
         }
     }
 
-    const expiredCount = await paymentRepository.expireOldPendingPayments(twentyFourHoursAgo);
+    const expiredCount = await paymentRepository.expireOldPendingPayments(maxAgeCutoff);
     if (expiredCount > 0) {
         logger.info('[PaymentService] Expired old pending payments', { count: expiredCount });
     }
@@ -2211,35 +2204,34 @@ export const triggerBarberPayout = async (barberId, bookingIds, totalPayoutInPai
         throw new NotFoundError('Booking');
     }
 
-    // Populate shop for payout details
+    // Populate shop to resolve the owning barber profile
     const populatedBooking = await booking.populate('shopId');
     const shop = populatedBooking.shopId;
+    const barberProfile = await barberRepository.findById(shop.barberId);
 
-    // Shop model has upiId, accountHolderName, bankName at ROOT level
-    // Additional payout config (bankAccount, ifsc, beneficiaryId)
-    // is in shop.payoutConfig (added during payment integration)
-    //
-    // IMPORTANT: Shop model does NOT have phone/email fields.
-    // These live on the User model (accessed via shop.ownerId).
+    // Barber owns payout config (bankAccount, ifsc, optional upiId, beneficiaryId).
+    // Shop only owns venue/business details.
+    // User owns phone/email and is accessed via barberProfile.userId.
     // We must populate the owner User to get phone and email for Cashfree beneficiary.
-    if (!shop?.upiId && !shop?.payoutConfig?.bankAccount) {
+    if (!barberProfile?.bankAccount || !barberProfile?.ifsc) {
         logger.error('[PayoutService] No payout details for shop', {
             shopId: shop?._id,
+            barberId: shop?.barberId,
         });
-        throw new BadRequestError('Shop has no payout details configured');
+        throw new BadRequestError('Barber has no payout details configured');
     }
 
     // Populate the owner User for phone and email
-    const ownerUser = await User.findById(shop.ownerId).select('phoneNumber email');
+    const ownerUser = await User.findById(barberProfile.userId).select('phoneNumber email');
 
     const barber = {
-        _id: shop.ownerId || shop._id,
-        fullName: shop.accountHolderName || shop.ownerName || shop.shopName,
+        _id: barberProfile._id,
+        fullName: barberProfile.accountHolderName || `${barberProfile.firstName} ${barberProfile.lastName}`,
         phone: ownerUser?.phoneNumber || '',   // User model field is 'phoneNumber'
         email: ownerUser?.email || '',          // User model field is 'email'
-        upiId: shop.upiId,
-        bankAccount: shop.payoutConfig?.bankAccount,
-        ifsc: shop.payoutConfig?.ifsc,
+        upiId: barberProfile.upiId,
+        bankAccount: barberProfile.bankAccount,
+        ifsc: barberProfile.ifsc,
     };
 
     // 5. Generate transfer ID
@@ -2448,17 +2440,18 @@ export const retryPayout = async (payoutId) => {
         const retryBooking = await bookingRepository.findById(payout.bookingId);
         const retryPopulated = await retryBooking.populate('shopId');
         const retryShop = retryPopulated.shopId;
-        const retryOwner = await User.findById(retryShop.ownerId).select('phoneNumber email');
+        const retryBarber = await barberRepository.findById(retryShop.barberId);
+        const retryOwner = await User.findById(retryBarber.userId).select('phoneNumber email');
 
         await _ensureBeneficiary(
             {
-                _id: retryShop.ownerId || retryShop._id,
-                fullName: retryShop.accountHolderName || retryShop.ownerName || retryShop.shopName,
+                _id: retryBarber._id,
+                fullName: `${retryBarber.firstName || ''} ${retryBarber.lastName || ''}`.trim() || retryShop.shopName,
                 phone: retryOwner?.phoneNumber || '',
                 email: retryOwner?.email || '',
-                upiId: retryShop.upiId,
-                bankAccount: retryShop.payoutConfig?.bankAccount,
-                ifsc: retryShop.payoutConfig?.ifsc,
+                upiId: retryBarber.upiId,
+                bankAccount: retryBarber.bankAccount,
+                ifsc: retryBarber.ifsc,
             },
             payout.beneficiaryId,
         );
@@ -3326,7 +3319,7 @@ IF payoutStatus === 'not_initiated':
     → Refund ALLOWED
     → Refund amount = totalPaid - refundFee - platformFee
     → refundFee: ₹7 (single) / ₹15 (bundle)
-    → platformFee: ₹3 (single) / ₹10 (bundle) — non-refundable
+    → platformFee: ₹4 (single) / ₹10 (bundle) — non-refundable
 
 IF payoutStatus === 'initiated' OR 'pending' OR 'completed':
     → Refund NOT ALLOWED automatically
@@ -3400,7 +3393,7 @@ Current Flow:
   4. Return booking
 
 New Flow (with payment & end-of-day batch payout):
-  1. Validate booking data (enforce ₹300 minimum for bundles)
+  1. Validate booking data (enforce ₹299 minimum for bundles, ₹69 minimum for single services)
   2. Check slot availability
   3. Create booking (status: pending, paymentStatus: pending, payoutStatus: not_initiated)
   4. Return booking with paymentRequired: true

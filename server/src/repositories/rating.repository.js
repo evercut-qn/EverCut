@@ -3,7 +3,7 @@ import Rating from '../models/rating.model.js';
 
 const CUSTOMER_POPULATE = {
     path: 'customerId',
-    select: 'firstName lastName photoUrl',
+    select: 'firstName lastName photoR2Key',
 };
 
 class RatingRepository {

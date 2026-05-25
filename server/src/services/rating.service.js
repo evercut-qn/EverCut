@@ -39,7 +39,7 @@ const normalizeReplyText = (replyText) => {
 };
 
 const getOwnedShop = async (ownerId) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
+    const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop');
     return sanitizeForResponse(shop);
 };
@@ -130,7 +130,7 @@ export const removeRating = async (ratingId, ownerId) => {
     return { message: 'Rating deleted successfully' };
 };
 
-export const addReplyToRating = async (ratingId, replyText, ownerId) => {
+export const upsertReplyToRating = async (ratingId, replyText, ownerId) => {
     const normalizedReplyText = normalizeReplyText(replyText);
 
     const rating = await ratingRepository.findById(ratingId);
@@ -139,29 +139,15 @@ export const addReplyToRating = async (ratingId, replyText, ownerId) => {
     const shop = await getOwnedShop(ownerId);
     assertRatingBelongsToShop(rating, shop, 'You can only reply to ratings on your own shop');
 
-    if (rating.reply?.text) {
-        throw new ConflictError('Reply already exists for this rating');
+    const hasReply = Boolean(rating.reply?.text);
+    const updatedRating = hasReply
+        ? await ratingRepository.updateReply(ratingId, normalizedReplyText, ownerId)
+        : await ratingRepository.addReply(ratingId, normalizedReplyText, ownerId);
+
+    if (!hasReply) {
+        await notificationEvents.notifyRatingReply({ ratingId, actorUserId: ownerId });
     }
 
-    const updatedRating = await ratingRepository.addReply(ratingId, normalizedReplyText, ownerId);
-    await notificationEvents.notifyRatingReply({ ratingId, actorUserId: ownerId });
-    return serializeRating(updatedRating);
-};
-
-export const updateReplyToRating = async (ratingId, replyText, ownerId) => {
-    const normalizedReplyText = normalizeReplyText(replyText);
-
-    const rating = await ratingRepository.findById(ratingId);
-    if (!rating) throw new NotFoundError('Rating');
-
-    const shop = await getOwnedShop(ownerId);
-    assertRatingBelongsToShop(rating, shop, 'You can only update replies on your own shop');
-
-    if (!rating.reply || !rating.reply.text) {
-        throw new BadRequestError('No reply exists for this rating');
-    }
-
-    const updatedRating = await ratingRepository.updateReply(ratingId, normalizedReplyText, ownerId);
     return serializeRating(updatedRating);
 };
 

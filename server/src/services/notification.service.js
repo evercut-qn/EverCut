@@ -57,17 +57,17 @@ export const listNotifications = async (userId, query = {}) => {
     };
 };
 
-export const getUnreadCount = async (userId) => ({
+export const getNotificationSummary = async (userId) => ({
     unreadCount: await notificationRepository.countUnread(userId),
 });
 
-export const markNotificationRead = async (userId, notificationId) => {
+export const patchNotification = async (userId, notificationId) => {
     const notification = await notificationRepository.markRead(userId, notificationId);
     if (!notification) throw new NotFoundError('Notification');
     return serializeNotification(notification);
 };
 
-export const markAllNotificationsRead = async (userId) => {
+export const patchNotifications = async (userId) => {
     const result = await notificationRepository.markAllRead(userId);
     return {
         modifiedCount: result.modifiedCount || 0,
@@ -222,9 +222,9 @@ const notificationService = {
     registerFcmToken,
     unregisterFcmToken,
     listNotifications,
-    getUnreadCount,
-    markNotificationRead,
-    markAllNotificationsRead,
+    getNotificationSummary,
+    patchNotification,
+    patchNotifications,
     notifyUser,
 };
 

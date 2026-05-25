@@ -8,7 +8,7 @@ import { getValidatedRequestData } from '../utils/request-validation.utils.js';
 export const createCustomerOnboarding = async (req, res) => {
     const { phoneNumber } = req.onboardingContext;
     const body = getValidatedRequestData(req, 'body');
-    const result = await onboardingService.createCustomerOnboarding(phoneNumber, body, req.file);
+    const result = await onboardingService.createCustomerOnboarding(phoneNumber, body);
     const { user, profile, tokens } = result;
 
     return res.status(201).json(
@@ -16,8 +16,11 @@ export const createCustomerOnboarding = async (req, res) => {
             {
                 user,
                 profile,
+                tokenType: tokens.tokenType,
                 accessToken: tokens.accessToken,
+                expiresIn: tokens.expiresIn,
                 refreshToken: tokens.refreshToken,
+                refreshExpiresIn: tokens.refreshExpiresIn,
             },
             'Customer created',
         ),
@@ -27,17 +30,19 @@ export const createCustomerOnboarding = async (req, res) => {
 export const createBarberOnboarding = async (req, res) => {
     const { phoneNumber } = req.onboardingContext;
     const body = getValidatedRequestData(req, 'body');
-    const result = await onboardingService.createBarberOnboarding(phoneNumber, body, req.files);
-    const { user, shop, photos, tokens } = result;
+    const result = await onboardingService.createBarberOnboarding(phoneNumber, body);
+    const { user, shop, tokens } = result;
 
     return res.status(201).json(
         ApiResponse.success(
             {
                 user,
                 shop,
-                photos,
+                tokenType: tokens.tokenType,
                 accessToken: tokens.accessToken,
+                expiresIn: tokens.expiresIn,
                 refreshToken: tokens.refreshToken,
+                refreshExpiresIn: tokens.refreshExpiresIn,
             },
             'Barber profile created',
         ),

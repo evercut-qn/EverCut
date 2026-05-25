@@ -71,8 +71,8 @@ Resource-level response rules:
 
 Query rules:
 
-- Booking list time scope is `timeframe=past|upcoming`.
-- Queue time scope is `timeframe=active|upcoming`.
+- Booking list time scope is `date range=past|upcoming`.
+- Queue time scope is `date range=active|upcoming`.
 - Deprecated `period` and `filter` query parameters are rejected by validation.
 - Other query parameters keep one responsibility each: `status`, `paymentStatus`, `dateFrom/dateTo` where implemented, `page`, `limit`, `sortBy`, and feature-specific filters.
 
@@ -81,10 +81,10 @@ Query rules:
 The stabilization pass followed a contract-first migration:
 
 1. Add serializer contract tests proving own-ID aliases are absent.
-2. Add query validation tests proving `timeframe` replaces `period` and `filter`.
+2. Add query validation tests proving `date range` replaces `period` and `filter`.
 3. Remove aliases from serializers and hand-built service payloads.
 4. Preserve relation IDs only where they are not duplicated by nested relation DTOs.
-5. Update queue controllers/services/validators to use `timeframe`.
+5. Update queue controllers/services/validators to use `date range`.
 6. Align notification FCM payloads to `id`.
 7. Reject deprecated request aliases in barber onboarding and shop update validators.
 8. Regenerate all Postman collections from the source generator.
@@ -99,9 +99,10 @@ Before `/shops/me` contained repeated concepts:
 {
   "id": "shop_1",
   "shopId": "shop_1",
-  "ownerName": "Test Barber",
-  "ownerFirstName": "Test",
-  "ownerLastName": "Barber",
+  "owner": {
+    "firstName": "Test",
+    "lastName": "Barber"
+  },
   "facilities": ["Wi-Fi"],
   "amenities": ["Wi-Fi"],
   "availableDays": ["Monday"],
@@ -140,13 +141,13 @@ After `/shops/me` has one source of truth:
 Before queue:
 
 ```text
-GET /api/v1/bookings/analytics/queue?filter=active
+GET /api/v1/bookings/analytics?filter=active
 ```
 
 After queue:
 
 ```text
-GET /api/v1/bookings/analytics/queue?timeframe=active
+GET /api/v1/bookings/analytics
 ```
 
 Before payment initiation:
@@ -167,7 +168,7 @@ Validated with:
 
 - `npm.cmd test`
 - Serializer contract tests for own-ID alias removal.
-- Booking validator tests for `timeframe` and deprecated query rejection.
+- Booking validator tests for `date range` and deprecated query rejection.
 - Onboarding/shop validator tests for deprecated request alias rejection.
 - Postman generator regeneration and stale URL/alias scans.
 - Documentation scans for deprecated query examples and obsolete response aliases.

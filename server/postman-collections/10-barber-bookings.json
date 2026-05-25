@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "EverCut - Barber Bookings",
-    "description": "Barber booking administration collection covering list with role-specific filters (employeeId, dateFrom, dateTo), status stats, monthly milestone progress, status updates, and explicit booking cancellation. Enhanced with employee and date range filtering for leave management and scheduling.",
+    "description": "Barber booking administration collection covering list filters, combined analytics, status updates, and explicit booking cancellation.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -113,7 +113,7 @@
         "method": "GET",
         "header": [],
         "url": "{{base_url}}/{{api_prefix}}/bookings",
-        "description": "Reads the barber booking dashboard payload and captures one ID for status updates plus one paid booking ID for the cancellation route when available."
+        "description": "Reads the barber booking administration payload and captures one ID for status updates plus one paid booking ID for the cancellation route when available."
       },
       "event": [
         {
@@ -156,12 +156,12 @@
       ]
     },
     {
-      "name": "2. Get Booking Stats",
+      "name": "2. Get Booking Analytics",
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/bookings/analytics/summary",
-        "description": "Returns booking counts grouped by status."
+        "url": "{{base_url}}/{{api_prefix}}/bookings/analytics",
+        "description": "Returns booking summary, monthly milestone progress, today pulse metrics, and both active/upcoming queue buckets."
       },
       "event": [
         {
@@ -190,41 +190,7 @@
       ]
     },
     {
-      "name": "3. Get Booking Milestone Progress",
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/bookings/analytics/milestones",
-        "description": "Returns the current month completed-booking milestone progress card data, including the active status, completed count, visible targets, and next reward gap."
-      },
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "pm.test('response uses the standard envelope', function () {",
-              "  const response = pm.response.json();",
-              "  pm.expect(response).to.be.an('object');",
-              "  pm.expect(response).to.have.property('success');",
-              "  pm.expect(response.success).to.be.a('boolean');",
-              "  pm.expect(response).to.have.property('message');",
-              "  pm.expect(response.message).to.be.a('string');",
-              "  pm.expect(response).to.have.property('data');",
-              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
-              "  const responseText = JSON.stringify(response);",
-              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
-              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
-              "  });",
-              "});",
-              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "4. Get Pending Confirmations",
+      "name": "3. Get Pending Confirmations",
       "request": {
         "method": "GET",
         "header": [],
@@ -258,7 +224,7 @@
       ]
     },
     {
-      "name": "5. Get Confirmed Bookings",
+      "name": "4. Get Confirmed Bookings",
       "request": {
         "method": "GET",
         "header": [],
@@ -292,7 +258,7 @@
       ]
     },
     {
-      "name": "6. Get Bookings By Employee",
+      "name": "5. Get Bookings By Employee",
       "request": {
         "method": "GET",
         "header": [],
@@ -334,7 +300,7 @@
       ]
     },
     {
-      "name": "7. Get Bookings By Date Range",
+      "name": "6. Get Bookings By Date Range",
       "request": {
         "method": "GET",
         "header": [],
@@ -368,7 +334,7 @@
       ]
     },
     {
-      "name": "8. Get Employee Bookings In Date Range",
+      "name": "7. Get Employee Bookings In Date Range",
       "request": {
         "method": "GET",
         "header": [],
@@ -402,7 +368,7 @@
       ]
     },
     {
-      "name": "9. Get Employee Bookings With Status Filter",
+      "name": "8. Get Employee Bookings With Status Filter",
       "request": {
         "method": "GET",
         "header": [],
@@ -436,7 +402,7 @@
       ]
     },
     {
-      "name": "10. Confirm Booking",
+      "name": "9. Confirm Booking",
       "request": {
         "method": "PATCH",
         "header": [
@@ -484,7 +450,7 @@
       ]
     },
     {
-      "name": "11. Update Booking Status",
+      "name": "10. Update Booking Status",
       "request": {
         "method": "PATCH",
         "header": [
@@ -532,7 +498,7 @@
       ]
     },
     {
-      "name": "12. Cancel Paid Booking (Terminal)",
+      "name": "11. Cancel Paid Booking (Terminal)",
       "request": {
         "method": "PATCH",
         "header": [

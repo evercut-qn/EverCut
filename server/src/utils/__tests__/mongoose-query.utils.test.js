@@ -6,24 +6,24 @@ import { trustQueryOperators } from '../mongoose-query.utils.js';
 
 test('sanitizeFilter wraps untrusted operator objects', () => {
     const filter = {
-        serviceFor: { $regex: /male/i },
+        serviceFor: { $regex: /men/i },
     };
 
     mongoose.sanitizeFilter(filter);
 
     assert.deepEqual(Object.keys(filter.serviceFor), ['$eq']);
-    assert.equal(filter.serviceFor.$eq.$regex.source, 'male');
+    assert.equal(filter.serviceFor.$eq.$regex.source, 'men');
 });
 
 test('trustQueryOperators preserves trusted operator objects during sanitizeFilter', () => {
     const filter = trustQueryOperators({
-        serviceFor: { $regex: /male/i },
+        serviceFor: { $regex: /men/i },
         employeeId: { $in: ['employee-1', 'employee-2'] },
     });
 
     mongoose.sanitizeFilter(filter);
 
-    assert.equal(filter.serviceFor.$regex.source, 'male');
+    assert.equal(filter.serviceFor.$regex.source, 'men');
     assert.deepEqual(filter.employeeId.$in, ['employee-1', 'employee-2']);
 });
 

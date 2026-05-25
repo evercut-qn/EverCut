@@ -1,16 +1,30 @@
 import serviceRepository from '../repositories/service.repository.js';
 import shopRepository from '../repositories/shop.repository.js';
-import cloudinary from '../config/cloudinary.config.js';
 import { BadRequestError, NotFoundError, ConflictError } from '../utils/api-error.js';
 import { escapeRegex } from '../utils/regex.utils.js';
 import { buildPagination } from '../utils/pagination.utils.js';
 import { calculateDiscountedPrice, normalizeServicePricing } from '../utils/service-pricing.utils.js';
 import { serializeService, serializeServices } from '../serializers/service.serializer.js';
 import { serializeShopSummary } from '../serializers/shop.serializer.js';
+import { MEDIA_ENTITY_TYPE, MEDIA_PURPOSE } from '../utils/constants.js';
+import * as mediaService from './media/media.service.js';
+import storageProvider from './media/storage-provider.service.js';
+import serviceDefaultImageRepository from '../repositories/service-default-image.repository.js';
 
-/**
- * Service-catalog service - manages the salon services (haircut, etc.)
- */
+const SERVICE_CARD_FIELDS = [
+    'serviceName',
+    'serviceFor',
+    'serviceType',
+    'imageR2Key',
+    'duration',
+    'actualPrice',
+    'offerPrice',
+    'finalPrice',
+    'totalDuration',
+    'totalPrice',
+    'bundledServices',
+    'shopId',
+].join(' ');
 
 const normalizeBundledServices = (bundledServices = []) => (
     [...new Set(
@@ -38,17 +52,23 @@ const buildServiceFilters = (queryFilters = {}) => {
     return filters;
 };
 
-const resolveServiceImage = async (serviceName, serviceType) => {
-    const formattedName = serviceName.toLowerCase().replace(/\s+/g, '');
-    const folderPath = serviceType === 'bundled' ? 'evercut/bundled' : 'evercut/single';
-    const publicId = `${folderPath}/${formattedName}`;
+const resolveDefaultServiceImageR2Key = async (serviceName, serviceType, serviceFor, bundledServices = []) => {
+    // 1. Try to find a specific match in the database (Exact -> Fuzzy -> Global Gender -> Global Unisex)
+    const match = await serviceDefaultImageRepository.findBestMatch(serviceName, serviceType, serviceFor);
+    if (match) return match.r2Key;
 
-    try {
-        const resource = await cloudinary.api.resource(publicId);
-        return resource.secure_url;
-    } catch {
-        return cloudinary.url('evercut/default/service.jpg', { secure: true, resource_type: 'image' });
+    // 2. Specialized logic for bundled services if no direct match found
+    if (serviceType === 'bundled' && bundledServices.length > 0) {
+        const concatenated = bundledServices
+            .map((s) => s.toLowerCase().replace(/\s+/g, ''))
+            .sort()
+            .join('');
+        const bundleMatch = await serviceDefaultImageRepository.findByName(concatenated);
+        if (bundleMatch) return bundleMatch.r2Key;
     }
+
+    // 3. Absolute system fallback (should ideally be handled by step 1's Global Unisex fallback)
+    return 'images/services/single/default/unisex.jpg';
 };
 
 const buildServicePayload = (data, existingService = null) => {
@@ -115,28 +135,53 @@ const rethrowDuplicateServiceWrite = (error) => {
 };
 
 export const addService = async (ownerId, data) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
+    const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop profile');
 
     const serviceData = buildServicePayload(data);
     await ensureUniqueActiveService(shop._id, serviceData);
 
+    let imageR2Key;
+    let imageMediaId = null;
+
+    if (data.imageMediaId) {
+        const media = await mediaService.resolveReadyMediaById(data.imageMediaId);
+        imageR2Key = media.r2Key;
+        imageMediaId = data.imageMediaId;
+    } else {
+        imageR2Key = await resolveDefaultServiceImageR2Key(
+            serviceData.serviceName,
+            serviceData.serviceType,
+            serviceData.serviceFor,
+            serviceData.bundledServices,
+        );
+    }
+
     let createdService;
     try {
         createdService = await serviceRepository.create({
             shopId: shop._id,
-            imageUrl: await resolveServiceImage(serviceData.serviceName, serviceData.serviceType),
+            imageR2Key,
             ...serviceData,
         });
     } catch (error) {
         rethrowDuplicateServiceWrite(error);
     }
 
+    if (imageMediaId) {
+        await mediaService.linkMediaToEntity(
+            imageMediaId,
+            createdService._id,
+            MEDIA_ENTITY_TYPE.SERVICE,
+            MEDIA_PURPOSE.SERVICE,
+        );
+    }
+
     return serializeService(createdService);
 };
 
 export const getServices = async (ownerId, queryFilters = {}) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
+    const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop profile');
 
     const filters = buildServiceFilters(queryFilters);
@@ -148,7 +193,7 @@ export const getServices = async (ownerId, queryFilters = {}) => {
 };
 
 export const updateService = async (ownerId, serviceId, data) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
+    const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop profile');
 
     const existingService = await serviceRepository.findById(serviceId);
@@ -159,8 +204,24 @@ export const updateService = async (ownerId, serviceId, data) => {
     const updateData = buildServicePayload(data, existingService);
     await ensureUniqueActiveService(shop._id, updateData, existingService._id);
 
-    if (updateData.serviceName !== existingService.serviceName) {
-        updateData.imageUrl = await resolveServiceImage(updateData.serviceName, updateData.serviceType);
+    let imageMediaId = data.imageMediaId;
+    let oldR2KeyToDelete = null;
+
+    if (imageMediaId) {
+        const media = await mediaService.resolveReadyMediaById(imageMediaId);
+        oldR2KeyToDelete = existingService.imageR2Key;
+        updateData.imageR2Key = media.r2Key;
+    } else if (
+        updateData.serviceName !== existingService.serviceName
+        || updateData.serviceFor !== existingService.serviceFor
+    ) {
+        // Only resolve new default if name or gender changed and no manual image provided
+        updateData.imageR2Key = await resolveDefaultServiceImageR2Key(
+            updateData.serviceName,
+            updateData.serviceType,
+            updateData.serviceFor,
+            updateData.bundledServices,
+        );
     }
 
     let updated;
@@ -170,11 +231,25 @@ export const updateService = async (ownerId, serviceId, data) => {
         rethrowDuplicateServiceWrite(error);
     }
     if (!updated) throw new NotFoundError('Service');
+
+    if (imageMediaId) {
+        await mediaService.linkMediaToEntity(
+            imageMediaId,
+            updated._id,
+            MEDIA_ENTITY_TYPE.SERVICE,
+            MEDIA_PURPOSE.SERVICE,
+        );
+
+        if (oldR2KeyToDelete && oldR2KeyToDelete !== updated.imageR2Key) {
+            storageProvider.deleteObject(oldR2KeyToDelete).catch(() => {});
+        }
+    }
+
     return serializeService(updated);
 };
 
 export const deleteService = async (ownerId, serviceId) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
+    const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop profile');
 
     const deleted = await serviceRepository.softDelete(serviceId, shop._id);
@@ -186,20 +261,20 @@ export const searchServices = async (query, gender) => {
     const filters = {};
     if (gender) filters.serviceFor = { $regex: new RegExp(`^${escapeRegex(gender)}$`, 'i') };
     return serializeServices(
-        await serviceRepository.searchByName(query, filters, 'serviceName serviceFor shopId'),
+        await serviceRepository.searchByName(query, filters, SERVICE_CARD_FIELDS),
         { includeShop: true },
     );
 };
 
 export const searchShops = async (query) => {
-    return (await shopRepository.searchByName(query, 'shopName address location category coverUrl'))
+    return (await shopRepository.searchByName(query, 'shopName address location category coverR2Key'))
         .map(serializeShopSummary)
         .filter(Boolean);
 };
 
 export const getServicesByGender = async (gender) => {
     return serializeServices(
-        await serviceRepository.findByGender(gender, 'serviceName shopId serviceFor serviceType'),
+        await serviceRepository.findByGender(gender, SERVICE_CARD_FIELDS),
         { includeShop: true },
     );
 };

@@ -3,7 +3,7 @@ import authenticate from '../middleware/authenticate.middleware.js';
 import { otpRateLimiter } from '../middleware/otp-rate-limiter.middleware.js';
 import { validate } from '../middleware/validate.middleware.js';
 import * as authController from '../controllers/auth.controller.js';
-import { OTP_RATE_LIMIT } from '../utils/constants.js';
+import config from '../config/index.js';
 import {
     refreshTokenSchema,
     resendOtpSchema,
@@ -13,18 +13,22 @@ import {
 
 const router = Router();
 
-// OTP endpoints (public)
+// ============================================================================
+// Public Routes (no authentication required)
+// ============================================================================
+
+// OTP endpoints
 router.post(
     '/otp/send',
     otpRateLimiter({
-        windowMs: OTP_RATE_LIMIT.windowMs,
-        max: OTP_RATE_LIMIT.maxSendPerIp,
+        windowMs: config.security.otpRateLimit.windowMs,
+        max: config.security.otpRateLimit.maxSendPerIp,
         keyPrefix: 'otp-send-ip',
         keySource: 'ip',
     }),
     otpRateLimiter({
-        windowMs: OTP_RATE_LIMIT.windowMs,
-        max: OTP_RATE_LIMIT.maxSendPerPhone,
+        windowMs: config.security.otpRateLimit.windowMs,
+        max: config.security.otpRateLimit.maxSendPerPhone,
         keyPrefix: 'otp-send-phone',
         keySource: 'body.mobile',
     }),
@@ -35,8 +39,8 @@ router.post(
 router.post(
     '/otp/verify',
     otpRateLimiter({
-        windowMs: OTP_RATE_LIMIT.windowMs,
-        max: OTP_RATE_LIMIT.maxVerifyPerPhone,
+        windowMs: config.security.otpRateLimit.windowMs,
+        max: config.security.otpRateLimit.maxVerifyPerPhone,
         keyPrefix: 'otp-verify',
         keySource: 'body.mobile',
     }),
@@ -47,8 +51,8 @@ router.post(
 router.post(
     '/otp/resend',
     otpRateLimiter({
-        windowMs: OTP_RATE_LIMIT.windowMs,
-        max: OTP_RATE_LIMIT.maxSendPerPhone,
+        windowMs: config.security.otpRateLimit.windowMs,
+        max: config.security.otpRateLimit.maxSendPerPhone,
         keyPrefix: 'otp-resend',
         keySource: 'body.mobile',
     }),
@@ -56,8 +60,14 @@ router.post(
     authController.resendOtp,
 );
 
-// Token endpoints
+// Token refresh endpoint (public - uses refresh token)
 router.post('/token/refresh', validate(refreshTokenSchema, 'body'), authController.refreshToken);
+
+// ============================================================================
+// Protected Routes (authentication required)
+// ============================================================================
+
+// Logout endpoint
 router.post('/logout', authenticate, authController.logout);
 
 export default router;

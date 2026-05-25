@@ -50,7 +50,7 @@ Customer Request (POST /bookings)
   ├─ 5. isWithinShopHours(time, openTime, closeTime)  ← checks START time only
   ├─ 6. Fetch services, sum durations, sum prices
   ├─ 7. assertValidServiceDuration (> 0)
-  ├─ 8. assertBundleMinimum (≥ ₹300 for bundles)
+  ├─ 8. assertBundleMinimum (≥ ₹299 for bundles), assertSingleMinimum (≥ ₹69 for single)
   ├─ 9. Max duration check (≤ 480 min)
   ├─10. buildSlotLockTimes(time, duration) → e.g. ["10:00","10:30","11:00"]
   ├─11. employeeRepository.claimSlots(empId, date, slotLockTimes)  ← ATOMIC
@@ -135,7 +135,7 @@ Between when a customer sees a slot as "available" and when they submit the book
 
 ### MODERATE-2: Occupancy Calculation Uses Magic Number
 
-`getTodaysPulse()` hardcodes `slotsPerEmployee = 16` (8h × 2 slots/hr) instead of computing from actual employee working hours and booked slot durations.
+`booking analytics today data` hardcodes `slotsPerEmployee = 16` (8h × 2 slots/hr) instead of computing from actual employee working hours and booked slot durations.
 
 ### MODERATE-3: `findConflict()` Repository Method Is Unused
 

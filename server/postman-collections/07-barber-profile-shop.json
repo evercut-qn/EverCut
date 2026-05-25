@@ -112,10 +112,10 @@
           }
         ],
         "url": "{{base_url}}/{{api_prefix}}/shops/me",
-        "description": "Updates only barber profile and business fields. Payout details are managed through /shops/me/payout-details. NOTE: Email updates must use PUT /account/email endpoint.",
+        "description": "Updates only barber profile and business fields. Payout details are managed through /shops/me/payout-details. NOTE: Email updates must use PATCH /account/email endpoint.",
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"firstName\": \"Test\",\n  \"lastName\": \"Barber\",\n  \"dateOfBirth\": \"1991-01-12\",\n  \"gender\": \"Male\",\n  \"shopName\": \"Postman Test Barber Studio\",\n  \"category\": \"Barber\",\n  \"targetCustomers\": \"male\",\n  \"address\": \"MG Road, Bengaluru\",\n  \"location\": {\"type\":\"Point\",\"coordinates\":[77.5946,12.9716]},\n  \"amenities\": [\"Air Conditioning\", \"Waiting Area\", \"Parking Area\", \"Wi-Fi\"],\n  \"workingDays\": [\"Monday\", \"Tuesday\", \"Wednesday\", \"Thursday\", \"Friday\", \"Saturday\"],\n  \"workingHours\": {\n    \"openTime\": \"09:00\",\n    \"closeTime\": \"20:00\"\n  },\n  \"breakTimes\": [\n    {\n      \"start\": \"13:00\",\n      \"end\": \"14:00\"\n    }\n  ],\n  \"bio\": \"Updated from the automated Postman profile collection.\"\n}",
+          "raw": "{\n  \"firstName\": \"Test\",\n  \"lastName\": \"Barber\",\n  \"dateOfBirth\": \"1991-01-12\",\n  \"gender\": \"male\",\n  \"shopName\": \"Postman Test Barber Studio\",\n  \"category\": \"Barber Shop\",\n  \"targetCustomers\": \"men\",\n  \"address\": \"MG Road, Bengaluru\",\n  \"location\": {\"type\":\"Point\",\"coordinates\":[77.5946,12.9716]},\n  \"amenities\": [\"Air Conditioning\", \"Waiting Area\", \"Parking Area\", \"Wi-Fi\"],\n  \"workingDays\": [\"Monday\", \"Tuesday\", \"Wednesday\", \"Thursday\", \"Friday\", \"Saturday\"],\n  \"workingHours\": {\n    \"openTime\": \"09:00\",\n    \"closeTime\": \"20:00\"\n  },\n  \"breakTimes\": [\n    {\n      \"start\": \"13:00\",\n      \"end\": \"14:00\"\n    }\n  ],\n  \"bio\": \"Updated from the automated Postman profile collection.\"\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -155,7 +155,7 @@
         "method": "GET",
         "header": [],
         "url": "{{base_url}}/{{api_prefix}}/shops/me/payout-details",
-        "description": "Reads the complete payout account details with verification status. Account number is masked for security."
+        "description": "Reads the complete payout account details with verification status. Account number is displayed in full."
       },
       "event": [
         {
@@ -181,7 +181,7 @@
               "const response = pm.response.json();",
               "const data = response.data || {};",
               "pm.test('response includes accountHolderName', function () { pm.expect(data).to.have.property('accountHolderName'); });",
-              "pm.test('response includes bankAccountLast4', function () { pm.expect(data).to.have.property('bankAccountLast4'); });",
+              "pm.test('response includes bankAccount', function () { pm.expect(data).to.have.property('bankAccount'); });",
               "pm.test('response includes ifsc', function () { pm.expect(data).to.have.property('ifsc'); });",
               "pm.test('response includes verificationStatus', function () { pm.expect(data).to.have.property('verificationStatus'); });",
               "pm.test('response includes canReceivePayouts', function () { pm.expect(data).to.have.property('canReceivePayouts'); });"
@@ -204,7 +204,7 @@
         "description": "Updates complete payout account details including account number and IFSC. Verification status resets to pending on change.",
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"accountHolderName\": \"Test Barber\",\n  \"bankName\": \"HDFC Bank\",\n  \"bankAccount\": \"12345678901234\",\n  \"ifsc\": \"HDFC0001234\",\n  \"upiId\": \"test.barber@upi\"\n}",
+          "raw": "{\n  \"accountHolderName\": \"Test Barber\",\n  \"bankName\": \"HDFC Bank\",\n  \"bankAccount\": \"12345678901234\",\n  \"ifsc\": \"HDFC0001234\"\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -235,7 +235,7 @@
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
               "const response = pm.response.json();",
               "const data = response.data || {};",
-              "pm.test('bankAccountLast4 is present', function () { pm.expect(data.bankAccountLast4).to.match(/^\\d{4}$/); });",
+              "pm.test('bankAccount is present and unmasked', function () { pm.expect(data.bankAccount).to.equal('12345678901234'); });",
               "pm.test('verificationStatus is pending after update', function () { pm.expect(data.verificationStatus).to.equal('pending'); });"
             ]
           }
@@ -252,11 +252,11 @@
             "value": "application/json"
           }
         ],
-        "url": "{{base_url}}/{{api_prefix}}/shops/me/status",
-        "description": "Explicitly opens the shop so customer discovery and bookings can run immediately after this collection.",
+        "url": "{{base_url}}/{{api_prefix}}/shops/me",
+        "description": "Explicitly opens the shop through the shop resource so customer discovery and bookings can run immediately after this collection.",
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"status\": true\n}",
+          "raw": "{\n  \"isOpen\": true\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -294,18 +294,22 @@
       "name": "6. Update Profile Picture",
       "request": {
         "method": "PATCH",
-        "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/shops/me/picture",
-        "description": "Uploads or replaces the owner profile picture.",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/{{api_prefix}}/shops/me/media/picture",
+        "description": "Replaces the owner profile picture with a confirmed R2 media object.",
         "body": {
-          "mode": "formdata",
-          "formdata": [
-            {
-              "key": "photo",
-              "type": "file",
-              "description": "Attach profile picture file manually in Postman"
+          "mode": "raw",
+          "raw": "{\n  \"mediaId\": \"{{shared_media_id}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
             }
-          ]
+          }
         }
       },
       "event": [
@@ -338,18 +342,22 @@
       "name": "7. Update Cover Image",
       "request": {
         "method": "PATCH",
-        "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/shops/me/cover",
-        "description": "Uploads or replaces the shop cover image.",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/{{api_prefix}}/shops/me/media/cover",
+        "description": "Replaces the shop cover image with a confirmed R2 media object.",
         "body": {
-          "mode": "formdata",
-          "formdata": [
-            {
-              "key": "cover",
-              "type": "file",
-              "description": "Attach cover image file manually in Postman"
+          "mode": "raw",
+          "raw": "{\n  \"mediaId\": \"{{shared_media_id}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
             }
-          ]
+          }
         }
       },
       "event": [
@@ -379,7 +387,75 @@
       ]
     },
     {
-      "name": "8. Update PIN",
+      "name": "8. Remove Profile Picture",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": "{{base_url}}/{{api_prefix}}/shops/me/media/picture",
+        "description": "Removes the barber profile picture."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
+              "});",
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "9. Remove Cover Image",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": "{{base_url}}/{{api_prefix}}/shops/me/media/cover",
+        "description": "Removes the shop cover image."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
+              "});",
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "10. Update PIN",
       "request": {
         "method": "PATCH",
         "header": [
@@ -388,7 +464,7 @@
             "value": "application/json"
           }
         ],
-        "url": "{{base_url}}/{{api_prefix}}/shops/me/pin",
+        "url": "{{base_url}}/{{api_prefix}}/shops/me/security",
         "description": "Flips the barber PIN between 1234 and 5678 so the request stays rerunnable.",
         "body": {
           "mode": "raw",
@@ -441,7 +517,7 @@
       ]
     },
     {
-      "name": "9. Sign-Out Everywhere (Terminal)",
+      "name": "11. Sign-Out Everywhere (Terminal)",
       "request": {
         "method": "DELETE",
         "header": [],
@@ -475,7 +551,7 @@
       ]
     },
     {
-      "name": "10. Delete Account (Terminal)",
+      "name": "12. Delete Account (Terminal)",
       "request": {
         "method": "DELETE",
         "header": [

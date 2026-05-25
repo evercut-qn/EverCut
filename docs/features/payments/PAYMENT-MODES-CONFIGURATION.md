@@ -415,7 +415,7 @@ const PAYMENT_MODE_CONFIG = {
 **Configuration:** `server/src/config/index.js` (line ~155)
 ```javascript
 payment: Object.freeze({
-  platformFeeSingle: 3,
+  platformFeeSingle: 4,
   platformFeeBundle: 10,
   // ... other business rules
   paymentModes: [{ type: 'UPI' }], // Change this

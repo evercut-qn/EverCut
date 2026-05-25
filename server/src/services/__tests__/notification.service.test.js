@@ -7,13 +7,17 @@ const ensureRequiredEnv = () => {
         FIREBASE_PROJECT_ID: 'evercut-test',
         FIREBASE_CLIENT_EMAIL: 'firebase@example.com',
         FIREBASE_PRIVATE_KEY: '-----BEGIN PRIVATE KEY-----\\nabc\\n-----END PRIVATE KEY-----',
-        CLOUDINARY_CLOUD_NAME: 'evercut',
-        CLOUDINARY_API_KEY: 'cloudinary-key',
-        CLOUDINARY_API_SECRET: 'cloudinary-secret',
+        CF_ACCOUNT_ID: 'test-account',
+        R2_ACCESS_KEY_ID: 'test-access-key',
+        R2_SECRET_ACCESS_KEY: 'test-secret-key',
+        R2_BUCKET: 'evercut-media-test',
+        CDN_BASE_URL: 'https://media.evercut.test',
+        MEDIA_TOKEN_SECRET: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
         MSG91_AUTH_KEY: 'msg91-auth',
         MSG91_OTP_TEMPLATE_ID: 'msg91-template',
         JWT_ACCESS_SECRET: 'access-secret',
         JWT_REFRESH_SECRET: 'refresh-secret',
+        JWT_ONBOARDING_SECRET: 'onboarding-secret',
         PHONEPE_CLIENT_ID: 'phonepe-client',
         PHONEPE_CLIENT_SECRET: 'phonepe-secret',
         PHONEPE_CLIENT_VERSION: '1',
@@ -72,6 +76,62 @@ test('registerFcmToken upserts a token for the authenticated user and device', a
     assert.equal('token' in result, false);
     assert.equal('_id' in result, false);
     assert.equal(result.revokedAt, null);
+});
+
+test('getNotificationSummary returns normalized unread metrics', async (t) => {
+    t.mock.method(notificationRepository, 'countUnread', async (userId) => {
+        assert.equal(userId, 'user-1');
+        return 7;
+    });
+
+    const result = await notificationService.getNotificationSummary('user-1');
+
+    assert.deepEqual(result, {
+        unreadCount: 7,
+    });
+});
+
+test('patchNotification marks one notification read for the authenticated recipient', async (t) => {
+    const readAt = new Date('2026-05-07T08:00:00.000Z');
+    t.mock.method(notificationRepository, 'markRead', async (userId, notificationId) => {
+        assert.equal(userId, 'user-1');
+        assert.equal(notificationId, 'notification-1');
+        return {
+            _id: notificationId,
+            recipientUserId: userId,
+            type: 'hybrid',
+            eventType: 'booking.confirmed',
+            title: 'Booking confirmed',
+            body: 'Your booking is confirmed',
+            status: 'sent',
+            readAt,
+        };
+    });
+
+    const result = await notificationService.patchNotification('user-1', 'notification-1');
+
+    assert.equal(result.id, 'notification-1');
+    assert.equal(result.recipientUserId, 'user-1');
+    assert.equal(result.readAt, readAt);
+});
+
+test('patchNotifications marks all unread notifications for the authenticated recipient', async (t) => {
+    t.mock.method(notificationRepository, 'markAllRead', async (userId) => {
+        assert.equal(userId, 'user-1');
+        return { modifiedCount: 3 };
+    });
+
+    const result = await notificationService.patchNotifications('user-1');
+
+    assert.deepEqual(result, {
+        modifiedCount: 3,
+    });
+});
+
+test('notification service does not expose deprecated read-action method names', () => {
+    assert.equal('getUnreadCount' in notificationService, false);
+    assert.equal('markNotificationRead' in notificationService, false);
+    assert.equal('markAllNotificationsRead' in notificationService, false);
 });
 
 test('notifyUser persists once, sends a hybrid payload to every active device, and marks delivery', async (t) => {

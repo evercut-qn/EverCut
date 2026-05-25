@@ -106,9 +106,9 @@ No backward compatibility was retained. Removed endpoints are intentionally unav
 - `PUT /api/v1/bookings/:id/status`
 - `GET /api/v1/bookings/status`
 - `GET /api/v1/bookings/pending-confirmations`
-- `GET /api/v1/bookings/stats`
-- `GET /api/v1/bookings/progress`
-- `GET /api/v1/bookings/stats/today`
+- `GET /api/v1/bookings/analytics`
+- `GET /api/v1/bookings/analytics`
+- `GET /api/v1/bookings/analytics`
 - `GET /api/v1/bookings/queue`
 - `POST /api/v1/bookings/:id/refund`
 
@@ -124,10 +124,10 @@ No backward compatibility was retained. Removed endpoints are intentionally unav
 - `PUT /api/v1/shops/me/upi`
 - `GET /api/v1/shops/me/bank-details`
 - `PUT /api/v1/shops/me/bank-details`
-- `PUT /api/v1/shops/me/status`
-- `PUT /api/v1/shops/me/picture`
-- `PUT /api/v1/shops/me/cover`
-- `PUT /api/v1/shops/me/pin`
+- `PUT /api/v1/shops/me`
+- `PUT /api/v1/shops/me/media/picture`
+- `PUT /api/v1/shops/me/media/cover`
+- `PUT /api/v1/shops/me/security`
 - `POST /api/v1/shops/me/sign-out-everywhere`
 - `DELETE /api/v1/shops/me`
 
@@ -137,7 +137,7 @@ No backward compatibility was retained. Removed endpoints are intentionally unav
 - `GET /api/v1/employees/:id/available-slots`
 - `GET /api/v1/employees/availability`
 - `PUT /api/v1/employees/:id`
-- `PUT /api/v1/employees/:id/status`
+- `PUT /api/v1/employees/:id`
 
 ## 5. Merged Endpoints
 
@@ -170,10 +170,10 @@ No backward compatibility was retained. Removed endpoints are intentionally unav
 | PUT | `/api/v1/bookings/:id/favorite` | Add favorite booking |
 | DELETE | `/api/v1/bookings/:id/favorite` | Remove favorite booking |
 | POST | `/api/v1/bookings/:id/refunds` | Initiate a refund |
-| GET | `/api/v1/bookings/analytics/summary` | Booking status summary |
-| GET | `/api/v1/bookings/analytics/milestones` | Monthly completed-booking milestone progress |
-| GET | `/api/v1/bookings/analytics/today` | Today's pulse metrics |
-| GET | `/api/v1/bookings/analytics/queue` | Today's queue |
+| GET | `/api/v1/bookings/analytics` | Booking status summary |
+| GET | `/api/v1/bookings/analytics` | Monthly completed-booking milestone progress |
+| GET | `/api/v1/bookings/analytics` | Today's pulse metrics |
+| GET | `/api/v1/bookings/analytics` | Today's queue |
 
 ### Shops
 
@@ -186,10 +186,10 @@ No backward compatibility was retained. Removed endpoints are intentionally unav
 | PATCH | `/api/v1/shops/me` | Update barber business profile |
 | GET | `/api/v1/shops/me/payout-details` | Get payout details |
 | PATCH | `/api/v1/shops/me/payout-details` | Update payout details |
-| PATCH | `/api/v1/shops/me/pin` | Update shop PIN |
-| PATCH | `/api/v1/shops/me/picture` | Update owner profile picture |
-| PATCH | `/api/v1/shops/me/cover` | Update shop cover image |
-| PATCH | `/api/v1/shops/me/status` | Update shop open/closed status |
+| PATCH | `/api/v1/shops/me/security` | Update shop PIN |
+| PATCH | `/api/v1/shops/me/media/picture` | Update owner profile picture |
+| PATCH | `/api/v1/shops/me/media/cover` | Update shop cover image |
+| PATCH | `/api/v1/shops/me` | Update shop open/closed status |
 | GET | `/api/v1/shops/:id` | Get public shop details |
 | GET | `/api/v1/shops/:id/employees` | List active shop employees |
 | GET | `/api/v1/shops/:id/availability` | Get shop-wide availability |
@@ -204,10 +204,10 @@ No backward compatibility was retained. Removed endpoints are intentionally unav
 | POST | `/api/v1/employees` | Create employee |
 | GET | `/api/v1/employees/:id` | Get employee detail and statistics |
 | PATCH | `/api/v1/employees/:id` | Update employee |
-| PATCH | `/api/v1/employees/:id/status` | Update employee availability status |
+| PATCH | `/api/v1/employees/:id` | Update employee availability status |
 | DELETE | `/api/v1/employees/:id` | Delete employee |
 | GET | `/api/v1/employees/:id/availability` | Get employee availability |
-| GET | `/api/v1/employees/analytics/availability` | Get staff availability analytics |
+| GET | `/api/v1/employees/analytics` | Get staff availability analytics |
 
 ### Account
 
@@ -224,7 +224,7 @@ No backward compatibility was retained. Removed endpoints are intentionally unav
 - `/shops/me` is used for the authenticated barber's own shop following the industry-standard `/me` convention (consistent with `/customers/me`), clearly distinguishing it from public `/:id` routes.
 - Payout details are isolated from business profile updates to avoid accidental payment-field writes.
 - Analytics routes are grouped under owning resources, making dashboard data discoverable without creating a separate dashboard route family.
-- Static routes are registered before parameterized routes to prevent paths like `/employees/analytics/availability` from being interpreted as employee IDs.
+- Static routes are registered before parameterized routes to prevent paths like `/employees/analytics` from being interpreted as employee IDs.
 
 ## 8. Assumptions Made
 

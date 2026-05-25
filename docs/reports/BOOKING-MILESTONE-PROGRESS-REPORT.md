@@ -1,4 +1,4 @@
-﻿# Booking Milestone Progress Report
+# Booking Milestone Progress Report
 
 > Legacy snapshot: This document records findings against the pre-2026-04-24 role-prefixed routing layout and removed `controllers/customer/*` / `controllers/barber/*` files. Treat route and file references here as historical unless explicitly updated. For the current API surface, see [ROUTING-STRATEGY-ANALYSIS](../architecture/ROUTING-STRATEGY-ANALYSIS.md).
 
@@ -66,7 +66,7 @@ The image shows a barber-facing progress card for a booking incentive or reward 
 The backend already had barber booking management fundamentals:
 
 - `GET /api/v1/barber/bookings` for booking listing
-- `GET /api/v1/barber/bookings/stats` for counts by status
+- `GET /api/v1/bookings/analytics` for counts by status
 - `GET /api/v1/barber/bookings/status` for status-filtered lists
 - `PUT /api/v1/barber/bookings/:id/status` for status changes
 - `DELETE /api/v1/barber/bookings/:id` for paid-booking deletion
@@ -95,7 +95,7 @@ The backend did **not** have a dedicated endpoint that returned:
 
 ### New endpoint added
 
-- `GET /api/v1/barber/bookings/progress`
+- `GET /api/v1/bookings/analytics`
 
 ### What it returns
 
@@ -144,7 +144,8 @@ Added booking-domain milestone logic in `booking.service.js`:
 
 ## 5. Files Modified
 
-- `server/src/utils/constants.js`
+- `server/src/config/index.js` (milestone targets moved here as `config.booking.milestoneTargets`)
+- `server/src/utils/constants.js` (`BOOKING_MILESTONE_TARGETS` removed — now in config)
 - `server/src/repositories/booking.repository.js`
 - `server/src/validators/booking.validator.js`
 - `server/src/controllers/barber/barber-booking.controller.js`
@@ -167,7 +168,7 @@ Added booking-domain milestone logic in `booking.service.js`:
 
 Updated the barber bookings collection generator to:
 
-- add `GET /api/v1/barber/bookings/progress`
+- add `GET /api/v1/bookings/analytics`
 - describe the new milestone-progress request
 - fix booking ID capture to read `response.data.items`
 

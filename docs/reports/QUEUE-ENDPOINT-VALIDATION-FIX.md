@@ -18,11 +18,11 @@ The migrated queue endpoint was returning a 500 Internal Server Error with the m
 
 When we migrated the dashboard routes to resource-based routes, we added the `/queue` endpoint to `bookings.routes.js` but **forgot to add the validation middleware** for the query parameters.
 
-The endpoint now accepts an optional `timeframe` query parameter (`active` or `upcoming`) and rejects the deprecated `filter` parameter:
+The endpoint now accepts an optional `date range` query parameter (`active` or `upcoming`) and rejects the deprecated `filter` parameter:
 
 ```javascript
 // ❌ BEFORE (Missing validation)
-router.get('/queue', authorize(ROLES.BARBER), bookingController.getTodaysQueue);
+router.get('/analytics', authorize(ROLES.BARBER), validate(bookingAnalyticsQuerySchema, 'query'), bookingController.getBookingAnalytics);
 ```
 
 The controller expects validated query data via `getValidatedRequestData(req, 'query')`, which throws an error if validation hasn't run.
@@ -33,16 +33,16 @@ The controller expects validated query data via `getValidatedRequestData(req, 'q
 
 ### 1. Created New Validator Schema
 
-Added `queueFilterQuerySchema` to `server/src/validators/booking.validator.js`:
+Added `bookingAnalyticsQuerySchema` to `server/src/validators/booking.validator.js`:
 
 ```javascript
-export const queueFilterQuerySchema = Joi.object({
-    timeframe: Joi.string().valid('active', 'upcoming').default('active'),
+export const bookingAnalyticsQuerySchema = Joi.object({
+    date range: Joi.string().valid('active', 'upcoming').default('active'),
 });
 ```
 
 **Features:**
-- Validates `timeframe` query parameter
+- Validates `date range` query parameter
 - Only allows `'active'` or `'upcoming'` values
 - Defaults to `'active'` if not provided
 - Follows Joi validation best practices
@@ -55,21 +55,21 @@ Updated `server/src/routes/bookings.routes.js`:
 ```javascript
 import {
     // ... other validators
-    queueFilterQuerySchema,
+    bookingAnalyticsQuerySchema,
 } from '../validators/booking.validator.js';
 ```
 
 **Add validation middleware:**
 ```javascript
 // ✅ AFTER (With validation)
-router.get('/queue', authorize(ROLES.BARBER), validate(queueFilterQuerySchema, 'query'), bookingController.getTodaysQueue);
+router.get('/analytics', authorize(ROLES.BARBER), validate(bookingAnalyticsQuerySchema, 'query'), bookingController.getBookingAnalytics);
 ```
 
 ---
 
 ## Files Modified
 
-1. ✅ `server/src/validators/booking.validator.js` - Added `queueFilterQuerySchema`
+1. ✅ `server/src/validators/booking.validator.js` - Added `bookingAnalyticsQuerySchema`
 2. ✅ `server/src/routes/bookings.routes.js` - Added validation middleware to `/queue` route
 
 ---
@@ -78,9 +78,9 @@ router.get('/queue', authorize(ROLES.BARBER), validate(queueFilterQuerySchema, '
 
 ### Valid Requests
 
-**Request 1: With timeframe parameter**
+**Request 1: With date range parameter**
 ```
-GET /api/v1/bookings/analytics/queue?timeframe=active
+GET /api/v1/bookings/analytics
 Authorization: Bearer {barber_token}
 ```
 
@@ -90,7 +90,7 @@ Authorization: Bearer {barber_token}
   "success": true,
   "message": "Today's queue fetched",
   "data": {
-    "timeframe": "active",
+    "date range": "active",
     "active": {
       "count": 3,
       "items": [...]
@@ -103,17 +103,17 @@ Authorization: Bearer {barber_token}
 }
 ```
 
-**Request 2: Without timeframe parameter (uses default)**
+**Request 2: Without date range parameter (uses default)**
 ```
-GET /api/v1/bookings/analytics/queue
+GET /api/v1/bookings/analytics
 Authorization: Bearer {barber_token}
 ```
 
-**Expected Response:** Same as above (defaults to `timeframe=active`)
+**Expected Response:** Same as above (defaults to `date range=active`)
 
-**Request 3: With upcoming timeframe**
+**Request 3: With upcoming date range**
 ```
-GET /api/v1/bookings/analytics/queue?timeframe=upcoming
+GET /api/v1/bookings/analytics
 Authorization: Bearer {barber_token}
 ```
 
@@ -123,7 +123,7 @@ Authorization: Bearer {barber_token}
   "success": true,
   "message": "Today's queue fetched",
   "data": {
-    "timeframe": "upcoming",
+    "date range": "upcoming",
     "active": {
       "count": 3,
       "items": []
@@ -138,9 +138,9 @@ Authorization: Bearer {barber_token}
 
 ### Invalid Requests
 
-**Request: Invalid timeframe value**
+**Request: Invalid date range value**
 ```
-GET /api/v1/bookings/analytics/queue?timeframe=invalid
+GET /api/v1/bookings/analytics?date range=invalid
 Authorization: Bearer {barber_token}
 ```
 
@@ -151,8 +151,8 @@ Authorization: Bearer {barber_token}
   "message": "Validation error",
   "errors": [
     {
-      "field": "timeframe",
-      "message": "timeframe must be one of [active, upcoming]"
+      "field": "date range",
+      "message": "date range must be one of [active, upcoming]"
     }
   ]
 }
@@ -240,9 +240,9 @@ Consider adding:
 ## Related Issues
 
 This fix also ensures:
-- `/bookings/stats/today` works correctly (no query params needed)
+- `/bookings/analytics` works correctly (no query params needed)
 - `/employees/availability` works correctly (no query params needed)
-- `/earnings/overview` works correctly (no query params needed)
+- `/bookings/analytics + /employees/analytics + /earnings` works correctly (no query params needed)
 
 All other migrated endpoints were already properly validated.
 
@@ -263,7 +263,7 @@ node -c server/src/routes/bookings.routes.js
 ```
 
 ### Manual Testing
-- ✅ Test with Postman collection `14-dashboard.json`
+- ✅ Test with Postman collection `14-operational-analytics.json`
 - ✅ Test request 4: "Get Today's Queue - Active"
 - ✅ Test request 5: "Get Today's Queue - Upcoming"
 

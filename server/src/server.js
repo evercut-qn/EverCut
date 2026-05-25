@@ -6,6 +6,8 @@ import { startPayoutPoller, stopPayoutPoller } from './jobs/payout-poller.cron.j
 import { startPayoutBatchJob, stopPayoutBatchJob } from './jobs/payout-batch.cron.js';
 import { startAutoCancelJob, stopAutoCancelJob } from './jobs/auto-cancel-bookings.cron.js';
 import { startSlotCleanupJob, stopSlotCleanupJob } from './jobs/slot-cleanup.cron.js';
+import { startMediaCleanupJob, stopMediaCleanupJob } from './jobs/media-cleanup.cron.js';
+import { startSubscriptionJobs, stopSubscriptionJobs } from './jobs/subscription.cron.js';
 import logger from './utils/logger.js';
 
 /**
@@ -23,6 +25,8 @@ const start = async () => {
         startPayoutBatchJob();
         startAutoCancelJob();
         startSlotCleanupJob();
+        startMediaCleanupJob();
+        startSubscriptionJobs();
 
         // Start HTTP server
         const server = app.listen(config.port, () => {
@@ -41,6 +45,8 @@ const start = async () => {
             stopPayoutBatchJob();
             stopAutoCancelJob();
             stopSlotCleanupJob();
+            stopMediaCleanupJob();
+            stopSubscriptionJobs();
 
             server.close(async () => {
                 await disconnectDB();

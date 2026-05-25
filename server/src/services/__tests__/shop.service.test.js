@@ -7,13 +7,17 @@ const ensureRequiredEnv = () => {
         FIREBASE_PROJECT_ID: 'evercut-test',
         FIREBASE_CLIENT_EMAIL: 'firebase@example.com',
         FIREBASE_PRIVATE_KEY: '-----BEGIN PRIVATE KEY-----\\nabc\\n-----END PRIVATE KEY-----',
-        CLOUDINARY_CLOUD_NAME: 'evercut',
-        CLOUDINARY_API_KEY: 'cloudinary-key',
-        CLOUDINARY_API_SECRET: 'cloudinary-secret',
+        CF_ACCOUNT_ID: 'test-account',
+        R2_ACCESS_KEY_ID: 'test-access-key',
+        R2_SECRET_ACCESS_KEY: 'test-secret-key',
+        R2_BUCKET: 'evercut-media-test',
+        CDN_BASE_URL: 'https://media.evercut.test',
+        MEDIA_TOKEN_SECRET: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
         MSG91_AUTH_KEY: 'msg91-auth',
         MSG91_OTP_TEMPLATE_ID: 'msg91-template',
         JWT_ACCESS_SECRET: 'access-secret',
         JWT_REFRESH_SECRET: 'refresh-secret',
+        JWT_ONBOARDING_SECRET: 'onboarding-secret',
         PHONEPE_CLIENT_ID: 'phonepe-client',
         PHONEPE_CLIENT_SECRET: 'phonepe-secret',
         PHONEPE_CLIENT_VERSION: '1',
@@ -32,7 +36,10 @@ const ensureRequiredEnv = () => {
 ensureRequiredEnv();
 
 const customerRepository = (await import('../../repositories/customer.repository.js')).default;
+const barberRepository = (await import('../../repositories/barber.repository.js')).default;
+const mediaRepository = (await import('../../repositories/media.repository.js')).default;
 const shopRepository = (await import('../../repositories/shop.repository.js')).default;
+const notificationEvents = (await import('../notification-events.service.js')).default;
 const shopService = await import('../shop.service.js');
 
 test('getFavoriteShops returns a paginated customer favorite shop list', async (t) => {
@@ -102,4 +109,58 @@ test('removeFavoriteShop is idempotent when the shop is no longer visible', asyn
         favorite: false,
         shopId: 'shop-1',
     });
+});
+
+test('updateBusinessInfo persists desired open state and emits a shop-status notification', async (t) => {
+    t.mock.method(barberRepository, 'findByUserId', async () => ({
+        _id: 'barber-1',
+        userId: 'owner-1',
+    }));
+    t.mock.method(shopRepository, 'findByBarberId', async () => ({
+        _id: 'shop-1',
+        barberId: 'barber-1',
+        isOpen: true,
+        openTime: '09:00',
+        closeTime: '18:00',
+        breakTimes: [],
+    }));
+    t.mock.method(mediaRepository, 'findByEntity', async () => []);
+
+    let updateArgs = null;
+    t.mock.method(shopRepository, 'updateByBarberId', async (barberId, updateData) => {
+        updateArgs = { barberId, updateData };
+        return {
+            _id: 'shop-1',
+            barberId,
+            ...updateData,
+        };
+    });
+
+    let accountUpdate = null;
+    t.mock.method(notificationEvents, 'notifyAccountUpdated', async (payload) => {
+        accountUpdate = payload;
+    });
+
+    let statusUpdate = null;
+    t.mock.method(notificationEvents, 'notifyShopStatusUpdated', async (payload) => {
+        statusUpdate = payload;
+    });
+
+    const result = await shopService.updateBusinessInfo('owner-1', { isOpen: false }, {});
+
+    assert.deepEqual(updateArgs, {
+        barberId: 'barber-1',
+        updateData: { isOpen: false },
+    });
+    assert.deepEqual(accountUpdate, {
+        userId: 'owner-1',
+        updateType: 'shop_profile',
+    });
+    assert.deepEqual(statusUpdate, {
+        ownerId: 'owner-1',
+        shopId: 'shop-1',
+        isOpen: false,
+    });
+    assert.equal(result.shop.isOpen, false);
+    assert.deepEqual(result.updatedFields, ['isOpen']);
 });

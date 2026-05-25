@@ -7,13 +7,17 @@ const ensureRequiredEnv = () => {
         FIREBASE_PROJECT_ID: 'evercut-test',
         FIREBASE_CLIENT_EMAIL: 'firebase@example.com',
         FIREBASE_PRIVATE_KEY: '-----BEGIN PRIVATE KEY-----\\nabc\\n-----END PRIVATE KEY-----',
-        CLOUDINARY_CLOUD_NAME: 'evercut',
-        CLOUDINARY_API_KEY: 'cloudinary-key',
-        CLOUDINARY_API_SECRET: 'cloudinary-secret',
+        CF_ACCOUNT_ID: 'test-account',
+        R2_ACCESS_KEY_ID: 'test-access-key',
+        R2_SECRET_ACCESS_KEY: 'test-secret-key',
+        R2_BUCKET: 'evercut-media-test',
+        CDN_BASE_URL: 'https://media.evercut.test',
+        MEDIA_TOKEN_SECRET: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
         MSG91_AUTH_KEY: 'msg91-auth',
         MSG91_OTP_TEMPLATE_ID: 'msg91-template',
         JWT_ACCESS_SECRET: 'access-secret',
         JWT_REFRESH_SECRET: 'refresh-secret',
+        JWT_ONBOARDING_SECRET: 'onboarding-secret',
         PHONEPE_CLIENT_ID: 'phonepe-client',
         PHONEPE_CLIENT_SECRET: 'phonepe-secret',
         PHONEPE_CLIENT_VERSION: '1',
@@ -31,12 +35,18 @@ const ensureRequiredEnv = () => {
 
 ensureRequiredEnv();
 
+const config = (await import('../../config/index.js')).default;
 const bookingRepository = (await import('../../repositories/booking.repository.js')).default;
 const employeeRepository = (await import('../../repositories/employee.repository.js')).default;
 const shopRepository = (await import('../../repositories/shop.repository.js')).default;
 const customerRepository = (await import('../../repositories/customer.repository.js')).default;
 const serviceRepository = (await import('../../repositories/service.repository.js')).default;
+const paymentRepository = (await import('../../repositories/payment.repository.js')).default;
 const bookingService = await import('../booking.service.js');
+
+test.beforeEach((t) => {
+    t.mock.method(paymentRepository, 'countActiveWaiverReservations', async () => 0);
+});
 
 const getInWindowBookingDate = (daysFromNow = 1) => {
     const date = new Date();
@@ -49,7 +59,7 @@ const getInWindowBookingDate = (daysFromNow = 1) => {
 };
 
 test('getBookingsByShop loads bookings by shopId so deleted employees do not disappear from history', async (t) => {
-    t.mock.method(shopRepository, 'findByOwnerId', async () => ({ _id: 'shop-1' }));
+    t.mock.method(shopRepository, 'findByBarberUserId', async () => ({ _id: 'shop-1' }));
 
     let countFilter = null;
     t.mock.method(bookingRepository, 'countAll', async (filter) => {
@@ -88,8 +98,76 @@ test('getBookingsByShop loads bookings by shopId so deleted employees do not dis
     assert.equal(result.numberOfCustomers, 2);
 });
 
-test('getBookingMilestoneProgress returns the monthly completed-booking target state for the requested period', async (t) => {
-    t.mock.method(shopRepository, 'findByOwnerId', async () => ({ _id: 'shop-1' }));
+test('getCustomerBookings applies explicit status, payment, and date filters', async (t) => {
+    t.mock.method(customerRepository, 'findByUserId', async () => ({ _id: 'customer-1' }));
+
+    let countFilter = null;
+    t.mock.method(bookingRepository, 'countAll', async (filter) => {
+        countFilter = filter;
+        return 1;
+    });
+
+    let findArgs = null;
+    t.mock.method(bookingRepository, 'findByCustomer', async (customerId, filters, options) => {
+        findArgs = { customerId, filters, options };
+        return [{ _id: 'booking-1' }];
+    });
+
+    const result = await bookingService.getCustomerBookings('user-1', {
+        page: 1,
+        limit: 10,
+        status: ['confirmed', 'completed'],
+        paymentStatus: 'success',
+        dateFrom: '2026-05-01',
+        dateTo: '2026-05-31',
+    });
+
+    assert.deepEqual(countFilter, {
+        customerId: 'customer-1',
+        status: { $in: ['confirmed', 'completed'] },
+        paymentStatus: 'success',
+        date: {
+            $gte: new Date('2026-05-01T00:00:00.000Z'),
+            $lte: new Date('2026-05-31T23:59:59.999Z'),
+        },
+    });
+    assert.deepEqual(findArgs, {
+        customerId: 'customer-1',
+        filters: {
+            status: { $in: ['confirmed', 'completed'] },
+            paymentStatus: 'success',
+            date: {
+                $gte: new Date('2026-05-01T00:00:00.000Z'),
+                $lte: new Date('2026-05-31T23:59:59.999Z'),
+            },
+        },
+        options: { skip: 0, limit: 10 },
+    });
+    assert.equal(result.items[0].id, 'booking-1');
+});
+
+test('getBookingsByShop rejects employee filters outside the owned shop', async (t) => {
+    t.mock.method(shopRepository, 'findByBarberUserId', async () => ({ _id: 'shop-1' }));
+    t.mock.method(employeeRepository, 'findById', async () => ({
+        _id: 'employee-2',
+        shopId: 'shop-2',
+    }));
+
+    await assert.rejects(
+        () => bookingService.getBookingsByShop('owner-1', { employeeId: 'employee-2' }),
+        {
+            name: 'BadRequestError',
+            message: 'Employee does not belong to this shop',
+        },
+    );
+});
+
+test('getBookingAnalytics returns the monthly completed-booking target state for the requested period', async (t) => {
+    t.mock.method(shopRepository, 'findByBarberUserId', async () => ({ _id: 'shop-1' }));
+    t.mock.method(employeeRepository, 'findByShopId', async () => []);
+    t.mock.method(bookingRepository, 'countAll', async () => 0);
+    t.mock.method(bookingRepository, 'countByStatusForShop', async () => 0);
+    t.mock.method(bookingRepository, 'findByShopId', async () => []);
 
     let capturedArgs = null;
     t.mock.method(bookingRepository, 'countCompletedForShopInDateRange', async (shopId, startDate, endDate) => {
@@ -97,14 +175,14 @@ test('getBookingMilestoneProgress returns the monthly completed-booking target s
         return 500;
     });
 
-    const result = await bookingService.getBookingMilestoneProgress('owner-1', { month: 3, year: 2026 });
+    const result = await bookingService.getBookingAnalytics('owner-1', { month: 3, year: 2026 });
 
     assert.deepEqual(capturedArgs, {
         shopId: 'shop-1',
         startDate: new Date('2026-03-01T00:00:00.000Z'),
         endDate: new Date('2026-04-01T00:00:00.000Z'),
     });
-    assert.deepEqual(result, {
+    assert.deepEqual(result.milestones, {
         period: {
             month: 3,
             year: 2026,
@@ -152,24 +230,114 @@ test('getBookingMilestoneProgress returns the monthly completed-booking target s
     });
 });
 
-test('getBookingMilestoneProgress returns no next milestone once all visible targets are completed', async (t) => {
-    t.mock.method(shopRepository, 'findByOwnerId', async () => ({ _id: 'shop-1' }));
+test('getBookingAnalytics returns no next milestone once all visible targets are completed', async (t) => {
+    t.mock.method(shopRepository, 'findByBarberUserId', async () => ({ _id: 'shop-1' }));
+    t.mock.method(employeeRepository, 'findByShopId', async () => []);
+    t.mock.method(bookingRepository, 'countAll', async () => 0);
+    t.mock.method(bookingRepository, 'countByStatusForShop', async () => 0);
+    t.mock.method(bookingRepository, 'findByShopId', async () => []);
     t.mock.method(bookingRepository, 'countCompletedForShopInDateRange', async () => 1200);
 
-    const result = await bookingService.getBookingMilestoneProgress('owner-1', { month: 3, year: 2026 });
+    const result = await bookingService.getBookingAnalytics('owner-1', { month: 3, year: 2026 });
 
-    assert.equal(result.progress.value, 1000);
-    assert.equal(result.progress.percentage, 100);
-    assert.deepEqual(result.currentMilestone, {
+    assert.equal(result.milestones.progress.value, 1000);
+    assert.equal(result.milestones.progress.percentage, 100);
+    assert.deepEqual(result.milestones.currentMilestone, {
         targetBookings: 1000,
         label: '3rd target',
         statusText: '3rd target completed',
     });
-    assert.equal(result.nextMilestone, null);
+    assert.equal(result.milestones.nextMilestone, null);
+});
+
+test('getBookingAnalytics returns summary, milestones, today pulse, and both queue buckets', async (t) => {
+    t.mock.timers.enable({
+        apis: ['Date'],
+        now: new Date('2026-03-15T12:00:00.000Z'),
+    });
+
+    t.mock.method(shopRepository, 'findByBarberUserId', async () => ({
+        _id: 'shop-1',
+        openTime: '09:00',
+        closeTime: '10:00',
+        breakTimes: [],
+    }));
+
+    t.mock.method(employeeRepository, 'findByShopId', async () => ([
+        {
+            _id: 'employee-1',
+            isActive: true,
+            deletedAt: null,
+            workingHours: { start: '09:00', end: '10:00' },
+            blockedDates: [],
+        },
+    ]));
+
+    t.mock.method(bookingRepository, 'countAll', async () => 12);
+    t.mock.method(bookingRepository, 'countByStatusForShop', async (_shopId, status) => ({
+        pending: 2,
+        awaiting_confirmation: 3,
+        completed: 4,
+        cancelled: 1,
+    }[status] || 0));
+    t.mock.method(bookingRepository, 'countCompletedForShopInDateRange', async () => 500);
+    t.mock.method(bookingRepository, 'findByShopId', async (_shopId, filters) => {
+        if (filters.status?.$nin) {
+            return [
+                {
+                    _id: 'active-booking',
+                    customerId: { firstName: 'Active', lastName: 'Customer' },
+                    employeeId: { firstName: 'Active', lastName: 'Barber' },
+                    serviceIds: [{ serviceName: 'Haircut' }],
+                    date: new Date(),
+                    time: '00:00',
+                    status: 'confirmed',
+                },
+                {
+                    _id: 'upcoming-booking',
+                    customerId: { firstName: 'Upcoming', lastName: 'Customer' },
+                    employeeId: { firstName: 'Upcoming', lastName: 'Barber' },
+                    serviceIds: [{ serviceName: 'Shave' }],
+                    date: new Date(),
+                    time: '23:59',
+                    status: 'confirmed',
+                },
+            ];
+        }
+
+        return [
+            {
+                _id: 'today-booking',
+                status: 'confirmed',
+                startMinute: 540,
+                endMinute: 570,
+                durationMinutes: 30,
+            },
+        ];
+    });
+
+    const result = await bookingService.getBookingAnalytics('owner-1', { month: 3, year: 2026 });
+
+    assert.deepEqual(result.summary, {
+        total: 12,
+        pending: 2,
+        awaitingConfirmation: 3,
+        completed: 4,
+        cancelled: 1,
+    });
+    assert.equal(result.milestones.period.label, 'March 2026');
+    assert.equal(result.today.occupancy.unit, 'minutes');
+    assert.equal(result.queue.active.count, 1);
+    assert.equal(result.queue.upcoming.count, 1);
+    assert.equal(result.queue.active.items[0].id, 'active-booking');
+    assert.equal(result.queue.upcoming.items[0].id, 'upcoming-booking');
 });
 
 test('createBooking creates a pending booking that requires payment before confirmation', async (t) => {
-    t.mock.method(customerRepository, 'findByUserId', async () => ({ _id: 'customer-1' }));
+    t.mock.method(customerRepository, 'findByUserId', async () => ({
+        _id: 'customer-1',
+        feeWaiverBookingsUsed: config.payment.feeWaiverQuota,
+    }));
 
     t.mock.method(shopRepository, 'findByIdWithFields', async () => ({
         _id: 'shop-1',
@@ -270,6 +438,12 @@ test('createBooking creates a pending booking that requires payment before confi
     assert.equal(createdBookingPayload.startMinute, 600);
     assert.equal(createdBookingPayload.endMinute, 630);
     assert.equal(createdBookingPayload.totalAmount, 120);
+    assert.equal(Object.hasOwn(createdBookingPayload, 'bookingAmount'), false);
+    assert.equal(Object.hasOwn(createdBookingPayload, 'platformFee'), false);
+    assert.equal(Object.hasOwn(createdBookingPayload, 'standardPlatformFee'), false);
+    assert.equal(Object.hasOwn(createdBookingPayload, 'totalCharged'), false);
+    assert.equal(Object.hasOwn(createdBookingPayload, 'waiverApplied'), false);
+    assert.equal(Object.hasOwn(createdBookingPayload, 'bookingFeeType'), false);
     assert.equal(createdBookingPayload.durationMinutes, 30);
     assert.deepEqual(createdBookingPayload.slotLockTimes, ['10:00']);
     assert.equal(createdBookingPayload.status, 'pending');
@@ -279,6 +453,65 @@ test('createBooking creates a pending booking that requires payment before confi
     assert.equal(result.paymentRequired, true);
     assert.equal(result.paymentStatus, 'pending');
     assert.equal(result.payoutStatus, 'not_initiated');
+    assert.equal(result.serviceAmount, 120);
+    assert.equal(result.platformFee, config.payment.platformFeeSingle);
+    assert.equal(result.totalAmount, 120 + config.payment.platformFeeSingle);
+    assert.equal(Object.hasOwn(result, 'bookingAmount'), false);
+    assert.equal(Object.hasOwn(result, 'totalCharged'), false);
+    assert.equal(Object.hasOwn(result, 'waiverApplied'), false);
+});
+
+test('createBooking returns payable total including platform fee without persisting fee snapshots', async (t) => {
+    const serviceAmount = 199;
+    const platformFee = config.payment.platformFeeSingle;
+
+    t.mock.method(customerRepository, 'findByUserId', async () => ({
+        _id: 'customer-1',
+        feeWaiverBookingsUsed: config.payment.feeWaiverQuota,
+    }));
+
+    t.mock.method(shopRepository, 'findByIdWithFields', async () => ({
+        _id: 'shop-1',
+        isOpen: true,
+        openTime: '09:00',
+        closeTime: '21:00',
+        availableDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
+        breakTimes: [],
+    }));
+
+    t.mock.method(serviceRepository, 'findByIds', async () => ([{
+        _id: 'service-1',
+        shopId: 'shop-1',
+        finalPrice: serviceAmount,
+        serviceType: 'single',
+        duration: 30,
+    }]));
+
+    t.mock.method(employeeRepository, 'findByIdLean', async () => ({
+        _id: 'employee-1',
+        shopId: 'shop-1',
+        isActive: true,
+        workingHours: { start: '09:00', end: '21:00' },
+        blockedDates: [],
+    }));
+
+    t.mock.method(employeeRepository, 'claimTimeRange', async (employeeId) => ({ _id: employeeId }));
+    t.mock.method(bookingRepository, 'create', async (payload) => ({
+        _id: 'booking-1',
+        ...payload,
+    }));
+
+    const result = await bookingService.createBooking('user-1', {
+        shopId: 'shop-1',
+        employeeId: 'employee-1',
+        serviceIds: ['service-1'],
+        date: getInWindowBookingDate(),
+        time: '10:00 AM',
+    });
+
+    assert.equal(result.serviceAmount, serviceAmount);
+    assert.equal(result.platformFee, platformFee);
+    assert.equal(result.totalAmount, serviceAmount + platformFee);
 });
 
 test('createBooking claims every slot marker covered by the selected service duration', async (t) => {
@@ -566,7 +799,8 @@ test('updateBookingSchedule rejects paid bookings before releasing the existing 
     assert.equal(releaseMock.mock.calls.length, 0);
 });
 
-test('createBooking rejects bundle bookings below the documented minimum service amount', async (t) => {
+test('createBooking rejects bundle bookings below the platform-fee minimum service amount', async (t) => {
+    const bundleMinimum = config.payment.minBundleServiceAmount;
     t.mock.method(customerRepository, 'findByUserId', async () => ({ _id: 'customer-1' }));
 
     t.mock.method(shopRepository, 'findByIdWithFields', async () => ({
@@ -581,8 +815,8 @@ test('createBooking rejects bundle bookings below the documented minimum service
         {
             _id: 'bundle-1',
             shopId: 'shop-1',
-            finalPrice: 250,
-            totalPrice: 250,
+            finalPrice: bundleMinimum - 1,
+            totalPrice: bundleMinimum - 1,
             serviceType: 'bundled',
             totalDuration: 90,
         },
@@ -605,7 +839,52 @@ test('createBooking rejects bundle bookings below the documented minimum service
             date: getInWindowBookingDate(),
             time: '10:00 AM',
         }),
-        /at least ₹300/,
+        new RegExp(`Minimum bundle booking amount is .${bundleMinimum}`),
+    );
+});
+
+test('createBooking rejects single service bookings below the platform-fee minimum service amount', async (t) => {
+    const singleMinimum = config.payment.minSingleServiceAmount;
+    t.mock.method(customerRepository, 'findByUserId', async () => ({ _id: 'customer-1' }));
+
+    t.mock.method(shopRepository, 'findByIdWithFields', async () => ({
+        _id: 'shop-1',
+        isOpen: true,
+        openTime: '09:00',
+        closeTime: '21:00',
+        availableDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'],
+    }));
+
+    t.mock.method(serviceRepository, 'findByIds', async () => ([
+        {
+            _id: 'single-1',
+            shopId: 'shop-1',
+            finalPrice: singleMinimum - 1,
+            actualPrice: singleMinimum - 1,
+            offerPrice: 0,
+            serviceType: 'single',
+            duration: 30,
+        },
+    ]));
+
+    t.mock.method(employeeRepository, 'claimSlot', async () => ({
+        _id: 'employee-1',
+    }));
+
+    t.mock.method(bookingRepository, 'create', async (payload) => ({
+        _id: 'booking-3',
+        ...payload,
+    }));
+
+    await assert.rejects(
+        bookingService.createBooking('user-1', {
+            shopId: 'shop-1',
+            employeeId: 'employee-1',
+            serviceIds: ['single-1'],
+            date: getInWindowBookingDate(),
+            time: '10:00 AM',
+        }),
+        new RegExp(`Minimum single service booking amount is .${singleMinimum}`),
     );
 });
 
@@ -647,7 +926,7 @@ test('updateBookingStatus returns a customer-friendly manual-refund message when
 });
 
 test('updateBookingStatus releases the exact booking range when a booking is completed', async (t) => {
-    t.mock.method(shopRepository, 'findByOwnerId', async () => ({ _id: 'shop-1' }));
+    t.mock.method(shopRepository, 'findByBarberUserId', async () => ({ _id: 'shop-1' }));
     t.mock.method(bookingRepository, 'findById', async () => ({
         _id: 'booking-1',
         shopId: 'shop-1',

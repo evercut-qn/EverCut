@@ -1,12 +1,15 @@
 import customerRepository from '../repositories/customer.repository.js';
-import photoRepository from '../repositories/photo.repository.js';
 import shopRepository from '../repositories/shop.repository.js';
+import barberRepository from '../repositories/barber.repository.js';
 import userRepository from '../repositories/user.repository.js';
+import subscriptionRepository from '../repositories/subscription.repository.js';
 import { serializeBarberProfile } from '../utils/barber-profile.utils.js';
 import {
     ALL_SERVICE_FOR,
     ALL_SHOP_AMENITIES,
     DAYS_OF_WEEK,
+    MEDIA_ENTITY_TYPE,
+    MEDIA_PURPOSE,
     ROLES,
 } from '../utils/constants.js';
 import { BadRequestError, ConflictError } from '../utils/api-error.js';
@@ -14,8 +17,8 @@ import { normalizeShopSchedule } from '../utils/shop-schedule.utils.js';
 import * as authService from './auth.service.js';
 import { hashPin, validatePinCreation } from './pin.service.js';
 import { serializeCustomerProfile } from '../serializers/customer.serializer.js';
-import { serializePhotos } from '../serializers/photo.serializer.js';
 import { serializeUser } from '../serializers/user.serializer.js';
+import * as mediaService from './media/media.service.js';
 
 /**
  * Onboarding service - handles first-time user and barber profile creation.
@@ -110,22 +113,14 @@ const parseBreakTimes = (value) => {
     });
 };
 
-const extractShopImages = (files) => {
-    if (!files) return [];
-    if (Array.isArray(files)) return files;
-
-    return files.photos || [];
-};
 
 const normalizeBarberOnboardingInput = (authUser, shopData) => {
     const firstName = String(shopData.firstName || '').trim();
     const lastName = String(shopData.lastName || '').trim();
-    const ownerNameFromNameParts = `${firstName} ${lastName}`.trim();
-    const ownerName = ownerNameFromNameParts;
 
     const email = String(shopData.email || authUser?.email || '').trim().toLowerCase();
     const phoneNumber = String(authUser?.phoneNumber || '').trim();
-    const category = shopData.category;
+    const category = String(shopData.category || '').trim();
     const address = String(shopData.address || '').trim();
     const upiId = String(shopData.upiId || '').trim();
 
@@ -159,17 +154,15 @@ const normalizeBarberOnboardingInput = (authUser, shopData) => {
 
     const breakTimes = parseBreakTimes(shopData.breakTimes ?? []);
 
-    const targetCustomersRaw = String(shopData.targetCustomers || '').trim().toLowerCase();
-    const targetCustomers = {
-        men: 'male',
-        women: 'female',
-    }[targetCustomersRaw] || targetCustomersRaw;
+    const targetCustomers = String(shopData.targetCustomers || '').trim();
     if (!ALL_SERVICE_FOR.includes(targetCustomers)) {
         throw new BadRequestError(`targetCustomers must be one of: ${ALL_SERVICE_FOR.join(', ')}`);
     }
 
     const accountHolderName = String(shopData.accountHolderName || '').trim();
     const bankName = String(shopData.bankName || '').trim();
+    const bankAccount = String(shopData.bankAccount || '').trim();
+    const ifsc = String(shopData.ifsc || '').trim().toUpperCase();
     const location = normalizeLocation(shopData.location);
 
     if (!firstName || !lastName) {
@@ -199,11 +192,11 @@ const normalizeBarberOnboardingInput = (authUser, shopData) => {
     if (!openTime || !closeTime) {
         throw new BadRequestError('openTime and closeTime are required');
     }
-    if (!upiId) {
-        throw new BadRequestError('upiId is required');
-    }
     if (!accountHolderName || !bankName) {
         throw new BadRequestError('accountHolderName and bankName are required');
+    }
+    if (!bankAccount || !ifsc) {
+        throw new BadRequestError('bankAccount and ifsc are required');
     }
 
     const normalizedSchedule = normalizeShopSchedule({ openTime, closeTime, breakTimes });
@@ -216,7 +209,6 @@ const normalizeBarberOnboardingInput = (authUser, shopData) => {
         lastName,
         gender: shopData.gender,
         dateOfBirth: shopData.dateOfBirth,
-        ownerName,
         shopName: String(shopData.shopName || '').trim(),
         category,
         targetCustomers,
@@ -224,6 +216,8 @@ const normalizeBarberOnboardingInput = (authUser, shopData) => {
         email,
         accountHolderName,
         bankName,
+        bankAccount,
+        ifsc,
         upiId,
         bio: shopData.bio || '',
         address,
@@ -258,14 +252,12 @@ const ensureUniqueUserIdentity = async ({ email, phoneNumber }) => {
     }
 };
 
-export const createCustomerOnboarding = async (phoneNumber, profileData, file) => {
+export const createCustomerOnboarding = async (phoneNumber, profileData) => {
     const verifiedPhoneNumber = normalizeVerifiedPhoneNumber(phoneNumber);
     if (!verifiedPhoneNumber) {
         throw new BadRequestError('Verified phone number is required');
     }
-    if (!file) {
-        throw new BadRequestError('Profile photo is required');
-    }
+    const media = await mediaService.resolveReadyMediaById(profileData.photoMediaId);
 
     await ensureUniqueUserIdentity({
         email: profileData.email,
@@ -287,9 +279,10 @@ export const createCustomerOnboarding = async (phoneNumber, profileData, file) =
         dateOfBirth: profileData.dateOfBirth,
         address: profileData.address,
         location,
-        photoUrl: file.path,
-        cloudinaryId: file.filename || file.public_id,
+        photoR2Key: media.r2Key,
     });
+
+    await mediaService.linkMediaToEntity(profileData.photoMediaId, profile._id, MEDIA_ENTITY_TYPE.CUSTOMER, MEDIA_PURPOSE.AVATAR);
 
     const tokens = await issueAuthenticationTokens(user);
 
@@ -300,7 +293,7 @@ export const createCustomerOnboarding = async (phoneNumber, profileData, file) =
     };
 };
 
-export const createBarberOnboarding = async (phoneNumber, shopData, files) => {
+export const createBarberOnboarding = async (phoneNumber, shopData) => {
     const verifiedPhoneNumber = normalizeVerifiedPhoneNumber(phoneNumber);
     if (!verifiedPhoneNumber) {
         throw new BadRequestError('Verified phone number is required');
@@ -314,10 +307,7 @@ export const createBarberOnboarding = async (phoneNumber, shopData, files) => {
         phoneNumber: normalized.phoneNumber,
     });
 
-    const onboardingImages = extractShopImages(files);
-    if (onboardingImages.length !== 3) {
-        throw new BadRequestError('Please upload exactly 3 shop images for onboarding');
-    }
+    const media = await mediaService.resolveReadyMediaById(shopData.photoMediaId);
 
     const pinResult = validatePinCreation(normalized.pin, normalized.confirmPin);
     if (!pinResult.isValid) {
@@ -326,80 +316,54 @@ export const createBarberOnboarding = async (phoneNumber, shopData, files) => {
 
     const pinHash = await hashPin(normalized.pin);
 
-    const coverImage = onboardingImages[0];
-    const coverUrl = coverImage.path;
-    const coverCloudinaryId = coverImage.public_id || coverImage.filename;
-
-    // Prepare payout config if bank details are provided
-    const payoutConfig = {};
-    if (shopData.bankAccount && shopData.ifsc) {
-        payoutConfig.bankAccount = String(shopData.bankAccount).trim();
-        payoutConfig.ifsc = String(shopData.ifsc).trim().toUpperCase();
-        payoutConfig.verificationStatus = 'pending';
-    }
-
     const user = await userRepository.create({
         phoneNumber: normalized.phoneNumber,
         email: normalized.email,
         roleType: ROLES.BARBER,
     });
 
-    const shopCreateData = {
-        ownerId: user._id,
-        shopName: normalized.shopName,
-        ownerName: normalized.ownerName,
-        ownerFirstName: normalized.firstName,
-        ownerLastName: normalized.lastName,
-        ownerGender: normalized.gender,
-        ownerDateOfBirth: normalized.dateOfBirth,
-        category: normalized.category,
-        targetCustomers: normalized.targetCustomers,
+    const barber = await barberRepository.create({
+        userId: user._id,
+        firstName: normalized.firstName,
+        lastName: normalized.lastName,
+        gender: normalized.gender,
+        dateOfBirth: normalized.dateOfBirth,
+        yearsOfExperience: normalized.yearsOfExperience,
         accountHolderName: normalized.accountHolderName,
         bankName: normalized.bankName,
-        upiId: normalized.upiId,
+        bankAccount: normalized.bankAccount,
+        ifsc: normalized.ifsc,
+        upiId: normalized.upiId || null,
+        payoutConfig: { verificationStatus: 'pending' },
+        pinHash,
+    });
+
+    const shopCreateData = {
+        barberId: barber._id,
+        shopName: normalized.shopName,
+        category: normalized.category,
+        targetCustomers: normalized.targetCustomers,
         bio: normalized.bio,
         address: normalized.address,
         location: normalized.location,
         numberOfEmployees: normalized.numberOfEmployees,
-        yearsOfExperience: normalized.yearsOfExperience,
         facilities: normalized.facilities,
         availableDays: normalized.availableDays,
         openTime: normalized.openTime,
         closeTime: normalized.closeTime,
         breakTimes: normalized.breakTimes,
-        coverUrl,
-        coverCloudinaryId,
-        pinHash,
+        coverR2Key: media.r2Key,
     };
 
-    // Only add payoutConfig if bank details were provided
-    if (Object.keys(payoutConfig).length > 0) {
-        shopCreateData.payoutConfig = payoutConfig;
-    }
-
     const createdShop = await shopRepository.create(shopCreateData);
-
-    const photos = [];
-    for (const [index, file] of onboardingImages.entries()) {
-        const photo = await photoRepository.create({
-            shopId: createdShop._id,
-            photoUrl: file.path,
-            cloudinaryId: file.public_id || file.filename,
-            photoName: file.originalname || `onboarding-shop-image-${index + 1}`,
-            photoType: 'shop_interior',
-            description: 'Uploaded during onboarding',
-            fileSize: file.size,
-            mimeType: file.mimetype,
-        });
-        photos.push(photo);
-    }
+    await mediaService.linkMediaToEntity(shopData.photoMediaId, createdShop._id, MEDIA_ENTITY_TYPE.SHOP, MEDIA_PURPOSE.COVER);
+    await subscriptionRepository.upsertDefaultForBarber(barber._id, 'ONBOARDING');
 
     const tokens = await issueAuthenticationTokens(user);
 
     return {
         user: serializeUser(user),
-        shop: serializeBarberProfile(createdShop, user, { photos }),
-        photos: serializePhotos(photos),
+        shop: serializeBarberProfile({ barber, shop: createdShop, user }),
         tokens,
     };
 };

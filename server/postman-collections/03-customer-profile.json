@@ -90,39 +90,23 @@
     {
       "name": "2. Update Profile",
       "request": {
-        "method": "PUT",
-        "header": [],
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
         "url": "{{base_url}}/{{api_prefix}}/customers/me",
-        "description": "Updates the customer data and reuses the sample image as an optional replacement photo. NOTE: Email updates must use PUT /account/email endpoint.",
+        "description": "Updates customer data. To replace the profile photo, include a confirmed R2 photoMediaId from the media upload flow. NOTE: Email updates must use PATCH /account/email endpoint.",
         "body": {
-          "mode": "formdata",
-          "formdata": [
-            {
-              "key": "firstName",
-              "value": "Test",
-              "type": "text"
-            },
-            {
-              "key": "lastName",
-              "value": "Customer",
-              "type": "text"
-            },
-            {
-              "key": "address",
-              "value": "Church Street, Bengaluru, India",
-              "type": "text"
-            },
-            {
-              "key": "location",
-              "value": "{\"type\":\"Point\",\"coordinates\":[77.5946,12.9716]}",
-              "type": "text"
-            },
-            {
-              "key": "photo",
-              "type": "file",
-              "description": "Attach replacement photo file manually in Postman (optional)"
+          "mode": "raw",
+          "raw": "{\n  \"firstName\": \"Test\",\n  \"lastName\": \"Customer\",\n  \"address\": \"Church Street, Bengaluru, India\",\n  \"location\": {\"type\":\"Point\",\"coordinates\":[77.5946,12.9716]},\n  \"photoMediaId\": \"{{shared_media_id}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
             }
-          ]
+          }
         }
       },
       "event": [
@@ -152,11 +136,93 @@
       ]
     },
     {
-      "name": "3. Get Services By Gender And Capture IDs",
+      "name": "3. Update Profile Picture",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/{{api_prefix}}/customers/me/media/picture",
+        "description": "Replaces the customer profile picture with a confirmed R2 media object.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"mediaId\": \"{{shared_media_id}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
+              "});",
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Remove Profile Picture",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": "{{base_url}}/{{api_prefix}}/customers/me/media/picture",
+        "description": "Removes the customer profile picture and deletes the associated R2 object."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('response uses the standard envelope', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response).to.be.an('object');",
+              "  pm.expect(response).to.have.property('success');",
+              "  pm.expect(response.success).to.be.a('boolean');",
+              "  pm.expect(response).to.have.property('message');",
+              "  pm.expect(response.message).to.be.a('string');",
+              "  pm.expect(response).to.have.property('data');",
+              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "  const responseText = JSON.stringify(response);",
+              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "  });",
+              "});",
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Get Services By Gender And Capture IDs",
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/shops/services?gender=male&coordinates={{coordinates}}",
+        "url": "{{base_url}}/{{api_prefix}}/shops/services?gender=men&coordinates={{coordinates}}",
         "description": "Uses the shared Bengaluru coordinates so the response includes the barber shop created by onboarding. The script captures the first nearby Postman shop and service IDs."
       },
       "event": [

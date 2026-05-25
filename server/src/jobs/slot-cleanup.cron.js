@@ -1,7 +1,7 @@
+import config from '../config/index.js';
 import employeeRepository from '../repositories/employee.repository.js';
 import logger from '../utils/logger.js';
 
-const CLEANUP_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 hours
 let intervalId = null;
 
 const getTodayDateString = () => new Date().toISOString().slice(0, 10);
@@ -19,9 +19,11 @@ export const cleanupPastSlotLocks = async (cutoffDate = getTodayDateString()) =>
 export const startSlotCleanupJob = () => {
     if (intervalId) return;
 
+    const cleanupIntervalMs = config.slotCleanup.intervalMs;
+
     logger.info('[SlotCleanupJob] Starting slot cleanup job', {
-        intervalMs: CLEANUP_INTERVAL_MS,
-        intervalHours: CLEANUP_INTERVAL_MS / 3_600_000,
+        intervalMs: cleanupIntervalMs,
+        intervalHours: cleanupIntervalMs / 3_600_000,
     });
 
     cleanupPastSlotLocks().catch((error) => {
@@ -34,7 +36,7 @@ export const startSlotCleanupJob = () => {
         } catch (error) {
             logger.error('[SlotCleanupJob] Job cycle failed', { error: error.message });
         }
-    }, CLEANUP_INTERVAL_MS);
+    }, cleanupIntervalMs);
 };
 
 export const stopSlotCleanupJob = () => {

@@ -119,7 +119,7 @@
         "description": "Creates a single service using only fields that the API validator accepts.",
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"serviceName\": \"{{single_service_name}}\",\n  \"serviceType\": \"single\",\n  \"serviceFor\": \"male\",\n  \"duration\": 30,\n  \"actualPrice\": 500,\n  \"offerPrice\": 50\n}",
+          "raw": "{\n  \"serviceName\": \"{{single_service_name}}\",\n  \"serviceType\": \"single\",\n  \"serviceFor\": \"men\",\n  \"duration\": 30,\n  \"actualPrice\": 500,\n  \"offerPrice\": 50\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -179,7 +179,7 @@
         "description": "Creates a bundled service using the fields required by the backend validator.",
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"serviceName\": \"{{bundled_service_name}}\",\n  \"serviceType\": \"bundled\",\n  \"serviceFor\": \"male\",\n  \"actualPrice\": 900,\n  \"offerPrice\": 100,\n  \"bundledServices\": [\"Haircut\", \"Beard Trim\", \"Head Massage\"],\n  \"totalDuration\": 75\n}",
+          "raw": "{\n  \"serviceName\": \"{{bundled_service_name}}\",\n  \"serviceType\": \"bundled\",\n  \"serviceFor\": \"men\",\n  \"actualPrice\": 900,\n  \"offerPrice\": 100,\n  \"bundledServices\": [\"Haircut\", \"Beard Trim\", \"Head Massage\"],\n  \"totalDuration\": 75\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -225,7 +225,7 @@
     {
       "name": "4. Update Service",
       "request": {
-        "method": "PUT",
+        "method": "PATCH",
         "header": [
           {
             "key": "Content-Type",

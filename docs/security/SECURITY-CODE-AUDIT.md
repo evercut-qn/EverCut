@@ -174,7 +174,7 @@ export const updateBookingStatus = async (req, res, next) => {
 **Remediation:**
 ```javascript
 export const updateBookingStatus = async (bookingId, status, ownerId) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
+    const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop');
     const booking = await bookingRepository.findById(bookingId);
     if (!booking || booking.shopId.toString() !== shop._id.toString()) {
@@ -262,7 +262,7 @@ const employee = await employeeRepository.claimSlot(employeeId, date, time);
 
 > **Status:** ✅ Resolved  
 > **Fixed on:** March 17, 2026  
-> **Fix:** Already resolved as part of Issue 3.3. The `deleteBookingAfterPayment` function now verifies that the requesting barber owns the shop the booking belongs to before proceeding, using `shopRepository.findByOwnerId()` and a `ForbiddenError` guard.
+> **Fix:** Already resolved as part of Issue 3.3. The `deleteBookingAfterPayment` function now verifies that the requesting barber owns the shop the booking belongs to before proceeding, using `shopRepository.findByBarberUserId()` and a `ForbiddenError` guard.
 
 **File:** `src/services/booking.service.js` — Lines 356–364
 

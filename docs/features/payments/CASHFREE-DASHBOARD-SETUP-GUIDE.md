@@ -110,7 +110,7 @@ After the webhook endpoint is created:
 
 Switch to **Production** mode and repeat Step 5 with your live domain:
 ```
-https://api.evercut.com/webhooks/cashfree
+https://api.evercut.in/webhooks/cashfree
 ```
 Collect the Production Webhook Secret Key separately and store it in your production `.env`.
 
@@ -180,8 +180,8 @@ CASHFREE_PLAN_ID_YEARLY=<Plan ID if you created a yearly plan>
 CASHFREE_BASE_URL=https://sandbox.cashfree.com/pg
 
 # ─── App URLs ───────────────────────────────────────────────────
-APP_BASE_URL=https://api.evercut.com
-SUBSCRIPTION_RETURN_URL=https://app.evercut.com/subscription/callback
+APP_BASE_URL=https://api.evercut.in
+SUBSCRIPTION_RETURN_URL=https://app.evercut.in/subscription/callback
 ```
 
 When deploying to Production, replace the Sandbox values with the Production values from Steps 4 and 7, and change `CASHFREE_BASE_URL` to:

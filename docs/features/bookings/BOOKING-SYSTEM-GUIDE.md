@@ -148,12 +148,11 @@ Frontend clients should show an informational warning when `employee.isAvailable
 | Method | Endpoint | Auth | Purpose |
 |--------|----------|------|---------|
 | POST | `/api/v1/bookings` | CUSTOMER | Create booking |
-| GET | `/api/v1/bookings` | CUSTOMER | List bookings (supports: timeframe, favorite, status, paymentStatus) |
+| GET | `/api/v1/bookings` | CUSTOMER | List bookings (supports: date range, favorite, status, paymentStatus) |
 | GET | `/api/v1/bookings/:id` | CUSTOMER | Get booking details |
 | PATCH | `/api/v1/bookings/:id` | CUSTOMER | Update schedule or cancel with `status=cancelled` |
 | POST | `/api/v1/bookings` | CUSTOMER | Reorder from `sourceBookingId` |
-| PUT | `/api/v1/bookings/:id/favorite` | CUSTOMER | Add favorite |
-| DELETE | `/api/v1/bookings/:id/favorite` | CUSTOMER | Remove favorite |
+| PATCH | `/api/v1/bookings/:id/favorite` | CUSTOMER | Set favorite state with `{ "favorite": true/false }` |
 
 ### Booking Management (Barber)
 
@@ -162,10 +161,7 @@ Frontend clients should show an informational warning when `employee.isAvailable
 | GET | `/api/v1/bookings` | BARBER | List all bookings (supports: employeeId, dateFrom, dateTo, status, paymentStatus) |
 | GET | `/api/v1/bookings?status=awaiting_confirmation&paymentStatus=success` | BARBER | List pending confirmations |
 | GET | `/api/v1/bookings?employeeId=X&dateFrom=Y&dateTo=Z` | BARBER | Filter by employee and date range |
-| GET | `/api/v1/bookings/analytics/summary` | BARBER | Get statistics |
-| GET | `/api/v1/bookings/analytics/milestones` | BARBER | Get milestone progress |
-| GET | `/api/v1/bookings/analytics/today` | BARBER | Get today's dashboard summary |
-| GET | `/api/v1/bookings/analytics/queue` | BARBER | Get today's queue |
+| GET | `/api/v1/bookings/analytics` | BARBER | Get summary, milestone, today pulse, and queue analytics |
 | PATCH | `/api/v1/bookings/:id` | BARBER | Confirm, complete, no-show, or cancel |
 
 ### Payment & Refunds
@@ -407,7 +403,9 @@ Content-Type: application/json
   "endMinute": 630,
   "durationMinutes": 30,
   "slotLockTimes": ["10:00"],
-  "totalAmount": 300
+  "serviceAmount": 300,
+  "platformFee": 4,
+  "totalAmount": 304
 }
 ```
 
@@ -443,8 +441,8 @@ Content-Type: application/json
     "orderId": "OMO123456789",
     "token": "eyJhbGci...",
     "merchantId": "MERCHANT_ID",
-    "amountInPaisa": 30300,
-    "amountInRupees": 303,
+    "amountInPaisa": 30400,
+    "amountInRupees": 304,
     "state": "PENDING",
     "expiresAt": 1234567890000,
     "gateway": "phonepe",
@@ -570,7 +568,8 @@ The `GET /api/v1/bookings` endpoint provides role-specific filtering capabilitie
 
 | Parameter | Type | Values | Description |
 |-----------|------|--------|-------------|
-| `timeframe` | string | `past`, `upcoming` | Filter by time relative to today |
+| `dateFrom` | string | YYYY-MM-DD | Start date, inclusive |
+| `dateTo` | string | YYYY-MM-DD | End date, inclusive |
 | `favorite` | boolean | `true`, `false` | Show only favorite bookings |
 | `status` | string | See status values below | Filter by booking status |
 | `paymentStatus` | string | See payment status values below | Filter by payment status |
@@ -580,12 +579,12 @@ The `GET /api/v1/bookings` endpoint provides role-specific filtering capabilitie
 **Example Requests:**
 
 ```http
-# Get upcoming bookings
-GET /api/v1/bookings?timeframe=upcoming
+# Get bookings from a date onward
+GET /api/v1/bookings?dateFrom=2026-05-07
 Authorization: Bearer <customer_token>
 
-# Get past confirmed bookings
-GET /api/v1/bookings?timeframe=past&status=confirmed
+# Get completed bookings before a date
+GET /api/v1/bookings?dateTo=2026-05-07&status=completed
 Authorization: Bearer <customer_token>
 
 # Get favorite bookings
@@ -632,7 +631,9 @@ Authorization: Bearer <customer_token>
         "time": "10:00",
         "endTime": "11:00",
         "durationMinutes": 60,
-        "totalAmount": 303,
+        "serviceAmount": 303,
+        "platformFee": 10,
+        "totalAmount": 313,
         "status": "confirmed",
         "paymentStatus": "success",
         "createdAt": "2026-05-01T08:30:00Z"
@@ -719,7 +720,9 @@ Authorization: Bearer <barber_token>
         "time": "10:00",
         "endTime": "10:30",
         "durationMinutes": 30,
-        "totalAmount": 250,
+        "serviceAmount": 250,
+        "platformFee": 4,
+        "totalAmount": 254,
         "status": "confirmed",
         "paymentStatus": "success",
         "payoutStatus": "not_initiated",
@@ -767,27 +770,25 @@ Authorization: Bearer <barber_token>
 
 **Customer Restrictions:**
 ```json
-// ❌ Customers cannot use barber-only filters
+// Customers cannot use barber-only filters
 GET /api/v1/bookings?employeeId=X
-GET /api/v1/bookings?dateFrom=2026-05-01
 
 // Response: 403 Forbidden
 {
   "success": false,
-  "message": "Employee and date range filters are only available for barbers"
+  "message": "Employee filters are only available for barbers"
 }
 ```
 
 **Barber Restrictions:**
 ```json
-// ❌ Barbers cannot use customer-only filters
-GET /api/v1/bookings?timeframe=upcoming
+// Barbers cannot use customer-only filters
 GET /api/v1/bookings?favorite=true
 
 // Response: 403 Forbidden
 {
   "success": false,
-  "message": "Timeframe and favorite filters are only available for customers"
+  "message": "Favorite filters are only available for customers"
 }
 ```
 
@@ -829,12 +830,12 @@ GET /api/v1/bookings?dateFrom=05-01-2026
 
 1. **View Upcoming Appointments**
    ```http
-   GET /api/v1/bookings?timeframe=upcoming&status=confirmed
+   GET /api/v1/bookings?dateFrom=2026-05-07&status=confirmed
    ```
 
 2. **Check Booking History**
    ```http
-   GET /api/v1/bookings?timeframe=past&page=1&limit=20
+   GET /api/v1/bookings?dateTo=2026-05-07&page=1&limit=20
    ```
 
 3. **Find Favorite Bookings to Reorder**
@@ -895,25 +896,25 @@ Customer pays cancellation fee. Covers platform costs and discourages frivolous 
 
 **Refund Calculation:**
 ```
-Service Amount: ₹300
-Platform Fee: ₹3
-Refund Fee: ₹7
-Total Paid: ₹303
+Service Amount: ₹299
+Platform Fee: ₹10
+Refund Fee: ₹15
+Total Paid: ₹309
 
 Refund = Service Amount - Refund Fee
-Refund = ₹300 - ₹7 = ₹293
+Refund = ₹299 - ₹15 = ₹284
 
-Customer Receives: ₹293
-Platform Keeps: ₹10 (₹3 platform fee + ₹7 refund fee)
+Customer Receives: ₹284
+Platform Keeps: ₹25 (₹10 platform fee + ₹15 refund fee)
 ```
 
 ### Rule 6: Full Refund on Auto-Cancel
 ```
-Total Paid: ₹303
-Refund: ₹303 (full amount)
+Total Paid: ₹304
+Refund: ₹304 (full amount)
 
-Customer Receives: ₹303
-Platform Loses: ₹3 (platform fee) + gateway fees
+Customer Receives: ₹304
+Platform Loses: ₹4 (platform fee) + gateway fees
 ```
 
 **Why full refund?** Barber didn't respond, so customer shouldn't pay any fees.
@@ -980,7 +981,7 @@ Barber can only cancel PENDING (unpaid) bookings. After payment, only auto-cance
 2. Customer pays → AWAITING_CONFIRMATION
 3. Barber confirms → CONFIRMED
 4. Customer cancels (>2h before) → CANCELLED
-5. Customer receives partial refund (₹293 from ₹303)
+5. Customer receives partial refund (₹293 from ₹304)
 6. Slot released
 ```
 
@@ -1092,12 +1093,12 @@ Barber can only cancel PENDING (unpaid) bookings. After payment, only auto-cance
 
 ### Edge Case 5: Service Price Changed After Booking
 
-**Problem:** Booking created with service price ₹300, shop owner changes price to ₹400.
+**Problem:** Booking created with service price ₹299, shop owner changes price to ₹400.
 
 **Handling:**
-- Booking stores totalAmount at creation time
+- Booking stores the service amount at creation time
 - Price changes don't affect existing bookings
-- Customer pays original price
+- Customer pays original service price plus the applicable platform fee
 
 **Reason:** Price locked at booking time
 

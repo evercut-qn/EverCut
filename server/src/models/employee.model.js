@@ -36,11 +36,7 @@ const employeeSchema = new mongoose.Schema(
             type: Date,
             required: true,
         },
-        photoUrl: {
-            type: String,
-            default: null,
-        },
-        cloudinaryId: {
+        photoR2Key: {
             type: String,
             default: null,
         },
@@ -59,7 +55,6 @@ const employeeSchema = new mongoose.Schema(
                 bookingId: {
                     type: mongoose.Schema.Types.ObjectId,
                     ref: 'Booking',
-                    index: true,
                 },
                 date: { type: String, required: true },
                 startTime: { type: String, required: true },

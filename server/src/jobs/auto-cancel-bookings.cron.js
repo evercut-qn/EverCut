@@ -1,15 +1,17 @@
+import config from '../config/index.js';
 import logger from '../utils/logger.js';
 import { autoCancelAwaitingBookings } from '../services/booking.service.js';
 
-const POLL_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
 let intervalId = null;
 
 export const startAutoCancelJob = () => {
     if (intervalId) return;
 
+    const pollIntervalMs = config.booking.autoCancelPollIntervalMs;
+
     logger.info('[AutoCancelJob] Starting auto-cancel job', {
-        intervalMs: POLL_INTERVAL_MS,
-        intervalMinutes: POLL_INTERVAL_MS / 60000,
+        intervalMs: pollIntervalMs,
+        intervalMinutes: pollIntervalMs / 60000,
     });
 
     // Run immediately on start
@@ -17,14 +19,14 @@ export const startAutoCancelJob = () => {
         logger.error('[AutoCancelJob] Initial run failed', { error: error.message });
     });
 
-    // Then run every 15 minutes
+    // Then run on configured interval
     intervalId = setInterval(async () => {
         try {
             await autoCancelAwaitingBookings();
         } catch (error) {
             logger.error('[AutoCancelJob] Job cycle failed', { error: error.message });
         }
-    }, POLL_INTERVAL_MS);
+    }, pollIntervalMs);
 };
 
 export const stopAutoCancelJob = () => {

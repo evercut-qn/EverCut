@@ -1,0 +1,83 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+
+const ensureRequiredEnv = () => {
+    const defaults = {
+        MONGODB_URI: 'mongodb://localhost:27017/evercut-test',
+        FIREBASE_PROJECT_ID: 'evercut-test',
+        FIREBASE_CLIENT_EMAIL: 'firebase@example.com',
+        FIREBASE_PRIVATE_KEY: '-----BEGIN PRIVATE KEY-----\\nabc\\n-----END PRIVATE KEY-----',
+        MSG91_AUTH_KEY: 'msg91-auth',
+        MSG91_OTP_TEMPLATE_ID: 'msg91-template',
+        JWT_ACCESS_SECRET: 'access-secret',
+        JWT_REFRESH_SECRET: 'refresh-secret',
+        JWT_ONBOARDING_SECRET: 'onboarding-secret',
+        CF_ACCOUNT_ID: 'test-account',
+        R2_ACCESS_KEY_ID: 'test-access-key',
+        R2_SECRET_ACCESS_KEY: 'test-secret-key',
+        R2_BUCKET: 'evercut-media-test',
+        CDN_BASE_URL: 'https://media.evercut.test',
+        MEDIA_TOKEN_SECRET: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+    };
+
+    for (const [key, value] of Object.entries(defaults)) {
+        process.env[key] ??= value;
+    }
+};
+
+ensureRequiredEnv();
+
+const mediaRepository = (await import('../../../repositories/media.repository.js')).default;
+const storageProvider = (await import('../storage-provider.service.js')).default;
+const mediaService = await import('../media.service.js');
+
+test('requestUploadUrl creates pending media and returns a presigned R2 PUT URL', async (t) => {
+    let createdPayload = null;
+    t.mock.method(mediaRepository, 'create', async (payload) => {
+        createdPayload = payload;
+        return { ...payload };
+    });
+
+    let signedRequest = null;
+    t.mock.method(storageProvider, 'generateUploadUrl', async ({ key, contentType }) => {
+        signedRequest = { key, contentType };
+        return 'https://r2.example/upload';
+    });
+
+    const result = await mediaService.requestUploadUrl('user-1', {
+        contentType: 'image/jpeg',
+        sizeBytes: 2048,
+        purpose: 'gallery',
+    });
+
+    assert.equal(result.uploadUrl, 'https://r2.example/upload');
+    assert.equal(result.mediaId, createdPayload._id);
+    assert.equal(createdPayload.status, 'pending');
+    assert.equal(createdPayload.purpose, 'gallery');
+    assert.equal(createdPayload.r2Bucket, 'evercut-media-test');
+    assert.match(createdPayload.r2Key, /^images\/gallery\/user-1\/[0-9a-f-]+\.jpg$/);
+    assert.deepEqual(signedRequest, {
+        key: createdPayload.r2Key,
+        contentType: 'image/jpeg',
+    });
+});
+
+test('requestUploadUrl rejects unsupported MIME types before creating media', async (t) => {
+    const createMock = t.mock.method(mediaRepository, 'create', async () => {
+        throw new Error('create should not be called for invalid media');
+    });
+
+    await assert.rejects(
+        () => mediaService.requestUploadUrl('user-1', {
+            contentType: 'application/pdf',
+            sizeBytes: 2048,
+            purpose: 'gallery',
+        }),
+        {
+            name: 'BadRequestError',
+            message: 'Unsupported media content type',
+        },
+    );
+
+    assert.equal(createMock.mock.calls.length, 0);
+});

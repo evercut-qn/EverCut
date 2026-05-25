@@ -1,18 +1,19 @@
 import Joi from 'joi';
+import config from '../config/index.js';
 import {
     ALL_GENDERS,
     ALL_SERVICE_FOR,
     ALL_SHOP_AMENITIES,
     ALL_SHOP_CATEGORIES,
+    ALL_SERVICE_TYPES,
     DAYS_OF_WEEK,
-    SECURITY_PIN_LENGTH,
 } from '../utils/constants.js';
 import {
     normalizeBreakTimes as normalizeScheduleBreakTimes,
     normalizeScheduleTime,
     normalizeShopSchedule,
 } from '../utils/shop-schedule.utils.js';
-import { objectId } from './common.validator.js';
+import { objectId, paginationSchema } from './common.validator.js';
 
 const coordinatesPattern = /^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/;
 
@@ -70,17 +71,13 @@ const breakTimesSchema = Joi.alternatives().try(
     Joi.string().trim(),
 );
 
-const targetCustomersSchema = Joi.string().valid(...ALL_SERVICE_FOR, 'men', 'women');
-const ifscSchema = Joi.string().trim().pattern(/^[A-Z]{4}0[A-Z0-9]{6}$/i);
-const bankAccountSchema = Joi.string().trim().min(6).max(34);
-
+const targetCustomersSchema = Joi.string().lowercase().valid(...ALL_SERVICE_FOR);
 export const updateBusinessSchema = Joi.object({
     shopName: Joi.string().trim().min(1).max(100),
     firstName: Joi.string().trim().min(1).max(50),
     lastName: Joi.string().trim().min(1).max(50),
-    gender: Joi.string().valid(...ALL_GENDERS),
+    gender: Joi.string().lowercase().valid(...ALL_GENDERS),
     dateOfBirth: Joi.date(),
-    ownerName: Joi.forbidden(),
     shopOwner: Joi.forbidden(),
     ownerFirstName: Joi.forbidden(),
     ownerLastName: Joi.forbidden(),
@@ -114,6 +111,7 @@ export const updateBusinessSchema = Joi.object({
     ),
     breakTimes: breakTimesSchema,
     breakTimings: Joi.forbidden(),
+    isOpen: Joi.boolean(),
     location: Joi.alternatives().try(
         Joi.object({
             type: Joi.string().valid('Point').required(),
@@ -123,10 +121,6 @@ export const updateBusinessSchema = Joi.object({
     ),
 })
     .custom((value, helpers) => {
-        value.ownerFirstName = value.firstName;
-        value.ownerLastName = value.lastName;
-        value.ownerGender = value.gender;
-        value.ownerDateOfBirth = value.dateOfBirth;
         value.facilities = value.amenities;
         value.availableDays = value.workingDays;
 
@@ -200,14 +194,9 @@ export const updateBusinessSchema = Joi.object({
     })
     .min(1);
 
-export const toggleStatusSchema = Joi.object({
-    status: Joi.alternatives().try(Joi.boolean(), Joi.string()).optional(),
-    isOpen: Joi.any().strip(),
-}).rename('isOpen', 'status', { ignoreUndefined: true, override: false });
-
 export const updatePinSchema = Joi.object({
     currentPin: Joi.string().required(),
-    newPin: Joi.string().pattern(new RegExp(`^\\d{${SECURITY_PIN_LENGTH}}$`)).required(),
+    newPin: Joi.string().pattern(new RegExp(`^\\d{${config.security.pinLength}}$`)).required(),
     confirmNewPin: Joi.string().required().valid(Joi.ref('newPin')).messages({
         'any.only': 'confirmNewPin must match newPin',
     }),
@@ -216,6 +205,10 @@ export const updatePinSchema = Joi.object({
 
 export const shopIdParamSchema = Joi.object({
     id: objectId.required(),
+});
+
+export const favoritePatchSchema = Joi.object({
+    favorite: Joi.boolean().required(),
 });
 
 export const shopListQuerySchema = Joi.object({
@@ -237,7 +230,7 @@ export const servicesByGenderQuerySchema = Joi.object({
     longitude: Joi.number().min(-180).max(180),
     latitude: Joi.number().min(-90).max(90),
     coordinates: Joi.string().pattern(coordinatesPattern),
-    gender: Joi.string().valid(...ALL_SERVICE_FOR).default('unisex'),
+    gender: Joi.string().lowercase().valid(...ALL_SERVICE_FOR).default('unisex'),
     search: Joi.string().trim().max(100).allow(''),
 })
     .custom(normalizeCoordinates, 'coordinates normalization')
@@ -245,7 +238,13 @@ export const servicesByGenderQuerySchema = Joi.object({
 
 export const searchServicesQuerySchema = Joi.object({
     query: Joi.string().trim().min(1).max(100).required(),
-    gender: Joi.string().valid(...ALL_SERVICE_FOR),
+    gender: Joi.string().lowercase().valid(...ALL_SERVICE_FOR),
+});
+
+export const shopServicesQuerySchema = paginationSchema.keys({
+    query: Joi.string().trim().max(100).allow(''),
+    serviceType: Joi.string().valid(...ALL_SERVICE_TYPES),
+    serviceFor: Joi.string().lowercase().valid(...ALL_SERVICE_FOR),
 });
 
 export const shopAvailabilityQuerySchema = Joi.object({
@@ -267,7 +266,7 @@ export const updatePayoutDetailsSchema = Joi.object({
     ifsc: Joi.string().trim().pattern(/^[A-Z]{4}0[A-Z0-9]{6}$/i).required().messages({
         'string.pattern.base': 'ifsc must be a valid IFSC code (e.g., SBIN0001234)',
     }),
-    upiId: Joi.string().trim().required(),
+    upiId: Joi.string().trim().optional(),
     // Strip any fields that should not be user-controlled
     verificationStatus: Joi.any().strip(),
     beneficiaryId: Joi.any().strip(),

@@ -1,9 +1,5 @@
 import { Router } from 'express';
 import { authenticateOnboarding } from '../middleware/authenticate.middleware.js';
-import {
-    uploadBarberOnboardingImages,
-    uploadCustomerPhoto,
-} from '../middleware/upload.middleware.js';
 import { validate } from '../middleware/validate.middleware.js';
 import {
     customerOnboardingSchema,
@@ -13,6 +9,10 @@ import * as onboardingController from '../controllers/onboarding.controller.js';
 
 const router = Router();
 
+// ============================================================================
+// Onboarding Routes (require onboarding token from OTP verification)
+// ============================================================================
+
 /**
  * POST /api/v1/onboarding/customers
  * Create customer after OTP verification with onboarding token.
@@ -20,7 +20,6 @@ const router = Router();
 router.post(
     '/customers',
     authenticateOnboarding,
-    uploadCustomerPhoto,
     validate(customerOnboardingSchema, 'body'),
     onboardingController.createCustomerOnboarding,
 );
@@ -32,7 +31,6 @@ router.post(
 router.post(
     '/barbers',
     authenticateOnboarding,
-    uploadBarberOnboardingImages,
     validate(barberOnboardingSchema, 'body'),
     onboardingController.createBarberOnboarding,
 );

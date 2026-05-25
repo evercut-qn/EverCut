@@ -14,8 +14,29 @@ export const getMe = async (req, res, next) => {
 export const updateMe = async (req, res, next) => {
     try {
         const body = getValidatedRequestData(req, 'body');
-        const updated = await userService.updateProfile(req.user._id, body, req.file);
+        const updated = await userService.updateProfile(req.user._id, body);
         return res.status(200).json(ApiResponse.success(updated, 'Profile updated'));
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const updateMyPicture = async (req, res, next) => {
+    try {
+        const { mediaId } = getValidatedRequestData(req, 'body');
+        const { default: mediaService } = await import('../services/media/media.service.js');
+        const result = await mediaService.updateCustomerProfilePicture(req.user._id, mediaId);
+        return res.status(200).json(ApiResponse.success(result, 'Profile picture updated'));
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const removeMyPicture = async (req, res, next) => {
+    try {
+        const { default: mediaService } = await import('../services/media/media.service.js');
+        const result = await mediaService.removeCustomerProfilePicture(req.user._id);
+        return res.status(200).json(ApiResponse.success(result, 'Profile picture removed'));
     } catch (err) {
         next(err);
     }

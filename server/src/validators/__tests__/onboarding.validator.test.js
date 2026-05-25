@@ -7,19 +7,21 @@ const buildValidPayload = () => ({
     email: 'barber@example.com',
     firstName: 'Test',
     lastName: 'Barber',
-    gender: 'Male',
+    gender: 'male',
     dateOfBirth: '1991-01-12',
     shopName: 'Postman Test Barber Studio',
-    category: 'Barber',
-    targetCustomers: 'male',
-    upiId: 'test.barber@upi',
+    category: 'Barber Shop',
+    targetCustomers: 'men',
     accountHolderName: 'Test Barber',
     bankName: 'HDFC Bank',
+    bankAccount: '12345678901234',
+    ifsc: 'HDFC0001234',
     address: 'MG Road, Bengaluru',
     location: { type: 'Point', coordinates: [77.5946, 12.9716] },
     workingDays: ['Monday', 'Tuesday', 'Wednesday'],
     workingHours: '{"openTime":"09:00 AM","closeTime":"08:00 PM"}',
     breakTimes: '[{"start":"01:00 PM","end":"02:00 PM"}]',
+    photoMediaId: 'media-1',
     pin: '1234',
     confirmPin: '1234',
 });
@@ -50,11 +52,41 @@ test('barberOnboardingSchema rejects break times outside shop hours', () => {
     assert.match(result.error?.message || '', /breakTimes\[0\] must stay within shop hours/);
 });
 
+test('barberOnboardingSchema allows missing breakTimes and optional upiId', () => {
+    const result = barberOnboardingSchema.validate({
+        ...buildValidPayload(),
+        breakTimes: undefined,
+        upiId: undefined,
+    }, {
+        abortEarly: false,
+        allowUnknown: false,
+        stripUnknown: true,
+    });
+
+    assert.equal(result.error, undefined);
+    assert.deepEqual(result.value.breakTimes, []);
+    assert.equal(result.value.upiId, undefined);
+});
+
+test('barberOnboardingSchema requires bankAccount and ifsc', () => {
+    const result = barberOnboardingSchema.validate({
+        ...buildValidPayload(),
+        bankAccount: undefined,
+        ifsc: undefined,
+    }, {
+        abortEarly: false,
+        allowUnknown: false,
+        stripUnknown: true,
+    });
+
+    assert.match(result.error?.message || '', /bankAccount|ifsc/);
+});
+
 test('barberOnboardingSchema rejects deprecated barber onboarding aliases', () => {
     const result = barberOnboardingSchema.validate({
         ...buildValidPayload(),
         category: undefined,
-        businessCategory: 'Barber',
+        businessCategory: 'Barber Shop',
         upiAddress: 'test.barber@upi',
     }, {
         abortEarly: false,

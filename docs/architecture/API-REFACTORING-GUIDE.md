@@ -31,13 +31,13 @@ Authorization: Bearer {barber_access_token}
 
 **New Approach:**
 Frontend should call individual resource endpoints:
-- `GET /api/v1/bookings/analytics/today` - For pulse metrics
-- `GET /api/v1/employees/analytics/availability` - For staff data
-- `GET /api/v1/bookings/analytics/queue` - For queue data
+- `GET /api/v1/bookings/analytics` - For pulse metrics
+- `GET /api/v1/employees/analytics` - For staff data
+- `GET /api/v1/bookings/analytics` - For queue data
 
 **Alternative (if aggregation is needed):**
 ```
-GET /api/v1/earnings/overview
+GET /api/v1/bookings/analytics + /api/v1/employees/analytics + /api/v1/earnings
 Authorization: Bearer {barber_access_token}
 ```
 
@@ -45,7 +45,7 @@ Authorization: Bearer {barber_access_token}
 
 ---
 
-#### ✅ **MIGRATED: `/dashboard/pulse` → `/bookings/analytics/today`**
+#### ✅ **MIGRATED: `/dashboard/pulse` → `/bookings/analytics`**
 
 **Old Endpoint:**
 ```
@@ -55,7 +55,7 @@ Authorization: Bearer {barber_access_token}
 
 **New Endpoint:**
 ```
-GET /api/v1/bookings/analytics/today
+GET /api/v1/bookings/analytics
 Authorization: Bearer {barber_access_token}
 ```
 
@@ -84,7 +84,7 @@ Authorization: Bearer {barber_access_token}
 
 ---
 
-#### ✅ **MIGRATED: `/dashboard/staff` → `/employees/analytics/availability`**
+#### ✅ **MIGRATED: `/dashboard/staff` → `/employees/analytics`**
 
 **Old Endpoint:**
 ```
@@ -94,7 +94,7 @@ Authorization: Bearer {barber_access_token}
 
 **New Endpoint:**
 ```
-GET /api/v1/employees/analytics/availability
+GET /api/v1/employees/analytics
 Authorization: Bearer {barber_access_token}
 ```
 
@@ -126,22 +126,22 @@ Authorization: Bearer {barber_access_token}
 
 ---
 
-#### ✅ **MIGRATED: `/dashboard/queue` → `/bookings/analytics/queue`**
+#### ✅ **MIGRATED: `/dashboard/queue` → `/bookings/analytics`**
 
 **Old Endpoint:**
 ```
-GET /api/v1/dashboard/queue?timeframe=active
+GET /api/v1/dashboard/queue?date range=active
 Authorization: Bearer {barber_access_token}
 ```
 
 **New Endpoint:**
 ```
-GET /api/v1/bookings/analytics/queue?timeframe=active
+GET /api/v1/bookings/analytics
 Authorization: Bearer {barber_access_token}
 ```
 
 **Query Parameters:**
-- `timeframe` (optional): `active` or `upcoming` (default: `active`)
+- `date range` (optional): `active` or `upcoming` (default: `active`)
 
 **Response Structure:** (unchanged)
 ```json
@@ -149,7 +149,7 @@ Authorization: Bearer {barber_access_token}
   "success": true,
   "message": "Today's queue fetched",
   "data": {
-    "timeframe": "active",
+    "date range": "active",
     "active": {
       "count": 3,
       "items": [
@@ -219,7 +219,7 @@ Authorization: Bearer {customer_access_token}
       "type": "Point",
       "coordinates": [77.5946, 12.9716]
     },
-    "gender": "Female",
+    "gender": "female",
     "dateOfBirth": "1995-03-15T00:00:00.000Z",
     "favoriteShopIds": [...],
     "favoriteBookingIds": [...],
@@ -258,9 +258,9 @@ const { pulse, staff, queue } = response.data;
 ```javascript
 // Parallel resource calls
 const [pulseRes, staffRes, queueRes] = await Promise.all([
-  fetch('/api/v1/bookings/analytics/today'),
-  fetch('/api/v1/employees/analytics/availability'),
-  fetch('/api/v1/bookings/analytics/queue?timeframe=active')
+  fetch('/api/v1/bookings/analytics'),
+  fetch('/api/v1/employees/analytics'),
+  fetch('/api/v1/bookings/analytics')
 ]);
 
 const pulse = pulseRes.data;
@@ -271,7 +271,7 @@ const queue = queueRes.data;
 **After (Option 2 - Aggregated Call):**
 ```javascript
 // Use the earnings overview endpoint
-const response = await fetch('/api/v1/earnings/overview');
+const response = await fetch('/api/v1/bookings/analytics + /api/v1/employees/analytics + /api/v1/earnings');
 const { pulse, staff, queue } = response.data;
 ```
 
@@ -342,14 +342,14 @@ If critical issues arise, the old dashboard routes can be temporarily restored b
 ## Testing Recommendations
 
 ### Unit Tests
-- ✅ Test new booking controller methods (`getTodaysPulse`, `getTodaysQueue`)
+- ✅ Test new booking controller methods (`booking analytics today data`, `booking analytics queue data`)
 - ✅ Test new employee controller method (`getStaffAvailability`)
-- ✅ Test new earnings controller method (`getDashboardOverview`)
+- ✅ Test new earnings controller method (`getOperationalAnalytics`)
 
 ### Integration Tests
-- Test that `/bookings/analytics/today` returns correct pulse metrics
-- Test that `/employees/analytics/availability` returns correct staff data
-- Test that `/bookings/analytics/queue` filters correctly by `active`/`upcoming`
+- Test that `/bookings/analytics` returns correct pulse metrics
+- Test that `/employees/analytics` returns correct staff data
+- Test that `/bookings/analytics` filters correctly by `active`/`upcoming`
 - Test that `/customers/me` returns complete profile data
 
 ### End-to-End Tests
@@ -373,10 +373,10 @@ For questions about this refactoring, contact:
 
 | Old Endpoint | New Endpoint | Method | Auth | Status |
 |-------------|--------------|--------|------|--------|
-| `/dashboard/overview` | `/earnings/overview` | GET | Barber | Migrated |
-| `/dashboard/pulse` | `/bookings/analytics/today` | GET | Barber | Migrated |
-| `/dashboard/staff` | `/employees/analytics/availability` | GET | Barber | Migrated |
-| `/dashboard/queue` | `/bookings/analytics/queue` | GET | Barber | Migrated |
+| `/dashboard/overview` | `/bookings/analytics + /employees/analytics + /earnings` | GET | Barber | Migrated |
+| `/dashboard/pulse` | `/bookings/analytics` | GET | Barber | Migrated |
+| `/dashboard/staff` | `/employees/analytics` | GET | Barber | Migrated |
+| `/dashboard/queue` | `/bookings/analytics` | GET | Barber | Migrated |
 | `/customers/me/home` | `/customers/me` | GET | Customer | Removed |
 
 ---

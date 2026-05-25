@@ -12,9 +12,73 @@ const compact = (value) => Object.fromEntries(
 
 const resolveId = (value) => (value && typeof value === 'object' ? value.id : toIdString(value));
 
-const serializeBookingRef = (value, serializer) => (
-    value && typeof value === 'object' ? serializer(value) : undefined
+const isObjectIdLike = (value) => (
+    value
+    && typeof value === 'object'
+    && (
+        typeof value.toHexString === 'function'
+        || value._bsontype === 'ObjectId'
+    )
 );
+
+const isPopulatedRef = (value) => (
+    value
+    && typeof value === 'object'
+    && !isObjectIdLike(value)
+);
+
+const serializeBookingRef = (value, serializer) => (
+    isPopulatedRef(value) ? serializer(value) : undefined
+);
+
+const toNumberOrUndefined = (value) => {
+    const numericValue = Number(value);
+    return Number.isFinite(numericValue) ? numericValue : undefined;
+};
+
+const paisaToRupees = (value) => {
+    const numericValue = toNumberOrUndefined(value);
+    return numericValue === undefined ? undefined : numericValue / 100;
+};
+
+const sumServiceAmounts = (services = []) => {
+    const amount = services.reduce(
+        (sum, service) => sum + (getEffectiveServicePrice(service) || 0),
+        0,
+    );
+    return amount || undefined;
+};
+
+const resolvePaymentSnapshot = (raw, plain) => {
+    const payment = raw.paymentTransactionId || raw.paymentTransaction || raw.payment;
+    if (isPopulatedRef(payment)) return toPlainObject(payment);
+
+    const plainPayment = plain.paymentTransactionId || plain.paymentTransaction || plain.payment;
+    return isPopulatedRef(plainPayment) ? plainPayment : null;
+};
+
+const resolveAmountSummary = ({ raw, plain, services }) => {
+    const payment = resolvePaymentSnapshot(raw, plain);
+    const paymentAmount = toNumberOrUndefined(payment?.amountInRupees)
+        ?? paisaToRupees(payment?.amount);
+    const serviceAmount = toNumberOrUndefined(plain.serviceAmount)
+        ?? paisaToRupees(payment?.settlement?.serviceAmount)
+        ?? toNumberOrUndefined(plain.totalAmount)
+        ?? sumServiceAmounts(services)
+        ?? 0;
+    const platformFee = toNumberOrUndefined(plain.platformFee)
+        ?? paisaToRupees(payment?.settlement?.platformFee);
+    const totalAmount = toNumberOrUndefined(plain.payableAmount)
+        ?? toNumberOrUndefined(plain.totalCharged)
+        ?? paymentAmount
+        ?? (platformFee !== undefined ? serviceAmount + platformFee : serviceAmount);
+
+    return {
+        serviceAmount,
+        platformFee,
+        totalAmount,
+    };
+};
 
 const toDateOnlyString = (value) => {
     if (!value) return null;
@@ -40,24 +104,26 @@ const withEmployeeBookingAvailability = (employee, bookingDate) => {
 };
 
 export const serializeBooking = (booking, options = {}) => {
-    const plain = sanitizeForResponse(toPlainObject(booking));
+    const raw = toPlainObject(booking);
+    const plain = sanitizeForResponse(raw);
     if (!plain) return null;
 
     const rawServices = options.services
-        || plain.services
+        || raw.services
         || (
-            Array.isArray(plain.serviceIds) && plain.serviceIds.some((service) => service && typeof service === 'object')
-                ? plain.serviceIds
+            Array.isArray(raw.serviceIds) && raw.serviceIds.some((service) => service && typeof service === 'object')
+                ? raw.serviceIds
                 : []
         );
     const services = serializeServices(rawServices);
+    const amountSummary = resolveAmountSummary({ raw, plain, services });
 
-    const customer = serializeBookingRef(plain.customerId || plain.customer, serializeCustomerSummary);
+    const customer = serializeBookingRef(raw.customerId || raw.customer, serializeCustomerSummary);
     const employee = serializeBookingRef(
-        withEmployeeBookingAvailability(plain.employeeId || plain.employee, plain.date),
+        withEmployeeBookingAvailability(raw.employeeId || raw.employee, raw.date ?? plain.date),
         (value) => serializeEmployee(value, { publicView: true }),
     );
-    const shop = serializeBookingRef(plain.shopId || plain.shop, serializeShopSummary);
+    const shop = serializeBookingRef(raw.shopId || raw.shop, serializeShopSummary);
 
     return compact({
         id: plain.id,
@@ -76,7 +142,9 @@ export const serializeBooking = (booking, options = {}) => {
         endTime: plain.endTime ?? null,
         startMinute: plain.startMinute,
         endMinute: plain.endMinute,
-        totalAmount: plain.totalAmount ?? 0,
+        serviceAmount: amountSummary.serviceAmount,
+        platformFee: amountSummary.platformFee,
+        totalAmount: amountSummary.totalAmount,
         durationMinutes: plain.durationMinutes ?? 0,
         slotLockTimes: plain.slotLockTimes ?? [],
         status: plain.status ?? BOOKING_STATUS.PENDING,
@@ -106,27 +174,25 @@ export const serializeBooking = (booking, options = {}) => {
 };
 
 export const serializeBookingCreation = (booking) => {
-    const plain = sanitizeForResponse(toPlainObject(booking));
+    const raw = toPlainObject(booking);
+    const plain = sanitizeForResponse(raw);
     if (!plain) return null;
 
-    const rawServices = plain.services
+    const rawServices = raw.services
         || (
-            Array.isArray(plain.serviceIds) && plain.serviceIds.some((service) => service && typeof service === 'object')
-                ? plain.serviceIds
+            Array.isArray(raw.serviceIds) && raw.serviceIds.some((service) => service && typeof service === 'object')
+                ? raw.serviceIds
                 : []
         );
     const services = serializeServices(rawServices);
-    const serviceAmount = services.reduce(
-        (sum, service) => sum + (getEffectiveServicePrice(service) || 0),
-        0,
-    );
+    const amountSummary = resolveAmountSummary({ raw, plain, services });
 
     return compact({
         id: plain.id || toIdString(plain.bookingId),
         shopId: plain.shopId?.id || toIdString(plain.shopId),
         customerId: plain.customerId?.id || toIdString(plain.customerId),
-        employeeId: plain.employee ? undefined : (plain.employeeId?.id || toIdString(plain.employeeId)),
-        employee: plain.employee ? serializeEmployee(plain.employee, { publicView: true }) : undefined,
+        employeeId: raw.employee ? undefined : (plain.employeeId?.id || toIdString(plain.employeeId)),
+        employee: raw.employee ? serializeEmployee(raw.employee, { publicView: true }) : undefined,
         serviceIds: services.length > 0
             ? undefined
             : (Array.isArray(plain.serviceIds) ? plain.serviceIds.map(toIdString).filter(Boolean) : undefined),
@@ -134,7 +200,9 @@ export const serializeBookingCreation = (booking) => {
         date: plain.date,
         time: plain.time,
         endTime: plain.endTime,
-        totalAmount: plain.totalAmount ?? serviceAmount,
+        serviceAmount: amountSummary.serviceAmount,
+        platformFee: amountSummary.platformFee,
+        totalAmount: amountSummary.totalAmount,
         durationMinutes: plain.durationMinutes,
         slotLockTimes: plain.slotLockTimes ?? [],
         startMinute: plain.startMinute,
@@ -148,23 +216,26 @@ export const serializeBookingCreation = (booking) => {
 };
 
 export const serializeBookingDetails = (details) => {
-    const plain = sanitizeForResponse(toPlainObject(details));
+    const raw = toPlainObject(details);
+    const plain = sanitizeForResponse(raw);
     if (!plain) return null;
+    const services = serializeServices(raw.services || []);
+    const amountSummary = resolveAmountSummary({ raw, plain, services });
 
     return compact({
         id: plain.id || toIdString(plain.bookingId),
-        customer: plain.customer ? serializeCustomerSummary(plain.customer) : null,
-        employee: plain.employee
-            ? serializeEmployee(withEmployeeBookingAvailability(plain.employee, plain.date), { publicView: true })
+        customer: raw.customer ? serializeCustomerSummary(raw.customer) : null,
+        employee: raw.employee
+            ? serializeEmployee(withEmployeeBookingAvailability(raw.employee, raw.date ?? plain.date), { publicView: true })
             : null,
-        shop: plain.shop ? serializeShopSummary(plain.shop) : null,
+        shop: raw.shop ? serializeShopSummary(raw.shop) : null,
         date: plain.date,
         time: plain.time,
         endTime: plain.endTime,
-        services: serializeServices(plain.services || []),
-        subTotal: plain.subTotal,
-        platformFee: plain.platformFee,
-        totalAmount: plain.totalAmount,
+        services,
+        serviceAmount: amountSummary.serviceAmount,
+        platformFee: amountSummary.platformFee,
+        totalAmount: amountSummary.totalAmount,
         totalServices: plain.totalServices,
         status: plain.status,
         paymentStatus: plain.paymentStatus,

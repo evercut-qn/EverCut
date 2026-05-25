@@ -165,6 +165,8 @@
               "  pm.expect(response.data).to.have.property('orderId');",
               "  pm.expect(response.data).to.have.property('token');",
               "  pm.expect(response.data).to.have.property('merchantId');",
+              "  pm.expect(response.data).to.have.property('amountInPaisa');",
+              "  pm.expect(response.data).to.have.property('amountInRupees');",
               "  pm.expect(response.data).to.not.have.property('redirectUrl');",
               "  pm.collectionVariables.set('payment_id', response.data.id);",
               "  pm.collectionVariables.set('merchant_order_id', response.data.merchantOrderId);",
@@ -182,7 +184,7 @@
         "method": "GET",
         "header": [],
         "url": "{{base_url}}/{{api_prefix}}/payments/{{payment_id}}",
-        "description": "Reads payment details and polls PhonePe once when the payment is still pending. Use this for manual status checks or post-failure support.",
+        "description": "Reads payment details and polls PhonePe once when the payment is still pending. Settlement includes serviceAmount, platformFee, barberPayout, and isBundle; the top-level payment response includes waiverApplied.",
         "auth": {
           "type": "bearer",
           "bearer": [
@@ -214,7 +216,20 @@
               "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
               "  });",
               "});",
-              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "pm.test('payment exposes platform-fee fields when payment exists', function () {",
+              "  const response = pm.response.json();",
+              "  const settlement = response.data && response.data.settlement;",
+              "  if (response.data) {",
+              "    pm.expect(response.data).to.have.property('waiverApplied');",
+              "  }",
+              "  if (settlement) {",
+              "    pm.expect(settlement).to.have.property('serviceAmount');",
+              "    pm.expect(settlement).to.have.property('platformFee');",
+              "    pm.expect(settlement).to.have.property('barberPayout');",
+              "    pm.expect(settlement).to.have.property('isBundle');",
+              "  }",
+              "});"
             ]
           }
         }

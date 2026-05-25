@@ -10,14 +10,35 @@ const ACTIVE_BOOKING_STATUSES = [
 
 const EMPLOYEE_POPULATE = {
     path: 'employeeId',
-    select: 'firstName lastName photoUrl blockedDates',
+    select: 'firstName lastName photoR2Key blockedDates',
     options: { includeDeleted: true },
 };
 
 const EMPLOYEE_NAME_POPULATE = {
     path: 'employeeId',
-    select: 'firstName lastName blockedDates',
+    select: 'firstName lastName photoR2Key blockedDates',
     options: { includeDeleted: true },
+};
+
+const BOOKING_SERVICE_CARD_FIELDS = [
+    'serviceName',
+    'serviceFor',
+    'serviceType',
+    'imageR2Key',
+    'duration',
+    'actualPrice',
+    'offerPrice',
+    'finalPrice',
+    'totalDuration',
+    'totalPrice',
+    'bundledServices',
+].join(' ');
+
+const CUSTOMER_SUMMARY_FIELDS = 'firstName lastName photoR2Key userId feeWaiverBookingsUsed';
+const CUSTOMER_NAME_FIELDS = 'firstName lastName photoR2Key';
+const PAYMENT_SUMMARY_POPULATE = {
+    path: 'paymentTransactionId',
+    select: 'amount amountInRupees waiverApplied settlement',
 };
 
 class BookingRepository {
@@ -45,16 +66,17 @@ class BookingRepository {
     async findByIds(ids, options = {}) {
         return Booking.find(trustQueryOperators({ _id: { $in: ids } }))
             .session(options.session || null)
-            .populate('shopId', 'ownerId upiId accountHolderName bankName payoutConfig ownerName shopName');
+            .populate('shopId', 'barberId shopName');
     }
 
     async findByIdPopulated(id) {
         return Booking.findById(id)
-            .populate('shopId', 'shopName coverUrl address openTime closeTime')
+            .populate('shopId', 'shopName coverR2Key address openTime closeTime')
             .populate(EMPLOYEE_POPULATE)
+            .populate(PAYMENT_SUMMARY_POPULATE)
             .populate({
                 path: 'customerId',
-                select: 'firstName lastName userId',
+                select: CUSTOMER_SUMMARY_FIELDS,
                 populate: { path: 'userId', select: 'email phoneNumber' },
             })
             .lean();
@@ -82,13 +104,17 @@ class BookingRepository {
         return Booking.findByIdAndDelete(id);
     }
 
-    async findByCustomer(customerId, filters = {}) {
-        return Booking.find(trustQueryOperators({ customerId, ...filters }))
+    async findByCustomer(customerId, filters = {}, options = {}) {
+        const query = Booking.find(trustQueryOperators({ customerId, ...filters }))
             .populate('serviceIds')
             .populate(EMPLOYEE_POPULATE)
-            .populate('shopId', 'shopName address coverUrl')
-            .sort({ date: -1 })
-            .lean();
+            .populate('shopId', 'shopName address coverR2Key')
+            .populate(PAYMENT_SUMMARY_POPULATE)
+            .sort({ date: -1 });
+
+        if (options.skip !== undefined) query.skip(options.skip);
+        if (options.limit !== undefined) query.limit(options.limit);
+        return query.lean();
     }
 
     async findUpcomingByCustomer(customerId, today, options = {}) {
@@ -98,7 +124,8 @@ class BookingRepository {
         }))
             .populate('serviceIds')
             .populate(EMPLOYEE_POPULATE)
-            .populate('shopId', 'shopName address coverUrl')
+            .populate('shopId', 'shopName address coverR2Key')
+            .populate(PAYMENT_SUMMARY_POPULATE)
             .sort({ date: 1 });
 
         if (options.skip !== undefined) query.skip(options.skip);
@@ -117,7 +144,8 @@ class BookingRepository {
         }))
             .populate('serviceIds')
             .populate(EMPLOYEE_POPULATE)
-            .populate('shopId', 'shopName address coverUrl')
+            .populate('shopId', 'shopName address coverR2Key')
+            .populate(PAYMENT_SUMMARY_POPULATE)
             .sort({ date: -1 });
 
         if (options.skip !== undefined) query.skip(options.skip);
@@ -133,11 +161,12 @@ class BookingRepository {
         const query = Booking.find(trustQueryOperators({ employeeId: { $in: employeeIds }, ...filters }))
             .populate({
                 path: 'customerId',
-                select: 'firstName lastName userId',
+                select: CUSTOMER_SUMMARY_FIELDS,
                 populate: { path: 'userId', select: 'phoneNumber' },
             })
             .populate(EMPLOYEE_NAME_POPULATE)
-            .populate('serviceIds', 'serviceName offerPrice');
+            .populate('serviceIds', BOOKING_SERVICE_CARD_FIELDS)
+            .populate(PAYMENT_SUMMARY_POPULATE);
 
         if (options.skip !== undefined) query.skip(options.skip);
         if (options.limit !== undefined) query.limit(options.limit);
@@ -148,11 +177,12 @@ class BookingRepository {
         const query = Booking.find(trustQueryOperators({ shopId, ...filters }))
             .populate({
                 path: 'customerId',
-                select: 'firstName lastName userId',
+                select: CUSTOMER_SUMMARY_FIELDS,
                 populate: { path: 'userId', select: 'phoneNumber' },
             })
             .populate(EMPLOYEE_NAME_POPULATE)
-            .populate('serviceIds', 'serviceName offerPrice')
+            .populate('serviceIds', BOOKING_SERVICE_CARD_FIELDS)
+            .populate(PAYMENT_SUMMARY_POPULATE)
             .sort({ date: -1, createdAt: -1 });
 
         if (options.skip !== undefined) query.skip(options.skip);
@@ -188,7 +218,7 @@ class BookingRepository {
 
     async findByStatusPopulated(status, employeeIds, options = {}) {
         const query = Booking.find(trustQueryOperators({ status, employeeId: { $in: employeeIds } }))
-            .populate('customerId', 'firstName lastName')
+            .populate('customerId', CUSTOMER_NAME_FIELDS)
             .populate(EMPLOYEE_NAME_POPULATE)
             .lean();
 
@@ -199,7 +229,7 @@ class BookingRepository {
 
     async findByStatusForShop(shopId, status, options = {}) {
         const query = Booking.find(trustQueryOperators({ shopId, status }))
-            .populate('customerId', 'firstName lastName')
+            .populate('customerId', CUSTOMER_NAME_FIELDS)
             .populate(EMPLOYEE_NAME_POPULATE)
             .sort({ date: -1, createdAt: -1 })
             .lean();
@@ -237,10 +267,10 @@ class BookingRepository {
         }))
             .populate({
                 path: 'customerId',
-                select: 'firstName lastName userId',
+                select: CUSTOMER_SUMMARY_FIELDS,
                 populate: { path: 'userId', select: 'phoneNumber email' },
             })
-            .populate('shopId', 'shopName ownerId')
+            .populate('shopId', 'shopName barberId')
             .lean();
     }
 
@@ -278,7 +308,7 @@ class BookingRepository {
             status: { $in: [BOOKING_STATUS.COMPLETED, BOOKING_STATUS.NO_SHOW] },
             payoutStatus: PAYOUT_STATUS.NOT_INITIATED,
             paymentStatus: PAYMENT_STATUS.SUCCESS,
-        })).populate('shopId', 'ownerId upiId accountHolderName bankName payoutConfig ownerName shopName');
+        })).populate('shopId', 'barberId shopName');
     }
 
     async findByCustomerWithDateRange(customerId, startDate, endDate) {
@@ -286,9 +316,10 @@ class BookingRepository {
             customerId,
             date: { $gte: startDate, $lte: endDate },
         }))
-            .populate('serviceIds', 'serviceName offerPrice duration')
+            .populate('serviceIds', BOOKING_SERVICE_CARD_FIELDS)
             .populate(EMPLOYEE_NAME_POPULATE)
-            .populate('shopId', 'shopName address')
+            .populate('shopId', 'shopName address coverR2Key')
+            .populate(PAYMENT_SUMMARY_POPULATE)
             .lean();
     }
 

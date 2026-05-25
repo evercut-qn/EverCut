@@ -34,11 +34,10 @@ A new feature has been added to allow barbers/shop owners to reply to customer r
 - `docs/SECURITY_AUDIT.md` - Marked rating ownership issue as resolved
 
 **API Endpoints Added:**
-- `GET /api/v1/barber/ratings` - Get all ratings for barber's shop
-- `GET /api/v1/barber/ratings/summary` - Get the barber shop's rating summary
-- `POST /api/v1/barber/ratings/:id/reply` - Add reply to a rating
-- `PUT /api/v1/barber/ratings/:id/reply` - Update existing reply
-- `DELETE /api/v1/barber/ratings/:id/reply` - Delete reply
+- `GET /api/v1/ratings` - Get all ratings for barber's shop
+- `GET /api/v1/ratings/analytics` - Get the barber shop's rating summary
+- `PUT /api/v1/ratings/:id/reply` - Create or update a reply
+- `DELETE /api/v1/ratings/:id/reply` - Delete reply
 
 **Security & Best Practices:**
 - ✅ Proper role-based access control (BARBER role required)
@@ -327,7 +326,7 @@ const customerSchema = new mongoose.Schema({
   userId:       { type: ObjectId, ref: 'User', required: true, unique: true },
   firstName:    { type: String, required: true, trim: true },
   lastName:     { type: String, required: true, trim: true },
-  gender:       { type: String, enum: ['Male', 'Female', 'Other'], required: true },
+  gender:       { type: String, enum: ['male', 'female', 'transgender'], required: true },
   dateOfBirth:  { type: Date, required: true },
   address:      { type: String, required: true },
   photoUrl:     { type: String, default: null },
@@ -344,10 +343,9 @@ const customerSchema = new mongoose.Schema({
 
 ```javascript
 const shopSchema = new mongoose.Schema({
-  ownerId:            { type: ObjectId, ref: 'User', required: true, unique: true },
+  barberId:           { type: ObjectId, ref: 'Barber', required: true, unique: true },
   shopName:           { type: String, required: true, trim: true },
-  ownerName:          { type: String, required: true, trim: true },
-  category:           { type: String, enum: ['Salon', 'Beauty Parlour', 'Barber', 'Door-Step'], required: true },
+  category:           { type: String, enum: ['Hair Salon', 'Beauty Salon', 'Barber Shop', 'Doorstep Service'], required: true },
   upiId:              { type: String, required: true },
   bio:                { type: String, default: '' },
   address:            { type: String, required: true },
@@ -382,7 +380,7 @@ const employeeSchema = new mongoose.Schema({
   firstName:    { type: String, required: true, trim: true },
   lastName:     { type: String, required: true, trim: true },
   phoneNumber:  { type: String, required: true },
-  gender:       { type: String, enum: ['Male', 'Female', 'Other'], required: true },
+  gender:       { type: String, enum: ['male', 'female', 'transgender'], required: true },
   dateOfBirth:  { type: Date, required: true },
   photoUrl:     { type: String, default: null },
   cloudinaryId: { type: String, default: null },
@@ -407,7 +405,7 @@ const serviceSchema = new mongoose.Schema({
   shopId:      { type: ObjectId, ref: 'Shop', required: true, index: true },
   serviceName: { type: String, required: true, trim: true },
   serviceType: { type: String, enum: ['single', 'bundled'], required: true },
-  serviceFor:  { type: String, enum: ['male', 'female', 'unisex'], default: 'unisex' },
+  serviceFor:  { type: String, enum: ['men', 'women', 'unisex'], default: 'unisex' },
   imageUrl:    { type: String, required: true },
   // Single service fields
   duration:    { type: Number },
@@ -667,8 +665,8 @@ Thin controllers that:
 /api/v1/customer/shops/doorstep      GET
 /api/v1/customer/shops/:id           GET (shop info page)
 /api/v1/customer/shops/:id/services  GET
-/api/v1/customer/shops/:id/ratings   GET
-/api/v1/customer/shops/:id/ratings/summary  GET
+/api/v1/shops/:id/ratings            GET
+/api/v1/shops/:id/ratings/analytics  GET
 /api/v1/customer/ratings             POST
 /api/v1/customer/search/services     GET
 /api/v1/customer/search/shops        GET
@@ -685,18 +683,19 @@ Thin controllers that:
 /api/v1/barber/services              GET, POST
 /api/v1/barber/services/:id          PUT, DELETE
 /api/v1/barber/bookings              GET (all by shop)
-/api/v1/barber/bookings/stats        GET (counts by status)
-/api/v1/barber/bookings/progress     GET (monthly completed-booking milestone progress)
+/api/v1/bookings/analytics             GET (combined booking analytics)
+/api/v1/bookings/analytics             GET (summary, milestones, today, queue)
 /api/v1/barber/bookings/:id/status   PUT (update status)
 /api/v1/barber/bookings/:id          DELETE (after payment)
 /api/v1/barber/bookings/users/:id    GET (user booking details)
 /api/v1/barber/photos                GET, POST (upload multiple)
 /api/v1/barber/photos/:id            GET, DELETE
-/api/v1/barber/photos/stats          GET
+/api/v1/barber/photos/analytics          GET
 /api/v1/barber/earnings              GET
-/api/v1/barber/ratings               GET
-/api/v1/barber/ratings/summary       GET
-/api/v1/barber/ratings/:id           DELETE
+/api/v1/ratings                      GET
+/api/v1/ratings/analytics            GET
+/api/v1/ratings/:id/reply            PUT, DELETE
+/api/v1/ratings/:id                  DELETE
 ```
 
 **Route files:**

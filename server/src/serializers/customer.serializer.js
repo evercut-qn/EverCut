@@ -1,5 +1,7 @@
 import { sanitizeForResponse, toIdString, toPlainObject } from './core.serializer.js';
 import { serializeUser } from './user.serializer.js';
+import { buildMediaUrl } from '../services/media/media-url.service.js';
+import config from '../config/index.js';
 
 const compact = (value) => Object.fromEntries(
     Object.entries(value).filter(([, nestedValue]) => nestedValue !== undefined),
@@ -12,20 +14,24 @@ const serializeIdList = (values = []) => (
 );
 
 export const serializeCustomerSummary = (customer) => {
-    const plain = sanitizeForResponse(toPlainObject(customer));
+    const raw = toPlainObject(customer);
+    const plain = sanitizeForResponse(raw);
     if (!plain) return null;
 
     return compact({
         id: plain.id,
         firstName: plain.firstName ?? null,
         lastName: plain.lastName ?? null,
-        photoUrl: plain.photoUrl ?? null,
+        photoUrl: buildMediaUrl(raw.photoR2Key),
     });
 };
 
 export const serializeCustomerProfile = (customer) => {
-    const plain = sanitizeForResponse(toPlainObject(customer));
+    const raw = toPlainObject(customer);
+    const plain = sanitizeForResponse(raw);
     if (!plain) return null;
+    const feeWaiverBookingsUsed = plain.feeWaiverBookingsUsed ?? 0;
+    const feeWaiverQuota = config.payment.feeWaiverQuota;
 
     return compact({
         id: plain.id,
@@ -36,10 +42,13 @@ export const serializeCustomerProfile = (customer) => {
         gender: plain.gender ?? null,
         dateOfBirth: plain.dateOfBirth ?? null,
         address: plain.address ?? null,
-        photoUrl: plain.photoUrl ?? null,
+        photoUrl: buildMediaUrl(raw.photoR2Key),
         location: plain.location ?? null,
         favoriteBookingIds: serializeIdList(plain.favoriteBookings),
         favoriteShopIds: serializeIdList(plain.favoriteShops),
+        feeWaiverBookingsUsed,
+        feeWaiverQuota,
+        feeWaiverExhausted: feeWaiverBookingsUsed >= feeWaiverQuota,
         createdAt: plain.createdAt,
         updatedAt: plain.updatedAt,
     });

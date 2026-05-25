@@ -5,7 +5,7 @@ export * from './employee.serializer.js';
 export * from './notification.serializer.js';
 export * from './payment.serializer.js';
 export * from './payout.serializer.js';
-export * from './photo.serializer.js';
+export * from './media.serializer.js';
 export * from './rating.serializer.js';
 export * from './service.serializer.js';
 export * from './shop.serializer.js';

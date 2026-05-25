@@ -1,7 +1,6 @@
-import shopRepository from '../repositories/shop.repository.js';
-import * as accountService from '../services/account.service.js';
+import barberRepository from '../repositories/barber.repository.js';
 import * as bookingService from '../services/booking.service.js';
-import * as photoService from '../services/photo.service.js';
+import * as mediaService from '../services/media/media.service.js';
 import * as pinService from '../services/pin.service.js';
 import * as shopService from '../services/shop.service.js';
 import { BadRequestError, NotFoundError } from '../utils/api-error.js';
@@ -53,14 +52,14 @@ export const updateMyPin = async (req, res, next) => {
         const validation = pinService.validatePinUpdate({ currentPin, newPin, confirmNewPin });
         if (!validation.isValid) throw new BadRequestError(validation.message);
 
-        const shop = await shopRepository.findByOwnerId(req.user._id);
-        if (!shop) throw new NotFoundError('Shop profile');
+        const barber = await barberRepository.findByUserId(req.user._id);
+        if (!barber) throw new NotFoundError('Barber profile');
 
-        const isValid = await pinService.verifyPin(shop.pinHash, currentPin);
+        const isValid = await pinService.verifyPin(barber.pinHash, currentPin);
         if (!isValid) throw new BadRequestError('Current PIN is incorrect');
 
         const newHash = await pinService.hashPin(newPin);
-        await shopRepository.updateByOwnerId(req.user._id, { pinHash: newHash });
+        await barberRepository.updateByUserId(req.user._id, { pinHash: newHash });
 
         return res.status(200).json(ApiResponse.success(null, 'PIN updated successfully'));
     } catch (err) {
@@ -70,7 +69,8 @@ export const updateMyPin = async (req, res, next) => {
 
 export const updateMyCover = async (req, res, next) => {
     try {
-        const result = await photoService.updateShopCover(req.user._id, req.file);
+        const { mediaId } = getValidatedRequestData(req, 'body');
+        const result = await mediaService.updateShopCover(req.user._id, mediaId);
         return res.status(200).json(ApiResponse.success(result, 'Cover image updated'));
     } catch (err) {
         next(err);
@@ -79,18 +79,27 @@ export const updateMyCover = async (req, res, next) => {
 
 export const updateMyPicture = async (req, res, next) => {
     try {
-        const result = await accountService.updateBarberProfilePicture(req.user._id, req.file);
+        const { mediaId } = getValidatedRequestData(req, 'body');
+        const result = await mediaService.updateBarberProfilePicture(req.user._id, mediaId);
         return res.status(200).json(ApiResponse.success(result, 'Profile picture updated'));
     } catch (err) {
         next(err);
     }
 };
 
-export const toggleMyStatus = async (req, res, next) => {
+export const removeMyCover = async (req, res, next) => {
     try {
-        const { status } = getValidatedRequestData(req, 'body');
-        const result = await shopService.toggleShopStatus(req.user._id, status);
-        return res.status(200).json(ApiResponse.success(result, 'Shop status updated'));
+        const result = await mediaService.removeShopCover(req.user._id);
+        return res.status(200).json(ApiResponse.success(result, 'Cover image removed'));
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const removeMyPicture = async (req, res, next) => {
+    try {
+        const result = await mediaService.removeBarberProfilePicture(req.user._id);
+        return res.status(200).json(ApiResponse.success(result, 'Profile picture removed'));
     } catch (err) {
         next(err);
     }
@@ -126,21 +135,14 @@ export const getFavoriteShops = async (req, res, next) => {
     }
 };
 
-export const addFavoriteShop = async (req, res, next) => {
+export const setFavoriteShop = async (req, res, next) => {
     try {
         const { id } = getValidatedRequestData(req, 'params');
-        const result = await shopService.addFavoriteShop(req.user._id, id);
-        return res.status(200).json(ApiResponse.success(result, 'Shop added to favorites'));
-    } catch (err) {
-        next(err);
-    }
-};
-
-export const removeFavoriteShop = async (req, res, next) => {
-    try {
-        const { id } = getValidatedRequestData(req, 'params');
-        const result = await shopService.removeFavoriteShop(req.user._id, id);
-        return res.status(200).json(ApiResponse.success(result, 'Shop removed from favorites'));
+        const { favorite } = getValidatedRequestData(req, 'body');
+        const result = favorite
+            ? await shopService.addFavoriteShop(req.user._id, id)
+            : await shopService.removeFavoriteShop(req.user._id, id);
+        return res.status(200).json(ApiResponse.success(result, 'Shop favorite updated'));
     } catch (err) {
         next(err);
     }
@@ -176,6 +178,17 @@ export const getShopAvailability = async (req, res, next) => {
         const query = getValidatedRequestData(req, 'query');
         const result = await bookingService.getShopAvailability(params.id, query.date, query.serviceId);
         return res.status(200).json(ApiResponse.success(result, 'Shop availability fetched'));
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const getShopServices = async (req, res, next) => {
+    try {
+        const { id } = getValidatedRequestData(req, 'params');
+        const query = getValidatedRequestData(req, 'query');
+        const result = await shopService.getShopServices(id, query);
+        return res.status(200).json(ApiResponse.paginated(result.items, result.pagination, 'Shop services fetched'));
     } catch (err) {
         next(err);
     }

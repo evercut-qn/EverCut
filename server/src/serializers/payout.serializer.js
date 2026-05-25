@@ -1,3 +1,4 @@
+import config from '../config/index.js';
 import { sanitizeForResponse, toIdString, toPlainObject } from './core.serializer.js';
 
 const compact = (value) => Object.fromEntries(
@@ -30,7 +31,7 @@ export const serializePayout = (payout) => {
         failureReason: plain.failureReason ?? null,
         errorCode: plain.errorCode ?? null,
         retryCount: plain.retryCount ?? 0,
-        maxRetries: plain.maxRetries ?? 3,
+        maxRetries: plain.maxRetries ?? config.payout.maxRetries,
         lastRetryAt: plain.lastRetryAt ?? null,
         remarks: plain.remarks ?? null,
         createdAt: plain.createdAt,

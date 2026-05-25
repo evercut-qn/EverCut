@@ -4,10 +4,12 @@ import mongoose from 'mongoose';
 
 import Booking from '../../models/booking.model.js';
 import Employee from '../../models/employee.model.js';
+import Media from '../../models/media.model.js';
 import PaymentTransaction from '../../models/payment-transaction.model.js';
 import PayoutTransaction from '../../models/payout-transaction.model.js';
 import bookingRepository from '../booking.repository.js';
 import employeeRepository from '../employee.repository.js';
+import mediaRepository from '../media.repository.js';
 import paymentRepository from '../payment.repository.js';
 import payoutRepository from '../payout.repository.js';
 
@@ -87,7 +89,7 @@ test('employeeRepository.claimSlots atomically rejects any occupied slot marker'
     ]);
     assert.equal(capturedFilter.shopId, 'shop-1');
     assert.deepEqual(capturedOptions, { returnDocument: 'after' });
-    assert.equal(capturedSelect, 'firstName lastName photoUrl');
+    assert.equal(capturedSelect, 'firstName lastName photoR2Key');
 });
 
 test('employeeRepository.claimTimeRange atomically rejects overlapping exact ranges', async (t) => {
@@ -143,7 +145,7 @@ test('employeeRepository.claimTimeRange atomically rejects overlapping exact ran
     ]);
     assert.equal(capturedFilter.shopId, 'shop-1');
     assert.deepEqual(capturedOptions, { returnDocument: 'after', runValidators: true });
-    assert.equal(capturedSelect, 'firstName lastName photoUrl workingHours');
+    assert.equal(capturedSelect, 'firstName lastName photoR2Key workingHours');
 });
 
 test('paymentRepository.findPendingByBookingId preserves its internal $in operator under sanitizeFilter', async (t) => {
@@ -166,6 +168,57 @@ test('paymentRepository.findPendingByBookingId preserves its internal $in operat
 
     assert.deepEqual(capturedFilter.status.$in, ['initiated', 'pending']);
     assert.deepEqual(capturedSort, { createdAt: -1 });
+});
+
+test('mediaRepository.findByIdAndUser preserves status operators under sanitizeFilter', async (t) => {
+    let capturedFilter = null;
+
+    t.mock.method(Media, 'findOne', (filter) => {
+        capturedFilter = filter;
+        return null;
+    });
+
+    await mediaRepository.findByIdAndUser('media-1', 'user-1', { status: { $ne: 'deleted' } });
+    sanitize(capturedFilter);
+
+    assert.equal(capturedFilter.status.$ne, 'deleted');
+});
+
+test('mediaRepository.softDeleteByIdAndUser preserves its status operator under sanitizeFilter', async (t) => {
+    let capturedFilter = null;
+
+    t.mock.method(Media, 'findOneAndUpdate', (filter) => {
+        capturedFilter = filter;
+        return null;
+    });
+
+    await mediaRepository.softDeleteByIdAndUser('media-1', 'user-1');
+    sanitize(capturedFilter);
+
+    assert.equal(capturedFilter.status.$ne, 'deleted');
+});
+
+test('mediaRepository.findExpiredPending preserves its createdAt operator under sanitizeFilter', async (t) => {
+    let capturedFilter = null;
+    let capturedLimit = null;
+    const cutoff = new Date('2026-05-12T13:00:00.000Z');
+    const query = {
+        limit(limitArg) {
+            capturedLimit = limitArg;
+            return this;
+        },
+    };
+
+    t.mock.method(Media, 'find', (filter) => {
+        capturedFilter = filter;
+        return query;
+    });
+
+    await mediaRepository.findExpiredPending(cutoff, 25);
+    sanitize(capturedFilter);
+
+    assert.equal(capturedFilter.createdAt.$lt, cutoff);
+    assert.equal(capturedLimit, 25);
 });
 
 test('paymentRepository.findCompletedByBookingIds preserves its internal $in operator under sanitizeFilter', async (t) => {

@@ -1,11 +1,13 @@
 import { sanitizeForResponse, toIdString, toPlainObject } from './core.serializer.js';
+import { buildMediaUrl } from '../services/media/media-url.service.js';
 
 const compact = (value) => Object.fromEntries(
     Object.entries(value).filter(([, nestedValue]) => nestedValue !== undefined),
 );
 
 export const serializeEmployee = (employee, options = {}) => {
-    const plain = sanitizeForResponse(toPlainObject(employee));
+    const raw = toPlainObject(employee);
+    const plain = sanitizeForResponse(raw);
     if (!plain) return null;
 
     const base = {
@@ -13,7 +15,7 @@ export const serializeEmployee = (employee, options = {}) => {
         shopId: plain.shopId?.id || toIdString(plain.shopId),
         firstName: plain.firstName ?? null,
         lastName: plain.lastName ?? null,
-        photoUrl: plain.photoUrl ?? null,
+        photoUrl: buildMediaUrl(raw.photoR2Key),
         gender: plain.gender ?? null,
         workingHours: plain.workingHours ?? null,
         isActive: plain.isActive ?? true,

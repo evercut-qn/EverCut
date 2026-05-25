@@ -9,11 +9,14 @@ import { ROLES } from '../utils/constants.js';
 
 const router = Router();
 
+// Webhook route - public but protected by signature verification in service layer
 router.post('/webhook', payoutController.handlePayoutWebhook);
+
+// All other payout routes require authentication
+router.use(authenticate);
 
 router.post(
     '/:payoutId/retry',
-    authenticate,
     authorize(ROLES.ADMIN),
     validate(payoutIdParamSchema, 'params'),
     payoutController.retryPayout,

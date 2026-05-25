@@ -78,7 +78,7 @@ class EmployeeRepository {
                 },
             },
             queryOptions,
-        ).select('firstName lastName photoUrl');
+        ).select('firstName lastName photoR2Key');
     }
 
     /**
@@ -143,7 +143,7 @@ class EmployeeRepository {
                 },
             },
             queryOptions,
-        ).select('firstName lastName photoUrl workingHours');
+        ).select('firstName lastName photoR2Key workingHours');
     }
 
     async moveTimeRange(employeeId, range, options = {}) {
@@ -196,7 +196,7 @@ class EmployeeRepository {
                 ...queryOptions,
                 arrayFilters: [{ 'bookingRange.bookingId': bookingId }],
             },
-        ).select('firstName lastName photoUrl workingHours');
+        ).select('firstName lastName photoR2Key workingHours');
     }
 
     /**

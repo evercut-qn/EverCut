@@ -1,9 +1,9 @@
 import customerRepository from '../repositories/customer.repository.js';
-import userRepository from '../repositories/user.repository.js';
 import { NotFoundError, BadRequestError } from '../utils/api-error.js';
-import cloudinary from '../config/cloudinary.config.js';
 import notificationEvents from './notification-events.service.js';
 import { serializeCustomerProfile } from '../serializers/customer.serializer.js';
+import * as mediaService from './media/media.service.js';
+import { MEDIA_ENTITY_TYPE, MEDIA_PURPOSE } from '../utils/constants.js';
 
 /**
  * Customer-facing profile service.
@@ -15,7 +15,7 @@ export const getProfile = async (userId) => {
     return serializeCustomerProfile(profile);
 };
 
-export const updateProfile = async (userId, data, file) => {
+export const updateProfile = async (userId, data) => {
     const profile = await customerRepository.findByUserId(userId);
     if (!profile) throw new NotFoundError('Customer');
 
@@ -32,33 +32,22 @@ export const updateProfile = async (userId, data, file) => {
         delete data.email;
     }
 
-    const nextPhotoCloudinaryId = file ? (file.filename || file.public_id) : null;
-    if (file) {
-        data.photoUrl = file.path;
-        data.cloudinaryId = nextPhotoCloudinaryId;
+    const photoMediaId = data.photoMediaId;
+    delete data.photoMediaId;
+
+    let nextPhotoR2Key = null;
+    if (photoMediaId) {
+        const media = await mediaService.resolveMediaForEntity(userId, photoMediaId);
+        nextPhotoR2Key = media.r2Key;
+        data.photoR2Key = nextPhotoR2Key;
     }
 
-    let updated;
-    let profileUpdated = false;
-    try {
-        updated = await customerRepository.updateByUserId(userId, data);
-        profileUpdated = true;
-    } catch (err) {
-        if (nextPhotoCloudinaryId && !profileUpdated) {
-            try {
-                await cloudinary.uploader.destroy(nextPhotoCloudinaryId);
-            } catch {
-                // Non-fatal; preserve the original error
-            }
-        }
-        throw err;
-    }
+    const updated = await customerRepository.updateByUserId(userId, data);
 
-    if (nextPhotoCloudinaryId && profile.cloudinaryId && profile.cloudinaryId !== nextPhotoCloudinaryId) {
-        try {
-            await cloudinary.uploader.destroy(profile.cloudinaryId);
-        } catch {
-            // Non-fatal; the new photo is already persisted
+    if (photoMediaId) {
+        await mediaService.linkMediaToEntity(photoMediaId, profile._id, MEDIA_ENTITY_TYPE.CUSTOMER, MEDIA_PURPOSE.AVATAR);
+        if (profile.photoR2Key && profile.photoR2Key !== nextPhotoR2Key) {
+            mediaService.deleteObjectByKey(profile.photoR2Key).catch(() => {});
         }
     }
 

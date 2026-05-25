@@ -87,7 +87,7 @@ Expected:
 Request:
 
 ```http
-GET /api/v1/notifications/unread-count
+GET /api/v1/notifications/summary
 Authorization: Bearer {{customer_access_token}}
 ```
 
@@ -109,7 +109,7 @@ First capture `notification_id` from Flow 3.
 Request:
 
 ```http
-PATCH /api/v1/notifications/{{notification_id}}/read
+PATCH /api/v1/notifications/{{notification_id}}
 Authorization: Bearer {{customer_access_token}}
 ```
 
@@ -123,7 +123,7 @@ Expected:
 Request:
 
 ```http
-PATCH /api/v1/notifications/read-all
+PATCH /api/v1/notifications
 Authorization: Bearer {{customer_access_token}}
 ```
 

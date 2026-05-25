@@ -20,6 +20,7 @@
 
 import connectDB, { disconnectDB } from '../src/config/database.config.js';
 import User from '../src/models/user.model.js';
+import Barber from '../src/models/barber.model.js';
 import Shop from '../src/models/shop.model.js';
 import Customer from '../src/models/customer.model.js';
 import Employee from '../src/models/employee.model.js';
@@ -45,7 +46,7 @@ const CUSTOMER_FIXTURES = [
         profile: {
             firstName: 'Ava',
             lastName: 'Replyless',
-            gender: 'Female',
+            gender: 'female',
             dateOfBirth: new Date('1996-04-12'),
             address: '101 Rating Fixture Street',
             location: { type: 'Point', coordinates: [77.5946, 12.9716] },
@@ -67,7 +68,7 @@ const CUSTOMER_FIXTURES = [
         profile: {
             firstName: 'Ben',
             lastName: 'Updated',
-            gender: 'Male',
+            gender: 'male',
             dateOfBirth: new Date('1994-06-21'),
             address: '102 Rating Fixture Street',
             location: { type: 'Point', coordinates: [77.5946, 12.9716] },
@@ -90,7 +91,7 @@ const CUSTOMER_FIXTURES = [
         profile: {
             firstName: 'Cara',
             lastName: 'Delete',
-            gender: 'Female',
+            gender: 'female',
             dateOfBirth: new Date('1991-11-05'),
             address: '103 Rating Fixture Street',
             location: { type: 'Point', coordinates: [77.5946, 12.9716] },
@@ -111,10 +112,9 @@ const EMPLOYEE_FIXTURE = {
     firstName: 'Marco',
     lastName: 'Fixture',
     phoneNumber: '+15550999001',
-    gender: 'Male',
+    gender: 'male',
     dateOfBirth: new Date('1992-09-09'),
-    photoUrl: 'https://example.com/mock-employee-photo.jpg',
-    cloudinaryId: 'mock-employee-photo',
+    photoR2Key: 'images/employees/mock-shop/mock-employee-photo.jpg',
     workingHours: {
         start: '09:00',
         end: '20:00',
@@ -124,8 +124,8 @@ const EMPLOYEE_FIXTURE = {
 const SERVICE_FIXTURE = {
     serviceName: 'Mock Signature Haircut',
     serviceType: 'single',
-    serviceFor: 'male',
-    imageUrl: 'https://example.com/mock-service-image.jpg',
+    serviceFor: 'men',
+    imageR2Key: 'images/services/default/service.jpg',
     duration: 45,
     actualPrice: 400,
     offerPrice: 50,
@@ -164,36 +164,55 @@ const upsertCustomer = async (userId, profileFixture) => {
     return customer;
 };
 
-const upsertShop = async (ownerId) => {
+const upsertBarber = async (userId) => {
     const pinHash = await hashPin('1234');
-    let shop = await withDeleted(Shop.findOne({ ownerId }));
+    let barber = await withDeleted(Barber.findOne({ userId }));
 
-    const shopPayload = {
-        ownerId,
-        shopName: 'EverCut Barber Rating Mock Shop',
-        ownerName: 'Test Barber Owner',
-        ownerFirstName: 'Test',
-        ownerLastName: 'Barber',
-        ownerGender: 'Male',
-        ownerDateOfBirth: new Date('1990-01-15'),
-        category: 'Barber',
-        targetCustomers: 'male',
+    const barberPayload = {
+        userId,
+        firstName: 'Test',
+        lastName: 'Barber',
+        gender: 'male',
+        dateOfBirth: new Date('1990-01-15'),
+        yearsOfExperience: 8,
         upiId: 'evercut.mock@upi',
         accountHolderName: 'Test Barber Owner',
         bankName: 'Mock Bank',
+        bankAccount: '12345678901234',
+        ifsc: 'HDFC0001234',
+        payoutConfig: { verificationStatus: 'pending' },
+        pinHash,
+        deletedAt: null,
+    };
+
+    if (!barber) {
+        barber = await Barber.create(barberPayload);
+        return barber;
+    }
+
+    Object.assign(barber, barberPayload);
+    await barber.save();
+    return barber;
+};
+
+const upsertShop = async (barberId) => {
+    let shop = await withDeleted(Shop.findOne({ barberId }));
+
+    const shopPayload = {
+        barberId,
+        shopName: 'EverCut Barber Rating Mock Shop',
+        category: 'Barber Shop',
+        targetCustomers: 'men',
         bio: 'Seeded barber shop used for barber rating route testing.',
         address: '500 Mock Data Avenue',
         location: { type: 'Point', coordinates: [77.5946, 12.9716] },
         numberOfEmployees: 1,
-        yearsOfExperience: 8,
         facilities: ['Air Conditioning', 'Waiting Area'],
         availableDays: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
         openTime: '09:00',
         closeTime: '20:00',
         breakTimes: [{ start: '13:00', end: '14:00' }],
-        coverUrl: 'https://example.com/mock-shop-cover.jpg',
-        coverCloudinaryId: 'mock-shop-cover',
-        pinHash,
+        coverR2Key: 'images/covers/mock-shop/mock-shop-cover.jpg',
         isOpen: true,
         deletedAt: null,
     };
@@ -293,7 +312,8 @@ const main = async () => {
 
     try {
         const barberUser = await upsertUser(BARBER_FIXTURE);
-        const shop = await upsertShop(barberUser._id);
+        const barber = await upsertBarber(barberUser._id);
+        const shop = await upsertShop(barber._id);
 
         const customers = [];
         for (const fixture of CUSTOMER_FIXTURES) {
@@ -328,6 +348,7 @@ const main = async () => {
             },
             shop: {
                 userId: barberUser._id.toString(),
+                barberId: barber._id.toString(),
                 shopId: shop._id.toString(),
                 shopName: shop.shopName,
             },

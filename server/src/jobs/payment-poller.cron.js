@@ -1,14 +1,16 @@
+import config from '../config/index.js';
 import logger from '../utils/logger.js';
 import { pollPendingPayments } from '../services/payment.service.js';
 
-const POLL_INTERVAL_MS = 5 * 60 * 1000;
 let intervalId = null;
 
 export const startPaymentPoller = () => {
     if (intervalId) return;
 
+    const pollIntervalMs = config.payment.pollIntervalMs;
+
     logger.info('[PaymentPoller] Starting payment status poller', {
-        intervalMs: POLL_INTERVAL_MS,
+        intervalMs: pollIntervalMs,
     });
 
     pollPendingPayments().catch((error) => {
@@ -21,7 +23,7 @@ export const startPaymentPoller = () => {
         } catch (error) {
             logger.error('[PaymentPoller] Poll cycle failed', { error: error.message });
         }
-    }, POLL_INTERVAL_MS);
+    }, pollIntervalMs);
 };
 
 export const stopPaymentPoller = () => {

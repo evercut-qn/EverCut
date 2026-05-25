@@ -7,13 +7,17 @@ const ensureRequiredEnv = () => {
         FIREBASE_PROJECT_ID: 'evercut-test',
         FIREBASE_CLIENT_EMAIL: 'firebase@example.com',
         FIREBASE_PRIVATE_KEY: '-----BEGIN PRIVATE KEY-----\\nabc\\n-----END PRIVATE KEY-----',
-        CLOUDINARY_CLOUD_NAME: 'evercut',
-        CLOUDINARY_API_KEY: 'cloudinary-key',
-        CLOUDINARY_API_SECRET: 'cloudinary-secret',
+        CF_ACCOUNT_ID: 'test-account',
+        R2_ACCESS_KEY_ID: 'test-access-key',
+        R2_SECRET_ACCESS_KEY: 'test-secret-key',
+        R2_BUCKET: 'evercut-media-test',
+        CDN_BASE_URL: 'https://media.evercut.test',
+        MEDIA_TOKEN_SECRET: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
         MSG91_AUTH_KEY: 'msg91-auth',
         MSG91_OTP_TEMPLATE_ID: 'msg91-template',
         JWT_ACCESS_SECRET: 'access-secret',
         JWT_REFRESH_SECRET: 'refresh-secret',
+        JWT_ONBOARDING_SECRET: 'onboarding-secret',
         PHONEPE_CLIENT_ID: 'phonepe-client',
         PHONEPE_CLIENT_SECRET: 'phonepe-secret',
         PHONEPE_CLIENT_VERSION: '1',
@@ -31,6 +35,7 @@ const ensureRequiredEnv = () => {
 
 ensureRequiredEnv();
 
+const config = (await import('../../config/index.js')).default;
 const paymentService = await import('../payment.service.js');
 const paymentRepository = (await import('../../repositories/payment.repository.js')).default;
 const bookingRepository = (await import('../../repositories/booking.repository.js')).default;
@@ -97,7 +102,7 @@ test('getPayments lists only the authenticated customer payments', async (t) => 
 });
 
 test('getPayments lists only the authenticated barber shop payments', async (t) => {
-    t.mock.method(shopRepository, 'findByOwnerId', async () => ({ _id: 'shop-1' }));
+    t.mock.method(shopRepository, 'findByBarberUserId', async () => ({ _id: 'shop-1' }));
 
     let countFilter = null;
     t.mock.method(paymentRepository, 'countAll', async (filter) => {
@@ -139,7 +144,14 @@ test('getPayments lists only the authenticated barber shop payments', async (t) 
 });
 
 test('initiatePayment creates a native PhonePe SDK order and never returns a redirect URL', async (t) => {
-    t.mock.method(customerRepository, 'findByUserId', async () => ({ _id: 'customer-1' }));
+    const serviceAmount = 120;
+    const singlePlatformFee = config.payment.platformFeeSingle;
+    const chargedAmount = serviceAmount + singlePlatformFee;
+
+    t.mock.method(customerRepository, 'findByUserId', async () => ({
+        _id: 'customer-1',
+        feeWaiverBookingsUsed: config.payment.feeWaiverQuota,
+    }));
     t.mock.method(bookingRepository, 'findById', async () => ({
         _id: 'booking-1',
         customerId: 'customer-1',
@@ -147,14 +159,15 @@ test('initiatePayment creates a native PhonePe SDK order and never returns a red
         serviceIds: ['service-1'],
         status: 'pending',
         paymentStatus: 'pending',
-        totalAmount: 120,
+        totalAmount: serviceAmount,
     }));
     t.mock.method(paymentRepository, 'findPendingByBookingId', async () => null);
+    t.mock.method(paymentRepository, 'countActiveWaiverReservations', async () => 0);
     t.mock.method(serviceRepository, 'findByIds', async () => ([
         {
             _id: 'service-1',
             serviceType: 'single',
-            finalPrice: 120,
+            finalPrice: serviceAmount,
             duration: 30,
         },
     ]));
@@ -201,17 +214,22 @@ test('initiatePayment creates a native PhonePe SDK order and never returns a red
     assert.equal(result.token, 'sdk-order-token');
     assert.equal(result.merchantId, 'merchant-id');
     assert.equal(result.gateway, 'phonepe');
-    assert.equal(result.amountInPaisa, 12300);
-    assert.equal(result.amountInRupees, 123);
+    assert.equal(result.amountInPaisa, chargedAmount * 100);
+    assert.equal(result.amountInRupees, chargedAmount);
     assert.equal(result.state, 'PENDING');
     assert.equal(result.expiresAt, 1777037869000);
     assert.match(result.merchantOrderId, /^EC-booking-1-/);
 
     assert.equal(gatewayArgs.redirectUrl, undefined);
-    assert.equal(gatewayArgs.amount, 12300);
+    assert.equal(gatewayArgs.amount, chargedAmount * 100);
     assert.equal(gatewayArgs.metadata.bookingId, 'booking-1');
 
-    assert.equal(createdPayment.amount, 12300);
+    assert.equal(createdPayment.amount, chargedAmount * 100);
+    assert.equal(createdPayment.waiverApplied, false);
+    assert.equal(createdPayment.settlement.platformFee, singlePlatformFee * 100);
+    assert.equal(Object.hasOwn(createdPayment.settlement, 'standardPlatformFee'), false);
+    assert.equal(Object.hasOwn(createdPayment.settlement, 'bookingFeeType'), false);
+    assert.equal(Object.hasOwn(createdPayment.settlement, 'waiverApplied'), false);
     assert.equal(paymentUpdates[0].id, 'payment-1');
     assert.equal(paymentUpdates[0].updates.gatewayOrderId, 'OMO-native-1');
     assert.equal(paymentUpdates[0].updates.sdkOrderTokenIssued, true);
@@ -274,6 +292,7 @@ test('verifyPayment confirms native SDK results through PhonePe order status bef
         status: 'pending',
         amount: 12300,
         amountInRupees: 123,
+        waiverApplied: true,
     };
 
     t.mock.method(paymentRepository, 'findById', async () => currentPayment);
@@ -300,6 +319,7 @@ test('verifyPayment confirms native SDK results through PhonePe order status bef
     });
 
     const bookingUpdates = [];
+    const waiverUpdates = [];
     let currentBooking = {
         _id: 'booking-1',
         status: 'pending',
@@ -310,6 +330,13 @@ test('verifyPayment confirms native SDK results through PhonePe order status bef
         bookingUpdates.push({ id, updates });
         currentBooking = { ...currentBooking, ...updates };
         return { _id: id, ...currentBooking };
+    });
+    t.mock.method(customerRepository, 'consumeFeeWaiverSlot', async (customerId) => {
+        waiverUpdates.push(customerId);
+        return {
+            _id: customerId,
+            feeWaiverBookingsUsed: 1,
+        };
     });
 
     const result = await paymentService.verifyPayment('user-1', 'payment-1', {
@@ -326,19 +353,78 @@ test('verifyPayment confirms native SDK results through PhonePe order status bef
     assert.equal(paymentUpdates[0].updates.status, 'completed');
     assert.equal(bookingUpdates[0].updates.status, 'awaiting_confirmation');
     assert.equal(bookingUpdates[0].updates.paymentStatus, 'success');
+    assert.deepEqual(waiverUpdates, ['customer-1']);
+});
+
+test('initiatePayment waives platform fee for an available introductory waiver slot', async (t) => {
+    const bundlePlatformFee = config.payment.platformFeeBundle;
+
+    t.mock.method(customerRepository, 'findByUserId', async () => ({
+        _id: 'customer-waiver',
+        feeWaiverBookingsUsed: config.payment.feeWaiverQuota - 1,
+    }));
+    t.mock.method(bookingRepository, 'findById', async () => ({
+        _id: 'booking-waiver',
+        customerId: 'customer-waiver',
+        shopId: 'shop-1',
+        serviceIds: ['bundle-1'],
+        status: 'pending',
+        paymentStatus: 'pending',
+        totalAmount: 500,
+    }));
+    t.mock.method(paymentRepository, 'findPendingByBookingId', async () => null);
+    t.mock.method(paymentRepository, 'countActiveWaiverReservations', async () => 0);
+    t.mock.method(serviceRepository, 'findByIds', async () => ([
+        {
+            _id: 'bundle-1',
+            serviceType: 'bundled',
+            totalPrice: 500,
+            finalPrice: null,
+        },
+    ]));
+
+    let createdPayment = null;
+    t.mock.method(paymentRepository, 'create', async (payload) => {
+        createdPayment = payload;
+        return { _id: 'payment-waiver', ...payload };
+    });
+    t.mock.method(phonePeAdapter, 'createOrder', async () => ({
+        orderId: 'OMO-waiver',
+        token: 'sdk-waiver-token',
+        state: 'PENDING',
+    }));
+    t.mock.method(paymentRepository, 'updateById', async (id, updates) => ({ _id: id, ...updates }));
+    t.mock.method(bookingRepository, 'updateById', async (id, updates) => ({ _id: id, ...updates }));
+
+    const result = await paymentService.initiatePayment('user-1', 'booking-waiver');
+
+    assert.equal(result.amountInPaisa, 50000);
+    assert.equal(createdPayment.amount, 50000);
+    assert.equal(createdPayment.waiverApplied, true);
+    assert.equal(createdPayment.settlement.serviceAmount, 50000);
+    assert.equal(createdPayment.settlement.platformFee, 0);
+    assert.equal(Object.hasOwn(createdPayment.settlement, 'standardPlatformFee'), false);
+    assert.equal(Object.hasOwn(createdPayment.settlement, 'bookingFeeType'), false);
+    assert.equal(Object.hasOwn(createdPayment.settlement, 'waiverApplied'), false);
 });
 
 test('initiateRefund deducts the refund fee and non-refundable platform fee before calling PhonePe', async (t) => {
+    const bundlePlatformFee = config.payment.platformFeeBundle;
+    const bundleRefundFee = config.payment.refundFeeBundle;
+    const serviceAmount = 31900;
+    const refundAmount = serviceAmount - (bundleRefundFee * 100);
+
     t.mock.method(paymentRepository, 'findCompletedByBookingId', async () => ({
         _id: 'payment-1',
         bookingId: 'booking-1',
         merchantOrderId: 'EC-booking-1',
-        amount: 31900,
+        amount: serviceAmount,
         amountInRupees: 319,
         status: 'completed',
         settlement: {
             isBundle: true,
-            platformFee: 1000,
+            serviceAmount,
+            platformFee: bundlePlatformFee * 100,
         },
     }));
 
@@ -373,12 +459,12 @@ test('initiateRefund deducts the refund fee and non-refundable platform fee befo
     assert.deepEqual(phonePeRefundArgs, {
         merchantRefundId: phonePeRefundArgs.merchantRefundId,
         originalMerchantOrderId: 'EC-booking-1',
-        amount: 29400,
+        amount: refundAmount,
     });
     assert.ok(phonePeRefundArgs.merchantRefundId.length <= 63);
     assert.match(phonePeRefundArgs.merchantRefundId, /^RF-[a-f0-9]{24}-[a-f0-9]{12}$/);
-    assert.equal(paymentUpdates[0].updates.refundFee, 1500);
-    assert.equal(paymentUpdates[0].updates.refund.amount, 29400);
+    assert.equal(paymentUpdates[0].updates.refundFee, bundleRefundFee * 100);
+    assert.equal(paymentUpdates[0].updates.refund.amount, refundAmount);
     assert.deepEqual(bookingUpdates[0], {
         id: 'booking-1',
         updates: {
@@ -389,11 +475,11 @@ test('initiateRefund deducts the refund fee and non-refundable platform fee befo
         merchantRefundId: phonePeRefundArgs.merchantRefundId,
         refundId: 'refund-1',
         state: 'PENDING',
-        refundAmount: 294,
+        refundAmount: refundAmount / 100,
         refundType: 'cancellation',
         deductions: {
-            refundFee: 15,
-            platformFee: 10,
+            refundFee: bundleRefundFee,
+            platformFee: bundlePlatformFee,
         },
     });
 });
@@ -405,11 +491,11 @@ test('initiateRefund generates PhonePe-safe merchant refund ids under 63 charact
         _id: 'payment-1',
         bookingId: '69e9f8d19a40bca252b1b9b7',
         merchantOrderId: longMerchantOrderId,
-        amount: 10200,
+        amount: 10300,
         status: 'completed',
         settlement: {
             serviceAmount: 9900,
-            platformFee: 300,
+            platformFee: config.payment.platformFeeSingle * 100,
             isBundle: false,
         },
     }));
@@ -443,11 +529,11 @@ test('initiateRefund records provider refund initiation failures for manual foll
         _id: 'payment-1',
         bookingId: 'booking-1',
         merchantOrderId: 'EC-booking-1',
-        amount: 10200,
+        amount: 10300,
         status: 'completed',
         settlement: {
             serviceAmount: 9900,
-            platformFee: 300,
+            platformFee: config.payment.platformFeeSingle * 100,
             isBundle: false,
         },
     }));
@@ -485,11 +571,11 @@ test('initiateRefund blocks automatic refunds once payout has already started', 
         _id: 'payment-1',
         bookingId: 'booking-1',
         merchantOrderId: 'EC-booking-1',
-        amount: 10200,
+        amount: 10300,
         status: 'completed',
         settlement: {
             isBundle: false,
-            platformFee: 300,
+            platformFee: config.payment.platformFeeSingle * 100,
         },
     }));
 
@@ -515,11 +601,11 @@ test('initiateRefund rejects barbers who do not own the booking shop', async (t)
         _id: 'payment-1',
         bookingId: 'booking-1',
         merchantOrderId: 'EC-booking-1',
-        amount: 10200,
+        amount: 10300,
         status: 'completed',
         settlement: {
             isBundle: false,
-            platformFee: 300,
+            platformFee: config.payment.platformFeeSingle * 100,
         },
     }));
 
@@ -529,7 +615,7 @@ test('initiateRefund rejects barbers who do not own the booking shop', async (t)
         payoutStatus: 'not_initiated',
     }));
 
-    t.mock.method(shopRepository, 'findByOwnerId', async () => ({
+    t.mock.method(shopRepository, 'findByBarberUserId', async () => ({
         _id: 'shop-2',
     }));
 
@@ -554,11 +640,11 @@ test('initiateRefund enforces barber ownership when the actor uses req.user.role
         _id: 'payment-1',
         bookingId: 'booking-1',
         merchantOrderId: 'EC-booking-1',
-        amount: 10200,
+        amount: 10300,
         status: 'completed',
         settlement: {
             isBundle: false,
-            platformFee: 300,
+            platformFee: config.payment.platformFeeSingle * 100,
         },
     }));
 
@@ -568,7 +654,7 @@ test('initiateRefund enforces barber ownership when the actor uses req.user.role
         payoutStatus: 'not_initiated',
     }));
 
-    t.mock.method(shopRepository, 'findByOwnerId', async () => ({
+    t.mock.method(shopRepository, 'findByBarberUserId', async () => ({
         _id: 'shop-2',
     }));
 
@@ -857,4 +943,64 @@ test('pollPendingPayments releases held booking slots when checkout sessions exp
         },
     });
     assert.ok(bookingUpdates[0].updates.cancelledAt instanceof Date);
+});
+
+test('initiatePayment rejects single service bookings below the minimum service amount', async (t) => {
+    const singleMinimum = config.payment.minSingleServiceAmount;
+
+    t.mock.method(customerRepository, 'findByUserId', async () => ({ _id: 'customer-1' }));
+    t.mock.method(bookingRepository, 'findById', async () => ({
+        _id: 'booking-single-low',
+        customerId: 'customer-1',
+        shopId: 'shop-1',
+        serviceIds: ['single-1'],
+        totalAmount: singleMinimum - 1,
+        status: 'pending',
+        paymentStatus: 'pending',
+    }));
+    t.mock.method(paymentRepository, 'findPendingByBookingId', async () => null);
+    t.mock.method(serviceRepository, 'findByIds', async () => ([
+        {
+            _id: 'single-1',
+            serviceType: 'single',
+            finalPrice: singleMinimum - 1,
+            totalPrice: null,
+            actualPrice: singleMinimum - 1,
+            offerPrice: 0,
+        },
+    ]));
+
+    await assert.rejects(
+        paymentService.initiatePayment('user-1', 'booking-single-low'),
+        new RegExp(`Minimum single service booking amount is .${singleMinimum}`),
+    );
+});
+
+test('initiatePayment rejects bundle bookings below the corrected minimum service amount', async (t) => {
+    const bundleMinimum = config.payment.minBundleServiceAmount;
+
+    t.mock.method(customerRepository, 'findByUserId', async () => ({ _id: 'customer-1' }));
+    t.mock.method(bookingRepository, 'findById', async () => ({
+        _id: 'booking-bundle-low',
+        customerId: 'customer-1',
+        shopId: 'shop-1',
+        serviceIds: ['bundle-1'],
+        totalAmount: bundleMinimum - 1,
+        status: 'pending',
+        paymentStatus: 'pending',
+    }));
+    t.mock.method(paymentRepository, 'findPendingByBookingId', async () => null);
+    t.mock.method(serviceRepository, 'findByIds', async () => ([
+        {
+            _id: 'bundle-1',
+            serviceType: 'bundled',
+            finalPrice: null,
+            totalPrice: bundleMinimum - 1,
+        },
+    ]));
+
+    await assert.rejects(
+        paymentService.initiatePayment('user-1', 'booking-bundle-low'),
+        new RegExp(`Minimum bundle booking amount is .${bundleMinimum}`),
+    );
 });

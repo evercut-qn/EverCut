@@ -30,8 +30,6 @@ export const BOOKING_STATUS = Object.freeze({
 
 export const ALL_BOOKING_STATUSES = Object.values(BOOKING_STATUS);
 
-export const BOOKING_MILESTONE_TARGETS = Object.freeze([500, 750, 1000]);
-
 // ---------------------------------------------------------------------------
 // Payment Statuses
 // ---------------------------------------------------------------------------
@@ -102,6 +100,17 @@ export const PAYMENT_GATEWAYS = Object.freeze({
     MANUAL: 'manual',
 });
 
+export const REFUND_TYPE = Object.freeze({
+    CANCELLATION: 'cancellation',
+    MANUAL: 'manual',
+});
+
+export const CANCELLATION_TYPE = Object.freeze({
+    CUSTOMER: 'customer',
+    BARBER: 'barber',
+    AUTO: 'auto',
+});
+
 export const PAYOUT_MODES = Object.freeze({
     UPI: 'upi',
     IMPS: 'imps',
@@ -110,43 +119,16 @@ export const PAYOUT_MODES = Object.freeze({
     BANK: 'banktransfer',
 });
 
-export const PLATFORM_FEES = Object.freeze({
-    SINGLE_SERVICE: 3,
-    BUNDLE: 10,
-});
-
-export const REFUND_FEES = Object.freeze({
-    SINGLE_SERVICE: 7,
-    BUNDLE: 15,
-});
-
-// ---------------------------------------------------------------------------
-// Booking Limits
-// ---------------------------------------------------------------------------
-
-export const BOOKING_LIMITS = Object.freeze({
-    MAX_SERVICES_PER_BOOKING: 10,      // Maximum 10 services/bundles per booking
-    MAX_BOOKING_DURATION_MINUTES: 480, // Maximum 8 hours per booking
-    MAX_ADVANCE_BOOKING_DAYS: 7,       // Maximum 7 days in advance
-});
-
-// ---------------------------------------------------------------------------
-// Bundle Rules
-// ---------------------------------------------------------------------------
-
-export const BUNDLE_RULES = Object.freeze({
-    MIN_SERVICE_AMOUNT: 300,
-});
 
 // ---------------------------------------------------------------------------
 // Shop Categories
 // ---------------------------------------------------------------------------
 
 export const SHOP_CATEGORY = Object.freeze({
-    SALON: 'Salon',
-    BEAUTY_PARLOUR: 'Beauty Parlour',
-    BARBER: 'Barber',
-    DOOR_STEP: 'Door-Step',
+    SALON: 'Hair Salon',
+    BEAUTY_PARLOUR: 'Beauty Salon',
+    BARBER: 'Barber Shop',
+    DOOR_STEP: 'Doorstep Service',
 });
 
 export const ALL_SHOP_CATEGORIES = Object.values(SHOP_CATEGORY);
@@ -197,36 +179,77 @@ export const ALL_SERVICE_TYPES = Object.values(SERVICE_TYPE);
 // ---------------------------------------------------------------------------
 
 export const SERVICE_FOR = Object.freeze({
-    MALE: 'male',
-    FEMALE: 'female',
+    MEN: 'men',
+    WOMEN: 'women',
     UNISEX: 'unisex',
 });
 
 export const ALL_SERVICE_FOR = Object.values(SERVICE_FOR);
 
 // ---------------------------------------------------------------------------
-// Photo Types
+// Media
 // ---------------------------------------------------------------------------
 
-export const PHOTO_TYPE = Object.freeze({
-    SHOP_INTERIOR: 'shop_interior',
-    SHOP_EXTERIOR: 'shop_exterior',
-    WORK_SAMPLE: 'work_sample',
-    TEAM_PHOTO: 'team_photo',
-    CERTIFICATE: 'certificate',
-    OTHER: 'other',
+export const MEDIA_TYPE = Object.freeze({
+    IMAGE: 'image',
+    VIDEO: 'video',
 });
 
-export const ALL_PHOTO_TYPES = Object.values(PHOTO_TYPE);
+export const ALL_MEDIA_TYPES = Object.values(MEDIA_TYPE);
+
+export const MEDIA_STATUS = Object.freeze({
+    PENDING: 'pending',
+    READY: 'ready',
+    PROCESSING: 'processing',
+    FAILED: 'failed',
+    DELETED: 'deleted',
+    HIDDEN: 'hidden',
+});
+
+export const ALL_MEDIA_STATUSES = Object.values(MEDIA_STATUS);
+
+export const MEDIA_PURPOSE = Object.freeze({
+    AVATAR: 'avatar',
+    PROFILE: 'profile',
+    COVER: 'cover',
+    GALLERY: 'gallery',
+    EMPLOYEE: 'employee',
+    ONBOARDING: 'onboarding',
+    SERVICE: 'service',
+    VIDEO_RAW: 'video_raw',
+    VIDEO_THUMBNAIL: 'video_thumbnail',
+});
+
+export const ALL_MEDIA_PURPOSES = Object.values(MEDIA_PURPOSE);
+
+export const MEDIA_ENTITY_TYPE = Object.freeze({
+    BARBER: 'Barber',
+    SHOP: 'Shop',
+    EMPLOYEE: 'Employee',
+    CUSTOMER: 'Customer',
+    SERVICE: 'Service',
+});
+
+export const ALL_MEDIA_ENTITY_TYPES = [...Object.values(MEDIA_ENTITY_TYPE), null];
+
+export const MIME_TO_EXTENSION = Object.freeze({
+    'image/jpeg': 'jpg',
+    'image/png': 'png',
+    'image/webp': 'webp',
+    'video/mp4': 'mp4',
+    'video/quicktime': 'mov',
+    'video/x-msvideo': 'avi',
+    'video/webm': 'webm',
+});
 
 // ---------------------------------------------------------------------------
 // Gender
 // ---------------------------------------------------------------------------
 
 export const GENDER = Object.freeze({
-    MALE: 'Male',
-    FEMALE: 'Female',
-    OTHER: 'Other',
+    MALE: 'male',
+    FEMALE: 'female',
+    TRANSGENDER: 'transgender',
 });
 
 export const ALL_GENDERS = Object.values(GENDER);
@@ -287,26 +310,6 @@ export const NOTIFICATION_EVENT = Object.freeze({
 export const ALL_NOTIFICATION_EVENTS = Object.values(NOTIFICATION_EVENT);
 
 // ---------------------------------------------------------------------------
-// Security
-// ---------------------------------------------------------------------------
-
-export const SECURITY_PIN_LENGTH = 4;
-
-// ---------------------------------------------------------------------------
-// OTP Rate Limiting
-// ---------------------------------------------------------------------------
-// Used by otp-rate-limiter.middleware.js.
-// OTP length and expiry are configured via msg91.config.js,
-// not duplicated here.
-
-export const OTP_RATE_LIMIT = Object.freeze({
-    windowMs: 15 * 60 * 1000,   // 15 minutes
-    maxSendPerPhone: 5,
-    maxSendPerIp: 10,
-    maxVerifyPerPhone: 10,
-});
-
-// ---------------------------------------------------------------------------
 // Token Types
 // ---------------------------------------------------------------------------
 
@@ -317,10 +320,86 @@ export const TOKEN_TYPE = Object.freeze({
 });
 
 // ---------------------------------------------------------------------------
-// Miscellaneous
+// Subscriptions
 // ---------------------------------------------------------------------------
 
-export const MAX_RESCHEDULE_COUNT = 1;
-export const CANCELLATION_WINDOW_HOURS = 2;
-export const NEARBY_DISTANCE_METERS = 2000;
-export const MAX_PHOTOS_PER_SHOP = 10;
+export const SUBSCRIPTION_PLANS = Object.freeze({
+    BASIC: 'PLAN_BASIC',
+    POPULAR: 'PLAN_POPULAR',
+    ADVANCED: 'PLAN_ADVANCED',
+});
+
+export const ALL_SUBSCRIPTION_PLANS = Object.values(SUBSCRIPTION_PLANS);
+
+export const SUBSCRIPTION_STATUSES = Object.freeze({
+    ACTIVE: 'ACTIVE',
+    PENDING_PAYMENT: 'PENDING_PAYMENT',
+    CANCELLED: 'CANCELLED',
+    EXPIRED: 'EXPIRED',
+    PAST_DUE: 'PAST_DUE',
+    PAUSED: 'PAUSED',
+});
+
+export const ALL_SUBSCRIPTION_STATUSES = Object.values(SUBSCRIPTION_STATUSES);
+
+export const SUBSCRIPTION_TRANSACTION_TYPES = Object.freeze({
+    CREATION: 'CREATION',
+    ACTIVATION: 'ACTIVATION',
+    RENEWAL: 'RENEWAL',
+    UPGRADE: 'UPGRADE',
+    DOWNGRADE: 'DOWNGRADE',
+    CANCELLATION: 'CANCELLATION',
+    EXPIRY: 'EXPIRY',
+    PAYMENT_FAILED: 'PAYMENT_FAILED',
+    PAUSE: 'PAUSE',
+    RESUME: 'RESUME',
+    REACTIVATION: 'REACTIVATION',
+});
+
+export const ALL_SUBSCRIPTION_TRANSACTION_TYPES = Object.values(SUBSCRIPTION_TRANSACTION_TYPES);
+
+export const SUBSCRIPTION_TRANSACTION_STATUSES = Object.freeze({
+    COMPLETED: 'COMPLETED',
+    FAILED: 'FAILED',
+    PENDING: 'PENDING',
+});
+
+export const ALL_SUBSCRIPTION_TRANSACTION_STATUSES = Object.values(SUBSCRIPTION_TRANSACTION_STATUSES);
+
+export const MUTABLE_SUBSCRIPTION_STATUSES = Object.freeze([
+    SUBSCRIPTION_STATUSES.ACTIVE,
+    SUBSCRIPTION_STATUSES.PENDING_PAYMENT,
+    SUBSCRIPTION_STATUSES.PAST_DUE,
+    SUBSCRIPTION_STATUSES.PAUSED,
+]);
+
+export const SUBSCRIPTION_STATUS_TRANSITIONS = Object.freeze({
+    [SUBSCRIPTION_STATUSES.PENDING_PAYMENT]: [
+        SUBSCRIPTION_STATUSES.ACTIVE,
+        SUBSCRIPTION_STATUSES.EXPIRED,
+        SUBSCRIPTION_STATUSES.CANCELLED,
+    ],
+    [SUBSCRIPTION_STATUSES.ACTIVE]: [
+        SUBSCRIPTION_STATUSES.CANCELLED,
+        SUBSCRIPTION_STATUSES.EXPIRED,
+        SUBSCRIPTION_STATUSES.PAST_DUE,
+        SUBSCRIPTION_STATUSES.PAUSED,
+    ],
+    [SUBSCRIPTION_STATUSES.PAST_DUE]: [
+        SUBSCRIPTION_STATUSES.ACTIVE,
+        SUBSCRIPTION_STATUSES.EXPIRED,
+    ],
+    [SUBSCRIPTION_STATUSES.PAUSED]: [
+        SUBSCRIPTION_STATUSES.ACTIVE,
+        SUBSCRIPTION_STATUSES.EXPIRED,
+        SUBSCRIPTION_STATUSES.CANCELLED,
+    ],
+    [SUBSCRIPTION_STATUSES.CANCELLED]: [
+        SUBSCRIPTION_STATUSES.EXPIRED,
+        SUBSCRIPTION_STATUSES.ACTIVE,
+    ],
+    [SUBSCRIPTION_STATUSES.EXPIRED]: [
+        SUBSCRIPTION_STATUSES.ACTIVE,
+        SUBSCRIPTION_STATUSES.PENDING_PAYMENT,
+    ],
+});

@@ -15,7 +15,7 @@ class PhonePeTokenManager {
         this._token = null;
         this._expiresAt = 0;
         this._refreshPromise = null;
-        this._refreshBufferMs = 5 * 60 * 1000;
+        this._refreshBufferMs = config.phonepe.tokenRefreshBufferMs;
     }
 
     async getToken() {

@@ -1,0 +1,17 @@
+{
+  "rules": [
+    {
+      "id": "evercut-media-prod-cors",
+      "allowed": {
+        "origins": [
+          "https://evercut.in",
+          "https://app.evercut.in"
+        ],
+        "methods": ["PUT", "GET", "HEAD"],
+        "headers": ["Content-Type"]
+      },
+      "exposeHeaders": ["ETag"],
+      "maxAgeSeconds": 3600
+    }
+  ]
+}

@@ -111,12 +111,12 @@ test('booking query schemas preserve pagination fields', () => {
     });
 });
 
-test('employee creation schema accepts multipart string fields', () => {
+test('employee creation schema accepts JSON string fields from API clients', () => {
     const employee = addEmployeeSchema.validate({
         firstName: 'Alex',
         lastName: 'Stylist',
         phoneNumber: '+15551234567',
-        gender: 'Male',
+        gender: 'male',
         dateOfBirth: '1994-04-12',
         workingHours: '{"start":"09:00","end":"18:00"}',
         blockedDates: '["2026-04-12"]',
@@ -127,7 +127,7 @@ test('employee creation schema accepts multipart string fields', () => {
         firstName: 'Alex',
         lastName: 'Stylist',
         phoneNumber: '+15551234567',
-        gender: 'Male',
+        gender: 'male',
         dateOfBirth: new Date('1994-04-12T00:00:00.000Z'),
         workingHours: {
             start: '09:00',
@@ -144,7 +144,7 @@ test('employee creation schema rejects invalid working hours and phone numbers',
         firstName: 'Alex',
         lastName: 'Stylist',
         phoneNumber: '+15551234567',
-        gender: 'Male',
+        gender: 'male',
         dateOfBirth: '1994-04-12',
         workingHours: '{"start":"18:00","end":"09:00"}',
     });
@@ -152,7 +152,7 @@ test('employee creation schema rejects invalid working hours and phone numbers',
         firstName: 'Alex',
         lastName: 'Stylist',
         phoneNumber: 'abc',
-        gender: 'Male',
+        gender: 'male',
         dateOfBirth: '1994-04-12',
     });
 

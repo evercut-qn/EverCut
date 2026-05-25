@@ -1,5 +1,6 @@
 import Shop from '../models/shop.model.js';
-import { NEARBY_DISTANCE_METERS } from '../utils/constants.js';
+import Barber from '../models/barber.model.js';
+import config from '../config/index.js';
 import { trustQueryOperators } from '../utils/mongoose-query.utils.js';
 import { escapeRegex } from '../utils/regex.utils.js';
 
@@ -12,23 +13,35 @@ class ShopRepository {
         return Shop.findById(id);
     }
 
-    async findByOwnerId(ownerId) {
-        return Shop.findOne({ ownerId });
+    async findByBarberId(barberId) {
+        return Shop.findOne({ barberId });
     }
 
-    async updateByOwnerId(ownerId, data) {
+    async findByBarberUserId(userId) {
+        const barber = await Barber.findOne({ userId });
+        if (!barber) return null;
+        return Shop.findOne({ barberId: barber._id });
+    }
+
+    async updateByBarberId(barberId, data) {
         return Shop.findOneAndUpdate(
-            { ownerId },
+            { barberId },
             { $set: data },
             { returnDocument: 'after', runValidators: true },
         );
+    }
+
+    async updateByBarberUserId(userId, data) {
+        const barber = await Barber.findOne({ userId });
+        if (!barber) return null;
+        return this.updateByBarberId(barber._id, data);
     }
 
     async updateById(id, data) {
         return Shop.findByIdAndUpdate(id, { $set: data }, { returnDocument: 'after', runValidators: true });
     }
 
-    async findNearby(coordinates, maxDistance = NEARBY_DISTANCE_METERS, selectFields) {
+    async findNearby(coordinates, maxDistance = config.shop.nearbyDistanceMeters, selectFields) {
         const query = Shop.find(trustQueryOperators({
             location: {
                 $near: {

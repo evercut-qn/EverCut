@@ -276,8 +276,8 @@ POST /subscriptions
     "customer_phone": "9876543210"                  // Required for notifications
   },
   "subscription_meta": {
-    "return_url": "https://app.evercut.com/subscription/callback?sub_id=SUB_usr123_1746000000000",
-    "notify_url": "https://api.evercut.com/webhooks/cashfree"  // Webhook override (optional)
+    "return_url": "https://app.evercut.in/subscription/callback?sub_id=SUB_usr123_1746000000000",
+    "notify_url": "https://api.evercut.in/webhooks/cashfree"  // Webhook override (optional)
   },
   "subscription_expiry_time": "2027-12-31T23:59:59+05:30",  // ISO 8601
   "subscription_first_charge_time": "2026-06-01T10:00:00+05:30",
@@ -1385,8 +1385,8 @@ CASHFREE_WEBHOOK_SECRET=your_webhook_secret
 CASHFREE_API_VERSION=2025-01-01
 
 # URLs
-APP_URL=https://api.evercut.com
-SUBSCRIPTION_RETURN_URL=https://app.evercut.com/subscription/callback
+APP_URL=https://api.evercut.in
+SUBSCRIPTION_RETURN_URL=https://app.evercut.in/subscription/callback
 
 # Redis (for Bull queues)
 REDIS_HOST=localhost

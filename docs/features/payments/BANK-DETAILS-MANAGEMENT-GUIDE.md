@@ -38,7 +38,7 @@ This guide documents the complete payout details management system for barber sh
   "data": {
     "accountHolderName": "John Doe",
     "bankName": "State Bank of India",
-    "bankAccountLast4": "******5678",
+    "bankAccount": "12345678901234",
     "ifsc": "SBIN0001234",
     "upiId": "john@paytm",
     "verificationStatus": "verified",
@@ -54,7 +54,7 @@ This guide documents the complete payout details management system for barber sh
 **Field Descriptions:**
 - `accountHolderName`: Name on the bank account
 - `bankName`: Name of the bank
-- `bankAccountLast4`: Masked account number (shows last 4 digits only)
+- `bankAccount`: Bank account number (displayed in full, unmasked)
 - `ifsc`: IFSC code of the bank branch
 - `upiId`: UPI ID for payouts
 - `verificationStatus`: One of `pending`, `verified`, `failed`
@@ -80,8 +80,7 @@ This guide documents the complete payout details management system for barber sh
   "accountHolderName": "John Doe",
   "bankName": "State Bank of India",
   "bankAccount": "12345678901234",
-  "ifsc": "SBIN0001234",
-  "upiId": "john@paytm"
+  "ifsc": "SBIN0001234"
 }
 ```
 
@@ -90,7 +89,7 @@ This guide documents the complete payout details management system for barber sh
 - `bankName`: Required, 1-120 characters
 - `bankAccount`: Required, 6-34 digits only
 - `ifsc`: Required, valid IFSC format (XXXX0XXXXXX)
-- `upiId`: Required, valid UPI ID
+- `upiId`: Optional UPI ID
 
 **Response:**
 ```json
@@ -100,7 +99,7 @@ This guide documents the complete payout details management system for barber sh
   "data": {
     "accountHolderName": "John Doe",
     "bankName": "State Bank of India",
-    "bankAccountLast4": "******1234",
+    "bankAccount": "12345678901234",
     "ifsc": "SBIN0001234",
     "upiId": "john@paytm",
     "verificationStatus": "pending",
@@ -122,9 +121,9 @@ This guide documents the complete payout details management system for barber sh
 
 ## ONBOARDING INTEGRATION
 
-### Optional Bank Details During Onboarding
+### Required Bank Details During Onboarding
 
-Bank details can be optionally provided during barber onboarding:
+Bank account and IFSC details are required during barber onboarding. UPI ID remains optional.
 
 **Endpoint:** `POST /api/v1/onboarding/barbers`
 
@@ -134,7 +133,6 @@ Bank details can be optionally provided during barber onboarding:
   "shopName": "John's Barbershop",
   "accountHolderName": "John Doe",
   "bankName": "State Bank of India",
-  "upiId": "john@paytm",
   "bankAccount": "12345678901234",
   "ifsc": "SBIN0001234",
   ...
@@ -142,10 +140,9 @@ Bank details can be optionally provided during barber onboarding:
 ```
 
 **Behavior:**
-- `bankAccount` and `ifsc` are **OPTIONAL** during onboarding
-- If provided, they are stored with `verificationStatus: 'pending'`
-- If not provided, barber can add them later via update endpoint
-- Barber must provide bank details before receiving first payout
+- `bankAccount` and `ifsc` are **REQUIRED** during onboarding
+- They are stored on the Barber profile with `verificationStatus: 'pending'`
+- `upiId` is optional and can be added or removed through the payout update endpoint
 
 ---
 
@@ -173,13 +170,13 @@ Bank details can be optionally provided during barber onboarding:
 
 ## SECURITY CONSIDERATIONS
 
-### 1. Account Number Masking
-- Bank account numbers are **always masked** in API responses
-- Only last 4 digits are shown: `******5678`
-- Full account number is never exposed via API
+### 1. Account Number Display
+- Bank account numbers are **displayed in full** (unmasked) in API responses for authorized barber profile views
+- No masking or redaction is applied to `bankAccount` in the backend serializer or mobile app layer
 
 ### 2. Sensitive Data Handling
-- Bank details are stored in `payoutConfig` subdocument
+- Bank account, IFSC, account holder, bank name, and UPI ID are stored on the Barber profile
+- Gateway beneficiary metadata is stored in the Barber profile `payoutConfig` subdocument
 - Verification status is system-managed (cannot be set by user)
 - Beneficiary ID is system-managed (set by payout service)
 
@@ -213,10 +210,10 @@ Bank details can be optionally provided during barber onboarding:
 
 ### Beneficiary Creation
 When bank details are provided/updated:
-1. System stores details in `shop.payoutConfig`
+1. System stores payout destination details on the Barber profile
 2. Payout service creates beneficiary in Cashfree
-3. Beneficiary ID is stored in `payoutConfig.beneficiaryId`
-4. Verification status is tracked in `payoutConfig.verificationStatus`
+3. Beneficiary ID is stored in `barber.payoutConfig.beneficiaryId`
+4. Verification status is tracked in `barber.payoutConfig.verificationStatus`
 
 ### Payout Requirements
 Before a payout can be initiated:
@@ -283,7 +280,7 @@ Before a payout can be initiated:
 - [ ] Fetch bank details for shop with no bank details
 - [ ] Fetch bank details for shop with unverified details
 - [ ] Fetch bank details for shop with verified details
-- [ ] Verify account number is masked
+- [ ] Verify account number is unmasked and fully displayed
 - [ ] Verify verification status is correct
 
 #### UPDATE Bank Details
@@ -337,19 +334,13 @@ Content-Type: application/json
   "accountHolderName": "John Doe",
   "bankName": "State Bank of India",
   "bankAccount": "12345678901234",
-  "ifsc": "SBIN0001234",
-  "upiId": "john@paytm"
+  "ifsc": "SBIN0001234"
 }
 ```
 
 ---
 
 ## MIGRATION NOTES
-
-### Existing Shops
-- Shops created before this feature will have `payoutConfig: undefined`
-- They can add payout details via the update endpoint
-- No data migration required
 
 ### API Compatibility
 - No backward compatibility is retained for the old shop-scoped payment endpoints.

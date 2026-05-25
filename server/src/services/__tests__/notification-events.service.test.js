@@ -7,13 +7,17 @@ const ensureRequiredEnv = () => {
         FIREBASE_PROJECT_ID: 'evercut-test',
         FIREBASE_CLIENT_EMAIL: 'firebase@example.com',
         FIREBASE_PRIVATE_KEY: '-----BEGIN PRIVATE KEY-----\\nabc\\n-----END PRIVATE KEY-----',
-        CLOUDINARY_CLOUD_NAME: 'evercut',
-        CLOUDINARY_API_KEY: 'cloudinary-key',
-        CLOUDINARY_API_SECRET: 'cloudinary-secret',
+        CF_ACCOUNT_ID: 'test-account',
+        R2_ACCESS_KEY_ID: 'test-access-key',
+        R2_SECRET_ACCESS_KEY: 'test-secret-key',
+        R2_BUCKET: 'evercut-media-test',
+        CDN_BASE_URL: 'https://media.evercut.test',
+        MEDIA_TOKEN_SECRET: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
         MSG91_AUTH_KEY: 'msg91-auth',
         MSG91_OTP_TEMPLATE_ID: 'msg91-template',
         JWT_ACCESS_SECRET: 'access-secret',
         JWT_REFRESH_SECRET: 'refresh-secret',
+        JWT_ONBOARDING_SECRET: 'onboarding-secret',
         PHONEPE_CLIENT_ID: 'phonepe-client',
         PHONEPE_CLIENT_SECRET: 'phonepe-secret',
         PHONEPE_CLIENT_VERSION: '1',
@@ -34,6 +38,7 @@ ensureRequiredEnv();
 const notificationEvents = (await import('../notification-events.service.js')).default;
 const notificationService = (await import('../notification.service.js')).default;
 const bookingRepository = (await import('../../repositories/booking.repository.js')).default;
+const barberRepository = (await import('../../repositories/barber.repository.js')).default;
 const customerRepository = (await import('../../repositories/customer.repository.js')).default;
 const shopRepository = (await import('../../repositories/shop.repository.js')).default;
 
@@ -56,8 +61,12 @@ test('notifyBookingAwaitingConfirmation sends a deduped hybrid event to the shop
     }));
     t.mock.method(shopRepository, 'findById', async () => ({
         _id: shopId,
-        ownerId: barberUserId,
+        barberId: '507f1f77bcf86cd799439017',
         shopName: 'EverCut Studio',
+    }));
+    t.mock.method(barberRepository, 'findById', async () => ({
+        _id: '507f1f77bcf86cd799439017',
+        userId: barberUserId,
     }));
     t.mock.method(customerRepository, 'findById', async () => ({
         _id: customerId,

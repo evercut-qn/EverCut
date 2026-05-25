@@ -1,6 +1,8 @@
 import bookingRepository from '../repositories/booking.repository.js';
 import shopRepository from '../repositories/shop.repository.js';
+import barberRepository from '../repositories/barber.repository.js';
 import paymentRepository from '../repositories/payment.repository.js';
+import subscriptionRepository from '../repositories/subscription.repository.js';
 import { NotFoundError, ForbiddenError } from '../utils/api-error.js';
 import { buildPagination } from '../utils/pagination.utils.js';
 import { PAYMENT_TRANSACTION_STATUS } from '../utils/constants.js';
@@ -198,7 +200,7 @@ const buildTransactionDetail = async (payment, booking) => {
 };
 
 export const getEarnings = async (ownerId) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
+    const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop profile');
 
     const now = new Date();
@@ -230,7 +232,7 @@ export const getEarnings = async (ownerId) => {
  * Get transaction history for barber
  */
 export const getTransactions = async (ownerId, query = {}) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
+    const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop profile');
 
     // Build filter
@@ -277,7 +279,7 @@ export const getTransactions = async (ownerId, query = {}) => {
  * Get detailed transaction information
  */
 export const getTransactionDetail = async (ownerId, transactionId) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
+    const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop profile');
 
     const payment = await paymentRepository.findByIdForEarnings(transactionId);
@@ -299,7 +301,7 @@ export const getTransactionDetail = async (ownerId, transactionId) => {
  * Generate transaction statement (PDF only)
  */
 export const generateStatement = async (ownerId, query) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
+    const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop profile');
 
     const filter = {
@@ -339,14 +341,14 @@ export const generateStatement = async (ownerId, query) => {
     // Calculate summary
     const summary = calculateTransactionSummary(transactions);
     
-    // Get owner name from shop (shop already has owner information)
-    const ownerName = shop.ownerName || `${shop.ownerFirstName || ''} ${shop.ownerLastName || ''}`.trim() || 'Shop Owner';
+    const barber = await barberRepository.findById(shop.barberId);
     
     // Generate PDF
     const pdfDoc = generateTransactionStatementPDF({
         shop: {
             shopName: shop.shopName,
-            ownerName,
+            firstName: barber?.firstName || '',
+            lastName: barber?.lastName || '',
         },
         transactions,
         dateRange: {
@@ -357,6 +359,7 @@ export const generateStatement = async (ownerId, query) => {
     });
     
     const filename = `transactions_${query.startDate}_to_${query.endDate}.pdf`;
+    await subscriptionRepository.incrementStatementCounter(shop.barberId);
     
     return {
         stream: pdfDoc,
@@ -365,26 +368,4 @@ export const generateStatement = async (ownerId, query) => {
     };
 };
 
-// ── Dashboard Analytics (moved from dashboard.service.js) ────────────────
-
-/**
- * Get comprehensive dashboard data (all sections combined)
- * Aggregates pulse, staff, and queue data
- */
-export const getDashboardOverview = async (ownerId) => {
-    // Import the services dynamically to avoid circular dependencies
-    const bookingService = await import('./booking.service.js');
-    const employeeService = await import('./employee.service.js');
-
-    const [pulse, staff, queue] = await Promise.all([
-        bookingService.getTodaysPulse(ownerId),
-        employeeService.getStaffAvailability(ownerId),
-        bookingService.getTodaysQueue(ownerId, 'active'),
-    ]);
-
-    return {
-        pulse,
-        staff,
-        queue,
-    };
-};
+// Resource analytics

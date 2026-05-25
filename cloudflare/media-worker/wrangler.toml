@@ -1,0 +1,45 @@
+name = "evercut-media-worker"
+main = "src/worker.js"
+compatibility_date = "2026-05-12"
+workers_dev = true
+
+[[r2_buckets]]
+binding = "MEDIA_BUCKET"
+bucket_name = "evercut-media-prod"
+
+[[kv_namespaces]]
+binding = "TOKEN_BLACKLIST"
+id = "6584dc2a84eb48cfbda02bbfcb171741"
+
+[vars]
+ENVIRONMENT = "prod"
+ALLOWED_ORIGINS = "https://evercut.in,https://app.evercut.in"
+
+# Enable this only after evercut.in is an active Cloudflare zone.
+# Until then, workers_dev keeps the Worker reachable at the generated
+# workers.dev URL.
+#
+# [[routes]]
+# pattern = "media.evercut.in"
+# custom_domain = true
+
+[env.dev]
+workers_dev = true
+
+[[env.dev.r2_buckets]]
+binding = "MEDIA_BUCKET"
+bucket_name = "evercut-media-dev"
+
+[[env.dev.kv_namespaces]]
+binding = "TOKEN_BLACKLIST"
+id = "91ae86ff93d441f5992a9b3a320d3ee2"
+
+[env.dev.vars]
+ENVIRONMENT = "dev"
+ALLOWED_ORIGINS = "http://localhost:3000,http://localhost:5000,http://127.0.0.1:3000,http://127.0.0.1:5000"
+
+# Enable this only after evercut.in is an active Cloudflare zone.
+#
+# [[env.dev.routes]]
+# pattern = "media-dev.evercut.in"
+# custom_domain = true

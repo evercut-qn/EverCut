@@ -1,17 +1,11 @@
 import { sanitizeForResponse, toPlainObject } from './core.serializer.js';
-import { serializePhotos } from './photo.serializer.js';
+import { serializeMediaList } from './media.serializer.js';
 import { serializeUser } from './user.serializer.js';
+import { buildMediaUrl } from '../services/media/media-url.service.js';
 
 const compact = (value) => Object.fromEntries(
     Object.entries(value).filter(([, nestedValue]) => nestedValue !== undefined),
 );
-
-const maskBankAccount = (bankAccount) => {
-    if (!bankAccount) return null;
-    const digits = String(bankAccount).replace(/\D/g, '');
-    if (digits.length <= 4) return digits || null;
-    return `******${digits.slice(-4)}`;
-};
 
 const toBreakTimes = (breakTimes = []) => (
     Array.isArray(breakTimes)
@@ -28,39 +22,26 @@ const toWorkingHours = (plain = {}) => ({
     closeTime: plain.closeTime ?? null,
 });
 
-const serializeOwner = (plain = {}, userContext = null, privateView = false) => {
+const serializeOwner = (barber = {}, userContext = null, privateView = false) => {
+    const rawBarber = toPlainObject(barber) || {};
+    const plain = sanitizeForResponse(rawBarber) || {};
     const user = userContext ? serializeUser(userContext) : {};
+    if (!Object.keys(plain).length && !Object.keys(user).length) return {};
 
     return compact({
         id: user?.id,
-        firstName: plain.ownerFirstName ?? null,
-        lastName: plain.ownerLastName ?? null,
-        gender: plain.ownerGender ?? null,
-        dateOfBirth: privateView ? (plain.ownerDateOfBirth ?? null) : undefined,
+        firstName: plain.firstName ?? null,
+        lastName: plain.lastName ?? null,
+        gender: plain.gender ?? null,
+        dateOfBirth: privateView ? (plain.dateOfBirth ?? null) : undefined,
         email: privateView ? (user?.email ?? null) : undefined,
         phoneNumber: privateView ? (user?.phoneNumber ?? null) : undefined,
-        photoUrl: plain.ownerPhotoUrl ?? null,
+        photoUrl: buildMediaUrl(rawBarber.photoR2Key),
     });
 };
 
-export const serializePayoutConfig = (payoutConfig = {}) => {
-    const plain = sanitizeForResponse(payoutConfig || {});
-    return {
-        bankAccountLast4: maskBankAccount(payoutConfig?.bankAccount || plain?.bankAccountLast4),
-        ifsc: plain?.ifsc || null,
-        beneficiaryId: plain?.beneficiaryId || null,
-        beneficiaryCreatedAt: plain?.beneficiaryCreatedAt || null,
-        verifiedAt: plain?.verifiedAt || null,
-        verificationStatus: plain?.verificationStatus || 'unverified',
-    };
-};
-
-export const serializeUpiDetails = (shop) => {
-    return serializeBankDetails(shop);
-};
-
-export const serializeBankDetails = (shop) => {
-    const raw = toPlainObject(shop);
+export const serializeBankDetails = (barber) => {
+    const raw = toPlainObject(barber);
     const plain = sanitizeForResponse(raw);
     if (!plain) return null;
 
@@ -71,8 +52,8 @@ export const serializeBankDetails = (shop) => {
         accountHolderName: plain.accountHolderName || null,
         bankName: plain.bankName || null,
         upiId: plain.upiId || null,
-        bankAccountLast4: maskBankAccount(raw?.payoutConfig?.bankAccount),
-        ifsc: plain.payoutConfig?.ifsc || null,
+        bankAccount: raw?.bankAccount || null,
+        ifsc: plain.ifsc || null,
         verificationStatus,
         isVerified,
         verifiedAt: plain.payoutConfig?.verifiedAt || null,
@@ -83,7 +64,8 @@ export const serializeBankDetails = (shop) => {
 };
 
 export const serializeShopSummary = (shop) => {
-    const plain = sanitizeForResponse(toPlainObject(shop));
+    const raw = toPlainObject(shop);
+    const plain = sanitizeForResponse(raw);
     if (!plain) return null;
 
     return compact({
@@ -93,19 +75,23 @@ export const serializeShopSummary = (shop) => {
         location: plain.location ?? null,
         category: plain.category ?? null,
         targetCustomers: plain.targetCustomers ?? null,
-        coverUrl: plain.coverUrl ?? null,
+        coverUrl: buildMediaUrl(raw.coverR2Key),
         amenities: plain.facilities ?? [],
         isOpen: plain.isOpen,
         workingDays: plain.availableDays,
         workingHours: toWorkingHours(plain),
+        badge: plain.badge,
+        visibilityTier: plain.visibilityTier,
+        priorityListingBoost: plain.priorityListingBoost,
     });
 };
 
 export const serializeShopProfile = (shop, options = {}) => {
-    const plain = sanitizeForResponse(toPlainObject(shop));
+    const raw = toPlainObject(shop);
+    const plain = sanitizeForResponse(raw);
     if (!plain) return null;
 
-    const owner = serializeOwner(plain, options.userContext, options.privateView);
+    const owner = serializeOwner(options.barber, options.userContext, options.privateView);
 
     return compact({
         id: plain.id,
@@ -113,32 +99,38 @@ export const serializeShopProfile = (shop, options = {}) => {
         shopName: plain.shopName ?? null,
         category: plain.category ?? null,
         targetCustomers: plain.targetCustomers ?? null,
-        payout: options.privateView ? serializeBankDetails(shop) : undefined,
+        payout: options.privateView ? serializeBankDetails(options.barber) : undefined,
         bio: plain.bio ?? '',
         address: plain.address ?? null,
         location: plain.location ?? null,
         numberOfEmployees: plain.numberOfEmployees ?? null,
-        yearsOfExperience: plain.yearsOfExperience ?? null,
+        yearsOfExperience: options.privateView ? (sanitizeForResponse(toPlainObject(options.barber))?.yearsOfExperience ?? null) : undefined,
         amenities: plain.facilities ?? [],
         workingDays: plain.availableDays ?? [],
         workingHours: toWorkingHours(plain),
         breakTimes: toBreakTimes(plain.breakTimes),
-        coverUrl: plain.coverUrl ?? null,
+        coverUrl: buildMediaUrl(raw.coverR2Key),
         isOpen: plain.isOpen ?? true,
         missedConfirmations: {
             count: plain.missedConfirmationCount || 0,
             lastMissedAt: plain.lastMissedConfirmationAt || null,
         },
-        photos: options.photos ? serializePhotos(options.photos) : undefined,
+        badge: options.entitlements?.badge ?? plain.badge,
+        visibilityTier: options.entitlements?.visibilityTier ?? plain.visibilityTier,
+        supportTier: options.entitlements?.supportTier ?? plain.supportTier,
+        priorityListingBoost: options.entitlements?.priorityListingBoost ?? plain.priorityListingBoost,
+        photos: options.photos ? serializeMediaList(options.photos) : undefined,
         createdAt: plain.createdAt,
         updatedAt: plain.updatedAt,
     });
 };
 
-export const serializeBarberProfile = (shop, userContext = {}, { photos } = {}) => {
+export const serializeBarberProfile = ({ barber, shop, user, photos, entitlements } = {}) => {
     const profile = serializeShopProfile(shop, {
-        userContext,
+        barber,
+        userContext: user,
         photos,
+        entitlements,
         privateView: true,
     });
     if (!profile) return null;

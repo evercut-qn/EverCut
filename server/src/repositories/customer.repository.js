@@ -1,4 +1,5 @@
 import Customer from '../models/customer.model.js';
+import config from '../config/index.js';
 
 class CustomerRepository {
     async create(data) {
@@ -11,6 +12,27 @@ class CustomerRepository {
 
     async findById(id) {
         return Customer.findById(id);
+    }
+
+    async consumeFeeWaiverSlot(customerId) {
+        const quota = config.payment.feeWaiverQuota;
+        if (quota <= 0) return null;
+
+        const customer = await Customer.findOneAndUpdate(
+            {
+                _id: customerId,
+                $or: [
+                    { feeWaiverBookingsUsed: { $exists: false } },
+                    { feeWaiverBookingsUsed: { $lt: quota } },
+                ],
+            },
+            {
+                $inc: { feeWaiverBookingsUsed: 1 },
+            },
+            { returnDocument: 'after', runValidators: true },
+        );
+
+        return customer || null;
     }
 
     async updateByUserId(userId, data) {
@@ -60,10 +82,11 @@ class CustomerRepository {
                 { path: 'serviceIds' },
                 {
                     path: 'employeeId',
-                    select: 'firstName lastName photoUrl',
+                    select: 'firstName lastName photoR2Key',
                     options: { includeDeleted: true },
                 },
-                { path: 'shopId', select: 'shopName address coverUrl' },
+                { path: 'customerId', select: 'firstName lastName photoR2Key' },
+                { path: 'shopId', select: 'shopName address coverR2Key' },
             ],
         }).lean();
     }
@@ -75,10 +98,11 @@ class CustomerRepository {
                 { path: 'serviceIds' },
                 {
                     path: 'employeeId',
-                    select: 'firstName lastName photoUrl',
+                    select: 'firstName lastName photoR2Key',
                     options: { includeDeleted: true },
                 },
-                { path: 'shopId', select: 'shopName address coverUrl' },
+                { path: 'customerId', select: 'firstName lastName photoR2Key' },
+                { path: 'shopId', select: 'shopName address coverR2Key' },
             ],
         }).lean();
     }
@@ -86,7 +110,7 @@ class CustomerRepository {
     async findFavoriteShopsByUserId(userId) {
         return Customer.findOne({ userId }).populate({
             path: 'favoriteShops',
-            select: 'shopName address coverUrl category targetCustomers facilities isOpen location',
+            select: 'shopName address coverR2Key category targetCustomers facilities isOpen location',
         }).lean();
     }
 }

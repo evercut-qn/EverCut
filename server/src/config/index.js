@@ -34,6 +34,29 @@ const providerEnv = (key, fallback) => {
   return value || fallback;
 };
 
+const requireEnumEnv = (key, allowedValues) => {
+  const value = requireEnv(key);
+  if (!allowedValues.includes(value)) {
+    throw new Error(`${key} must be ${allowedValues.join(' or ')}`);
+  }
+  return value;
+};
+
+const assertRazorpayKeyMatchesEnvironment = (keyId, env) => {
+  if (keyId.startsWith('rzp_test_') && env === 'PRODUCTION') {
+    throw new Error('RAZORPAY_KEY_ID is a test key but RAZORPAY_ENV is PRODUCTION');
+  }
+
+  if (keyId.startsWith('rzp_live_') && env === 'SANDBOX') {
+    throw new Error('RAZORPAY_KEY_ID is a live key but RAZORPAY_ENV is SANDBOX');
+  }
+};
+
+const PROVIDER_ENVIRONMENTS = Object.freeze(['SANDBOX', 'PRODUCTION']);
+const razorpayEnv = requireEnumEnv('RAZORPAY_ENV', PROVIDER_ENVIRONMENTS);
+const razorpayKeyId = providerEnv('RAZORPAY_KEY_ID', 'rzp_test_key');
+assertRazorpayKeyMatchesEnvironment(razorpayKeyId, razorpayEnv);
+
 // ---------------------------------------------------------------------------
 // Config Object
 // ---------------------------------------------------------------------------
@@ -56,32 +79,53 @@ const config = Object.freeze({
     privateKey: requireEnv('FIREBASE_PRIVATE_KEY').replace(/\\n/g, '\n'),
   }),
 
-  /** Cloudinary */
-  cloudinary: Object.freeze({
-    cloudName: requireEnv('CLOUDINARY_CLOUD_NAME'),
-    apiKey: requireEnv('CLOUDINARY_API_KEY'),
-    apiSecret: requireEnv('CLOUDINARY_API_SECRET'),
+  /** Cloudflare R2 */
+  r2: Object.freeze({
+    accountId: requireEnv('CF_ACCOUNT_ID'),
+    accessKeyId: requireEnv('R2_ACCESS_KEY_ID'),
+    secretAccessKey: requireEnv('R2_SECRET_ACCESS_KEY'),
+    bucket: requireEnv('R2_BUCKET'),
+    cdnBaseUrl: requireEnv('CDN_BASE_URL'),
+    mediaTokenSecret: requireEnv('MEDIA_TOKEN_SECRET'),
   }),
 
-  /** Upload limits */
-  upload: Object.freeze({
-    maxFileSize: 5 * 1024 * 1024, // 5 MB
+  /** Media business rules */
+  media: Object.freeze({
+    maxImageSize: 10 * 1024 * 1024,
+    maxVideoSize: 500 * 1024 * 1024,
+    maxGalleryPerShop: 10,
     maxFiles: 10,
-    allowedImageFormats: ['jpg', 'jpeg', 'png', 'webp'],
-    allowedMimeTypes: [
+    presignedUrlTtl: 15 * 60,
+    signedUrlTtl: 60 * 60,
+    multipartPartSize: 50 * 1024 * 1024,
+    maxMultipartParts: 100,
+    pendingUploadTtlHours: 24,
+    allowedImageMimes: [
       'image/jpeg',
-      'image/jpg',
       'image/png',
-      'image/gif',
       'image/webp',
+    ],
+    allowedVideoMimes: [
+      'video/mp4',
+      'video/quicktime',
+      'video/x-msvideo',
+      'video/webm',
     ],
   }),
 
   /** Security / Rate Limiting */
   security: Object.freeze({
     bcryptSaltRounds: 10,
+    pinLength: 4,
     rateLimitWindowMs: 15 * 60 * 1000, // 15 minutes
     rateLimitMax: 100, // requests per window
+    otpRateLimit: Object.freeze({
+      windowMs: 15 * 60 * 1000,   // 15 minutes
+      maxSendPerPhone: 5,
+      maxSendPerIp: 10,
+      maxVerifyPerPhone: 10,
+      cleanupIntervalMs: 10 * 60 * 1000, // 10 minutes
+    }),
   }),
 
   /** MSG91 OTP */
@@ -99,8 +143,10 @@ const config = Object.freeze({
   jwt: Object.freeze({
     accessSecret: requireEnv('JWT_ACCESS_SECRET'),
     refreshSecret: requireEnv('JWT_REFRESH_SECRET'),
-    accessExpiry: optionalEnv('JWT_ACCESS_EXPIRY', '15m'),
-    refreshExpiry: optionalEnv('JWT_REFRESH_EXPIRY', '180d'),
+    onboardingSecret: requireEnv('JWT_ONBOARDING_SECRET'),
+    accessExpiry: '15m',
+    refreshExpiry: '180d',
+    onboardingExpiry: '24h',
   }),
 
   /** Pagination defaults */
@@ -125,6 +171,7 @@ const config = Object.freeze({
     baseUrl: optionalEnv('PHONEPE_ENV', 'SANDBOX') === 'PRODUCTION'
       ? 'https://api.phonepe.com/apis/pg'
       : 'https://api-preprod.phonepe.com/apis/pg-sandbox',
+    tokenRefreshBufferMs: 5 * 60 * 1000,  // 5 minutes before expiry
   }),
 
   /** Cashfree Payouts */
@@ -138,16 +185,58 @@ const config = Object.freeze({
     payoutApiVersion: '2024-01-01',
   }),
 
-  /** Payment + Payout business rules */
+  /** Razorpay subscription billing */
+  razorpay: Object.freeze({
+    keyId: razorpayKeyId,
+    keySecret: providerEnv('RAZORPAY_KEY_SECRET', 'test-razorpay-secret'),
+    webhookSecret: providerEnv('RAZORPAY_WEBHOOK_SECRET', 'test-razorpay-webhook-secret'),
+    planIdPopular: providerEnv('RAZORPAY_PLAN_ID_POPULAR', 'plan_test_popular'),
+    planIdAdvanced: providerEnv('RAZORPAY_PLAN_ID_ADVANCED', 'plan_test_advanced'),
+    env: razorpayEnv,
+  }),
+
+  /** Subscription business rules */
+  subscription: Object.freeze({
+    expiryCheckIntervalMs: 5 * 60 * 1000,
+    reconciliationCronSchedule: '0 2 * * *',
+    mediaReconciliationCronSchedule: '0 3 * * *',
+    cronTimezone: 'Asia/Kolkata',
+    webhookTimestampToleranceSec: 300,
+  }),
+
+  /** Booking business rules */
+  booking: Object.freeze({
+    maxServicesPerBooking: 10,
+    maxDurationMinutes: 480,       // 8 hours
+    maxAdvanceDays: 7,
+    maxRescheduleCount: 1,
+    cancellationWindowHours: 2,
+    activeThresholdMinutes: 30,
+    confirmationTimeoutHours: 24,
+    milestoneTargets: [500, 750, 1000],
+    autoCancelPollIntervalMs: 15 * 60 * 1000,  // 15 minutes
+  }),
+
+  /** Shop business rules */
+  shop: Object.freeze({
+    nearbyDistanceMeters: 2000,
+  }),
+
+  /** Payment business rules */
   payment: Object.freeze({
-    platformFeeSingle: 3,
+    platformFeeSingle: 4,
     platformFeeBundle: 10,
     refundFeeSingle: 7,
     refundFeeBundle: 15,
-    minBundleServiceAmount: 300,
+    feeWaiverQuota: 2,
+    minBundleServiceAmount: 299,
+    minSingleServiceAmount: 69,
     sessionExpirySeconds: 1200,
     maxPollAttempts: 10,
     pollIntervalBaseMs: 3000,
+    stalePaymentThresholdMs: 30 * 60 * 1000,     // 30 minutes
+    maxPaymentAgeMs: 24 * 60 * 60 * 1000,        // 24 hours
+    pollIntervalMs: 5 * 60 * 1000,               // 5 minutes
     payoutBatchCronTime: '0 23 * * *',
     payoutBatchTimezone: 'Asia/Kolkata',
     // Payment modes configuration (PhonePe V2 Schema)
@@ -155,6 +244,18 @@ const config = Object.freeze({
     // Empty array = all payment modes enabled
     // Examples: [{ type: 'UPI' }], [{ type: 'UPI' }, { type: 'CARD' }]
     paymentModes: [{ type: 'UPI' }],
+  }),
+
+  /** Payout business rules */
+  payout: Object.freeze({
+    maxRetries: 3,
+    pollIntervalMs: 10 * 60 * 1000,              // 10 minutes
+    stuckThresholdMs: 10 * 60 * 1000,             // 10 minutes
+  }),
+
+  /** Slot cleanup job */
+  slotCleanup: Object.freeze({
+    intervalMs: 6 * 60 * 60 * 1000,              // 6 hours
   }),
 });
 

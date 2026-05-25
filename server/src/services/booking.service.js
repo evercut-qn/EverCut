@@ -1,7 +1,9 @@
 import mongoose from 'mongoose';
 
+import config from '../config/index.js';
 import bookingRepository from '../repositories/booking.repository.js';
 import employeeRepository from '../repositories/employee.repository.js';
+import paymentRepository from '../repositories/payment.repository.js';
 import serviceRepository from '../repositories/service.repository.js';
 import shopRepository from '../repositories/shop.repository.js';
 import customerRepository from '../repositories/customer.repository.js';
@@ -21,18 +23,18 @@ import {
 } from '../utils/time.utils.js';
 import { buildPagination } from '../utils/pagination.utils.js';
 import {
-    BOOKING_MILESTONE_TARGETS,
     BOOKING_STATUS,
-    BOOKING_LIMITS,
-    BUNDLE_RULES,
-    MAX_RESCHEDULE_COUNT,
-    CANCELLATION_WINDOW_HOURS,
     PAYMENT_STATUS,
     PAYOUT_STATUS,
     ROLES,
     SERVICE_TYPE,
 } from '../utils/constants.js';
 import { getEffectiveServicePrice, normalizeServicePricing } from '../utils/service-pricing.utils.js';
+import {
+    assertMinimumServiceAmount,
+    classifyBookingFeeType,
+    resolveCustomerPlatformFee,
+} from '../utils/platform-fee.utils.js';
 import { buildSlotLockTimes, toDateOnlyString } from '../utils/slot-lock.utils.js';
 import { calculateAvailableSlots, getAvailableSlotTimes, normalizeBookedRanges } from '../utils/slot-calculator.utils.js';
 import logger from '../utils/logger.js';
@@ -42,6 +44,7 @@ import {
     serializeBookingCreation,
     serializeBookingDetails,
 } from '../serializers/booking.serializer.js';
+import { buildMediaUrl } from './media/media-url.service.js';
 
 /**
  * Booking service — all booking business logic.
@@ -50,6 +53,20 @@ import {
 // ── Customer: create booking ─────────────────────────────────────────────
 
 const normalizeBookedServices = (services = []) => services.map(normalizeServicePricing);
+const BOOKING_SERVICE_CARD_FIELDS = [
+    'serviceName',
+    'serviceFor',
+    'serviceType',
+    'imageR2Key',
+    'duration',
+    'actualPrice',
+    'offerPrice',
+    'finalPrice',
+    'totalDuration',
+    'totalPrice',
+    'bundledServices',
+    'shopId',
+].join(' ');
 const toObjectIdString = (value) => String(value?._id || value || '');
 const paginateArray = (items, query = {}) => {
     const { skip, limit, pagination } = buildPagination(query, items.length);
@@ -57,6 +74,40 @@ const paginateArray = (items, query = {}) => {
         items: items.slice(skip, skip + limit),
         pagination,
     };
+};
+const setFilterValue = (filters, field, value) => {
+    if (Array.isArray(value)) {
+        filters[field] = { $in: value };
+    } else if (value) {
+        filters[field] = value;
+    }
+};
+
+const toUtcDateBoundary = (dateText, endOfDay = false) => {
+    const [year, month, day] = String(dateText).split('-').map(Number);
+    return new Date(Date.UTC(
+        year,
+        month - 1,
+        day,
+        endOfDay ? 23 : 0,
+        endOfDay ? 59 : 0,
+        endOfDay ? 59 : 0,
+        endOfDay ? 999 : 0,
+    ));
+};
+
+const applyDateRangeFilter = (filters, query = {}) => {
+    if (!query.dateFrom && !query.dateTo) return;
+
+    filters.date = {};
+
+    if (query.dateFrom) {
+        filters.date.$gte = toUtcDateBoundary(query.dateFrom);
+    }
+
+    if (query.dateTo) {
+        filters.date.$lte = toUtcDateBoundary(query.dateTo, true);
+    }
 };
 const sumServicePrices = (services = []) => services.reduce(
     (sum, service) => sum + (getEffectiveServicePrice(service) ?? 0),
@@ -144,12 +195,6 @@ const isBundleSelection = (services = []) => (
     services.length > 1
     || services.some((service) => service.serviceType === SERVICE_TYPE.BUNDLED)
 );
-const assertBundleMinimum = (services = [], totalAmount = 0) => {
-    if (!isBundleSelection(services)) return;
-    if (totalAmount >= BUNDLE_RULES.MIN_SERVICE_AMOUNT) return;
-
-    throw new BadRequestError(`Bundle service amount must be at least ₹${BUNDLE_RULES.MIN_SERVICE_AMOUNT}`);
-};
 const assertShopAcceptsDate = (shop, date) => {
     if (!shop.isOpen) throw new BadRequestError('Shop is currently closed');
 
@@ -162,7 +207,7 @@ const assertShopAcceptsDate = (shop, date) => {
 const loadEmployeeForScheduling = async (employeeId, shopId) => {
     const employee = await employeeRepository.findByIdLean(
         employeeId,
-        'firstName lastName photoUrl shopId workingHours blockedDates isActive deletedAt',
+        'firstName lastName photoR2Key shopId workingHours blockedDates isActive deletedAt',
     );
     if (!employee) throw new NotFoundError('Employee');
     if (!employee.isActive || employee.deletedAt) throw new BadRequestError('Employee is not active');
@@ -287,6 +332,63 @@ const buildBookingPersistencePayload = ({
     payoutStatus: PAYOUT_STATUS.NOT_INITIATED,
     ...(idempotencyKey && { idempotencyKey }),
 });
+
+const buildPayableAmountSummary = async ({ customer, bookingFeeType, serviceAmount }) => {
+    const activeWaiverReservations = await paymentRepository.countActiveWaiverReservations(customer._id);
+    const feeSummary = resolveCustomerPlatformFee({
+        customer,
+        bookingFeeType,
+        activeWaiverReservations,
+    });
+
+    return {
+        serviceAmount,
+        platformFee: feeSummary.platformFee,
+        totalAmount: serviceAmount + feeSummary.platformFee,
+    };
+};
+
+const hasPaymentAmountSnapshot = (booking) => (
+    booking?.paymentTransactionId
+    && typeof booking.paymentTransactionId === 'object'
+    && (
+        booking.paymentTransactionId.amount !== undefined
+        || booking.paymentTransactionId.amountInRupees !== undefined
+        || booking.paymentTransactionId.settlement?.platformFee !== undefined
+    )
+);
+
+const withPayableAmountSummary = async (booking, customer = null) => {
+    if (!booking || hasPaymentAmountSnapshot(booking)) return booking;
+
+    const services = normalizeBookedServices(
+        Array.isArray(booking.serviceIds)
+            ? booking.serviceIds.filter((service) => service && typeof service === 'object')
+            : [],
+    );
+    if (!services.length) return booking;
+
+    const bookingCustomer = customer || (
+        booking.customerId && typeof booking.customerId === 'object'
+            ? booking.customerId
+            : null
+    );
+    if (!bookingCustomer?._id) return booking;
+
+    const serviceAmount = Number(booking.totalAmount || sumServicePrices(services) || 0);
+    const bookingFeeType = classifyBookingFeeType(services);
+    const amountSummary = await buildPayableAmountSummary({
+        customer: bookingCustomer,
+        bookingFeeType,
+        serviceAmount,
+    });
+
+    return {
+        ...booking,
+        ...amountSummary,
+    };
+};
+
 const MONTH_LABEL_FORMATTER = new Intl.DateTimeFormat('en-US', {
     month: 'long',
     year: 'numeric',
@@ -317,14 +419,10 @@ const buildBookingDetailsPayload = async (booking) => {
     const services = normalizeBookedServices(
         await serviceRepository.findByIds(
             booking.serviceIds,
-            'serviceName finalPrice totalPrice actualPrice offerPrice imageUrl serviceType duration totalDuration',
+            BOOKING_SERVICE_CARD_FIELDS,
         ),
     );
     const totalAmount = sumServicePrices(services);
-
-    // Calculate platform fee
-    const isBundled = isBundleSelection(services);
-    const platformFee = isBundled ? 10 : 3;
 
     return serializeBookingDetails({
         bookingId: booking._id,
@@ -335,9 +433,8 @@ const buildBookingDetailsPayload = async (booking) => {
         time: booking.time,
         endTime: booking.endTime,
         services,
-        subTotal: totalAmount,
-        platformFee,
-        totalAmount: totalAmount + platformFee,
+        serviceAmount: totalAmount,
+        totalAmount: booking.totalAmount ?? totalAmount,
         totalServices: services.length,
         status: booking.status,
         paymentStatus: booking.paymentStatus,
@@ -388,11 +485,11 @@ export const createBooking = async (userId, data) => {
     }
 
     // Validate date/time is in future and within booking window
-    if (!isValidBookingDateTime(date, normalizedTime, BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS)) {
+    if (!isValidBookingDateTime(date, normalizedTime, config.booking.maxAdvanceDays)) {
         if (!isBookingInFuture(date, normalizedTime)) {
             throw new BadRequestError('Cannot book in the past. Please select a future date and time.');
         }
-        throw new BadRequestError(`Bookings can only be made up to ${BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS} days in advance.`);
+        throw new BadRequestError(`Bookings can only be made up to ${config.booking.maxAdvanceDays} days in advance.`);
     }
 
     // Validate shop
@@ -410,9 +507,9 @@ export const createBooking = async (userId, data) => {
     }
 
     // Validate: Maximum services limit
-    if (serviceIds.length > BOOKING_LIMITS.MAX_SERVICES_PER_BOOKING) {
+    if (serviceIds.length > config.booking.maxServicesPerBooking) {
         throw new BadRequestError(
-            `Cannot select more than ${BOOKING_LIMITS.MAX_SERVICES_PER_BOOKING} services per booking`,
+            `Cannot select more than ${config.booking.maxServicesPerBooking} services per booking`,
         );
     }
 
@@ -420,7 +517,7 @@ export const createBooking = async (userId, data) => {
     const services = normalizeBookedServices(
         await serviceRepository.findByIds(
             serviceIds,
-            'serviceName finalPrice totalPrice actualPrice offerPrice serviceType shopId duration totalDuration',
+            BOOKING_SERVICE_CARD_FIELDS,
         ),
     );
     if (!services.length) throw new NotFoundError('Services');
@@ -433,13 +530,19 @@ export const createBooking = async (userId, data) => {
 
     const totalAmount = sumServicePrices(services);
     const durationMinutes = sumServiceDurations(services);
+    const bookingFeeType = classifyBookingFeeType(services);
     assertValidServiceDuration(durationMinutes);
-    assertBundleMinimum(services, totalAmount);
+    assertMinimumServiceAmount(totalAmount, bookingFeeType);
+    const amountSummary = await buildPayableAmountSummary({
+        customer,
+        bookingFeeType,
+        serviceAmount: totalAmount,
+    });
 
     // Validate: Maximum duration limit
-    if (durationMinutes > BOOKING_LIMITS.MAX_BOOKING_DURATION_MINUTES) {
+    if (durationMinutes > config.booking.maxDurationMinutes) {
         throw new BadRequestError(
-            `Total booking duration cannot exceed ${BOOKING_LIMITS.MAX_BOOKING_DURATION_MINUTES / 60} hours`,
+            `Total booking duration cannot exceed ${config.booking.maxDurationMinutes / 60} hours`,
         );
     }
 
@@ -500,7 +603,7 @@ export const createBooking = async (userId, data) => {
         date,
         time: schedulePlan.startTime,
         endTime: schedulePlan.endTime,
-        totalAmount,
+        ...amountSummary,
         durationMinutes,
         slotLockTimes: schedulePlan.slotLockTimes,
         startMinute: schedulePlan.startMinute,
@@ -523,14 +626,14 @@ const getBookingDetailsForCustomer = async (bookingId, userId) => {
         throw new ForbiddenError('You can only access your own bookings');
     }
 
-    return buildBookingDetailsPayload(booking);
+    return buildBookingDetailsPayload(await withPayableAmountSummary(booking, customer));
 };
 
 const getBookingDetailsForShopOwner = async (bookingId, ownerId) => {
     const booking = await bookingRepository.findByIdPopulated(bookingId);
     if (!booking) throw new NotFoundError('Booking');
 
-    const shop = await shopRepository.findByOwnerId(ownerId);
+    const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop');
 
     const bookingShopId = booking.shopId?._id || booking.shopId;
@@ -538,7 +641,7 @@ const getBookingDetailsForShopOwner = async (bookingId, ownerId) => {
         throw new ForbiddenError('You can only access bookings for your own shop');
     }
 
-    return buildBookingDetailsPayload(booking);
+    return buildBookingDetailsPayload(await withPayableAmountSummary(booking));
 };
 
 export const getBookingDetailsForUser = async (bookingId, user) => {
@@ -573,8 +676,8 @@ const cancelBookingByCustomer = async (bookingId, userId) => {
     }
 
     // Check cancellation window
-    if (isWithinCancellationWindow(booking.date, booking.time, CANCELLATION_WINDOW_HOURS)) {
-        throw new BadRequestError(`Cancellation not allowed within ${CANCELLATION_WINDOW_HOURS} hours of appointment`);
+    if (isWithinCancellationWindow(booking.date, booking.time, config.booking.cancellationWindowHours)) {
+        throw new BadRequestError(`Cancellation not allowed within ${config.booking.cancellationWindowHours} hours of appointment`);
     }
 
     let cancellationNote = null;
@@ -641,26 +744,32 @@ const reorderBooking = async (userId, bookingId, newDate, newTime) => {
         throw new BadRequestError('Please choose a different date or time');
     }
 
-    if (!isValidBookingDateTime(newDate, normalizedNewTime, BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS)) {
+    if (!isValidBookingDateTime(newDate, normalizedNewTime, config.booking.maxAdvanceDays)) {
         if (!isBookingInFuture(newDate, normalizedNewTime)) {
             throw new BadRequestError('Cannot book for a past date/time');
         }
-        throw new BadRequestError(`Bookings can only be made up to ${BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS} days in advance.`);
+        throw new BadRequestError(`Bookings can only be made up to ${config.booking.maxAdvanceDays} days in advance.`);
     }
 
     const services = normalizeBookedServices(
         await serviceRepository.findByIds(
             existing.serviceIds,
-            'serviceName finalPrice totalPrice actualPrice offerPrice serviceType duration totalDuration',
+            BOOKING_SERVICE_CARD_FIELDS,
         ),
     );
     const totalAmount = sumServicePrices(services);
     const durationMinutes = sumServiceDurations(services);
+    const bookingFeeType = classifyBookingFeeType(services);
     assertValidServiceDuration(durationMinutes);
-    assertBundleMinimum(services, totalAmount);
-    if (durationMinutes > BOOKING_LIMITS.MAX_BOOKING_DURATION_MINUTES) {
+    assertMinimumServiceAmount(totalAmount, bookingFeeType);
+    const amountSummary = await buildPayableAmountSummary({
+        customer,
+        bookingFeeType,
+        serviceAmount: totalAmount,
+    });
+    if (durationMinutes > config.booking.maxDurationMinutes) {
         throw new BadRequestError(
-            `Total booking duration cannot exceed ${BOOKING_LIMITS.MAX_BOOKING_DURATION_MINUTES / 60} hours`,
+            `Total booking duration cannot exceed ${config.booking.maxDurationMinutes / 60} hours`,
         );
     }
 
@@ -718,7 +827,7 @@ const reorderBooking = async (userId, bookingId, newDate, newTime) => {
         bookingId: newBooking._id,
         employee,
         services,
-        totalAmount,
+        ...amountSummary,
         durationMinutes,
         time: schedulePlan.startTime,
         endTime: schedulePlan.endTime,
@@ -735,9 +844,6 @@ const reorderBooking = async (userId, bookingId, newDate, newTime) => {
 // ── Customer: list bookings ──────────────────────────────────────────────
 
 export const getCustomerBookings = async (userId, query = {}) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
     const customer = await customerRepository.findByUserId(userId);
     if (!customer) throw new NotFoundError('Customer profile');
     const customerId = customer._id;
@@ -746,26 +852,21 @@ export const getCustomerBookings = async (userId, query = {}) => {
         return getFavoriteBookings(userId, query);
     }
 
-    const timeframe = query.timeframe || 'upcoming';
+    const filters = {};
+    setFilterValue(filters, 'status', query.status);
+    setFilterValue(filters, 'paymentStatus', query.paymentStatus);
+    applyDateRangeFilter(filters, query);
 
-    if (timeframe === 'past') {
-        const total = await bookingRepository.countPastByCustomer(customerId, today);
-        const { skip, limit, pagination } = buildPagination(query, total);
-        const items = (await bookingRepository.findPastByCustomer(customerId, today, { skip, limit }))
-            .map(serializeBooking)
-            .filter(Boolean);
-        return { items, pagination };
-    }
-    if (timeframe === 'upcoming') {
-        const total = await bookingRepository.countUpcomingByCustomer(customerId, today);
-        const { skip, limit, pagination } = buildPagination(query, total);
-        const items = (await bookingRepository.findUpcomingByCustomer(customerId, today, { skip, limit }))
-            .map(serializeBooking)
-            .filter(Boolean);
-        return { items, pagination };
-    }
-
-    throw new BadRequestError('Invalid timeframe. Use: past or upcoming');
+    const total = await bookingRepository.countAll({ customerId, ...filters });
+    const { skip, limit, pagination } = buildPagination(query, total);
+    const bookings = await Promise.all(
+        (await bookingRepository.findByCustomer(customerId, filters, { skip, limit }))
+            .map((booking) => withPayableAmountSummary(booking, customer)),
+    );
+    const items = bookings
+        .map(serializeBooking)
+        .filter(Boolean);
+    return { items, pagination };
 };
 
 const loadCustomer = async (userId) => {
@@ -826,11 +927,11 @@ export const updateBookingSchedule = async (bookingId, userId, { employeeId, dat
 
     assertBookingCanChangeBeforePayment(booking);
 
-    if (!isValidBookingDateTime(date, normalizedTime, BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS)) {
+    if (!isValidBookingDateTime(date, normalizedTime, config.booking.maxAdvanceDays)) {
         if (!isBookingInFuture(date, normalizedTime)) {
             throw new BadRequestError('Cannot update to a past date/time');
         }
-        throw new BadRequestError(`Bookings can only be made up to ${BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS} days in advance.`);
+        throw new BadRequestError(`Bookings can only be made up to ${config.booking.maxAdvanceDays} days in advance.`);
     }
 
     const oldDate = booking.date.toISOString().split('T')[0];
@@ -845,11 +946,11 @@ export const updateBookingSchedule = async (bookingId, userId, { employeeId, dat
         throw new BadRequestError('Appointment has already passed');
     }
 
-    if (isWithinCancellationWindow(booking.date, booking.time, CANCELLATION_WINDOW_HOURS)) {
-        throw new BadRequestError(`Booking updates are not allowed within ${CANCELLATION_WINDOW_HOURS} hours of appointment`);
+    if (isWithinCancellationWindow(booking.date, booking.time, config.booking.cancellationWindowHours)) {
+        throw new BadRequestError(`Booking updates are not allowed within ${config.booking.cancellationWindowHours} hours of appointment`);
     }
 
-    if ((booking.rescheduleCount || 0) >= MAX_RESCHEDULE_COUNT) {
+    if ((booking.rescheduleCount || 0) >= config.booking.maxRescheduleCount) {
         throw new BadRequestError('You can only reschedule once');
     }
 
@@ -956,8 +1057,8 @@ export const getAvailableSlots = async (employeeId, date, serviceId) => {
     }
 
     // Check if date is within booking window
-    if (!isWithinBookingWindow(date, BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS, now)) {
-        throw new BadRequestError(`Availability can only be checked up to ${BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS} days in advance.`);
+    if (!isWithinBookingWindow(date, config.booking.maxAdvanceDays, now)) {
+        throw new BadRequestError(`Availability can only be checked up to ${config.booking.maxAdvanceDays} days in advance.`);
     }
 
     // Normalize serviceIds to array
@@ -1057,8 +1158,8 @@ export const getShopAvailability = async (shopId, date, serviceId) => {
     }
 
     // Check if date is within booking window
-    if (!isWithinBookingWindow(date, BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS, now)) {
-        throw new BadRequestError(`Availability can only be checked up to ${BOOKING_LIMITS.MAX_ADVANCE_BOOKING_DAYS} days in advance.`);
+    if (!isWithinBookingWindow(date, config.booking.maxAdvanceDays, now)) {
+        throw new BadRequestError(`Availability can only be checked up to ${config.booking.maxAdvanceDays} days in advance.`);
     }
 
     // Normalize serviceIds to array
@@ -1148,7 +1249,7 @@ export const getShopAvailability = async (shopId, date, serviceId) => {
             employeeAvailability.push({
                 employeeId: employee._id,
                 employeeName: `${employee.firstName} ${employee.lastName}`,
-                photoUrl: employee.photoUrl,
+                photoUrl: buildMediaUrl(employee.photoR2Key),
                 availableSlots,
                 totalAvailable: availableSlots.length,
             });
@@ -1182,21 +1283,14 @@ export const getShopAvailability = async (shopId, date, serviceId) => {
 // ── Barber-side: booking management ──────────────────────────────────────
 
 export const getBookingsByShop = async (ownerId, query = {}) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
+    const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop');
 
     // Build filters
     const filters = {};
     
-    // Status filter
-    if (query.status) {
-        filters.status = query.status;
-    }
-    
-    // Payment status filter
-    if (query.paymentStatus) {
-        filters.paymentStatus = query.paymentStatus;
-    }
+    setFilterValue(filters, 'status', query.status);
+    setFilterValue(filters, 'paymentStatus', query.paymentStatus);
     
     // Employee filter
     if (query.employeeId) {
@@ -1208,22 +1302,7 @@ export const getBookingsByShop = async (ownerId, query = {}) => {
         filters.employeeId = query.employeeId;
     }
     
-    // Date range filter
-    if (query.dateFrom || query.dateTo) {
-        filters.date = {};
-        
-        if (query.dateFrom) {
-            const fromDate = new Date(query.dateFrom);
-            fromDate.setHours(0, 0, 0, 0);
-            filters.date.$gte = fromDate;
-        }
-        
-        if (query.dateTo) {
-            const toDate = new Date(query.dateTo);
-            toDate.setHours(23, 59, 59, 999);
-            filters.date.$lte = toDate;
-        }
-    }
+    applyDateRangeFilter(filters, query);
 
     const total = await bookingRepository.countAll({ shopId: shop._id, ...filters });
     const { skip, limit, pagination } = buildPagination(query, total);
@@ -1235,7 +1314,9 @@ export const getBookingsByShop = async (ownerId, query = {}) => {
     ]);
 
     return {
-        items: bookings.map(serializeBooking).filter(Boolean),
+        items: (await Promise.all(bookings.map((booking) => withPayableAmountSummary(booking))))
+            .map(serializeBooking)
+            .filter(Boolean),
         pagination,
         numberOfEmployees,
         numberOfCustomers: numCustomers,
@@ -1249,7 +1330,7 @@ const updateBookingStatusForShopOwner = async (bookingId, status, ownerId) => {
     ];
     if (!allowed.includes(status)) throw new BadRequestError(`Invalid status. Allowed: ${allowed.join(', ')}`);
 
-    const shop = await shopRepository.findByOwnerId(ownerId);
+    const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop');
 
     const booking = await bookingRepository.findById(bookingId);
@@ -1310,8 +1391,8 @@ export const updateBookingStatus = async (bookingId, user, status) => {
     throw new ForbiddenError('This endpoint is available only to customers and barbers');
 };
 
-export const getBookingStats = async (ownerId) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
+const buildBookingSummaryAnalytics = async (ownerId) => {
+    const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop');
 
     const [total, pending, awaitingConfirmation, completed, cancelled] = await Promise.all([
@@ -1324,8 +1405,8 @@ export const getBookingStats = async (ownerId) => {
     return { total, pending, awaitingConfirmation, completed, cancelled };
 };
 
-export const getBookingMilestoneProgress = async (ownerId, query = {}) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
+const buildMilestoneAnalytics = async (ownerId, query = {}) => {
+    const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop');
 
     const period = query.month && query.year
@@ -1338,11 +1419,11 @@ export const getBookingMilestoneProgress = async (ownerId, query = {}) => {
         endDate,
     );
 
-    const progressMax = BOOKING_MILESTONE_TARGETS[BOOKING_MILESTONE_TARGETS.length - 1] || 0;
+    const progressMax = config.booking.milestoneTargets[config.booking.milestoneTargets.length - 1] || 0;
     const progressValue = progressMax > 0
         ? Math.min(completedBookings, progressMax)
         : completedBookings;
-    const milestones = BOOKING_MILESTONE_TARGETS.map((targetBookings, index) => ({
+    const milestones = config.booking.milestoneTargets.map((targetBookings, index) => ({
         targetBookings,
         label: getTargetLabel(index),
         isCompleted: completedBookings >= targetBookings,
@@ -1381,6 +1462,22 @@ export const getBookingMilestoneProgress = async (ownerId, query = {}) => {
     };
 };
 
+export const getBookingAnalytics = async (ownerId, query = {}) => {
+    const [summary, milestones, today, queue] = await Promise.all([
+        buildBookingSummaryAnalytics(ownerId),
+        buildMilestoneAnalytics(ownerId, query),
+        buildTodayAnalytics(ownerId),
+        buildQueueAnalytics(ownerId),
+    ]);
+
+    return {
+        summary,
+        milestones,
+        today,
+        queue,
+    };
+};
+
 // Status-filtered booking lists are served by getBookingsByShop(query).
 
 // ── Barber: Get Pending Confirmations ────────────────────────────────────
@@ -1393,7 +1490,7 @@ const confirmBookingByBarber = async (bookingId, ownerId) => {
     const booking = await bookingRepository.findById(bookingId);
     if (!booking) throw new NotFoundError('Booking');
 
-    const shop = await shopRepository.findByOwnerId(ownerId);
+    const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop');
 
     if (booking.shopId.toString() !== shop._id.toString()) {
@@ -1433,7 +1530,7 @@ const cancelBookingByBarber = async (bookingId, ownerId) => {
     const booking = await bookingRepository.findById(bookingId);
     if (!booking) throw new NotFoundError('Booking');
 
-    const shop = await shopRepository.findByOwnerId(ownerId);
+    const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop');
 
     if (booking.shopId.toString() !== shop._id.toString()) {
@@ -1503,15 +1600,14 @@ const cancelBookingByBarber = async (bookingId, ownerId) => {
 // ── System: Auto-Cancel Awaiting Bookings ────────────────────────────────
 
 export const autoCancelAwaitingBookings = async () => {
-    const CONFIRMATION_TIMEOUT_HOURS = 24;
-    const cutoffTime = new Date(Date.now() - CONFIRMATION_TIMEOUT_HOURS * 60 * 60 * 1000);
+    const cutoffTime = new Date(Date.now() - config.booking.confirmationTimeoutHours * 60 * 60 * 1000);
 
     logger.info('[BookingService] Starting auto-cancel job', {
         cutoffTime,
-        timeoutHours: CONFIRMATION_TIMEOUT_HOURS,
+        timeoutHours: config.booking.confirmationTimeoutHours,
     });
 
-    // Find bookings awaiting confirmation for more than 24 hours
+    // Find bookings awaiting confirmation for more than the configured timeout
     const expiredBookings = await bookingRepository.findAwaitingConfirmationExpired(cutoffTime, 100);
 
     if (expiredBookings.length === 0) {
@@ -1605,14 +1701,14 @@ export const autoCancelAwaitingBookings = async () => {
     return summary;
 };
 
-// ── Dashboard Analytics (moved from dashboard.service.js) ────────────────
+// Resource analytics
 
 /**
  * Get today's pulse metrics - Executive Performance
  * Shows real-time occupancy and booking status breakdown
  */
-export const getTodaysPulse = async (ownerId) => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
+const buildTodayAnalytics = async (ownerId) => {
+    const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop');
 
     const today = new Date();
@@ -1719,8 +1815,8 @@ export const getTodaysPulse = async (ownerId) => {
  * Get today's queue - active and upcoming appointments
  * Shows appointments organized by status (active/upcoming)
  */
-export const getTodaysQueue = async (ownerId, timeframe = 'active') => {
-    const shop = await shopRepository.findByOwnerId(ownerId);
+const buildQueueAnalytics = async (ownerId) => {
+    const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop');
 
     const now = new Date();
@@ -1762,9 +1858,9 @@ export const getTodaysQueue = async (ownerId, timeframe = 'active') => {
         const timeDiff = bookingMinutes - currentMinutes;
 
         // Active: bookings happening now or in the past (not yet completed)
-        // Upcoming: bookings more than 30 minutes in the future
-        if (timeDiff <= 30) {
-            // Booking is now or in the past, or within 30 minutes in the future
+        // Upcoming: bookings more than the configured threshold minutes in the future
+        if (timeDiff <= config.booking.activeThresholdMinutes) {
+            // Booking is now or in the past, or within the threshold minutes in the future
             activeBookings.push(booking);
         } else {
             // Booking is more than 30 minutes in the future
@@ -1796,17 +1892,14 @@ export const getTodaysQueue = async (ownerId, timeframe = 'active') => {
         services: booking.serviceIds?.map((s) => s.serviceName) || [],
     });
 
-    const selectedQueue = timeframe === 'active' ? activeBookings : upcomingBookings;
-
     return {
-        timeframe,
         active: {
             count: activeBookings.length,
-            items: timeframe === 'active' ? selectedQueue.map(formatQueueItem) : [],
+            items: activeBookings.map(formatQueueItem),
         },
         upcoming: {
             count: upcomingBookings.length,
-            items: timeframe === 'upcoming' ? selectedQueue.map(formatQueueItem) : [],
+            items: upcomingBookings.map(formatQueueItem),
         },
     };
 };

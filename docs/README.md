@@ -92,7 +92,6 @@ Detailed guides for implementing specific features.
 | [POSTMAN-BOOKING-PAYMENT-GUIDE.md](./testing/POSTMAN-BOOKING-PAYMENT-GUIDE.md) | Postman testing guide for booking & payment flow | ✅ Production Ready |
 | [PAYMENT-GATEWAY-IMPLEMENTATION-GUIDE.md](./features/payments/PAYMENT-GATEWAY-IMPLEMENTATION-GUIDE.md) | PhonePe payment gateway implementation details | 📋 Implementation Guide |
 | [PAYMENT-GATEWAY-RESEARCH-GUIDE.md](./features/payments/PAYMENT-GATEWAY-RESEARCH-GUIDE.md) | Payment gateway research and comparison | 📊 Research |
-| [HOOKDECK-DAILY-WORKFLOW.md](./features/payments/HOOKDECK-DAILY-WORKFLOW.md) | Webhook development workflow using Hookdeck | 📋 Development Guide |
 | [old-method/](./features/payments/old-method/) | Archived web redirect/payment-link documentation | 📦 Archived |
 
 > **Note:** EverCut migrated from web redirect payment flow to native PhonePe Flutter SDK in April 2026. Old redirect-based documentation is archived in `features/payments/old-method/` for historical reference only.
@@ -104,6 +103,20 @@ Detailed guides for implementing specific features.
 | [notification-system-overview.md](./features/notifications/notification-system-overview.md) | Functional overview of hybrid FCM + REST notification behavior | ✅ Production Ready |
 | [flutter-notification-integration-guide.md](./flows/flutter-notification-integration-guide.md) | Flutter client integration guide for FCM and REST notification APIs | ✅ Production Ready |
 | [notification-system-postman-guide.md](./testing/notification-system-postman-guide.md) | Postman-only backend notification testing guide | ✅ Production Ready |
+
+### Subscription System
+
+| Document | Description | Status |
+|----------|-------------|--------|
+| [EVERCUT-SUBSCRIPTION-DEVELOPER-DOCUMENTATION.md](./features/subscription/EVERCUT-SUBSCRIPTION-DEVELOPER-DOCUMENTATION.md) | Business requirements and plan specifications | ✅ Reference |
+| [SUBSCRIPTION-EXTERNAL-SETUP-DOCUMENTATION.md](./features/subscription/SUBSCRIPTION-EXTERNAL-SETUP-DOCUMENTATION.md) | Razorpay dashboard setup, plan creation, UPI AutoPay mandates | 📋 Setup Guide |
+| [SUBSCRIPTION-INTERNAL-IMPLEMENTATION-DOCUMENTATION.md](./features/subscription/SUBSCRIPTION-INTERNAL-IMPLEMENTATION-DOCUMENTATION.md) | Complete technical architecture and implementation blueprint | 📋 Implementation Guide |
+
+### Webhook Development
+
+| Document | Description | Status |
+|----------|-------------|--------|
+| [HOOKDECK-DAILY-WORKFLOW.md](./features/webhooks/HOOKDECK-DAILY-WORKFLOW.md) | Local webhook development workflow (PhonePe, Cashfree, Razorpay) using Hookdeck | 📋 Development Guide |
 
 ---
 
@@ -140,7 +153,6 @@ Research documents for technology decisions and comparisons.
 ```
 docs/
 ├── README.md                          # This file
-├── PAYMENT-MIGRATION-SUMMARY.md       # Native SDK migration summary
 ├── flows/                             # Developer implementation guides
 │   ├── FLUTTER-BOOKING-PAYMENT-FLOW.md
 │   └── flutter-notification-integration-guide.md
@@ -162,6 +174,12 @@ docs/
 │   │   └── README.md
 │   ├── payments/
 │   │   └── old-method/                # Archived redirect flow docs
+│   ├── subscription/
+│   │   ├── EVERCUT-SUBSCRIPTION-DEVELOPER-DOCUMENTATION.md
+│   │   ├── SUBSCRIPTION-EXTERNAL-SETUP-DOCUMENTATION.md
+│   │   └── SUBSCRIPTION-INTERNAL-IMPLEMENTATION-DOCUMENTATION.md
+│   ├── webhooks/
+│   │   └── HOOKDECK-DAILY-WORKFLOW.md  # PhonePe + Cashfree + Razorpay
 │   ├── notifications/
 │   │   └── notification-system-overview.md
 │   └── msg91/
