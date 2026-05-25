@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EverCut — Razorpay Subscription Checkout (Dev Test)</title>
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0f0f13;
+      color: #e2e8f0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .card {
+      background: #1a1a2e;
+      border: 1px solid #2d2d4e;
+      border-radius: 16px;
+      padding: 36px;
+      width: 100%;
+      max-width: 480px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    }
+
+    .logo {
+      font-size: 22px;
+      font-weight: 700;
+      color: #818cf8;
+      margin-bottom: 4px;
+    }
+
+    .subtitle {
+      font-size: 13px;
+      color: #64748b;
+      margin-bottom: 32px;
+    }
+
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 6px;
+    }
+
+    input {
+      width: 100%;
+      background: #0f0f1a;
+      border: 1px solid #2d2d4e;
+      border-radius: 8px;
+      padding: 10px 14px;
+      color: #e2e8f0;
+      font-size: 14px;
+      font-family: 'Courier New', monospace;
+      margin-bottom: 20px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input:focus { border-color: #818cf8; }
+    input::placeholder { color: #334155; }
+
+    .hint {
+      font-size: 11px;
+      color: #475569;
+      margin-top: -16px;
+      margin-bottom: 20px;
+    }
+
+    button {
+      width: 100%;
+      background: linear-gradient(135deg, #818cf8, #6366f1);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      padding: 14px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+      margin-top: 8px;
+    }
+
+    button:hover { opacity: 0.9; transform: translateY(-1px); }
+    button:active { transform: translateY(0); }
+    button:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+    .status {
+      margin-top: 20px;
+      padding: 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      display: none;
+      line-height: 1.6;
+    }
+
+    .status.success { background: #052e16; border: 1px solid #166534; color: #86efac; display: block; }
+    .status.error   { background: #2d0a0a; border: 1px solid #7f1d1d; color: #fca5a5; display: block; }
+    .status.info    { background: #0c1a3a; border: 1px solid #1e3a8a; color: #93c5fd; display: block; }
+
+    .divider {
+      border: none;
+      border-top: 1px solid #2d2d4e;
+      margin: 28px 0;
+    }
+
+    .test-cards {
+      font-size: 12px;
+      color: #64748b;
+    }
+
+    .test-cards strong {
+      color: #94a3b8;
+      display: block;
+      margin-bottom: 10px;
+    }
+
+    .card-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 0;
+      border-bottom: 1px solid #1e293b;
+    }
+
+    .card-row:last-child { border-bottom: none; }
+
+    .card-number { font-family: monospace; color: #c7d2fe; }
+
+    .info-box {
+      background: #0c1a3a;
+      border: 1px solid #1e3a8a;
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 12px;
+      color: #93c5fd;
+      margin-bottom: 24px;
+      line-height: 1.7;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">✂ EverCut</div>
+    <div class="subtitle">Razorpay Subscription Checkout — Dev/Sandbox Testing</div>
+
+    <div class="info-box">
+      ℹ️ Paste the values from your <code>POST /subscriptions/subscribe</code> response below and click Pay. 
+      Since Hookdeck is running, Razorpay will fire real webhooks to your local server after payment.
+    </div>
+
+    <label>Razorpay Key ID</label>
+    <input type="text" id="keyId" placeholder="rzp_test_xxxxxxxxxxxx" />
+    <p class="hint">From subscribe response → <code>data.razorpayKeyId</code></p>
+
+    <label>Razorpay Subscription ID</label>
+    <input type="text" id="subscriptionId" placeholder="sub_xxxxxxxxxxxxxxx" />
+    <p class="hint">From subscribe response → <code>data.razorpaySubscriptionId</code></p>
+
+    <label>Your Name (for Razorpay modal)</label>
+    <input type="text" id="name" placeholder="Test Barber" value="Test Barber" />
+
+    <label>Your Email</label>
+    <input type="text" id="email" placeholder="test.barber@example.com" value="test.barber@example.com" />
+
+    <label>Your Phone</label>
+    <input type="text" id="phone" placeholder="9876543211" value="9876543211" />
+
+    <button id="payBtn" onclick="openCheckout()">Pay with Razorpay</button>
+
+    <div id="status" class="status"></div>
+
+    <hr class="divider" />
+
+    <div class="test-cards">
+      <strong>🧪 Razorpay Sandbox Test Cards</strong>
+      <div class="card-row">
+        <span class="card-number">4111 1111 1111 1111</span>
+        <span>Visa — Always succeeds</span>
+      </div>
+      <div class="card-row">
+        <span class="card-number">5267 3181 8797 5449</span>
+        <span>Mastercard — Succeeds</span>
+      </div>
+      <div class="card-row">
+        <span class="card-number">4000 0000 0000 0002</span>
+        <span>Always fails</span>
+      </div>
+      <div style="margin-top: 10px; color: #475569;">
+        Use any future expiry date · CVV: any 3 digits · OTP: 1234 (if prompted)
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function setStatus(msg, type) {
+      const el = document.getElementById('status');
+      el.textContent = msg;
+      el.className = 'status ' + type;
+    }
+
+    function openCheckout() {
+      const keyId = document.getElementById('keyId').value.trim();
+      const subscriptionId = document.getElementById('subscriptionId').value.trim();
+      const name = document.getElementById('name').value.trim() || 'Test Barber';
+      const email = document.getElementById('email').value.trim() || 'test.barber@example.com';
+      const phone = document.getElementById('phone').value.trim() || '9876543211';
+
+      if (!keyId) { setStatus('❌ Please enter your Razorpay Key ID', 'error'); return; }
+      if (!subscriptionId) { setStatus('❌ Please enter your Razorpay Subscription ID', 'error'); return; }
+      if (!subscriptionId.startsWith('sub_')) {
+        setStatus('❌ Subscription ID must start with sub_', 'error');
+        return;
+      }
+
+      setStatus('Opening Razorpay checkout...', 'info');
+
+      const options = {
+        key: keyId,
+        subscription_id: subscriptionId,
+        name: 'EverCut',
+        description: 'Barber Subscription Plan',
+        image: 'https://i.imgur.com/n5tjHFD.png',
+        prefill: {
+          name: name,
+          email: email,
+          contact: phone,
+        },
+        theme: { color: '#6366f1' },
+        handler: function(response) {
+          console.log('Payment success', response);
+          setStatus(
+            '✅ Payment completed!\n\n' +
+            'Payment ID: ' + response.razorpay_payment_id + '\n' +
+            'Subscription ID: ' + response.razorpay_subscription_id + '\n\n' +
+            'Razorpay will now fire the subscription.activated webhook to your Hookdeck tunnel. ' +
+            'Go back to Postman and call GET /subscriptions/me in 5–10 seconds to confirm status = ACTIVE.',
+            'success'
+          );
+          document.getElementById('payBtn').textContent = '✓ Payment Done — Check Postman';
+        },
+        modal: {
+          ondismiss: function() {
+            setStatus('Payment modal closed. No payment was made.', 'info');
+          }
+        }
+      };
+
+      try {
+        const rzp = new Razorpay(options);
+        rzp.on('payment.failed', function(response) {
+          console.error('Payment failed', response);
+          setStatus(
+            '❌ Payment failed.\n' +
+            'Code: ' + response.error.code + '\n' +
+            'Description: ' + response.error.description,
+            'error'
+          );
+        });
+        rzp.open();
+        setStatus('', '');
+      } catch(e) {
+        setStatus('❌ Failed to open Razorpay: ' + e.message, 'error');
+      }
+    }
+  </script>
+</body>
+</html>
+
+<!-- file:///Users/prankitapotbhare/Projects/EverCut/server/scripts/razorpay-subscription-checkout.html -->
