@@ -7,13 +7,6 @@ const compact = (value) => Object.fromEntries(
     Object.entries(value).filter(([, nestedValue]) => nestedValue !== undefined),
 );
 
-const maskBankAccount = (bankAccount) => {
-    if (!bankAccount) return null;
-    const digits = String(bankAccount).replace(/\D/g, '');
-    if (digits.length <= 4) return digits || null;
-    return `******${digits.slice(-4)}`;
-};
-
 const toBreakTimes = (breakTimes = []) => (
     Array.isArray(breakTimes)
         ? breakTimes.map((entry) => {
@@ -59,7 +52,7 @@ export const serializeBankDetails = (barber) => {
         accountHolderName: plain.accountHolderName || null,
         bankName: plain.bankName || null,
         upiId: plain.upiId || null,
-        bankAccountLast4: maskBankAccount(raw?.bankAccount),
+        bankAccount: raw?.bankAccount || null,
         ifsc: plain.ifsc || null,
         verificationStatus,
         isVerified,

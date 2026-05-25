@@ -1023,13 +1023,13 @@ const barberProfileCollection = {
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/shops/me/payout-details',
-        description: 'Reads the complete payout account details with verification status. Account number is masked for security.',
+        description: 'Reads the complete payout account details with verification status. Account number is displayed in full.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           "const response = pm.response.json();",
           "const data = response.data || {};",
           "pm.test('response includes accountHolderName', function () { pm.expect(data).to.have.property('accountHolderName'); });",
-          "pm.test('response includes bankAccountLast4', function () { pm.expect(data).to.have.property('bankAccountLast4'); });",
+          "pm.test('response includes bankAccount', function () { pm.expect(data).to.have.property('bankAccount'); });",
           "pm.test('response includes ifsc', function () { pm.expect(data).to.have.property('ifsc'); });",
           "pm.test('response includes verificationStatus', function () { pm.expect(data).to.have.property('verificationStatus'); });",
           "pm.test('response includes canReceivePayouts', function () { pm.expect(data).to.have.property('canReceivePayouts'); });"
@@ -1048,7 +1048,7 @@ const barberProfileCollection = {
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           "const response = pm.response.json();",
           "const data = response.data || {};",
-          "pm.test('bankAccountLast4 is present', function () { pm.expect(data.bankAccountLast4).to.match(/^\\d{4}$/); });",
+          "pm.test('bankAccount is present and unmasked', function () { pm.expect(data.bankAccount).to.equal('12345678901234'); });",
           "pm.test('verificationStatus is pending after update', function () { pm.expect(data.verificationStatus).to.equal('pending'); });"
         ),
       }),

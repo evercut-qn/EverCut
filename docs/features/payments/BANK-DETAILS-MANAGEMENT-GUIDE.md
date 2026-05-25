@@ -38,7 +38,7 @@ This guide documents the complete payout details management system for barber sh
   "data": {
     "accountHolderName": "John Doe",
     "bankName": "State Bank of India",
-    "bankAccountLast4": "******5678",
+    "bankAccount": "12345678901234",
     "ifsc": "SBIN0001234",
     "upiId": "john@paytm",
     "verificationStatus": "verified",
@@ -54,7 +54,7 @@ This guide documents the complete payout details management system for barber sh
 **Field Descriptions:**
 - `accountHolderName`: Name on the bank account
 - `bankName`: Name of the bank
-- `bankAccountLast4`: Masked account number (shows last 4 digits only)
+- `bankAccount`: Bank account number (displayed in full, unmasked)
 - `ifsc`: IFSC code of the bank branch
 - `upiId`: UPI ID for payouts
 - `verificationStatus`: One of `pending`, `verified`, `failed`
@@ -99,7 +99,7 @@ This guide documents the complete payout details management system for barber sh
   "data": {
     "accountHolderName": "John Doe",
     "bankName": "State Bank of India",
-    "bankAccountLast4": "******1234",
+    "bankAccount": "12345678901234",
     "ifsc": "SBIN0001234",
     "upiId": "john@paytm",
     "verificationStatus": "pending",
@@ -170,10 +170,9 @@ Bank account and IFSC details are required during barber onboarding. UPI ID rema
 
 ## SECURITY CONSIDERATIONS
 
-### 1. Account Number Masking
-- Bank account numbers are **always masked** in API responses
-- Only last 4 digits are shown: `******5678`
-- Full account number is never exposed via API
+### 1. Account Number Display
+- Bank account numbers are **displayed in full** (unmasked) in API responses for authorized barber profile views
+- No masking or redaction is applied to `bankAccount` in the backend serializer or mobile app layer
 
 ### 2. Sensitive Data Handling
 - Bank account, IFSC, account holder, bank name, and UPI ID are stored on the Barber profile
@@ -281,7 +280,7 @@ Before a payout can be initiated:
 - [ ] Fetch bank details for shop with no bank details
 - [ ] Fetch bank details for shop with unverified details
 - [ ] Fetch bank details for shop with verified details
-- [ ] Verify account number is masked
+- [ ] Verify account number is unmasked and fully displayed
 - [ ] Verify verification status is correct
 
 #### UPDATE Bank Details

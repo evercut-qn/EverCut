@@ -19,7 +19,6 @@ const SENSITIVE_KEYS = new Set([
     'sdkOrderToken',
     'gatewayResponse',
     'webhookEventId',
-    'bankAccount',
 ]);
 
 const isObjectIdLike = (value) => (
