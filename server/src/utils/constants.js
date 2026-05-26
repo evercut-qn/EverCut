@@ -80,6 +80,13 @@ export const PAYOUT_TRANSACTION_STATUS = Object.freeze({
 
 export const ALL_PAYOUT_TRANSACTION_STATUSES = Object.values(PAYOUT_TRANSACTION_STATUS);
 
+export const PAYOUT_GATEWAY = Object.freeze({
+    CASHFREE: 'cashfree',
+    MANUAL: 'manual',
+});
+
+export const ALL_PAYOUT_GATEWAYS = Object.values(PAYOUT_GATEWAY);
+
 export const PHONEPE_WEBHOOK_EVENTS = Object.freeze({
     ORDER_COMPLETED: 'checkout.order.completed',
     ORDER_FAILED: 'checkout.order.failed',

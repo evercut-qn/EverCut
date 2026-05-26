@@ -472,7 +472,7 @@ Barbers can also **revoke** the mandate entirely from their UPI app:
 
 | Setting | Value |
 |---|---|
-| **Webhook URL** | `https://api.evercut.com/api/v1/subscriptions/webhook` |
+| **Webhook URL** | `https://api.evercut.in/api/v1/subscriptions/webhook` |
 | **Secret** | Auto-generated or custom (store as `RAZORPAY_WEBHOOK_SECRET`) |
 | **Alert Email** | `dev@quantneural.com` |
 | **Active Events** | Select individually (see below) |
@@ -736,7 +736,7 @@ The generator emits `postman-collections/17-subscriptions.json` with plan, lifec
 - [ ] Plan IDs verified via `node scripts/create-razorpay-plans.mjs --list` and updated in production environment variables
 - [ ] Subscription defaults migration dry-run reviewed via `node scripts/migrate-subscription-defaults.mjs`
 - [ ] Subscription defaults migration executed after deploy via `node scripts/migrate-subscription-defaults.mjs --execute`
-- [ ] Webhook URL set to production API endpoint (`https://api.evercut.com/api/v1/subscriptions/webhook`)
+- [ ] Webhook URL set to production API endpoint (`https://api.evercut.in/api/v1/subscriptions/webhook`)
 - [ ] SSL certificate valid on webhook endpoint
 - [ ] Webhook signature verification tested with live keys
 - [ ] Production monitoring configured (Section 13)

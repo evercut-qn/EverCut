@@ -146,7 +146,9 @@ class PaymentRepository {
         );
     }
 
-    async markSettledByIds(ids, settledAt = new Date()) {
+    async markSettledByIds(ids, settledAt = new Date(), options = {}) {
+        const queryOptions = {};
+        if (options.session) queryOptions.session = options.session;
         return PaymentTransaction.updateMany(
             trustQueryOperators({ _id: { $in: ids } }),
             {
@@ -155,10 +157,13 @@ class PaymentRepository {
                     'settlement.settledAt': settledAt,
                 },
             },
+            queryOptions,
         );
     }
 
-    async markUnsettledByIds(ids) {
+    async markUnsettledByIds(ids, options = {}) {
+        const queryOptions = {};
+        if (options.session) queryOptions.session = options.session;
         return PaymentTransaction.updateMany(
             trustQueryOperators({ _id: { $in: ids } }),
             {
@@ -167,6 +172,7 @@ class PaymentRepository {
                     'settlement.settledAt': null,
                 },
             },
+            queryOptions,
         );
     }
 

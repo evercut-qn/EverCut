@@ -10,16 +10,21 @@ import logger from '../utils/logger.js';
 import config from '../config/index.js';
 import {
     BadRequestError,
+    ConflictError,
     NotFoundError,
     PayoutError,
 } from '../utils/api-error.js';
 import {
+    BOOKING_STATUS,
     CASHFREE_WEBHOOK_EVENTS,
+    PAYMENT_STATUS,
+    PAYOUT_GATEWAY,
     PAYOUT_MODES,
     PAYOUT_STATUS,
     PAYOUT_TRANSACTION_STATUS,
 } from '../utils/constants.js';
 import { serializePayout } from '../serializers/payout.serializer.js';
+import { buildPagination } from '../utils/pagination.utils.js';
 
 const NON_RETRYABLE_ERROR_CODES = new Set([
     'INSUFFICIENT_BALANCE',
@@ -35,6 +40,38 @@ const getSettledBarberPayout = (payment) => (
     || payment?.settlement?.serviceAmount
     || 0
 );
+const ELIGIBLE_MANUAL_BOOKING_PAYOUT_STATUSES = new Set([
+    PAYOUT_STATUS.NOT_INITIATED,
+    PAYOUT_STATUS.FAILED,
+    PAYOUT_STATUS.REVERSED,
+]);
+const ELIGIBLE_PAYOUT_BOOKING_STATUSES = new Set([
+    BOOKING_STATUS.COMPLETED,
+    BOOKING_STATUS.NO_SHOW,
+]);
+
+const normalizeUtr = (utr) => String(utr || '').trim().toUpperCase();
+const normalizeAdminNotes = (notes) => {
+    const normalized = String(notes || '').trim();
+    return normalized || null;
+};
+
+const buildUpiDeepLink = ({ upiId, name, amountInRupees, bookingCount }) => {
+    const params = new URLSearchParams({
+        pa: upiId,
+        pn: name || 'EverCut Barber',
+        am: String(amountInRupees),
+        tn: `EverCut Payout - ${bookingCount} booking(s)`,
+    });
+    return `upi://pay?${params.toString()}`;
+};
+
+const parseSortParam = (sortParam) => {
+    const [field = 'createdAt', direction = 'desc'] = String(sortParam || 'createdAt:desc').split(':');
+    const allowedFields = new Set(['createdAt', 'amount', 'amountInRupees', 'processedAt']);
+    if (!allowedFields.has(field)) return { createdAt: -1 };
+    return { [field]: direction === 'asc' ? 1 : -1 };
+};
 
 const generateTransferId = (barberId) => {
     // Cashfree requires transfer_id to be max 40 characters
@@ -241,6 +278,287 @@ async function ensureBeneficiary(shop, barber, beneficiaryId) {
     return beneficiaryId;
 }
 
+const assertUniqueBookingIds = (bookingIds) => {
+    const uniqueIds = [...new Set((bookingIds || []).map(toObjectIdString))];
+    if (uniqueIds.length !== bookingIds.length) {
+        throw new BadRequestError('Booking IDs must be unique');
+    }
+    return uniqueIds;
+};
+
+const validateManualPayoutBookings = ({ bookings, bookingIds, barberId }) => {
+    if (bookings.length !== bookingIds.length) {
+        throw new NotFoundError('One or more bookings');
+    }
+
+    for (const booking of bookings) {
+        if (!ELIGIBLE_PAYOUT_BOOKING_STATUSES.has(booking.status)) {
+            throw new BadRequestError('All bookings must be completed or marked no-show before payout');
+        }
+        if (booking.paymentStatus !== PAYMENT_STATUS.SUCCESS) {
+            throw new BadRequestError('All bookings must have successful payments before payout');
+        }
+        if (!ELIGIBLE_MANUAL_BOOKING_PAYOUT_STATUSES.has(booking.payoutStatus)) {
+            throw new ConflictError('One or more bookings already has an active payout or completed payout');
+        }
+
+        const bookingBarberId = toObjectIdString(booking.shopId?.barberId);
+        if (!bookingBarberId || bookingBarberId !== toObjectIdString(barberId)) {
+            throw new BadRequestError('Bookings do not belong to the requested barber');
+        }
+    }
+};
+
+const validateManualPayoutPayments = ({ paymentTransactions, bookingIds }) => {
+    if (paymentTransactions.length !== bookingIds.length) {
+        throw new NotFoundError('Completed payment for one or more bookings');
+    }
+
+    const paymentMap = new Map(
+        paymentTransactions.map((payment) => [toObjectIdString(payment.bookingId), payment]),
+    );
+
+    const totalPayoutInPaisa = bookingIds.reduce((sum, bookingId) => {
+        const payment = paymentMap.get(toObjectIdString(bookingId));
+        if (!payment) {
+            throw new NotFoundError('Completed payment for one or more bookings');
+        }
+        if (payment.settlement?.settled) {
+            throw new ConflictError('One or more payments are already settled');
+        }
+        return sum + getSettledBarberPayout(payment);
+    }, 0);
+
+    if (totalPayoutInPaisa <= 0) {
+        throw new BadRequestError('Invalid payout amount');
+    }
+
+    return totalPayoutInPaisa;
+};
+
+const isDuplicateUtrError = (error) => error?.code === 11000 && error?.keyPattern?.utr;
+
+export const getPendingPayoutsForAdmin = async (query = {}) => {
+    const results = await bookingRepository.aggregatePendingPayoutsByBarber({ search: query.search });
+    const { skip, limit, pagination } = buildPagination(query, results.length);
+    const paginated = results.slice(skip, skip + limit);
+
+    const items = paginated.map((item) => {
+        const barberName = `${item.barberFirstName || ''} ${item.barberLastName || ''}`.trim();
+        const totalAmountInPaisa = item.totalAmountInPaisa || 0;
+        const amountInRupees = totalAmountInPaisa / 100;
+
+        return {
+            barberId: toObjectIdString(item.barberId),
+            barberName,
+            shopName: item.shopName || null,
+            shopId: toObjectIdString(item.shopId),
+            upiId: item.upiId || null,
+            accountHolderName: item.accountHolderName || null,
+            totalAmountInPaisa,
+            totalAmountInRupees: amountInRupees,
+            bookingCount: item.bookingCount || 0,
+            bookingIds: (item.bookingIds || []).map(toObjectIdString),
+            payoutStatuses: item.payoutStatuses || [],
+            oldestBookingDate: item.oldestBookingDate || null,
+            upiDeepLink: item.upiId
+                ? buildUpiDeepLink({
+                    upiId: item.upiId,
+                    name: item.accountHolderName || barberName,
+                    amountInRupees,
+                    bookingCount: item.bookingCount || 0,
+                })
+                : null,
+        };
+    });
+
+    return { items, pagination };
+};
+
+export const createManualPayout = async ({ barberId, bookingIds, utr, transferMode, notes }, adminId) => {
+    const uniqueBookingIds = assertUniqueBookingIds(bookingIds);
+    const normalizedUtr = normalizeUtr(utr);
+    const existingByUtr = await payoutRepository.findByUtr(normalizedUtr);
+    if (existingByUtr) {
+        throw new ConflictError(`A payout with UTR ${normalizedUtr} already exists`);
+    }
+
+    const [barber, bookings] = await Promise.all([
+        barberRepository.findById(barberId),
+        bookingRepository.findByIds(uniqueBookingIds),
+    ]);
+    if (!barber) {
+        throw new NotFoundError('Barber');
+    }
+
+    validateManualPayoutBookings({ bookings, bookingIds: uniqueBookingIds, barberId });
+
+    const paymentTransactions = await paymentRepository.findCompletedByBookingIds(uniqueBookingIds);
+    const totalPayoutInPaisa = validateManualPayoutPayments({
+        paymentTransactions,
+        bookingIds: uniqueBookingIds,
+    });
+
+    const payoutId = payoutRepository.createId();
+    const claimResult = await bookingRepository.claimManualPayoutBookings({
+        bookingIds: uniqueBookingIds,
+        payoutId,
+    });
+
+    if (claimResult.matchedCount !== uniqueBookingIds.length) {
+        await bookingRepository.releaseManualPayoutClaim(payoutId);
+        throw new ConflictError('One or more bookings were modified by another admin or already have an active payout');
+    }
+
+    const processedAt = new Date();
+    const amountInRupees = totalPayoutInPaisa / 100;
+    const paymentTransactionIds = paymentTransactions.map((payment) => payment._id);
+    const firstBooking = bookings[0];
+    const shop = firstBooking.shopId;
+
+    let payoutTransaction;
+    try {
+        payoutTransaction = await payoutRepository.create({
+            _id: payoutId,
+            bookingIds: uniqueBookingIds,
+            barberId: barber._id,
+            shopId: shop._id || shop,
+            paymentTransactionIds,
+            transferId: generateTransferId(barber._id),
+            beneficiaryId: `MANUAL_${barber._id}`,
+            amount: totalPayoutInPaisa,
+            amountInRupees,
+            transferMode: transferMode || PAYOUT_MODES.UPI,
+            status: PAYOUT_TRANSACTION_STATUS.SUCCESS,
+            utr: normalizedUtr,
+            processedAt,
+            gateway: PAYOUT_GATEWAY.MANUAL,
+            completedByAdminId: adminId,
+            lastStatusUpdatedByAdminId: adminId,
+            adminNotes: normalizeAdminNotes(notes),
+            remarks: `Manual payout for ${uniqueBookingIds.length} booking(s)`,
+        });
+    } catch (error) {
+        await bookingRepository.releaseManualPayoutClaim(payoutId);
+        if (isDuplicateUtrError(error)) {
+            throw new ConflictError(`A payout with UTR ${normalizedUtr} already exists`);
+        }
+        throw error;
+    }
+
+    await bookingRepository.completeManualPayoutBookings(uniqueBookingIds, payoutId, {
+        processedAt,
+        utr: normalizedUtr,
+    });
+    await paymentRepository.markSettledByIds(paymentTransactionIds, processedAt);
+
+    const barberUserId = await getPayoutRecipientUserId(barber._id);
+    await notificationEvents.notifyPayoutStatus({
+        payoutId: payoutTransaction._id,
+        barberId: barberUserId,
+        status: PAYOUT_TRANSACTION_STATUS.SUCCESS,
+        amountInRupees,
+    });
+
+    logger.info('[PayoutService] Manual payout created', {
+        payoutId: payoutTransaction._id,
+        adminId,
+        barberId: toObjectIdString(barber._id),
+        bookingCount: uniqueBookingIds.length,
+        amountInRupees,
+        utr: normalizedUtr,
+        gateway: PAYOUT_GATEWAY.MANUAL,
+    });
+
+    return serializePayout(payoutTransaction);
+};
+
+export const updatePayoutStatus = async (payoutId, { status, reason, notes }, adminId) => {
+    const payout = await payoutRepository.findById(payoutId);
+    if (!payout) {
+        throw new NotFoundError('Payout');
+    }
+
+    if (status !== PAYOUT_TRANSACTION_STATUS.FAILED) {
+        throw new BadRequestError('Only FAILED status transition is supported');
+    }
+
+    if ((payout.gateway || PAYOUT_GATEWAY.CASHFREE) !== PAYOUT_GATEWAY.MANUAL) {
+        throw new BadRequestError('Manual status correction is only supported for manual payouts');
+    }
+
+    if (payout.status === PAYOUT_TRANSACTION_STATUS.FAILED) {
+        return serializePayout(payout);
+    }
+
+    if (![PAYOUT_TRANSACTION_STATUS.INITIATED, PAYOUT_TRANSACTION_STATUS.SUCCESS].includes(payout.status)) {
+        throw new BadRequestError(`Cannot transition payout from ${payout.status} to ${status}`);
+    }
+
+    const updated = await payoutRepository.atomicStatusUpdate(payoutId, payout.status, {
+        status: PAYOUT_TRANSACTION_STATUS.FAILED,
+        failureReason: reason,
+        processedAt: null,
+        lastStatusUpdatedByAdminId: adminId,
+        adminNotes: normalizeAdminNotes(notes),
+    });
+
+    if (!updated) {
+        throw new ConflictError('Payout was modified by another admin. Please refresh and try again.');
+    }
+
+    await bookingRepository.markPayoutBookingsFailed(payout.bookingIds, payout._id);
+    if (Array.isArray(payout.paymentTransactionIds) && payout.paymentTransactionIds.length > 0) {
+        await paymentRepository.markUnsettledByIds(payout.paymentTransactionIds);
+    }
+
+    logger.info('[PayoutService] Manual payout marked as failed', {
+        payoutId,
+        adminId,
+        reason,
+        gateway: payout.gateway,
+    });
+
+    return serializePayout(updated);
+};
+
+export const listPayouts = async (query = {}) => {
+    const filter = {};
+    if (query.status) filter.status = query.status;
+    if (query.barberId) filter.barberId = query.barberId;
+    if (query.gateway) filter.gateway = query.gateway;
+    if (query.startDate || query.endDate) {
+        filter.createdAt = {};
+        if (query.startDate) filter.createdAt.$gte = new Date(query.startDate);
+        if (query.endDate) {
+            const endDate = new Date(query.endDate);
+            endDate.setHours(23, 59, 59, 999);
+            filter.createdAt.$lte = endDate;
+        }
+    }
+
+    const total = await payoutRepository.countAll(filter);
+    const { skip, limit, pagination } = buildPagination(query, total);
+    const payouts = await payoutRepository.findAllFiltered(filter, {
+        skip,
+        limit,
+        sort: parseSortParam(query.sort),
+    });
+
+    return {
+        items: payouts.map(serializePayout),
+        pagination,
+    };
+};
+
+export const getPayoutDetail = async (payoutId) => {
+    const payout = await payoutRepository.findByIdPopulated(payoutId);
+    if (!payout) {
+        throw new NotFoundError('Payout');
+    }
+    return serializePayout(payout);
+};
+
 export const triggerBarberPayout = async (barberId, bookingIds, totalPayoutInPaisa = null) => {
     if (!Array.isArray(bookingIds) || bookingIds.length === 0) {
         throw new BadRequestError('At least one booking is required for payout');
@@ -252,10 +570,10 @@ export const triggerBarberPayout = async (barberId, bookingIds, totalPayoutInPai
     }
 
     for (const booking of bookings) {
-        if (booking.status !== 'completed') {
-            throw new BadRequestError('All bookings must be completed before payout');
+        if (!ELIGIBLE_PAYOUT_BOOKING_STATUSES.has(booking.status)) {
+            throw new BadRequestError('All bookings must be completed or marked no-show before payout');
         }
-        if (booking.paymentStatus !== 'success') {
+        if (booking.paymentStatus !== PAYMENT_STATUS.SUCCESS) {
             throw new BadRequestError('All bookings must have successful payments before payout');
         }
         if (![PAYOUT_STATUS.NOT_INITIATED, PAYOUT_STATUS.FAILED, PAYOUT_STATUS.REVERSED].includes(booking.payoutStatus)) {

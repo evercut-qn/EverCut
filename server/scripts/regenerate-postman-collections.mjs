@@ -159,13 +159,14 @@ const barberLocationGeoJson = '{"type":"Point","coordinates":[77.5946,12.9716]}'
 const authenticationCollection = {
   info: {
     name: 'EverCut - Authentication',
-    description: 'OTP authentication endpoints for customer and barber test users. Sends OTP, verifies it, and captures onboarding tokens for brand-new users or JWT access/refresh tokens for returning users. Requires msg91.testMode set to true in config/index.js for local development.',
+    description: 'OTP authentication endpoints for customer, barber, and admin test users. Sends OTP, verifies it, and captures onboarding tokens for brand-new users or JWT access/refresh tokens for returning users. Requires msg91.testMode set to true in config/index.js for local development.',
     schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
   },
   variable: [
     ...baseVariables(
       textVariable('test_customer_mobile', '9876543210'),
       textVariable('test_barber_mobile', '9876543211'),
+      textVariable('test_admin_mobile', '9876543212'),
       textVariable('test_otp', '123456'),
     ),
   ],
@@ -257,7 +258,41 @@ const authenticationCollection = {
       }),
     },
     {
-      name: '5. Refresh Customer Token',
+      name: '5. Send Admin OTP',
+      ...request({
+        method: 'POST',
+        url: '{{base_url}}/{{api_prefix}}/auth/otp/send',
+        auth: { type: 'noauth' },
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "mobile": "{{test_admin_mobile}}"\n}`),
+        description: 'Send an OTP to the admin test number. Create the admin first with node scripts/create-admin-user.mjs --phone {{test_admin_mobile}} --email admin@example.com.',
+        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
+      }),
+    },
+    {
+      name: '6. Verify Admin OTP',
+      ...request({
+        method: 'POST',
+        url: '{{base_url}}/{{api_prefix}}/auth/otp/verify',
+        auth: { type: 'noauth' },
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "mobile": "{{test_admin_mobile}}",\n  "otp": "{{test_otp}}"\n}`),
+        description: 'Verify the admin OTP and capture the ADMIN access/refresh tokens used by payout management requests.',
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          "const response = pm.response.json();",
+          "const data = response.data || {};",
+          "pm.test('admin is an existing user', function () { pm.expect(data.isNewUser).to.equal(false); });",
+          "pm.test('admin role token issued', function () { pm.expect(data.user && data.user.roleType).to.equal('ADMIN'); });",
+          "if (data.accessToken) pm.environment.set('admin_access_token', data.accessToken);",
+          "if (data.refreshToken) pm.environment.set('admin_refresh_token', data.refreshToken);",
+          "pm.collectionVariables.set('last_session_role', 'ADMIN');",
+          "pm.collectionVariables.set('last_session_is_new_user', String(Boolean(data.isNewUser)));"
+        ),
+      }),
+    },
+    {
+      name: '7. Refresh Customer Token',
       ...request({
         method: 'POST',
         url: '{{base_url}}/{{api_prefix}}/auth/token/refresh',
@@ -278,7 +313,7 @@ const authenticationCollection = {
       }),
     },
     {
-      name: '6. Refresh Barber Token',
+      name: '8. Refresh Barber Token',
       ...request({
         method: 'POST',
         url: '{{base_url}}/{{api_prefix}}/auth/token/refresh',
@@ -299,7 +334,25 @@ const authenticationCollection = {
       }),
     },
     {
-      name: '7. Logout Customer (Terminal)',
+      name: '9. Refresh Admin Token',
+      ...request({
+        method: 'POST',
+        url: '{{base_url}}/{{api_prefix}}/auth/token/refresh',
+        auth: { type: 'noauth' },
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "refreshToken": "{{admin_refresh_token}}"\n}`),
+        description: 'Exchange the stored admin refresh token for a fresh access/refresh token pair.',
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          "const response = pm.response.json();",
+          "const data = response.data || {};",
+          "if (data.accessToken) pm.environment.set('admin_access_token', data.accessToken);",
+          "if (data.refreshToken) pm.environment.set('admin_refresh_token', data.refreshToken);"
+        ),
+      }),
+    },
+    {
+      name: '10. Logout Customer (Terminal)',
       ...request({
         method: 'POST',
         url: '{{base_url}}/{{api_prefix}}/auth/logout',
@@ -313,7 +366,7 @@ const authenticationCollection = {
       }),
     },
     {
-      name: '8. Resend Customer OTP (Text)',
+      name: '11. Resend Customer OTP (Text)',
       ...request({
         method: 'POST',
         url: '{{base_url}}/{{api_prefix}}/auth/otp/resend',
@@ -325,7 +378,7 @@ const authenticationCollection = {
       }),
     },
     {
-      name: '9. Send Phone Update OTP (Customer)',
+      name: '12. Send Phone Update OTP (Customer)',
       ...request({
         method: 'POST',
         url: '{{base_url}}/{{api_prefix}}/account/phone/send-otp',
@@ -337,7 +390,7 @@ const authenticationCollection = {
       }),
     },
     {
-      name: '10. Verify Phone Update OTP (Customer)',
+      name: '13. Verify Phone Update OTP (Customer)',
       ...request({
         method: 'POST',
         url: '{{base_url}}/{{api_prefix}}/account/phone/verify-otp',
@@ -354,7 +407,7 @@ const authenticationCollection = {
       }),
     },
     {
-      name: '11. Update Email (Customer)',
+      name: '14. Update Email (Customer)',
       ...request({
         method: 'PATCH',
         url: '{{base_url}}/{{api_prefix}}/account/email',
@@ -373,7 +426,7 @@ const authenticationCollection = {
       }),
     },
     {
-      name: '12. Health Check',
+      name: '15. Health Check',
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/health',
@@ -2011,7 +2064,7 @@ const barberRatingsCollection = {
 const paymentsPayoutsCollection = {
   info: {
     name: 'EverCut - Payments & Payouts',
-    description: 'Native PhonePe SDK payment initiation/verification, refund processing, and payout retry for the EverCut dual-provider payment system. PhonePe is used for customer collection; Cashfree Payouts is used for barber disbursement.',
+    description: 'Native PhonePe SDK payment initiation/verification, refund processing, manual payout recording, payout history, and Cashfree retry support for the EverCut dual-provider payment system.',
     schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
   },
   auth: bearerAuth('customer_access_token'),
@@ -2024,6 +2077,8 @@ const paymentsPayoutsCollection = {
       ['refund_id', 'refund_id'],
       ['payout_id', 'payout_id'],
       ['admin_access_token', 'admin_access_token'],
+      ['manual_payout_barber_id', 'manual_payout_barber_id'],
+      ['manual_payout_booking_ids_json', 'manual_payout_booking_ids_json'],
     ],
     extra: [
       "// Ensure payment_booking_id is synced ONLY if it hasn't been set manually.",
@@ -2044,7 +2099,10 @@ const paymentsPayoutsCollection = {
       textVariable('merchant_order_id', '', 'Auto-captured from payment initiation'),
       textVariable('merchant_refund_id', '', 'Auto-captured from refund initiation'),
       textVariable('refund_id', '', 'Auto-captured from refund initiation'),
-      textVariable('payout_id', '', 'Payout ID for retry operations'),
+      textVariable('manual_payout_barber_id', '', 'Auto-captured from GET /payouts/pending'),
+      textVariable('manual_payout_booking_ids_json', '[]', 'JSON array of booking IDs captured from GET /payouts/pending'),
+      textVariable('manual_payout_utr', 'POSTMANUTR{{$timestamp}}', 'Unique UTR/reference for creating a manual payout'),
+      textVariable('payout_id', '', 'Payout ID for manual payout detail/update or Cashfree retry operations'),
     ),
   ],
   item: [
@@ -2161,12 +2219,107 @@ const paymentsPayoutsCollection = {
       }),
     },
     {
-      name: '6. Retry Failed Payout',
+      name: '6. List Pending Manual Payouts',
+      ...request({
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/payouts/pending?page=1&limit=20',
+        auth: bearerAuth('admin_access_token'),
+        description: 'Admin-only derived payout queue. Captures the first barber group and booking IDs for manual payout creation.',
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          "const response = pm.response.json();",
+          "const first = Array.isArray(response.data) ? response.data[0] : null;",
+          "if (first) {",
+          "  pm.collectionVariables.set('manual_payout_barber_id', first.barberId);",
+          "  pm.collectionVariables.set('manual_payout_booking_ids_json', JSON.stringify(first.bookingIds || []));",
+          "  pm.globals.set('manual_payout_barber_id', first.barberId);",
+          "  pm.globals.set('manual_payout_booking_ids_json', JSON.stringify(first.bookingIds || []));",
+          "}",
+          "pm.test('pending payout rows include aggregate fields when present', function () {",
+          "  if (!first) return;",
+          "  pm.expect(first).to.have.property('totalAmountInPaisa');",
+          "  pm.expect(first).to.have.property('bookingCount');",
+          "  pm.expect(first).to.have.property('bookingIds');",
+          "});"
+        ),
+      }),
+    },
+    {
+      name: '7. Create Manual Payout',
+      ...request({
+        method: 'POST',
+        url: '{{base_url}}/{{api_prefix}}/payouts',
+        auth: bearerAuth('admin_access_token'),
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "barberId": "{{manual_payout_barber_id}}",\n  "bookingIds": {{manual_payout_booking_ids_json}},\n  "utr": "{{manual_payout_utr}}",\n  "transferMode": "upi",\n  "notes": "Recorded through Postman manual payout flow"\n}`),
+        description: 'Records an already-completed external payout. Amount is computed server-side from completed payment transactions; UTR must be unique.',
+        event: mergedEvents(
+          [
+            "const utr = pm.collectionVariables.get('manual_payout_utr');",
+            "if (!utr || utr.includes('{{$timestamp}}') || utr.startsWith('POSTMANUTR')) {",
+            "  pm.collectionVariables.set('manual_payout_utr', `POSTMANUTR${Date.now()}`);",
+            "}",
+          ],
+          [
+          "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
+          "const response = pm.response.json();",
+          "const payoutId = response.data && response.data.id;",
+          "if (payoutId) {",
+          "  pm.collectionVariables.set('payout_id', payoutId);",
+          "  pm.globals.set('payout_id', payoutId);",
+          "}",
+          "pm.test('manual payout was recorded as success', function () {",
+          "  pm.expect(response.data.gateway).to.equal('manual');",
+          "  pm.expect(response.data.status).to.equal('SUCCESS');",
+          "  pm.expect(response.data).to.have.property('utr');",
+          "});"
+          ]
+        ),
+      }),
+    },
+    {
+      name: '8. List Manual Payout History',
+      ...request({
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/payouts?gateway=manual&sort=createdAt:desc&page=1&limit=20',
+        auth: bearerAuth('admin_access_token'),
+        description: 'Lists manual payout transactions with standard pagination. Add status, barberId, startDate, and endDate query params as needed.',
+        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
+      }),
+    },
+    {
+      name: '9. Get Payout Detail',
+      ...request({
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/payouts/{{payout_id}}',
+        auth: bearerAuth('admin_access_token'),
+        description: 'Reads a single payout transaction with serialized payout metadata and populated detail when available.',
+        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
+      }),
+    },
+    {
+      name: '10. Mark Manual Payout Failed (Terminal)',
+      ...request({
+        method: 'PATCH',
+        url: '{{base_url}}/{{api_prefix}}/payouts/{{payout_id}}',
+        auth: bearerAuth('admin_access_token'),
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "status": "FAILED",\n  "reason": "Postman failure correction test",\n  "notes": "This reopens the booking payout status for retry"\n}`),
+        description: 'Terminal correction for a manual payout recorded in error. This is destructive for the payout lifecycle; run only when testing failure/retry behavior.',
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          "const response = pm.response.json();",
+          "pm.test('payout is failed', function () { pm.expect(response.data.status).to.equal('FAILED'); });"
+        ),
+      }),
+    },
+    {
+      name: '11. Retry Failed Cashfree Payout',
       ...request({
         method: 'POST',
         url: '{{base_url}}/{{api_prefix}}/payouts/{{payout_id}}/retry',
         auth: bearerAuth('admin_access_token'),
-        description: 'Retries a failed or reversed payout. Requires an ADMIN token and a payout ID from MongoDB.',
+        description: 'Retries a failed or reversed Cashfree payout. Requires an ADMIN token and a payout ID for a legacy/automatic Cashfree payout.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           "pm.test('captures retry payout references when present', function () {",
@@ -2614,54 +2767,6 @@ const subscriptionsCollection = {
         ),
       }),
     },
-    {
-      name: '8. Simulate Razorpay Activated Webhook',
-      ...request({
-        method: 'POST',
-        url: '{{base_url}}/{{api_prefix}}/subscriptions/webhook',
-        auth: { type: 'noauth' },
-        headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody(subscriptionWebhookBody),
-        description: 'Local Razorpay webhook simulation. The pre-request script signs the raw JSON body with razorpay_webhook_secret.',
-        event: razorpayWebhookSignatureEvent,
-      }),
-    },
-    {
-      name: '9. Simulate Razorpay Renewal Webhook',
-      ...request({
-        method: 'POST',
-        url: '{{base_url}}/{{api_prefix}}/subscriptions/webhook',
-        auth: { type: 'noauth' },
-        headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody(subscriptionRenewalWebhookBody),
-        description: 'Local subscription.charged webhook simulation for renewal and statement-counter reset validation.',
-        event: razorpayWebhookSignatureEvent,
-      }),
-    },
-    {
-      name: '10. Simulate Razorpay Plan Updated Webhook',
-      ...request({
-        method: 'POST',
-        url: '{{base_url}}/{{api_prefix}}/subscriptions/webhook',
-        auth: { type: 'noauth' },
-        headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody(subscriptionUpdatedWebhookBody),
-        description: 'Local subscription.updated webhook simulation for provider-driven upgrade or downgrade reconciliation.',
-        event: razorpayWebhookSignatureEvent,
-      }),
-    },
-    {
-      name: '11. Simulate Razorpay Payment Failed Webhook',
-      ...request({
-        method: 'POST',
-        url: '{{base_url}}/{{api_prefix}}/subscriptions/webhook',
-        auth: { type: 'noauth' },
-        headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody(subscriptionPaymentFailedWebhookBody),
-        description: 'Local payment.failed webhook simulation for retry/failure audit records.',
-        event: razorpayWebhookSignatureEvent,
-      }),
-    },
   ],
 };
 
@@ -2673,6 +2778,7 @@ const environmentTemplate = {
     { key: 'api_prefix', value: 'api/v1', enabled: true },
     { key: 'test_customer_mobile', value: '9876543210', enabled: true },
     { key: 'test_barber_mobile', value: '9876543211', enabled: true },
+    { key: 'test_admin_mobile', value: '9876543212', enabled: true },
     { key: 'test_otp', value: '123456', enabled: true },
     { key: 'customer_access_token', value: '', enabled: true },
     { key: 'customer_refresh_token', value: '', enabled: true },
@@ -2681,6 +2787,7 @@ const environmentTemplate = {
     { key: 'barber_refresh_token', value: '', enabled: true },
     { key: 'barber_onboarding_token', value: '', enabled: true },
     { key: 'admin_access_token', value: '', enabled: true },
+    { key: 'admin_refresh_token', value: '', enabled: true },
     { key: 'fcm_token', value: 'postman-fcm-token-{{$timestamp}}', enabled: true },
     { key: 'razorpay_webhook_secret', value: '', enabled: true },
     { key: 'razorpay_subscription_id', value: '', enabled: true },

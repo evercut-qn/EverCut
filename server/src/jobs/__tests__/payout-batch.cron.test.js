@@ -58,7 +58,7 @@ test('runPayoutBatchNow groups completed bookings by barber and creates one payo
         return { barberId, bookingIds, totalPayoutInPaisa };
     };
 
-    const result = await payoutBatchJob.runPayoutBatchNow({ triggerBarberPayout });
+    const result = await payoutBatchJob.runPayoutBatchNow({ triggerBarberPayout, payoutMode: 'auto' });
 
     assert.deepEqual(triggerCalls, [
         {
@@ -101,7 +101,7 @@ test('runPayoutBatchNow prefers barberPayout when settlement values diverge from
         return { barberId, bookingIds, totalPayoutInPaisa };
     };
 
-    await payoutBatchJob.runPayoutBatchNow({ triggerBarberPayout });
+    await payoutBatchJob.runPayoutBatchNow({ triggerBarberPayout, payoutMode: 'auto' });
 
     assert.deepEqual(triggerCalls, [
         {
@@ -110,4 +110,26 @@ test('runPayoutBatchNow prefers barberPayout when settlement values diverge from
             totalPayoutInPaisa: 9900,
         },
     ]);
+});
+
+test('runPayoutBatchNow skips automatic payout work in manual mode', async (t) => {
+    const findMock = t.mock.method(bookingRepository, 'findCompletedWithPendingPayout', async () => {
+        throw new Error('booking lookup should not run in manual mode');
+    });
+
+    const result = await payoutBatchJob.runPayoutBatchNow({
+        triggerBarberPayout: async () => {
+            throw new Error('trigger should not run in manual mode');
+        },
+        payoutMode: 'manual',
+    });
+
+    assert.deepEqual(result, {
+        totalBookings: 0,
+        uniqueBarbers: 0,
+        success: 0,
+        failed: 0,
+        skipped: true,
+    });
+    assert.equal(findMock.mock.calls.length, 0);
 });

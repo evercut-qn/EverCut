@@ -25,7 +25,7 @@ All collections now assume the backend returns the same JSON envelope for both s
 
 | File | Collection name | Description |
 |---|---|---|
-| `01-authentication.json` | EverCut - Authentication | OTP authentication for customer and barber test users, token capture, and health check |
+| `01-authentication.json` | EverCut - Authentication | OTP authentication for customer, barber, and admin test users, token capture, and health check |
 | `02-onboarding.json` | EverCut - Onboarding | First-run customer and barber onboarding using onboarding JWTs, with shop schedule normalization to 24-hour storage |
 | `03-customer-profile.json` | EverCut - Customer | Profile read/update and service discovery ID capture |
 | `04-customer-bookings.json` | EverCut - Customer Bookings | Full booking lifecycle: create, schedule update, favorite state, reorder, cancel |
@@ -39,7 +39,7 @@ All collections now assume the backend returns the same JSON envelope for both s
 | `12-barber-earnings.json` | EverCut - Barber Earnings | Earnings summary (requires completed bookings for non-zero values) |
 | `13-barber-ratings.json` | EverCut - Barber Ratings | Rating listing, analytics, reply management, and rating removal |
 | `14-operational-analytics.json` | EverCut - Operational Analytics | Booking, employee, and earnings analytics through resource-owned endpoints |
-| `15-payments-payouts.json` | EverCut - Payments & Payouts | Native PhonePe SDK payment initiation/verification/status/refunds and Cashfree payout retry |
+| `15-payments-payouts.json` | EverCut - Payments & Payouts | Native PhonePe SDK payment initiation/verification/status/refunds, manual payout recording, payout history, and Cashfree payout retry |
 | `16-notifications.json` | EverCut - Notifications | FCM token management, notification history, summary, and read-state updates |
 | `17-subscriptions.json` | EverCut - Subscriptions | Razorpay subscription lifecycle, plan changes, transaction history, and signed webhook simulation |
 | `EverCut.postman_environment.json` | — | Active environment with OTP/JWT variables for local testing |
@@ -57,11 +57,17 @@ All collections now assume the backend returns the same JSON envelope for both s
 | 2 | POST | `/api/v1/auth/otp/verify` | Verify customer OTP - captures onboarding or session tokens |
 | 3 | POST | `/api/v1/auth/otp/send` | Send OTP to barber |
 | 4 | POST | `/api/v1/auth/otp/verify` | Verify barber OTP - captures onboarding or session tokens |
-| 5 | POST | `/api/v1/auth/token/refresh` | Refresh customer access token |
-| 6 | POST | `/api/v1/auth/token/refresh` | Refresh barber access token |
-| 7 | POST | `/api/v1/auth/logout` | Logout customer *(Terminal)* |
-| 8 | POST | `/api/v1/auth/otp/resend` | Resend OTP (text channel) |
-| 9 | GET | `/api/v1/health` | Health check |
+| 5 | POST | `/api/v1/auth/otp/send` | Send OTP to admin |
+| 6 | POST | `/api/v1/auth/otp/verify` | Verify admin OTP - captures admin session tokens |
+| 7 | POST | `/api/v1/auth/token/refresh` | Refresh customer access token |
+| 8 | POST | `/api/v1/auth/token/refresh` | Refresh barber access token |
+| 9 | POST | `/api/v1/auth/token/refresh` | Refresh admin access token |
+| 10 | POST | `/api/v1/auth/logout` | Logout customer *(Terminal)* |
+| 11 | POST | `/api/v1/auth/otp/resend` | Resend OTP (text channel) |
+| 12 | POST | `/api/v1/account/phone/send-otp` | Send phone update OTP |
+| 13 | POST | `/api/v1/account/phone/verify-otp` | Verify phone update OTP |
+| 14 | PATCH | `/api/v1/account/email` | Update customer email |
+| 15 | GET | `/api/v1/health` | Health check |
 
 ### `02-onboarding.json`
 
@@ -214,10 +220,15 @@ Employee `workingHours.start` and `workingHours.end` remain `HH:MM` 24-hour valu
 |---|---|---|---|
 | 1 | POST | `/api/v1/payments` | Create native PhonePe SDK order for a pending customer booking |
 | 2 | GET | `/api/v1/payments/{{payment_id}}` | Read and poll payment status |
-| 2B | GET | `/api/v1/payments` | List visible payments for the authenticated actor |
-| 3 | POST | `/api/v1/payments/{{payment_id}}/verify` | Verify Flutter SDK callback through backend/PhonePe Order Status |
-| 4 | POST | `/api/v1/bookings/{{payment_booking_id}}/refunds` | Initiate refund before payout starts |
-| 5 | POST | `/api/v1/payouts/{{payout_id}}/retry` | Retry failed or reversed payout as admin |
+| 3 | GET | `/api/v1/payments` | List visible payments for the authenticated actor |
+| 4 | POST | `/api/v1/payments/{{payment_id}}/verify` | Verify Flutter SDK callback through backend/PhonePe Order Status |
+| 5 | POST | `/api/v1/bookings/{{payment_booking_id}}/refunds` | Initiate refund before payout starts |
+| 6 | GET | `/api/v1/payouts/pending` | List pending manual payout groups as admin |
+| 7 | POST | `/api/v1/payouts` | Create manual payout as admin |
+| 8 | GET | `/api/v1/payouts?gateway=manual` | List manual payout history |
+| 9 | GET | `/api/v1/payouts/{{payout_id}}` | Get payout detail |
+| 10 | PATCH | `/api/v1/payouts/{{payout_id}}` | Mark manual payout failed *(Terminal)* |
+| 11 | POST | `/api/v1/payouts/{{payout_id}}/retry` | Retry failed or reversed Cashfree payout as admin |
 
 ### `16-notifications.json`
 
@@ -247,7 +258,7 @@ Employee `workingHours.start` and `workingHours.end` remain `HH:MM` 24-hour valu
 
 ### Prerequisites
 
-1. In `src/config/index.js`, set `testMode: true` inside the `msg91` config block to skip real SMS in development. The default is `false`; the inline comment says `flip to true in dev to skip real SMS`.
+1. In non-production, `src/config/index.js` has MSG91 `testMode` enabled so local OTP requests use the configured test OTP instead of sending real SMS.
 2. The test OTP is hardcoded as `123456` via `testOtp: '123456'` in the same config block - no env var needed.
 3. From `server/`, start the API with `npm run dev`.
 
@@ -257,12 +268,13 @@ No manual token generation needed - the authentication and onboarding collection
 
 1. Import every `.json` collection from this folder.
 2. Import `EverCut.postman_environment.json` as the active environment.
-3. Verify `test_customer_mobile`, `test_barber_mobile`, and `test_otp` are set in the environment.
-4. Run `01-authentication.json` requests 1-4 to send and verify OTP for both test users.
-5. Returning users get access tokens immediately; brand-new users get onboarding tokens first and then receive access tokens from `02-onboarding.json`.
-6. Run the other collections in order.
+3. Verify `test_customer_mobile`, `test_barber_mobile`, `test_admin_mobile`, and `test_otp` are set in the environment.
+4. Create the admin user with `node scripts/create-admin-user.mjs --phone 9876543212 --email admin@example.com`.
+5. Run `01-authentication.json` requests 1-6 to send and verify OTP for customer, barber, and admin users.
+6. Returning users get access tokens immediately; brand-new users get onboarding tokens first and then receive access tokens from `02-onboarding.json`.
+7. Run the other collections in order.
 
-> Access tokens expire after 15 minutes once onboarding is complete. Run the **Refresh Token** requests (5-6) or re-run requests 1-4 to get fresh tokens. Tokens are auto-captured - no manual copy-paste.
+> Access tokens expire after 15 minutes once onboarding is complete. Run the **Refresh Token** requests (7-9) or re-run OTP verification to get fresh tokens. Tokens are auto-captured - no manual copy-paste.
 
 ### Test Users
 
@@ -270,6 +282,7 @@ No manual token generation needed - the authentication and onboarding collection
 |---|---|---|---|
 | Customer | *(auto-generated on first successful onboarding)* | `test.customer@example.com` | `9876543210` |
 | Barber | *(auto-generated on first successful onboarding)* | `test.barber@example.com` | `9876543211` |
+| Admin | Created with `scripts/create-admin-user.mjs` | `admin@example.com` | `9876543212` |
 
 ### Environment Variables
 
@@ -279,6 +292,7 @@ No manual token generation needed - the authentication and onboarding collection
 | `api_prefix` | `api/v1` |
 | `test_customer_mobile` | `9876543210` |
 | `test_barber_mobile` | `9876543211` |
+| `test_admin_mobile` | `9876543212` |
 | `test_otp` | `123456` |
 | `customer_access_token` | *(auto-set by 01-authentication.json for returning users or by 02-onboarding.json after first-time signup)* |
 | `customer_refresh_token` | *(auto-set by 01-authentication.json for returning users or by 02-onboarding.json after first-time signup)* |
@@ -286,13 +300,17 @@ No manual token generation needed - the authentication and onboarding collection
 | `barber_refresh_token` | *(auto-set by 01-authentication.json for returning users or by 02-onboarding.json after first-time signup)* |
 | `customer_onboarding_token` | *(auto-set by 01-authentication.json)* |
 | `barber_onboarding_token` | *(auto-set by 01-authentication.json)* |
-| `admin_access_token` | Manual ADMIN JWT for payout retry |
+| `admin_access_token` | Auto-set by `01-authentication.json` request 6 for manual payout and Cashfree retry requests |
+| `admin_refresh_token` | Auto-set by `01-authentication.json` request 6 |
 | `payment_booking_id` | Booking ID to pay for; can be copied from `shared_booking_id` |
 | `payment_id` | Auto-set by `15-payments-payouts.json` request 1 |
 | `merchant_order_id` | Auto-set by `15-payments-payouts.json` request 1 |
 | `merchant_refund_id` | Auto-set by `15-payments-payouts.json` request 5 |
 | `refund_id` | Auto-set by `15-payments-payouts.json` request 5 |
-| `payout_id` | Manual payout transaction ID for retry tests |
+| `manual_payout_barber_id` | Auto-set by `15-payments-payouts.json` request 6 |
+| `manual_payout_booking_ids_json` | Auto-set by `15-payments-payouts.json` request 6 |
+| `manual_payout_utr` | Unique UTR used by `15-payments-payouts.json` request 7 |
+| `payout_id` | Manual payout transaction ID for detail/update or Cashfree retry tests |
 | `subscription_plan_id` | `PLAN_POPULAR` by default; set to `PLAN_ADVANCED` to test Advanced checkout |
 | `subscription_upgrade_plan_id` | `PLAN_ADVANCED` |
 | `subscription_downgrade_plan_id` | `PLAN_POPULAR` |
@@ -308,11 +326,17 @@ No manual token generation needed - the authentication and onboarding collection
 | 2 | POST | `/api/v1/auth/otp/verify` | Verify customer OTP - captures onboarding or session tokens |
 | 3 | POST | `/api/v1/auth/otp/send` | Send OTP to barber |
 | 4 | POST | `/api/v1/auth/otp/verify` | Verify barber OTP - captures onboarding or session tokens |
-| 5 | POST | `/api/v1/auth/token/refresh` | Refresh customer access token |
-| 6 | POST | `/api/v1/auth/token/refresh` | Refresh barber access token |
-| 7 | POST | `/api/v1/auth/logout` | Logout customer *(Terminal)* |
-| 8 | POST | `/api/v1/auth/otp/resend` | Resend OTP (text channel) |
-| 9 | GET | `/api/v1/health` | Health check |
+| 5 | POST | `/api/v1/auth/otp/send` | Send OTP to admin |
+| 6 | POST | `/api/v1/auth/otp/verify` | Verify admin OTP - captures admin session tokens |
+| 7 | POST | `/api/v1/auth/token/refresh` | Refresh customer access token |
+| 8 | POST | `/api/v1/auth/token/refresh` | Refresh barber access token |
+| 9 | POST | `/api/v1/auth/token/refresh` | Refresh admin access token |
+| 10 | POST | `/api/v1/auth/logout` | Logout customer *(Terminal)* |
+| 11 | POST | `/api/v1/auth/otp/resend` | Resend OTP (text channel) |
+| 12 | POST | `/api/v1/account/phone/send-otp` | Send phone update OTP |
+| 13 | POST | `/api/v1/account/phone/verify-otp` | Verify phone update OTP |
+| 14 | PATCH | `/api/v1/account/email` | Update customer email |
+| 15 | GET | `/api/v1/health` | Health check |
 
 ### Recommended Run Order
 
@@ -329,6 +353,14 @@ No manual token generation needed - the authentication and onboarding collection
 3. Continue with customer collections in order.
 4. Run `15-payments-payouts.json` after a pending booking has been created. Request 1 captures the payment references needed by the status, refund, and webhook requests.
 5. Run `17-subscriptions.json` after barber onboarding. Request 3 captures `razorpay_subscription_id`; request 8 signs its body with `razorpay_webhook_secret` before calling the webhook endpoint.
+
+**Admin manual payout side:**
+
+1. Create an admin user with `node scripts/create-admin-user.mjs --phone 9876543212 --email admin@example.com`.
+2. `01-authentication.json` → **5. Send Admin OTP** → **6. Verify Admin OTP**.
+3. Prepare at least one completed/no-show, paid booking with pending payout status.
+4. `15-payments-payouts.json` → **6. List Pending Manual Payouts** → **7. Create Manual Payout**.
+5. Use requests 8-10 for history/detail/failure-correction testing. Request 11 is only for legacy Cashfree payout retry.
 
 > Requests marked ***(Terminal)*** are destructive. Run them last within their collection and avoid them if you still need the related account or data for later requests.
 
@@ -347,6 +379,9 @@ Collections capture and share the following Postman globals automatically:
 | `shared_media_id` | `11-barber-media.json` requests 1 and 5 | Media attachment, detail, and delete |
 | `shared_barber_pin` | `07-barber-profile-shop.json` request 8 | Future PIN-gated requests |
 | `razorpay_subscription_id` | `17-subscriptions.json` request 3 | Subscription status and webhook simulation |
+| `manual_payout_barber_id` | `15-payments-payouts.json` request 6 | Manual payout creation |
+| `manual_payout_booking_ids_json` | `15-payments-payouts.json` request 6 | Manual payout creation |
+| `payout_id` | `15-payments-payouts.json` request 7 | Payout detail, failure correction, or Cashfree retry |
 
 ---
 

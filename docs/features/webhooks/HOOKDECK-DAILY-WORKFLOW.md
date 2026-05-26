@@ -1159,7 +1159,7 @@ function verifySignature(headers, rawBody) {
 | **Secret source** | `server/.env` file | Environment variables via hosting platform (e.g., Railway, AWS, Render) |
 | **Secret value** | Unique per developer (generate your own) | Shared team secret, managed via secrets manager |
 | **Razorpay mode** | Test Mode (`rzp_test_*` keys) | Live Mode (`rzp_live_*` keys) |
-| **Webhook URL** | Hookdeck URL (`hkdk.events/...`) | Production server URL (`api.evercut.com/...`) |
+| **Webhook URL** | Hookdeck URL (`hkdk.events/...`) | Production server URL (`api.evercut.in/...`) |
 | **Signature verification** | Always enabled (ensures code works correctly) | Always enabled (security requirement) |
 | **Webhook dashboard** | Razorpay Test Mode → Webhooks | Razorpay Live Mode → Webhooks |
 

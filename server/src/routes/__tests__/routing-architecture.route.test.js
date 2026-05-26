@@ -393,3 +393,20 @@ test('changed resource routes require the expected authentication and role guard
     assert.match(payoutRoutes, /router\.post\('\/webhook', payoutController\.handlePayoutWebhook\)/);
     assert.match(payoutRoutes, /authorize\(ROLES\.ADMIN\)/);
 });
+
+test('payout routes expose a compact admin manual-payout workflow without duplicate list endpoints', async () => {
+    const payoutRoutes = await readSource('routes/payout.routes.js');
+
+    assert.match(payoutRoutes, /router\.get\(\s*'\/pending'/);
+    assert.match(payoutRoutes, /router\.get\(\s*'\/'/);
+    assert.match(payoutRoutes, /router\.post\(\s*'\/'/);
+    assert.match(payoutRoutes, /router\.get\(\s*'\/:payoutId'/);
+    assert.match(payoutRoutes, /router\.patch\(\s*'\/:payoutId'/);
+    assert.match(payoutRoutes, /router\.post\(\s*'\/:payoutId\/retry'/);
+    assert.doesNotMatch(payoutRoutes, /\/completed/);
+    assert.doesNotMatch(payoutRoutes, /\/failed/);
+    assert.ok(
+        payoutRoutes.indexOf("router.get(\n    '/pending'") < payoutRoutes.indexOf("router.get(\n    '/:payoutId'"),
+        'GET /payouts/pending must be registered before GET /payouts/:payoutId',
+    );
+});

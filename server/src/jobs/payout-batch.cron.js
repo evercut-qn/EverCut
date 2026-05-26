@@ -46,7 +46,19 @@ const parseDailyCron = (cronExpression) => {
 
 export const runPayoutBatchNow = async ({
     triggerBarberPayout = payoutService.triggerBarberPayout,
+    payoutMode = config.payout.mode,
 } = {}) => {
+    if (payoutMode === 'manual') {
+        logger.info('[PayoutBatchJob] Skipped - payout mode is manual');
+        return {
+            totalBookings: 0,
+            uniqueBarbers: 0,
+            success: 0,
+            failed: 0,
+            skipped: true,
+        };
+    }
+
     const pendingBookings = await bookingRepository.findCompletedWithPendingPayout();
 
     if (pendingBookings.length === 0) {
@@ -117,6 +129,11 @@ export const runPayoutBatchNow = async ({
 export const startPayoutBatchJob = () => {
     if (intervalId) return;
 
+    if (config.payout.mode === 'manual') {
+        logger.info('[PayoutBatchJob] Not scheduling automatic payout batch - payout mode is manual');
+        return { started: false, skipped: true };
+    }
+
     const { minute, hour } = parseDailyCron(config.payment.payoutBatchCronTime);
     const timeZone = config.payment.payoutBatchTimezone || 'Asia/Kolkata';
 
@@ -148,6 +165,8 @@ export const startPayoutBatchJob = () => {
             });
         }
     }, 60_000);
+
+    return { started: true, skipped: false };
 };
 
 export const stopPayoutBatchJob = () => {

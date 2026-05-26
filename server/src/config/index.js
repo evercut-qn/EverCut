@@ -248,6 +248,7 @@ const config = Object.freeze({
 
   /** Payout business rules */
   payout: Object.freeze({
+    mode: 'manual',
     maxRetries: 3,
     pollIntervalMs: 10 * 60 * 1000,              // 10 minutes
     stuckThresholdMs: 10 * 60 * 1000,             // 10 minutes

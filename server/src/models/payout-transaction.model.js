@@ -1,7 +1,12 @@
 import mongoose from 'mongoose';
 
 import config from '../config/index.js';
-import { ALL_PAYOUT_TRANSACTION_STATUSES, PAYOUT_MODES } from '../utils/constants.js';
+import {
+    ALL_PAYOUT_GATEWAYS,
+    ALL_PAYOUT_TRANSACTION_STATUSES,
+    PAYOUT_GATEWAY,
+    PAYOUT_MODES,
+} from '../utils/constants.js';
 
 const payoutTransactionSchema = new mongoose.Schema(
     {
@@ -105,6 +110,27 @@ const payoutTransactionSchema = new mongoose.Schema(
             type: String,
             default: null,
         },
+        gateway: {
+            type: String,
+            enum: ALL_PAYOUT_GATEWAYS,
+            default: PAYOUT_GATEWAY.CASHFREE,
+            index: true,
+        },
+        completedByAdminId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+            default: null,
+        },
+        lastStatusUpdatedByAdminId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+            default: null,
+        },
+        adminNotes: {
+            type: String,
+            default: null,
+            maxlength: 500,
+        },
     },
     {
         timestamps: true,
@@ -114,6 +140,16 @@ const payoutTransactionSchema = new mongoose.Schema(
 
 payoutTransactionSchema.index({ status: 1, createdAt: 1 });
 payoutTransactionSchema.index({ barberId: 1, status: 1 });
+payoutTransactionSchema.index({ gateway: 1, status: 1, createdAt: -1 });
+payoutTransactionSchema.index(
+    { utr: 1 },
+    {
+        unique: true,
+        partialFilterExpression: {
+            utr: { $type: 'string' },
+        },
+    },
+);
 
 const PayoutTransaction = mongoose.model('PayoutTransaction', payoutTransactionSchema);
 export default PayoutTransaction;

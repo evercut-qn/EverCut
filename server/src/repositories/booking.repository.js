@@ -93,6 +93,81 @@ class BookingRepository {
         );
     }
 
+    async claimManualPayoutBookings({ bookingIds, payoutId }) {
+        return Booking.updateMany(
+            trustQueryOperators({
+                _id: { $in: bookingIds },
+                status: { $in: [BOOKING_STATUS.COMPLETED, BOOKING_STATUS.NO_SHOW] },
+                paymentStatus: PAYMENT_STATUS.SUCCESS,
+                payoutStatus: {
+                    $in: [
+                        PAYOUT_STATUS.NOT_INITIATED,
+                        PAYOUT_STATUS.FAILED,
+                        PAYOUT_STATUS.REVERSED,
+                    ],
+                },
+            }),
+            {
+                $set: {
+                    payoutTransactionId: payoutId,
+                    payoutStatus: PAYOUT_STATUS.INITIATED,
+                    payoutCompletedAt: null,
+                    barberUtr: null,
+                },
+            },
+        );
+    }
+
+    async completeManualPayoutBookings(bookingIds, payoutId, { processedAt, utr }) {
+        return Booking.updateMany(
+            trustQueryOperators({
+                _id: { $in: bookingIds },
+                payoutTransactionId: payoutId,
+                payoutStatus: PAYOUT_STATUS.INITIATED,
+            }),
+            {
+                $set: {
+                    payoutStatus: PAYOUT_STATUS.COMPLETED,
+                    payoutCompletedAt: processedAt,
+                    barberUtr: utr,
+                },
+            },
+        );
+    }
+
+    async markPayoutBookingsFailed(bookingIds, payoutId) {
+        return Booking.updateMany(
+            trustQueryOperators({
+                _id: { $in: bookingIds },
+                payoutTransactionId: payoutId,
+            }),
+            {
+                $set: {
+                    payoutStatus: PAYOUT_STATUS.FAILED,
+                    payoutCompletedAt: null,
+                    barberUtr: null,
+                },
+            },
+        );
+    }
+
+    async releaseManualPayoutClaim(payoutId) {
+        return Booking.updateMany(
+            trustQueryOperators({
+                payoutTransactionId: payoutId,
+                payoutStatus: PAYOUT_STATUS.INITIATED,
+            }),
+            {
+                $set: {
+                    payoutTransactionId: null,
+                    payoutStatus: PAYOUT_STATUS.NOT_INITIATED,
+                    payoutCompletedAt: null,
+                    barberUtr: null,
+                },
+            },
+        );
+    }
+
     async updateStatus(id, status) {
         const update = { status };
         if (status === BOOKING_STATUS.CANCELLED) update.cancelledAt = new Date();
@@ -309,6 +384,111 @@ class BookingRepository {
             payoutStatus: PAYOUT_STATUS.NOT_INITIATED,
             paymentStatus: PAYMENT_STATUS.SUCCESS,
         })).populate('shopId', 'barberId shopName');
+    }
+
+    async aggregatePendingPayoutsByBarber({ search } = {}) {
+        const eligiblePayoutStatuses = [
+            PAYOUT_STATUS.NOT_INITIATED,
+            PAYOUT_STATUS.FAILED,
+            PAYOUT_STATUS.REVERSED,
+        ];
+
+        const pipeline = [
+            {
+                $match: {
+                    status: { $in: [BOOKING_STATUS.COMPLETED, BOOKING_STATUS.NO_SHOW] },
+                    payoutStatus: { $in: eligiblePayoutStatuses },
+                    paymentStatus: PAYMENT_STATUS.SUCCESS,
+                },
+            },
+            {
+                $lookup: {
+                    from: 'shops',
+                    localField: 'shopId',
+                    foreignField: '_id',
+                    as: 'shop',
+                },
+            },
+            { $unwind: '$shop' },
+            { $match: { 'shop.deletedAt': null } },
+            {
+                $lookup: {
+                    from: 'barbers',
+                    localField: 'shop.barberId',
+                    foreignField: '_id',
+                    as: 'barber',
+                },
+            },
+            { $unwind: '$barber' },
+            { $match: { 'barber.deletedAt': null } },
+            {
+                $lookup: {
+                    from: 'payment_transactions',
+                    localField: '_id',
+                    foreignField: 'bookingId',
+                    as: 'payments',
+                },
+            },
+            {
+                $addFields: {
+                    completedPayment: {
+                        $arrayElemAt: [
+                            {
+                                $filter: {
+                                    input: '$payments',
+                                    as: 'payment',
+                                    cond: { $eq: ['$$payment.status', 'completed'] },
+                                },
+                            },
+                            0,
+                        ],
+                    },
+                },
+            },
+            { $match: { completedPayment: { $ne: null } } },
+            {
+                $group: {
+                    _id: '$shop.barberId',
+                    barberId: { $first: '$shop.barberId' },
+                    barberFirstName: { $first: '$barber.firstName' },
+                    barberLastName: { $first: '$barber.lastName' },
+                    shopName: { $first: '$shop.shopName' },
+                    shopId: { $first: '$shop._id' },
+                    upiId: { $first: '$barber.upiId' },
+                    accountHolderName: { $first: '$barber.accountHolderName' },
+                    totalAmountInPaisa: {
+                        $sum: {
+                            $ifNull: [
+                                '$completedPayment.settlement.barberPayout',
+                                '$completedPayment.settlement.serviceAmount',
+                            ],
+                        },
+                    },
+                    bookingCount: { $sum: 1 },
+                    bookingIds: { $push: '$_id' },
+                    payoutStatuses: { $addToSet: '$payoutStatus' },
+                    oldestBookingDate: { $min: '$date' },
+                },
+            },
+        ];
+
+        if (search) {
+            const escapedSearch = String(search).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const searchRegex = new RegExp(escapedSearch, 'i');
+            pipeline.push({
+                $match: {
+                    $or: [
+                        { barberFirstName: searchRegex },
+                        { barberLastName: searchRegex },
+                        { shopName: searchRegex },
+                    ],
+                },
+            });
+        }
+
+        pipeline.push({ $sort: { totalAmountInPaisa: -1, oldestBookingDate: 1 } });
+
+        return Booking.aggregate(pipeline);
     }
 
     async findByCustomerWithDateRange(customerId, startDate, endDate) {
