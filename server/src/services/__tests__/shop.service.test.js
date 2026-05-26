@@ -164,3 +164,89 @@ test('updateBusinessInfo persists desired open state and emits a shop-status not
     assert.equal(result.shop.isOpen, false);
     assert.deepEqual(result.updatedFields, ['isOpen']);
 });
+
+test('updatePayoutDetails requires UPI and preserves omitted optional bank fields', async (t) => {
+    const existingBarber = {
+        _id: 'barber-1',
+        userId: 'owner-1',
+        upiId: 'old.barber@upi',
+        accountHolderName: 'Existing Holder',
+        bankName: 'Existing Bank',
+        bankAccount: '12345678901234',
+        ifsc: 'HDFC0001234',
+        payoutConfig: {
+            verificationStatus: 'verified',
+            verifiedAt: new Date('2026-05-01T10:00:00.000Z'),
+        },
+    };
+
+    t.mock.method(barberRepository, 'findByUserId', async () => existingBarber);
+
+    let updateData = null;
+    t.mock.method(barberRepository, 'updateByUserId', async (_ownerId, data) => {
+        updateData = data;
+        return { ...existingBarber, ...data };
+    });
+
+    t.mock.method(notificationEvents, 'notifyAccountUpdated', async () => ({ notification: null }));
+
+    const result = await shopService.updatePayoutDetails('owner-1', {
+        upiId: 'new.barber@upi',
+    });
+
+    assert.equal(updateData.upiId, 'new.barber@upi');
+    assert.equal(Object.hasOwn(updateData, 'accountHolderName'), false);
+    assert.equal(Object.hasOwn(updateData, 'bankName'), false);
+    assert.equal(Object.hasOwn(updateData, 'bankAccount'), false);
+    assert.equal(Object.hasOwn(updateData, 'ifsc'), false);
+    assert.equal(updateData.payoutConfig.verificationStatus, 'verified');
+    assert.equal(result.upiId, 'new.barber@upi');
+
+    await assert.rejects(
+        shopService.updatePayoutDetails('owner-1', { bankAccount: '999999999999' }),
+        /upiId is required/i,
+    );
+});
+
+test('updatePayoutDetails clears optional bank fields when null or empty values are provided', async (t) => {
+    const existingBarber = {
+        _id: 'barber-1',
+        userId: 'owner-1',
+        upiId: 'barber@upi',
+        accountHolderName: 'Existing Holder',
+        bankName: 'Existing Bank',
+        bankAccount: '12345678901234',
+        ifsc: 'HDFC0001234',
+        payoutConfig: {
+            verificationStatus: 'verified',
+            verifiedAt: new Date('2026-05-01T10:00:00.000Z'),
+        },
+    };
+
+    t.mock.method(barberRepository, 'findByUserId', async () => existingBarber);
+
+    let updateData = null;
+    t.mock.method(barberRepository, 'updateByUserId', async (_ownerId, data) => {
+        updateData = data;
+        return { ...existingBarber, ...data };
+    });
+
+    t.mock.method(notificationEvents, 'notifyAccountUpdated', async () => ({ notification: null }));
+
+    const result = await shopService.updatePayoutDetails('owner-1', {
+        upiId: 'barber@upi',
+        accountHolderName: null,
+        bankName: '',
+        bankAccount: null,
+        ifsc: '',
+    });
+
+    assert.equal(updateData.accountHolderName, null);
+    assert.equal(updateData.bankName, null);
+    assert.equal(updateData.bankAccount, null);
+    assert.equal(updateData.ifsc, null);
+    assert.equal(updateData.payoutConfig.verificationStatus, 'pending');
+    assert.equal(updateData.payoutConfig.verifiedAt, null);
+    assert.equal(result.bankAccount, null);
+    assert.equal(result.ifsc, null);
+});

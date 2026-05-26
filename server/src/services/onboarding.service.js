@@ -19,6 +19,7 @@ import { hashPin, validatePinCreation } from './pin.service.js';
 import { serializeCustomerProfile } from '../serializers/customer.serializer.js';
 import { serializeUser } from '../serializers/user.serializer.js';
 import * as mediaService from './media/media.service.js';
+import { isValidUpiId, normalizePayoutString } from '../utils/payout-details.utils.js';
 
 /**
  * Onboarding service - handles first-time user and barber profile creation.
@@ -122,7 +123,7 @@ const normalizeBarberOnboardingInput = (authUser, shopData) => {
     const phoneNumber = String(authUser?.phoneNumber || '').trim();
     const category = String(shopData.category || '').trim();
     const address = String(shopData.address || '').trim();
-    const upiId = String(shopData.upiId || '').trim();
+    const upiId = normalizePayoutString(shopData.upiId);
 
     const workingHours = parseJsonIfString(shopData.workingHours, 'workingHours');
     const openTime = String(
@@ -159,10 +160,10 @@ const normalizeBarberOnboardingInput = (authUser, shopData) => {
         throw new BadRequestError(`targetCustomers must be one of: ${ALL_SERVICE_FOR.join(', ')}`);
     }
 
-    const accountHolderName = String(shopData.accountHolderName || '').trim();
-    const bankName = String(shopData.bankName || '').trim();
-    const bankAccount = String(shopData.bankAccount || '').trim();
-    const ifsc = String(shopData.ifsc || '').trim().toUpperCase();
+    const accountHolderName = normalizePayoutString(shopData.accountHolderName);
+    const bankName = normalizePayoutString(shopData.bankName);
+    const bankAccount = normalizePayoutString(shopData.bankAccount);
+    const ifsc = normalizePayoutString(shopData.ifsc, { uppercase: true });
     const location = normalizeLocation(shopData.location);
 
     if (!firstName || !lastName) {
@@ -192,11 +193,11 @@ const normalizeBarberOnboardingInput = (authUser, shopData) => {
     if (!openTime || !closeTime) {
         throw new BadRequestError('openTime and closeTime are required');
     }
-    if (!accountHolderName || !bankName) {
-        throw new BadRequestError('accountHolderName and bankName are required');
+    if (!upiId) {
+        throw new BadRequestError('upiId is required');
     }
-    if (!bankAccount || !ifsc) {
-        throw new BadRequestError('bankAccount and ifsc are required');
+    if (!isValidUpiId(upiId)) {
+        throw new BadRequestError('upiId must be a valid UPI ID');
     }
 
     const normalizedSchedule = normalizeShopSchedule({ openTime, closeTime, breakTimes });
@@ -333,7 +334,7 @@ export const createBarberOnboarding = async (phoneNumber, shopData) => {
         bankName: normalized.bankName,
         bankAccount: normalized.bankAccount,
         ifsc: normalized.ifsc,
-        upiId: normalized.upiId || null,
+        upiId: normalized.upiId,
         payoutConfig: { verificationStatus: 'pending' },
         pinHash,
     });

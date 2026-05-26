@@ -14,6 +14,7 @@ const buildBarber = (overrides = {}) => new Barber({
     gender: 'male',
     dateOfBirth: new Date('1991-01-12'),
     yearsOfExperience: 8,
+    upiId: 'test.barber@upi',
     accountHolderName: 'Test Barber',
     bankName: 'HDFC Bank',
     bankAccount: '12345678901234',
@@ -38,23 +39,30 @@ const buildShop = (overrides = {}) => new Shop({
     ...overrides,
 });
 
-test('Barber owns person, security, and payout details with optional UPI', () => {
-    const barber = buildBarber({ upiId: undefined });
+test('Barber owns person, security, and required UPI payout details', () => {
+    const barber = buildBarber();
 
     assert.equal(barber.validateSync(), undefined);
 });
 
-test('Barber requires bank account and IFSC for payout readiness', () => {
-    const barber = buildBarber({
-        bankAccount: undefined,
-        ifsc: undefined,
-    });
+test('Barber requires UPI for payout readiness', () => {
+    const barber = buildBarber({ upiId: undefined });
 
     const error = barber.validateSync();
 
     assert.ok(error);
-    assert.ok(error.errors.bankAccount);
-    assert.ok(error.errors.ifsc);
+    assert.ok(error.errors.upiId);
+});
+
+test('Barber allows bank details to be omitted', () => {
+    const barber = buildBarber({
+        accountHolderName: undefined,
+        bankName: undefined,
+        bankAccount: undefined,
+        ifsc: undefined,
+    });
+
+    assert.equal(barber.validateSync(), undefined);
 });
 
 test('Shop owns venue details and rejects barber-owned fields', () => {

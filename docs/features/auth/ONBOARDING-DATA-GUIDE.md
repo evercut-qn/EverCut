@@ -127,11 +127,11 @@ Content-Type: application/json
 | `workingDays` | array | Yes | Day names |
 | `workingHours` | object | Yes | `{ "openTime": "09:00", "closeTime": "20:00" }` |
 | `breakTimes` | array | No | Optional `{ "start": "13:00", "end": "14:00" }` entries |
-| `accountHolderName` | string | Yes | Payout account holder |
-| `bankName` | string | Yes | Bank name |
-| `bankAccount` | string | Yes | 6-34 digit payout bank account |
-| `ifsc` | string | Yes | Valid IFSC code |
-| `upiId` | string | No | Optional UPI ID |
+| `upiId` | string | Yes | Required UPI ID for payouts |
+| `accountHolderName` | string | No | Optional payout account holder |
+| `bankName` | string | No | Optional bank name |
+| `bankAccount` | string | No | Optional 6-34 digit payout bank account |
+| `ifsc` | string | No | Optional valid IFSC code |
 | `pin` | string | Yes | 4 digit account PIN |
 | `confirmPin` | string | Yes | Must match `pin` |
 | `photoMediaId` | string | No | Confirmed onboarding media ID for owner/shop profile |
@@ -163,10 +163,7 @@ Content-Type: application/json
       "end": "14:00"
     }
   ],
-  "accountHolderName": "John Barber",
-  "bankName": "HDFC Bank",
-  "bankAccount": "12345678901234",
-  "ifsc": "HDFC0001234",
+  "upiId": "john.barber@upi",
   "pin": "1234",
   "confirmPin": "1234",
   "photoMediaId": "01HXMEDIAEXAMPLE"

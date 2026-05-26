@@ -12,6 +12,7 @@ const buildValidPayload = () => ({
     shopName: 'Postman Test Barber Studio',
     category: 'Barber Shop',
     targetCustomers: 'men',
+    upiId: 'test.barber@upi',
     accountHolderName: 'Test Barber',
     bankName: 'HDFC Bank',
     bankAccount: '12345678901234',
@@ -52,11 +53,10 @@ test('barberOnboardingSchema rejects break times outside shop hours', () => {
     assert.match(result.error?.message || '', /breakTimes\[0\] must stay within shop hours/);
 });
 
-test('barberOnboardingSchema allows missing breakTimes and optional upiId', () => {
+test('barberOnboardingSchema allows missing breakTimes', () => {
     const result = barberOnboardingSchema.validate({
         ...buildValidPayload(),
         breakTimes: undefined,
-        upiId: undefined,
     }, {
         abortEarly: false,
         allowUnknown: false,
@@ -65,12 +65,28 @@ test('barberOnboardingSchema allows missing breakTimes and optional upiId', () =
 
     assert.equal(result.error, undefined);
     assert.deepEqual(result.value.breakTimes, []);
-    assert.equal(result.value.upiId, undefined);
 });
 
-test('barberOnboardingSchema requires bankAccount and ifsc', () => {
+test('barberOnboardingSchema requires a valid upiId', () => {
+    for (const upiId of [undefined, null, '', 'not-a-upi']) {
+        const result = barberOnboardingSchema.validate({
+            ...buildValidPayload(),
+            upiId,
+        }, {
+            abortEarly: false,
+            allowUnknown: false,
+            stripUnknown: true,
+        });
+
+        assert.match(result.error?.message || '', /upiId/);
+    }
+});
+
+test('barberOnboardingSchema allows omitted optional bank fields', () => {
     const result = barberOnboardingSchema.validate({
         ...buildValidPayload(),
+        accountHolderName: undefined,
+        bankName: undefined,
         bankAccount: undefined,
         ifsc: undefined,
     }, {
@@ -79,7 +95,11 @@ test('barberOnboardingSchema requires bankAccount and ifsc', () => {
         stripUnknown: true,
     });
 
-    assert.match(result.error?.message || '', /bankAccount|ifsc/);
+    assert.equal(result.error, undefined);
+    assert.equal(result.value.accountHolderName, undefined);
+    assert.equal(result.value.bankName, undefined);
+    assert.equal(result.value.bankAccount, undefined);
+    assert.equal(result.value.ifsc, undefined);
 });
 
 test('barberOnboardingSchema rejects deprecated barber onboarding aliases', () => {

@@ -269,8 +269,8 @@ export const triggerBarberPayout = async (barberId, bookingIds, totalPayoutInPai
         throw new BadRequestError('Bookings do not belong to the requested barber');
     }
 
-    if (!barber.upiId && !(barber.bankAccount && barber.ifsc)) {
-        throw new BadRequestError('Shop has no payout destination configured');
+    if (!barber.upiId) {
+        throw new BadRequestError('Shop has no UPI payout destination configured');
     }
 
     const paymentTransactions = await paymentRepository.findCompletedByBookingIds(bookingIds);
@@ -321,7 +321,7 @@ export const triggerBarberPayout = async (barberId, bookingIds, totalPayoutInPai
         beneficiaryId,
         amount: payoutAmountInPaisa,
         amountInRupees,
-        transferMode: barber.upiId ? PAYOUT_MODES.UPI : PAYOUT_MODES.BANK,
+        transferMode: PAYOUT_MODES.UPI,
         status: PAYOUT_TRANSACTION_STATUS.INITIATED,
         remarks: `EverCut EOD payout for ${bookingIds.length} booking(s)`,
     });
@@ -336,7 +336,7 @@ export const triggerBarberPayout = async (barberId, bookingIds, totalPayoutInPai
             transferId,
             amountInRupees,
             beneficiaryId,
-            transferMode: barber.upiId ? PAYOUT_MODES.UPI : PAYOUT_MODES.BANK,
+            transferMode: PAYOUT_MODES.UPI,
             remarks: payoutTransaction.remarks,
         });
 
@@ -481,6 +481,10 @@ export const retryPayout = async (payoutId) => {
     }
 
     const { shop, barber } = await getShopAndBarber(payout.shopId);
+    if (!barber.upiId) {
+        throw new BadRequestError('Shop has no UPI payout destination configured');
+    }
+
     const beneficiaryId = await ensureBeneficiary(
         shop,
         barber,
@@ -513,7 +517,7 @@ export const retryPayout = async (payoutId) => {
             transferId: newTransferId,
             amountInRupees: payout.amountInRupees,
             beneficiaryId,
-            transferMode: payout.transferMode,
+            transferMode: PAYOUT_MODES.UPI,
             remarks: payout.remarks || `EverCut payout retry for ${payout.bookingIds.length} booking(s)`,
         });
 
