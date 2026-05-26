@@ -8,7 +8,7 @@ import {
     DAYS_OF_WEEK,
 } from '../utils/constants.js';
 import { normalizeShopSchedule } from '../utils/shop-schedule.utils.js';
-import { locationSchema } from './common.validator.js';
+import { locationSchema, upiIdSchema } from './common.validator.js';
 
 const daysSchema = Joi.alternatives().try(
     Joi.array().items(Joi.string().valid(...DAYS_OF_WEEK)),
@@ -61,12 +61,16 @@ export const barberOnboardingSchema = Joi.object({
     businessCategory: Joi.forbidden(),
     category: Joi.string().valid(...ALL_SHOP_CATEGORIES),
     targetCustomers: targetCustomersSchema.required(),
-    upiId: Joi.string(),
+    upiId: upiIdSchema,
     upiAddress: Joi.forbidden(),
-    accountHolderName: Joi.string().trim().min(1).max(100).required(),
-    bankName: Joi.string().trim().min(1).max(120).required(),
-    bankAccount: Joi.string().trim().pattern(/^\d{6,34}$/).required(),
-    ifsc: Joi.string().trim().pattern(/^[A-Z]{4}0[A-Z0-9]{6}$/i).required(),
+    accountHolderName: Joi.string().trim().min(1).max(100).allow(null, ''),
+    bankName: Joi.string().trim().min(1).max(120).allow(null, ''),
+    bankAccount: Joi.string().trim().pattern(/^\d{6,34}$/).allow(null, '').messages({
+        'string.pattern.base': 'bankAccount must be 6-34 digits',
+    }),
+    ifsc: Joi.string().trim().pattern(/^[A-Z]{4}0[A-Z0-9]{6}$/i).allow(null, '').messages({
+        'string.pattern.base': 'ifsc must be a valid IFSC code (e.g., SBIN0001234)',
+    }),
     bio: Joi.string().max(500).allow('').default(''),
     address: Joi.string().trim(),
     shopLocation: Joi.forbidden(),

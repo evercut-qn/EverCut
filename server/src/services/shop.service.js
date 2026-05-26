@@ -11,6 +11,7 @@ import { serializeRating } from '../utils/rating-response.utils.js';
 import { buildPagination } from '../utils/pagination.utils.js';
 import { normalizeServicePricing } from '../utils/service-pricing.utils.js';
 import { normalizeShopSchedule } from '../utils/shop-schedule.utils.js';
+import { isValidUpiId, normalizePayoutString } from '../utils/payout-details.utils.js';
 import notificationEvents from './notification-events.service.js';
 import entitlementService from './subscription/entitlement.service.js';
 import * as mediaService from './media/media.service.js';
@@ -354,24 +355,41 @@ export const updatePayoutDetails = async (ownerId, body) => {
     const barber = await barberRepository.findByUserId(ownerId);
     if (!barber) throw new NotFoundError('Barber profile');
 
-    if (!body.accountHolderName || !body.bankName || !body.bankAccount || !body.ifsc) {
-        throw new BadRequestError('All bank details fields are required');
+    const upiId = normalizePayoutString(body.upiId);
+    if (!upiId) {
+        throw new BadRequestError('upiId is required');
+    }
+    if (!isValidUpiId(upiId)) {
+        throw new BadRequestError('upiId must be a valid UPI ID');
     }
 
-    const isBankAccountChanging = barber.bankAccount !== body.bankAccount;
-    const isIfscChanging = barber.ifsc !== body.ifsc.toUpperCase();
-    const isBankDetailsChanging = isBankAccountChanging || isIfscChanging;
-
     const updateData = {
-        accountHolderName: body.accountHolderName,
-        bankName: body.bankName,
-        upiId: body.upiId || null,
-        bankAccount: body.bankAccount,
-        ifsc: body.ifsc.toUpperCase(),
+        upiId,
         payoutConfig: {
             ...(barber.payoutConfig || {}),
         },
     };
+
+    if (hasOwn(body, 'accountHolderName')) {
+        updateData.accountHolderName = normalizePayoutString(body.accountHolderName);
+    }
+    if (hasOwn(body, 'bankName')) {
+        updateData.bankName = normalizePayoutString(body.bankName);
+    }
+    if (hasOwn(body, 'bankAccount')) {
+        updateData.bankAccount = normalizePayoutString(body.bankAccount);
+    }
+    if (hasOwn(body, 'ifsc')) {
+        updateData.ifsc = normalizePayoutString(body.ifsc, { uppercase: true });
+    }
+
+    const existingBankAccount = barber.bankAccount || null;
+    const existingIfsc = barber.ifsc || null;
+    const isBankAccountChanging = hasOwn(updateData, 'bankAccount')
+        && existingBankAccount !== updateData.bankAccount;
+    const isIfscChanging = hasOwn(updateData, 'ifsc')
+        && existingIfsc !== updateData.ifsc;
+    const isBankDetailsChanging = isBankAccountChanging || isIfscChanging;
 
     if (isBankDetailsChanging) {
         updateData.payoutConfig.verificationStatus = 'pending';

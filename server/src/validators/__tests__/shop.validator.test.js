@@ -49,6 +49,7 @@ test('updateBusinessSchema rejects deprecated shop update aliases', () => {
 
 test('updatePayoutDetailsSchema strips provider-managed beneficiary identifiers', () => {
     const result = updatePayoutDetailsSchema.validate({
+        upiId: 'postman.barber@upi',
         accountHolderName: 'Postman Barber',
         bankName: 'HDFC Bank',
         bankAccount: '12345678901234',
@@ -62,15 +63,30 @@ test('updatePayoutDetailsSchema strips provider-managed beneficiary identifiers'
 
     assert.equal(result.error, undefined);
     assert.equal(Object.hasOwn(result.value, 'beneficiaryId'), false);
-    assert.equal(Object.hasOwn(result.value, 'upiId'), false);
+    assert.equal(result.value.upiId, 'postman.barber@upi');
 });
 
-test('updatePayoutDetailsSchema allows optional upiId', () => {
+test('updatePayoutDetailsSchema requires a valid upiId', () => {
+    for (const upiId of [undefined, null, '', 'not-a-upi']) {
+        const result = updatePayoutDetailsSchema.validate({
+            upiId,
+            accountHolderName: 'Postman Barber',
+            bankName: 'HDFC Bank',
+            bankAccount: '12345678901234',
+            ifsc: 'HDFC0001234',
+        }, {
+            abortEarly: false,
+            allowUnknown: false,
+            stripUnknown: true,
+        });
+
+        assert.match(result.error?.message || '', /upiId/);
+    }
+});
+
+test('updatePayoutDetailsSchema allows all bank fields to be omitted', () => {
     const result = updatePayoutDetailsSchema.validate({
-        accountHolderName: 'Postman Barber',
-        bankName: 'HDFC Bank',
-        bankAccount: '12345678901234',
-        ifsc: 'HDFC0001234',
+        upiId: 'postman.barber@upi',
     }, {
         abortEarly: false,
         allowUnknown: false,
@@ -78,4 +94,27 @@ test('updatePayoutDetailsSchema allows optional upiId', () => {
     });
 
     assert.equal(result.error, undefined);
+    assert.deepEqual(result.value, {
+        upiId: 'postman.barber@upi',
+    });
+});
+
+test('updatePayoutDetailsSchema allows null and empty optional bank fields', () => {
+    const result = updatePayoutDetailsSchema.validate({
+        upiId: 'postman.barber@upi',
+        accountHolderName: null,
+        bankName: '',
+        bankAccount: null,
+        ifsc: '',
+    }, {
+        abortEarly: false,
+        allowUnknown: false,
+        stripUnknown: true,
+    });
+
+    assert.equal(result.error, undefined);
+    assert.equal(result.value.accountHolderName, null);
+    assert.equal(result.value.bankName, '');
+    assert.equal(result.value.bankAccount, null);
+    assert.equal(result.value.ifsc, '');
 });

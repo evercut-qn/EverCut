@@ -82,6 +82,19 @@ test('postman collection generator no longer emits legacy /customer or /barber U
     assert.doesNotMatch(source, /\/barber\//);
 });
 
+test('postman payout examples require UPI and do not require bank fields', async () => {
+    const source = await readFile(
+        path.join(serverDir, 'scripts', 'regenerate-postman-collections.mjs'),
+        'utf8',
+    );
+
+    assert.match(source, /"upiId": "test\.barber@upi"/);
+    assert.match(source, /"upiId": "postman\.barber@upi"/);
+    assert.match(source, /Updates UPI payout details; bank account fields are optional/);
+    assert.doesNotMatch(source, /UPI ID remains optional/);
+    assert.doesNotMatch(source, /All bank details fields are required/);
+});
+
 test('feature routes and controllers use simple direct files instead of module index wrappers', async () => {
     const expectedPaths = [
         'routes/auth.routes.js',

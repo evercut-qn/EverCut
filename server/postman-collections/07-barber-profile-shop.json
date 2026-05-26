@@ -201,10 +201,10 @@
           }
         ],
         "url": "{{base_url}}/{{api_prefix}}/shops/me/payout-details",
-        "description": "Updates complete payout account details including account number and IFSC. Verification status resets to pending on change.",
+        "description": "Updates UPI payout details; bank account fields are optional. Verification status resets to pending only when bank account number or IFSC changes.",
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"accountHolderName\": \"Test Barber\",\n  \"bankName\": \"HDFC Bank\",\n  \"bankAccount\": \"12345678901234\",\n  \"ifsc\": \"HDFC0001234\"\n}",
+          "raw": "{\n  \"upiId\": \"postman.barber@upi\"\n}",
           "options": {
             "raw": {
               "language": "json"
@@ -235,8 +235,8 @@
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
               "const response = pm.response.json();",
               "const data = response.data || {};",
-              "pm.test('bankAccount is present and unmasked', function () { pm.expect(data.bankAccount).to.equal('12345678901234'); });",
-              "pm.test('verificationStatus is pending after update', function () { pm.expect(data.verificationStatus).to.equal('pending'); });"
+              "pm.test('upiId is updated', function () { pm.expect(data.upiId).to.equal('postman.barber@upi'); });",
+              "pm.test('verificationStatus is present', function () { pm.expect(data).to.have.property('verificationStatus'); });"
             ]
           }
         }

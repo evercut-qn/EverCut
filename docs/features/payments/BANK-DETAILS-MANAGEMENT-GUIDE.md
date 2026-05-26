@@ -8,11 +8,12 @@
 
 ## OVERVIEW
 
-This guide documents the complete payout details management system for barber shops. Payout details are required for receiving payouts from completed bookings.
+This guide documents the complete payout details management system for barber shops. A valid UPI ID is required for receiving payouts from completed bookings. Bank account fields are optional profile metadata and may be provided when available.
 
 ### Key Features
 - ✅ Dedicated bank details endpoints (separate from general business info)
-- ✅ Optional capture during onboarding
+- ✅ Required UPI capture during onboarding
+- ✅ Optional bank detail capture during onboarding and payout updates
 - ✅ Secure update with validation
 - ✅ Masked account numbers in responses
 - ✅ Verification status tracking
@@ -26,7 +27,7 @@ This guide documents the complete payout details management system for barber sh
 
 **Endpoint:** `GET /api/v1/shops/me/payout-details`
 
-**Purpose:** Retrieve current bank account details with verification status
+**Purpose:** Retrieve current payout details with verification status
 
 **Authentication:** Required (BARBER role)
 
@@ -34,13 +35,13 @@ This guide documents the complete payout details management system for barber sh
 ```json
 {
   "success": true,
-  "message": "Bank details fetched",
+  "message": "Payout details fetched",
   "data": {
-    "accountHolderName": "John Doe",
-    "bankName": "State Bank of India",
-    "bankAccount": "12345678901234",
-    "ifsc": "SBIN0001234",
     "upiId": "john@paytm",
+    "accountHolderName": null,
+    "bankName": null,
+    "bankAccount": null,
+    "ifsc": null,
     "verificationStatus": "verified",
     "isVerified": true,
     "verifiedAt": "2026-05-01T10:30:00.000Z",
@@ -52,11 +53,11 @@ This guide documents the complete payout details management system for barber sh
 ```
 
 **Field Descriptions:**
-- `accountHolderName`: Name on the bank account
-- `bankName`: Name of the bank
-- `bankAccount`: Bank account number (displayed in full, unmasked)
-- `ifsc`: IFSC code of the bank branch
-- `upiId`: UPI ID for payouts
+- `upiId`: Required UPI ID for payouts
+- `accountHolderName`: Optional name on the bank account
+- `bankName`: Optional name of the bank
+- `bankAccount`: Optional bank account number (displayed in full, unmasked when present)
+- `ifsc`: Optional IFSC code of the bank branch
 - `verificationStatus`: One of `pending`, `verified`, `failed`
 - `isVerified`: Boolean indicating if account is verified
 - `verifiedAt`: Timestamp when account was verified
@@ -70,43 +71,42 @@ This guide documents the complete payout details management system for barber sh
 
 **Endpoint:** `PATCH /api/v1/shops/me/payout-details`
 
-**Purpose:** Update bank account details
+**Purpose:** Update UPI payout details and optional bank account metadata
 
 **Authentication:** Required (BARBER role)
 
 **Request Body:**
 ```json
 {
-  "accountHolderName": "John Doe",
-  "bankName": "State Bank of India",
-  "bankAccount": "12345678901234",
-  "ifsc": "SBIN0001234"
+  "upiId": "john@paytm"
 }
 ```
 
 **Validation Rules:**
-- `accountHolderName`: Required, 1-100 characters
-- `bankName`: Required, 1-120 characters
-- `bankAccount`: Required, 6-34 digits only
-- `ifsc`: Required, valid IFSC format (XXXX0XXXXXX)
-- `upiId`: Optional UPI ID
+- `upiId`: Required, valid UPI ID format (`local-part@provider`)
+- `accountHolderName`: Optional, 1-100 characters when provided
+- `bankName`: Optional, 1-120 characters when provided
+- `bankAccount`: Optional, 6-34 digits only when provided
+- `ifsc`: Optional, valid IFSC format (XXXX0XXXXXX) when provided
+- Omitted bank fields preserve existing values on payout-details updates
+- `null` or empty optional bank fields clear the stored value
 
 **Response:**
 ```json
 {
   "success": true,
-  "message": "Bank details updated successfully",
+  "message": "Payout details updated successfully",
   "data": {
-    "accountHolderName": "John Doe",
-    "bankName": "State Bank of India",
-    "bankAccount": "12345678901234",
-    "ifsc": "SBIN0001234",
     "upiId": "john@paytm",
-    "verificationStatus": "pending",
-    "isVerified": false,
-    "verifiedAt": null,
-    "beneficiaryId": null,
-    "beneficiaryCreatedAt": null,
+    "accountHolderName": null,
+    "bankName": null,
+    "bankAccount": null,
+    "ifsc": null,
+    "verificationStatus": "verified",
+    "isVerified": true,
+    "verifiedAt": "2026-05-01T10:30:00.000Z",
+    "beneficiaryId": "BENEF123456",
+    "beneficiaryCreatedAt": "2026-05-01T10:25:00.000Z",
     "canReceivePayouts": false
   }
 }
@@ -114,6 +114,7 @@ This guide documents the complete payout details management system for barber sh
 
 **Important Notes:**
 - If bank account or IFSC changes, verification status resets to `pending`
+- Updating only `upiId` does not reset bank verification status
 - Beneficiary will need to be re-verified in payout gateway
 - Previous beneficiary ID is retained for tracking
 
@@ -121,9 +122,9 @@ This guide documents the complete payout details management system for barber sh
 
 ## ONBOARDING INTEGRATION
 
-### Required Bank Details During Onboarding
+### Required UPI During Onboarding
 
-Bank account and IFSC details are required during barber onboarding. UPI ID remains optional.
+UPI ID is required during barber onboarding. Bank account fields are optional and are stored as `null` when omitted, empty, or explicitly sent as `null`.
 
 **Endpoint:** `POST /api/v1/onboarding/barbers`
 
@@ -131,24 +132,33 @@ Bank account and IFSC details are required during barber onboarding. UPI ID rema
 ```json
 {
   "shopName": "John's Barbershop",
-  "accountHolderName": "John Doe",
-  "bankName": "State Bank of India",
-  "bankAccount": "12345678901234",
-  "ifsc": "SBIN0001234",
+  "upiId": "john@paytm",
   ...
 }
 ```
 
 **Behavior:**
-- `bankAccount` and `ifsc` are **REQUIRED** during onboarding
-- They are stored on the Barber profile with `verificationStatus: 'pending'`
-- `upiId` is optional and can be added or removed through the payout update endpoint
+- `upiId` is **REQUIRED** during onboarding and payout-details updates
+- `accountHolderName`, `bankName`, `bankAccount`, and `ifsc` are optional
+- Optional bank fields are stored on the Barber profile when supplied
+- Bank fields can be added, partially updated, or cleared through the payout update endpoint
 
 ---
 
 ## VALIDATION DETAILS
 
+### UPI ID
+- **Required:** Yes
+- **Format:** `local-part@provider`
+- **Pattern:** `/^[A-Za-z0-9._-]{2,256}@[A-Za-z][A-Za-z0-9.-]{1,63}$/`
+- **Examples:**
+  - ✅ Valid: `john@paytm`
+  - ✅ Valid: `test.barber@upi`
+  - ❌ Invalid: `john` (missing provider)
+  - ❌ Invalid: `@paytm` (missing local part)
+
 ### Bank Account Number
+- **Required:** No
 - **Format:** 6-34 digits only
 - **Pattern:** `/^\d{6,34}$/`
 - **Examples:**
@@ -158,6 +168,7 @@ Bank account and IFSC details are required during barber onboarding. UPI ID rema
   - ❌ Invalid: `ABCD1234` (contains letters)
 
 ### IFSC Code
+- **Required:** No
 - **Format:** 4 letters + 0 + 6 alphanumeric characters
 - **Pattern:** `/^[A-Z]{4}0[A-Z0-9]{6}$/i`
 - **Examples:**
@@ -192,8 +203,8 @@ Bank account and IFSC details are required during barber onboarding. UPI ID rema
 ## VERIFICATION FLOW
 
 ### Automatic Verification
-1. Barber provides/updates bank details
-2. System sets `verificationStatus: 'pending'`
+1. Barber provides/updates UPI and optional bank details
+2. System sets `verificationStatus: 'pending'` when bank account or IFSC changes
 3. Payout service creates/updates beneficiary in gateway
 4. Gateway verifies bank account (penny drop or similar)
 5. System updates `verificationStatus: 'verified'` and sets `verifiedAt`
@@ -209,15 +220,15 @@ Bank account and IFSC details are required during barber onboarding. UPI ID rema
 ## INTEGRATION WITH PAYOUT SYSTEM
 
 ### Beneficiary Creation
-When bank details are provided/updated:
+When payout details are provided/updated:
 1. System stores payout destination details on the Barber profile
-2. Payout service creates beneficiary in Cashfree
+2. Payout service creates a Cashfree beneficiary using the required UPI ID
 3. Beneficiary ID is stored in `barber.payoutConfig.beneficiaryId`
 4. Verification status is tracked in `barber.payoutConfig.verificationStatus`
 
 ### Payout Requirements
 Before a payout can be initiated:
-- ✅ Bank details must be provided
+- ✅ Valid UPI ID must be provided
 - ✅ Account must be verified (`verificationStatus: 'verified'`)
 - ✅ Beneficiary must exist in payout gateway
 - ✅ `canReceivePayouts` must be `true`
@@ -228,16 +239,31 @@ Before a payout can be initiated:
 
 ### Common Errors
 
-**1. Missing Required Fields**
+**1. Missing Required UPI**
 ```json
 {
   "success": false,
-  "message": "All bank details fields are required",
+  "message": "Validation failed",
+  "data": {
+    "errors": ["upiId is required"]
+  },
   "statusCode": 400
 }
 ```
 
-**2. Invalid Bank Account Format**
+**2. Invalid UPI Format**
+```json
+{
+  "success": false,
+  "message": "Validation failed",
+  "data": {
+    "errors": ["upiId must be a valid UPI ID"]
+  },
+  "statusCode": 400
+}
+```
+
+**3. Invalid Bank Account Format**
 ```json
 {
   "success": false,
@@ -249,7 +275,7 @@ Before a payout can be initiated:
 }
 ```
 
-**3. Invalid IFSC Format**
+**4. Invalid IFSC Format**
 ```json
 {
   "success": false,
@@ -261,7 +287,7 @@ Before a payout can be initiated:
 }
 ```
 
-**4. Shop Not Found**
+**5. Shop Not Found**
 ```json
 {
   "success": false,
@@ -284,7 +310,10 @@ Before a payout can be initiated:
 - [ ] Verify verification status is correct
 
 #### UPDATE Bank Details
+- [ ] Update only required UPI ID
 - [ ] Update all bank details fields
+- [ ] Update with all bank fields omitted
+- [ ] Clear optional bank fields with `null` or empty strings
 - [ ] Update with valid bank account (6-34 digits)
 - [ ] Update with valid IFSC code
 - [ ] Attempt update with invalid bank account (too short)
@@ -294,8 +323,9 @@ Before a payout can be initiated:
 - [ ] Verify previous beneficiary ID is retained
 
 #### Onboarding
-- [ ] Create barber with bank details
-- [ ] Create barber without bank details
+- [ ] Create barber with required UPI and bank details
+- [ ] Create barber with required UPI and without bank details
+- [ ] Reject barber onboarding without UPI
 - [ ] Verify bank details are stored correctly
 - [ ] Verify verification status is set to pending
 
@@ -331,10 +361,7 @@ Authorization: Bearer {{barberAccessToken}}
 Content-Type: application/json
 
 {
-  "accountHolderName": "John Doe",
-  "bankName": "State Bank of India",
-  "bankAccount": "12345678901234",
-  "ifsc": "SBIN0001234"
+  "upiId": "john@paytm"
 }
 ```
 

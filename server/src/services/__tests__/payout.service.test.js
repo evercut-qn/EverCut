@@ -203,6 +203,52 @@ test('triggerBarberPayout rejects caller-supplied payout totals that do not matc
     assert.equal(transferMock.mock.calls.length, 0);
 });
 
+test('triggerBarberPayout rejects bank-only payout destinations without UPI', async (t) => {
+    t.mock.method(bookingRepository, 'findByIds', async () => ([
+        {
+            _id: 'booking-1',
+            shopId: 'shop-1',
+            status: 'completed',
+            paymentStatus: 'success',
+            payoutStatus: 'not_initiated',
+        },
+    ]));
+
+    t.mock.method(shopRepository, 'findById', async () => ({
+        _id: 'shop-1',
+        barberId: 'barber-1',
+        shopName: 'Trim Studio',
+    }));
+    t.mock.method(barberRepository, 'findById', async () => ({
+        _id: 'barber-1',
+        userId: 'user-1',
+        firstName: 'Barber',
+        lastName: 'One',
+        accountHolderName: 'Barber One',
+        upiId: null,
+        bankAccount: '12345678901234',
+        ifsc: 'HDFC0001234',
+        payoutConfig: {},
+    }));
+    t.mock.method(userRepository, 'findById', async () => ({
+        _id: 'user-1',
+        phoneNumber: '9999999999',
+        email: 'barber@example.com',
+    }));
+
+    const beneficiaryMock = t.mock.method(cashfreePayoutAdapter, 'createBeneficiary', async () => ({
+        beneficiaryId: 'BARBER_barber-1',
+        created: true,
+    }));
+
+    await assert.rejects(
+        payoutService.triggerBarberPayout('barber-1', ['booking-1']),
+        /upi payout destination/i,
+    );
+
+    assert.equal(beneficiaryMock.mock.calls.length, 0);
+});
+
 test('handlePayoutWebhook processes reversals even after a prior payout success', async (t) => {
     t.mock.method(cashfreePayoutAdapter, 'verifyWebhook', () => true);
     t.mock.method(cashfreePayoutAdapter, 'parseWebhookPayload', () => ({

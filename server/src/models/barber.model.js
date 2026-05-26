@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { ALL_GENDERS } from '../utils/constants.js';
+import { UPI_ID_PATTERN } from '../utils/payout-details.utils.js';
 
 const payoutConfigSchema = new mongoose.Schema(
     {
@@ -65,27 +66,28 @@ const barberSchema = new mongoose.Schema(
         },
         upiId: {
             type: String,
-            default: null,
+            required: true,
             trim: true,
+            match: [UPI_ID_PATTERN, 'upiId must be a valid UPI ID'],
         },
         accountHolderName: {
             type: String,
-            required: true,
+            default: null,
             trim: true,
         },
         bankName: {
             type: String,
-            required: true,
+            default: null,
             trim: true,
         },
         bankAccount: {
             type: String,
-            required: true,
+            default: null,
             trim: true,
         },
         ifsc: {
             type: String,
-            required: true,
+            default: null,
             uppercase: true,
             trim: true,
         },

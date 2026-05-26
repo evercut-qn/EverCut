@@ -68,6 +68,7 @@ test('createBarberOnboarding links media as COVER and does NOT return photos arr
         bankName: 'Test Bank',
         bankAccount: '12345678901234',
         ifsc: 'HDFC0001234',
+        upiId: 'john.doe@upi',
         payoutConfig: { verificationStatus: 'pending' },
     };
     const mockMedia = { _id: 'media-1', r2Key: 'key/1.jpg', status: 'ready' };
@@ -107,6 +108,7 @@ test('createBarberOnboarding links media as COVER and does NOT return photos arr
         bankName: 'Test Bank',
         bankAccount: '12345678901234',
         ifsc: 'HDFC0001234',
+        upiId: 'john.doe@upi',
         address: 'Test Address',
         location: { type: 'Point', coordinates: [0, 0] },
         workingDays: ['Monday'],
@@ -122,4 +124,74 @@ test('createBarberOnboarding links media as COVER and does NOT return photos arr
     assert.strictEqual(linkedPurpose, 'cover'); // Verified fix
     assert.strictEqual(defaultSubscriptionBarberId, 'barber-1');
     assert.strictEqual(result.shop.photos, undefined); // Verified sanitization
+});
+
+test('createBarberOnboarding requires upiId and stores null optional bank fields when omitted', async (t) => {
+    const mockUser = { _id: 'user-1', phoneNumber: '+919876543210', roleType: 'BARBER' };
+    const mockShop = {
+        _id: 'shop-1',
+        barberId: 'barber-1',
+        shopName: 'Test Shop',
+        category: 'Barber Shop',
+        targetCustomers: 'men',
+        address: 'Test Address',
+        location: { type: 'Point', coordinates: [0, 0] },
+        availableDays: ['Monday'],
+        openTime: '09:00',
+        closeTime: '18:00',
+        coverR2Key: 'key/1.jpg',
+    };
+    const mockMedia = { _id: 'media-1', r2Key: 'key/1.jpg', status: 'ready' };
+
+    t.mock.method(userRepository, 'findByPhone', async () => null);
+    t.mock.method(userRepository, 'findByEmail', async () => null);
+    t.mock.method(userRepository, 'create', async () => mockUser);
+    t.mock.method(shopRepository, 'create', async () => mockShop);
+    t.mock.method(mediaRepository, 'findById', async () => mockMedia);
+    t.mock.method(mediaRepository, 'updateById', async (mediaId) => ({ _id: mediaId }));
+    t.mock.method(userRepository, 'updateById', async () => ({}));
+    t.mock.method(subscriptionRepository, 'upsertDefaultForBarber', async (barberId) => ({ _id: 'subscription-1', barberId }));
+
+    let createdBarber = null;
+    t.mock.method(barberRepository, 'create', async (data) => {
+        createdBarber = data;
+        return {
+            _id: 'barber-1',
+            ...data,
+            payoutConfig: { verificationStatus: 'pending' },
+        };
+    });
+
+    const shopData = {
+        email: 'test@example.com',
+        firstName: 'John',
+        lastName: 'Doe',
+        gender: 'male',
+        dateOfBirth: '1990-01-01',
+        shopName: 'Test Shop',
+        category: 'Barber Shop',
+        targetCustomers: 'men',
+        upiId: 'john.doe@upi',
+        address: 'Test Address',
+        location: { type: 'Point', coordinates: [0, 0] },
+        workingDays: ['Monday'],
+        openTime: '09:00',
+        closeTime: '18:00',
+        photoMediaId: 'media-1',
+        pin: '1234',
+        confirmPin: '1234',
+    };
+
+    await onboardingService.createBarberOnboarding('+919876543210', shopData);
+
+    assert.equal(createdBarber.upiId, 'john.doe@upi');
+    assert.equal(createdBarber.accountHolderName, null);
+    assert.equal(createdBarber.bankName, null);
+    assert.equal(createdBarber.bankAccount, null);
+    assert.equal(createdBarber.ifsc, null);
+
+    await assert.rejects(
+        onboardingService.createBarberOnboarding('+919876543210', { ...shopData, upiId: '' }),
+        /upiId is required/i,
+    );
 });

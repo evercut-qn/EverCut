@@ -2,6 +2,7 @@ import Joi from 'joi';
 import mongoose from 'mongoose';
 import config from '../config/index.js';
 import { toTwentyFourHourTime } from '../utils/time.utils.js';
+import { UPI_ID_PATTERN } from '../utils/payout-details.utils.js';
 
 /**
  * Common reusable validation rules.
@@ -23,6 +24,17 @@ export const paginationSchema = Joi.object({
 
 // Date string (YYYY-MM-DD)
 export const dateString = Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/);
+
+export const upiIdSchema = Joi.string()
+    .trim()
+    .pattern(UPI_ID_PATTERN)
+    .required()
+    .messages({
+        'any.required': 'upiId is required',
+        'string.base': 'upiId is required',
+        'string.empty': 'upiId is required',
+        'string.pattern.base': 'upiId must be a valid UPI ID',
+    });
 
 // Time string accepted from either availability APIs (HH:MM) or legacy clients (hh:mm AM/PM).
 export const timeString = Joi.string()

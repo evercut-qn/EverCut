@@ -56,16 +56,11 @@ class CashfreePayoutAdapter extends PayoutGatewayAdapter {
             requestBody.beneficiary_contact_details = contactDetails;
         }
 
-        if (vpa) {
-            requestBody.beneficiary_instrument_details = { vpa };
-        } else if (bankAccount && ifsc) {
-            requestBody.beneficiary_instrument_details = {
-                bank_account_number: bankAccount,
-                bank_ifsc: ifsc,
-            };
-        } else {
-            throw new PayoutError('Either UPI VPA or bank account details are required for beneficiary creation');
+        if (!vpa) {
+            throw new PayoutError('UPI VPA is required for beneficiary creation');
         }
+
+        requestBody.beneficiary_instrument_details = { vpa };
 
         await this._makeRequest('POST', CASHFREE_ENDPOINTS.CREATE_BENEFICIARY, requestBody);
 

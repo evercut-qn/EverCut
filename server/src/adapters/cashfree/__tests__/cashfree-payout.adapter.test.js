@@ -48,6 +48,18 @@ test('createBeneficiary sends Cashfree Payouts V2 beneficiary payload shape', as
     assert.equal(Object.hasOwn(calls[0].body, 'beneficiary_email'), false);
 });
 
+test('createBeneficiary rejects bank-only payout instruments because UPI is required', async () => {
+    await assert.rejects(
+        cashfreePayoutAdapter.createBeneficiary({
+            beneficiaryId: 'BARBER_1',
+            name: 'Test Barber',
+            bankAccount: '12345678901234',
+            ifsc: 'HDFC0001234',
+        }),
+        /UPI VPA is required/,
+    );
+});
+
 test('getBeneficiary uses Cashfree Payouts V2 query parameter lookup', async (t) => {
     const calls = mockFetch(t, { beneficiary_id: 'BARBER_1' });
 

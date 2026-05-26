@@ -1362,17 +1362,11 @@ class CashfreePayoutAdapter extends PayoutGatewayAdapter {
             requestBody.beneficiary_email = email;
         }
 
-        // Set instrument details based on available data
-        if (vpa) {
-            requestBody.beneficiary_instrument_details = { vpa };
-        } else if (bankAccount && ifsc) {
-            requestBody.beneficiary_instrument_details = {
-                bank_account_number: bankAccount,
-                bank_ifsc: ifsc,
-            };
-        } else {
-            throw new Error('Either UPI VPA or bank account + IFSC is required');
+        if (!vpa) {
+            throw new Error('UPI VPA is required for beneficiary creation');
         }
+
+        requestBody.beneficiary_instrument_details = { vpa };
 
         const data = await this._makeRequest(
             'POST',
@@ -2209,16 +2203,16 @@ export const triggerBarberPayout = async (barberId, bookingIds, totalPayoutInPai
     const shop = populatedBooking.shopId;
     const barberProfile = await barberRepository.findById(shop.barberId);
 
-    // Barber owns payout config (bankAccount, ifsc, optional upiId, beneficiaryId).
+    // Barber owns payout config (required upiId, optional bankAccount/ifsc, beneficiaryId).
     // Shop only owns venue/business details.
     // User owns phone/email and is accessed via barberProfile.userId.
     // We must populate the owner User to get phone and email for Cashfree beneficiary.
-    if (!barberProfile?.bankAccount || !barberProfile?.ifsc) {
-        logger.error('[PayoutService] No payout details for shop', {
+    if (!barberProfile?.upiId) {
+        logger.error('[PayoutService] No UPI payout destination for shop', {
             shopId: shop?._id,
             barberId: shop?.barberId,
         });
-        throw new BadRequestError('Barber has no payout details configured');
+        throw new BadRequestError('Barber has no UPI payout destination configured');
     }
 
     // Populate the owner User for phone and email
@@ -2248,7 +2242,7 @@ export const triggerBarberPayout = async (barberId, bookingIds, totalPayoutInPai
         beneficiaryId,
         amount: barberPayoutInPaisa,
         amountInRupees: barberPayoutInRupees,
-        transferMode: barber.upiId ? 'UPI' : 'BANK',
+        transferMode: 'UPI',
         status: PAYOUT_TRANSACTION_STATUS.INITIATED,
         remarks: `EverCut - Booking ${bookingId}`,
     });
@@ -2262,7 +2256,7 @@ export const triggerBarberPayout = async (barberId, bookingIds, totalPayoutInPai
             transferId,
             amountInRupees: barberPayoutInRupees,
             beneficiaryId,
-            transferMode: barber.upiId ? 'UPI' : 'BANK',
+            transferMode: 'UPI',
             remarks: `EverCut - Booking ${bookingId}`,
         });
 
