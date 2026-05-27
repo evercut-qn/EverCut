@@ -198,6 +198,25 @@ test('payment and payout controllers use the direct flat controller files', asyn
     assert.doesNotMatch(payoutRoutes, /\.\.\/controllers\/payout\//);
 });
 
+test('payout routes do not expose manual payout status mutation', async () => {
+    const payoutRoutes = await readSource('routes/payout.routes.js');
+    const payoutController = await readSource('controllers/payout.controller.js');
+    const postmanSource = await readFile(
+        path.join(serverDir, 'scripts', 'regenerate-postman-collections.mjs'),
+        'utf8',
+    );
+
+    assert.doesNotMatch(payoutRoutes, /router\.patch\(\s*'\/:payoutId'/);
+    assert.doesNotMatch(payoutRoutes, /updatePayoutStatusSchema/);
+    assert.doesNotMatch(payoutRoutes, /payoutController\.updatePayout/);
+    assert.doesNotMatch(payoutController, /updatePayout/);
+    assert.doesNotMatch(postmanSource, /Mark Manual Payout Failed/);
+    assert.doesNotMatch(
+        postmanSource,
+        /method:\s*'PATCH'[\s\S]{0,300}url:\s*'{{base_url}}\/{{api_prefix}}\/payouts\/{{payout_id}}'/,
+    );
+});
+
 test('booking discovery and payment routes use final resource-oriented URLs', async () => {
     const bookingRoutes = await readSource('routes/bookings.routes.js');
     const shopRoutes = await readSource('routes/shops.routes.js');
@@ -394,14 +413,14 @@ test('changed resource routes require the expected authentication and role guard
     assert.match(payoutRoutes, /authorize\(ROLES\.ADMIN\)/);
 });
 
-test('payout routes expose a compact admin manual-payout workflow without duplicate list endpoints', async () => {
+test('payout routes expose a compact immutable manual-payout workflow without duplicate list endpoints', async () => {
     const payoutRoutes = await readSource('routes/payout.routes.js');
 
     assert.match(payoutRoutes, /router\.get\(\s*'\/pending'/);
     assert.match(payoutRoutes, /router\.get\(\s*'\/'/);
     assert.match(payoutRoutes, /router\.post\(\s*'\/'/);
     assert.match(payoutRoutes, /router\.get\(\s*'\/:payoutId'/);
-    assert.match(payoutRoutes, /router\.patch\(\s*'\/:payoutId'/);
+    assert.doesNotMatch(payoutRoutes, /router\.patch\(\s*'\/:payoutId'/);
     assert.match(payoutRoutes, /router\.post\(\s*'\/:payoutId\/retry'/);
     assert.doesNotMatch(payoutRoutes, /\/completed/);
     assert.doesNotMatch(payoutRoutes, /\/failed/);

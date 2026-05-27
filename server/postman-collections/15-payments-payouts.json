@@ -120,7 +120,7 @@
       "key": "payout_id",
       "value": "",
       "type": "string",
-      "description": "Payout ID for manual payout detail/update or Cashfree retry operations"
+      "description": "Payout ID for manual payout detail or Cashfree retry operations"
     }
   ],
   "item": [
@@ -662,67 +662,7 @@
       ]
     },
     {
-      "name": "10. Mark Manual Payout Failed (Terminal)",
-      "request": {
-        "method": "PATCH",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          }
-        ],
-        "url": "{{base_url}}/{{api_prefix}}/payouts/{{payout_id}}",
-        "description": "Terminal correction for a manual payout recorded in error. This is destructive for the payout lifecycle; run only when testing failure/retry behavior.",
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"status\": \"FAILED\",\n  \"reason\": \"Postman failure correction test\",\n  \"notes\": \"This reopens the booking payout status for retry\"\n}",
-          "options": {
-            "raw": {
-              "language": "json"
-            }
-          }
-        },
-        "auth": {
-          "type": "bearer",
-          "bearer": [
-            {
-              "key": "token",
-              "value": "{{admin_access_token}}",
-              "type": "string"
-            }
-          ]
-        }
-      },
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "pm.test('response uses the standard envelope', function () {",
-              "  const response = pm.response.json();",
-              "  pm.expect(response).to.be.an('object');",
-              "  pm.expect(response).to.have.property('success');",
-              "  pm.expect(response.success).to.be.a('boolean');",
-              "  pm.expect(response).to.have.property('message');",
-              "  pm.expect(response.message).to.be.a('string');",
-              "  pm.expect(response).to.have.property('data');",
-              "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
-              "  const responseText = JSON.stringify(response);",
-              "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
-              "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
-              "  });",
-              "});",
-              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
-              "const response = pm.response.json();",
-              "pm.test('payout is failed', function () { pm.expect(response.data.status).to.equal('FAILED'); });"
-            ]
-          }
-        }
-      ]
-    },
-    {
-      "name": "11. Retry Failed Cashfree Payout",
+      "name": "10. Retry Failed Cashfree Payout",
       "request": {
         "method": "POST",
         "header": [],

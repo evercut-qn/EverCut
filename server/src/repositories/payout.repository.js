@@ -59,16 +59,7 @@ class PayoutRepository {
             .populate('shopId', 'shopName')
             .populate('bookingIds', 'date time status paymentStatus payoutStatus totalAmount barberUtr payoutCompletedAt')
             .populate('paymentTransactionIds', 'bookingId customerId shopId merchantOrderId amount amountInRupees status settlement')
-            .populate('completedByAdminId', 'email phoneNumber roleType')
-            .populate('lastStatusUpdatedByAdminId', 'email phoneNumber roleType');
-    }
-
-    async atomicStatusUpdate(id, expectedStatus, updates) {
-        return PayoutTransaction.findOneAndUpdate(
-            trustQueryOperators({ _id: id, status: expectedStatus }),
-            { $set: updates },
-            { returnDocument: 'after' },
-        );
+            .populate('completedByAdminId', 'email phoneNumber roleType');
     }
 
     async findStuckPayouts(olderThan) {

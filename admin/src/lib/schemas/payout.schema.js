@@ -1,5 +1,19 @@
 import { z } from 'zod';
-import { objectIdSchema } from './common.schema';
+import { objectIdSchema, paginationSchema, searchSchema } from './common.schema';
+
+export const payoutStatusSchema = z.enum(['INITIATED', 'PENDING', 'SUCCESS', 'FAILED', 'REVERSED']);
+export const payoutGatewaySchema = z.enum(['cashfree', 'manual']);
+
+export const payoutSortSchema = z.enum([
+  'createdAt:desc',
+  'createdAt:asc',
+  'amount:desc',
+  'amount:asc',
+  'amountInRupees:desc',
+  'amountInRupees:asc',
+  'processedAt:desc',
+  'processedAt:asc',
+]);
 
 /** Schema to validate manual payouts request submissions */
 export const createPayoutSchema = z.object({
@@ -31,5 +45,23 @@ export const createPayoutSchema = z.object({
     .optional()
     .or(z.literal('')),
 });
+
+/** Schema to validate payout history filter query parameters */
+export const payoutListQuerySchema = paginationSchema.extend({
+  tab: z.enum(['pending', 'history']).default('pending'),
+  status: z.union([payoutStatusSchema, z.literal('')]).optional(),
+  gateway: z.union([payoutGatewaySchema, z.literal('')]).optional(),
+  barberId: z.union([objectIdSchema, z.literal('')]).optional(),
+  startDate: z.union([z.iso.date(), z.literal('')]).optional(),
+  endDate: z.union([z.iso.date(), z.literal('')]).optional(),
+  sort: payoutSortSchema.default('createdAt:desc'),
+  search: searchSchema.or(z.literal('')).optional(),
+}).refine(
+  (value) => !value.startDate || !value.endDate || value.endDate >= value.startDate,
+  {
+    message: 'End date must be on or after start date',
+    path: ['endDate'],
+  },
+);
 
 export default createPayoutSchema;

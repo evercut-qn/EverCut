@@ -121,11 +121,6 @@ const payoutTransactionSchema = new mongoose.Schema(
             ref: 'User',
             default: null,
         },
-        lastStatusUpdatedByAdminId: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: 'User',
-            default: null,
-        },
         adminNotes: {
             type: String,
             default: null,
