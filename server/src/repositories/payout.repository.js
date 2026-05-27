@@ -41,6 +41,8 @@ class PayoutRepository {
 
     async findAllFiltered(filter = {}, { skip, limit, sort } = {}) {
         const query = PayoutTransaction.find(trustQueryOperators(filter))
+            .populate('barberId', 'firstName lastName upiId accountHolderName')
+            .populate('shopId', 'shopName')
             .sort(sort || { createdAt: -1 });
         if (skip !== undefined) query.skip(skip);
         if (limit !== undefined) query.limit(limit);
