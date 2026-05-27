@@ -42,7 +42,7 @@ export default async function AdminLayout({ children }) {
         <MobileNavigationDrawer />
 
         {/* Desktop Collapsible Navigation Sidebar */}
-        <Sidebar className="hidden lg:flex shrink-0" />
+        <Sidebar className="hidden lg:block shrink-0" />
 
         {/* Content Container Area */}
         <div className="flex-1 flex flex-col min-w-0">

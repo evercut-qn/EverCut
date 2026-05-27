@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils/cn';
  */
 export function Header({ className }) {
   const pathname = usePathname();
-  const { toggleOpen } = useSidebarStore();
+  const toggleOpen = useSidebarStore((state) => state.toggleOpen);
 
   // Generate dynamic breadcrumb label based on active route path
   const pathParts = pathname.split('/').filter(Boolean);

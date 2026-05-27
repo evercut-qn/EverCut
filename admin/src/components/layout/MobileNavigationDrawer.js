@@ -11,7 +11,8 @@ import { cn } from '@/lib/utils/cn';
  */
 export function MobileNavigationDrawer() {
   const pathname = usePathname();
-  const { isOpen, setOpen } = useSidebarStore();
+  const isOpen = useSidebarStore((state) => state.isOpen);
+  const setOpen = useSidebarStore((state) => state.setOpen);
 
   // Close the drawer automatically when pathname changes (user navigated)
   useEffect(() => {
