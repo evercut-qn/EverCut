@@ -91,7 +91,6 @@ export const serializePayout = (payout) => {
         remarks: plain.remarks ?? null,
         gateway: plain.gateway ?? 'cashfree',
         completedByAdminId: toIdString(plain.completedByAdminId) ?? null,
-        lastStatusUpdatedByAdminId: toIdString(plain.lastStatusUpdatedByAdminId) ?? null,
         adminNotes: plain.adminNotes ?? null,
         barber: isPopulatedObject(plain.barberId) ? serializePayoutBarber(plain.barberId) : undefined,
         shop: isPopulatedObject(plain.shopId) ? serializePayoutShop(plain.shopId) : undefined,
@@ -103,9 +102,6 @@ export const serializePayout = (payout) => {
             : undefined,
         completedByAdmin: isPopulatedObject(plain.completedByAdminId)
             ? serializeAdminSummary(plain.completedByAdminId)
-            : undefined,
-        lastStatusUpdatedByAdmin: isPopulatedObject(plain.lastStatusUpdatedByAdminId)
-            ? serializeAdminSummary(plain.lastStatusUpdatedByAdminId)
             : undefined,
         createdAt: plain.createdAt,
         updatedAt: plain.updatedAt,

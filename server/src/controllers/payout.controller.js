@@ -82,14 +82,3 @@ export const createManualPayout = async (req, res, next) => {
         next(error);
     }
 };
-
-export const updatePayout = async (req, res, next) => {
-    try {
-        const { payoutId } = getValidatedRequestData(req, 'params');
-        const body = getValidatedRequestData(req, 'body');
-        const result = await payoutService.updatePayoutStatus(payoutId, body, req.user._id);
-        return res.status(200).json(ApiResponse.success(result, 'Payout updated'));
-    } catch (error) {
-        next(error);
-    }
-};

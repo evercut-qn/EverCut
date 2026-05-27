@@ -227,8 +227,7 @@ Employee `workingHours.start` and `workingHours.end` remain `HH:MM` 24-hour valu
 | 7 | POST | `/api/v1/payouts` | Create manual payout as admin |
 | 8 | GET | `/api/v1/payouts?gateway=manual` | List manual payout history |
 | 9 | GET | `/api/v1/payouts/{{payout_id}}` | Get payout detail |
-| 10 | PATCH | `/api/v1/payouts/{{payout_id}}` | Mark manual payout failed *(Terminal)* |
-| 11 | POST | `/api/v1/payouts/{{payout_id}}/retry` | Retry failed or reversed Cashfree payout as admin |
+| 10 | POST | `/api/v1/payouts/{{payout_id}}/retry` | Retry failed or reversed Cashfree payout as admin |
 
 ### `16-notifications.json`
 
@@ -310,7 +309,7 @@ No manual token generation needed - the authentication and onboarding collection
 | `manual_payout_barber_id` | Auto-set by `15-payments-payouts.json` request 6 |
 | `manual_payout_booking_ids_json` | Auto-set by `15-payments-payouts.json` request 6 |
 | `manual_payout_utr` | Unique UTR used by `15-payments-payouts.json` request 7 |
-| `payout_id` | Manual payout transaction ID for detail/update or Cashfree retry tests |
+| `payout_id` | Manual payout transaction ID for detail lookup or Cashfree retry tests |
 | `subscription_plan_id` | `PLAN_POPULAR` by default; set to `PLAN_ADVANCED` to test Advanced checkout |
 | `subscription_upgrade_plan_id` | `PLAN_ADVANCED` |
 | `subscription_downgrade_plan_id` | `PLAN_POPULAR` |
@@ -360,7 +359,7 @@ No manual token generation needed - the authentication and onboarding collection
 2. `01-authentication.json` → **5. Send Admin OTP** → **6. Verify Admin OTP**.
 3. Prepare at least one completed/no-show, paid booking with pending payout status.
 4. `15-payments-payouts.json` → **6. List Pending Manual Payouts** → **7. Create Manual Payout**.
-5. Use requests 8-10 for history/detail/failure-correction testing. Request 11 is only for legacy Cashfree payout retry.
+5. Use requests 8-9 for payout history/detail testing. Request 10 is only for legacy Cashfree payout retry.
 
 > Requests marked ***(Terminal)*** are destructive. Run them last within their collection and avoid them if you still need the related account or data for later requests.
 
@@ -381,7 +380,7 @@ Collections capture and share the following Postman globals automatically:
 | `razorpay_subscription_id` | `17-subscriptions.json` request 3 | Subscription status and webhook simulation |
 | `manual_payout_barber_id` | `15-payments-payouts.json` request 6 | Manual payout creation |
 | `manual_payout_booking_ids_json` | `15-payments-payouts.json` request 6 | Manual payout creation |
-| `payout_id` | `15-payments-payouts.json` request 7 | Payout detail, failure correction, or Cashfree retry |
+| `payout_id` | `15-payments-payouts.json` request 7 | Payout detail or Cashfree retry |
 
 ---
 

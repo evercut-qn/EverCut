@@ -9,7 +9,6 @@ import {
     listPayoutsQuerySchema,
     payoutIdParamSchema,
     pendingPayoutsQuerySchema,
-    updatePayoutStatusSchema,
 } from '../validators/payout.validator.js';
 import { ROLES } from '../utils/constants.js';
 
@@ -47,14 +46,6 @@ router.get(
     authorize(ROLES.ADMIN),
     validate(payoutIdParamSchema, 'params'),
     payoutController.getPayoutDetail,
-);
-
-router.patch(
-    '/:payoutId',
-    authorize(ROLES.ADMIN),
-    validate(payoutIdParamSchema, 'params'),
-    validate(updatePayoutStatusSchema, 'body'),
-    payoutController.updatePayout,
 );
 
 router.post(

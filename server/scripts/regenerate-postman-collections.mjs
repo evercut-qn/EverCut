@@ -2102,7 +2102,7 @@ const paymentsPayoutsCollection = {
       textVariable('manual_payout_barber_id', '', 'Auto-captured from GET /payouts/pending'),
       textVariable('manual_payout_booking_ids_json', '[]', 'JSON array of booking IDs captured from GET /payouts/pending'),
       textVariable('manual_payout_utr', 'POSTMANUTR{{$timestamp}}', 'Unique UTR/reference for creating a manual payout'),
-      textVariable('payout_id', '', 'Payout ID for manual payout detail/update or Cashfree retry operations'),
+      textVariable('payout_id', '', 'Payout ID for manual payout detail or Cashfree retry operations'),
     ),
   ],
   item: [
@@ -2298,23 +2298,7 @@ const paymentsPayoutsCollection = {
       }),
     },
     {
-      name: '10. Mark Manual Payout Failed (Terminal)',
-      ...request({
-        method: 'PATCH',
-        url: '{{base_url}}/{{api_prefix}}/payouts/{{payout_id}}',
-        auth: bearerAuth('admin_access_token'),
-        headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody(`{\n  "status": "FAILED",\n  "reason": "Postman failure correction test",\n  "notes": "This reopens the booking payout status for retry"\n}`),
-        description: 'Terminal correction for a manual payout recorded in error. This is destructive for the payout lifecycle; run only when testing failure/retry behavior.',
-        event: testEvent(
-          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
-          "const response = pm.response.json();",
-          "pm.test('payout is failed', function () { pm.expect(response.data.status).to.equal('FAILED'); });"
-        ),
-      }),
-    },
-    {
-      name: '11. Retry Failed Cashfree Payout',
+      name: '10. Retry Failed Cashfree Payout',
       ...request({
         method: 'POST',
         url: '{{base_url}}/{{api_prefix}}/payouts/{{payout_id}}/retry',

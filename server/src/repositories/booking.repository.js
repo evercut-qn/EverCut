@@ -135,22 +135,6 @@ class BookingRepository {
         );
     }
 
-    async markPayoutBookingsFailed(bookingIds, payoutId) {
-        return Booking.updateMany(
-            trustQueryOperators({
-                _id: { $in: bookingIds },
-                payoutTransactionId: payoutId,
-            }),
-            {
-                $set: {
-                    payoutStatus: PAYOUT_STATUS.FAILED,
-                    payoutCompletedAt: null,
-                    barberUtr: null,
-                },
-            },
-        );
-    }
-
     async releaseManualPayoutClaim(payoutId) {
         return Booking.updateMany(
             trustQueryOperators({

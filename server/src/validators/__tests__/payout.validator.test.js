@@ -6,8 +6,8 @@ import {
     listPayoutsQuerySchema,
     payoutIdParamSchema,
     pendingPayoutsQuerySchema,
-    updatePayoutStatusSchema,
 } from '../payout.validator.js';
+import * as payoutValidators from '../payout.validator.js';
 
 test('payoutIdParamSchema accepts a valid payout id', () => {
     const { error, value } = payoutIdParamSchema.validate({
@@ -58,26 +58,12 @@ test('createManualPayoutSchema normalizes UTR and rejects duplicate booking IDs'
     assert.match(duplicateBookings.error?.message || '', /duplicate/i);
 });
 
-test('updatePayoutStatusSchema only accepts failed manual correction payloads', () => {
-    const valid = updatePayoutStatusSchema.validate({
-        status: 'FAILED',
-        reason: 'UPI transfer rejected',
-        notes: '',
-    });
-
-    assert.equal(valid.error, undefined);
-    assert.deepEqual(valid.value, {
-        status: 'FAILED',
-        reason: 'UPI transfer rejected',
-        notes: '',
-    });
-
-    const invalid = updatePayoutStatusSchema.validate({
-        status: 'SUCCESS',
-        reason: 'Looks good',
-    });
-
-    assert.match(invalid.error?.message || '', /FAILED/);
+test('payout validators do not expose a manual payout status mutation schema', () => {
+    assert.equal(
+        Object.hasOwn(payoutValidators, 'updatePayoutStatusSchema'),
+        false,
+        'manual payout records are immutable and must not expose a status mutation validator',
+    );
 });
 
 test('listPayoutsQuerySchema validates filters and defaults pagination and sort', () => {

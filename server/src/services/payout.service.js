@@ -434,7 +434,6 @@ export const createManualPayout = async ({ barberId, bookingIds, utr, transferMo
             processedAt,
             gateway: PAYOUT_GATEWAY.MANUAL,
             completedByAdminId: adminId,
-            lastStatusUpdatedByAdminId: adminId,
             adminNotes: normalizeAdminNotes(notes),
             remarks: `Manual payout for ${uniqueBookingIds.length} booking(s)`,
         });
@@ -471,55 +470,6 @@ export const createManualPayout = async ({ barberId, bookingIds, utr, transferMo
     });
 
     return serializePayout(payoutTransaction);
-};
-
-export const updatePayoutStatus = async (payoutId, { status, reason, notes }, adminId) => {
-    const payout = await payoutRepository.findById(payoutId);
-    if (!payout) {
-        throw new NotFoundError('Payout');
-    }
-
-    if (status !== PAYOUT_TRANSACTION_STATUS.FAILED) {
-        throw new BadRequestError('Only FAILED status transition is supported');
-    }
-
-    if ((payout.gateway || PAYOUT_GATEWAY.CASHFREE) !== PAYOUT_GATEWAY.MANUAL) {
-        throw new BadRequestError('Manual status correction is only supported for manual payouts');
-    }
-
-    if (payout.status === PAYOUT_TRANSACTION_STATUS.FAILED) {
-        return serializePayout(payout);
-    }
-
-    if (![PAYOUT_TRANSACTION_STATUS.INITIATED, PAYOUT_TRANSACTION_STATUS.SUCCESS].includes(payout.status)) {
-        throw new BadRequestError(`Cannot transition payout from ${payout.status} to ${status}`);
-    }
-
-    const updated = await payoutRepository.atomicStatusUpdate(payoutId, payout.status, {
-        status: PAYOUT_TRANSACTION_STATUS.FAILED,
-        failureReason: reason,
-        processedAt: null,
-        lastStatusUpdatedByAdminId: adminId,
-        adminNotes: normalizeAdminNotes(notes),
-    });
-
-    if (!updated) {
-        throw new ConflictError('Payout was modified by another admin. Please refresh and try again.');
-    }
-
-    await bookingRepository.markPayoutBookingsFailed(payout.bookingIds, payout._id);
-    if (Array.isArray(payout.paymentTransactionIds) && payout.paymentTransactionIds.length > 0) {
-        await paymentRepository.markUnsettledByIds(payout.paymentTransactionIds);
-    }
-
-    logger.info('[PayoutService] Manual payout marked as failed', {
-        payoutId,
-        adminId,
-        reason,
-        gateway: payout.gateway,
-    });
-
-    return serializePayout(updated);
 };
 
 export const listPayouts = async (query = {}) => {

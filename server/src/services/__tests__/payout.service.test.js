@@ -189,84 +189,12 @@ test('createManualPayout rejects stale booking claims before creating a payout r
     assert.equal(createMock.mock.calls.length, 0);
 });
 
-test('updatePayoutStatus marks a manual payout failed and reopens its bookings for payout retry', async (t) => {
-    const payout = {
-        _id: 'payout-1',
-        gateway: 'manual',
-        status: 'SUCCESS',
-        bookingIds: ['booking-1'],
-        paymentTransactionIds: ['payment-1'],
-        completedByAdminId: 'admin-original',
-        utr: 'UTR123',
-    };
-
-    t.mock.method(payoutRepository, 'findById', async () => payout);
-
-    let atomicCall = null;
-    t.mock.method(payoutRepository, 'atomicStatusUpdate', async (...args) => {
-        atomicCall = args;
-        return {
-            ...payout,
-            status: 'FAILED',
-            failureReason: 'UPI transfer rejected',
-            adminNotes: 'Retry after UPI confirmation',
-            lastStatusUpdatedByAdminId: 'admin-2',
-        };
-    });
-
-    let bookingFailureCall = null;
-    t.mock.method(bookingRepository, 'markPayoutBookingsFailed', async (...args) => {
-        bookingFailureCall = args;
-        return { matchedCount: 1, modifiedCount: 1 };
-    });
-
-    let unsettledIds = null;
-    t.mock.method(paymentRepository, 'markUnsettledByIds', async (ids) => {
-        unsettledIds = ids;
-        return { acknowledged: true, modifiedCount: 1 };
-    });
-
-    const result = await payoutService.updatePayoutStatus('payout-1', {
-        status: 'FAILED',
-        reason: 'UPI transfer rejected',
-        notes: 'Retry after UPI confirmation',
-    }, 'admin-2');
-
-    assert.equal(atomicCall[0], 'payout-1');
-    assert.equal(atomicCall[1], 'SUCCESS');
-    assert.equal(atomicCall[2].failureReason, 'UPI transfer rejected');
-    assert.equal(atomicCall[2].lastStatusUpdatedByAdminId, 'admin-2');
-    assert.deepEqual(bookingFailureCall, [
-        ['booking-1'],
-        'payout-1',
-    ]);
-    assert.deepEqual(unsettledIds, ['payment-1']);
-    assert.equal(result.status, 'FAILED');
-    assert.equal(result.completedByAdminId, 'admin-original');
-    assert.equal(result.lastStatusUpdatedByAdminId, 'admin-2');
-});
-
-test('updatePayoutStatus rejects Cashfree payouts so manual correction cannot corrupt automatic payouts', async (t) => {
-    t.mock.method(payoutRepository, 'findById', async () => ({
-        _id: 'payout-1',
-        gateway: 'cashfree',
-        status: 'SUCCESS',
-        bookingIds: ['booking-1'],
-        paymentTransactionIds: ['payment-1'],
-    }));
-    const atomicMock = t.mock.method(payoutRepository, 'atomicStatusUpdate', async () => {
-        throw new Error('atomic update should not run');
-    });
-
-    await assert.rejects(
-        payoutService.updatePayoutStatus('payout-1', {
-            status: 'FAILED',
-            reason: 'Manual correction',
-        }, 'admin-1'),
-        /manual payouts/i,
+test('payout service does not expose manual payout status mutation', () => {
+    assert.equal(
+        Object.hasOwn(payoutService, 'updatePayoutStatus'),
+        false,
+        'manual payouts are immutable successful ledger records',
     );
-
-    assert.equal(atomicMock.mock.calls.length, 0);
 });
 
 test('triggerBarberPayout stores generic beneficiary and gateway transfer identifiers', async (t) => {
