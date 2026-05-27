@@ -5,7 +5,8 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
-import { Loader2, Scissors, Send, KeyRound, PhoneCall } from 'lucide-react';
+import { Loader2, Send, KeyRound, PhoneCall } from 'lucide-react';
+import { Logo } from '@/components/ui/Logo';
 
 import { FormInput } from '@/components/forms';
 import { requestOTPSchema, verifyOTPSchema } from '@/lib/schemas/auth.schema';
@@ -115,11 +116,9 @@ export function LoginForm() {
     <div className="space-y-6">
       {/* Header Info */}
       <div className="flex flex-col items-center text-center">
-        <div className="p-3 bg-primary/10 rounded-full border border-primary/20 mb-3 text-primary">
-          <Scissors className="h-6 w-6 animate-pulse" />
-        </div>
-        <h1 className="text-xl font-bold font-display text-foreground">EverCut Admin Portal</h1>
-        <p className="text-xs text-muted-foreground mt-1 max-w-[280px]">
+        <Logo variant="full" className="h-14 w-auto mb-3 text-foreground" />
+        <h1 className="text-xs font-bold tracking-widest uppercase text-muted-foreground">Admin Portal</h1>
+        <p className="text-xs text-muted-foreground mt-3 max-w-[280px]">
           {step === 'phone' 
             ? 'Enter your administrative mobile number to request a session code.' 
             : `Enter the code sent to verified line +91 ${phoneVal}`}

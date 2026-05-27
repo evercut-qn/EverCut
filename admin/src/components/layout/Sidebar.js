@@ -9,9 +9,10 @@ import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/utils/cn';
 import { handleLogoutAction } from '@/app/(admin)/_actions/logout.action';
 import { 
-  Scissors, LayoutDashboard, Users, CreditCard, 
+  LayoutDashboard, Users, CreditCard, 
   Settings, LogOut, ChevronLeft, ChevronRight, Loader2, X
 } from 'lucide-react';
+import { Logo } from '@/components/ui/Logo';
 
 /**
  * Collapsible navigation sidebar. Hides administrative routes
@@ -55,9 +56,12 @@ export function Sidebar({ className, forceExpanded = false, onClose }) {
     )}>
       {/* Sidebar Brand Header */}
       <div className="h-16 flex items-center justify-between px-4 border-b border-border">
-        <Link href="/overview" className="flex items-center gap-2 font-bold font-display text-primary">
-          <Scissors className="h-5 w-5 shrink-0" />
-          {!isCollapsed && <span className="text-sm tracking-wide font-bold">EverCut Admin</span>}
+        <Link href="/overview" className="flex items-center gap-2">
+          {isCollapsed ? (
+            <Logo variant="icon" className="h-5 w-5 shrink-0 text-foreground" />
+          ) : (
+            <Logo variant="full" className="h-6 w-auto text-foreground" />
+          )}
         </Link>
         {onClose ? (
           <button 
