@@ -16,6 +16,9 @@ const outfit = Outfit({
 export const metadata = {
   title: 'EverCut Admin Panel — Operations Management',
   description: 'Administrative interface for EverCut hair salons bookings, barber schedules, and financial operations tracking.',
+  appleWebApp: {
+    title: 'EverCut - Admin Panel',
+  },
 };
 
 /**
