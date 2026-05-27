@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { ChevronLeft, ChevronRight, QrCode, ExternalLink, CheckCircle2 } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
+import { QrCode, ExternalLink, CheckCircle2 } from 'lucide-react';
 import QRCode from 'qrcode';
 import { PayoutRequestModal } from './PayoutRequestModal';
 import { TableSearchBar } from '@/components/ui/TableSearchBar';
+import { PaginationControls } from './shared/PaginationControls';
 
 /**
  * Modal to display the generated UPI QR Code.
@@ -62,8 +63,7 @@ function QRCodeModal({ isOpen, onClose, upiDeepLink, amount, barberName }) {
  * @param {number} props.totalItems - Total pending items
  * @param {number} [props.defaultLimit=20]
  */
-export function PendingPayoutsTable({ initialData = [], totalItems = 0, defaultLimit = 20 }) {
-  const router = useRouter();
+export function PendingPayoutsTable({ initialData = [], pagination, defaultLimit = 20 }) {
   const searchParams = useSearchParams();
 
   // Dialog state management
@@ -72,15 +72,9 @@ export function PendingPayoutsTable({ initialData = [], totalItems = 0, defaultL
 
   const currentPage = Number(searchParams.get('page')) || 1;
   const currentLimit = Number(searchParams.get('limit')) || defaultLimit;
-  const totalPages = Math.ceil(totalItems / currentLimit);
+  const totalPages = pagination?.totalPages || 1;
 
   const hasSearch = Boolean(searchParams.get('search'));
-
-  function handlePageChange(nextPage) {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set('page', String(nextPage));
-    router.push(`?${params.toString()}`);
-  }
 
   return (
     <div className="space-y-4">
@@ -202,31 +196,7 @@ export function PendingPayoutsTable({ initialData = [], totalItems = 0, defaultL
 
       {/* Pagination Footer */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
-          <span>
-            Showing page <strong>{currentPage}</strong> of <strong>{totalPages || 1}</strong> ({totalItems} records found)
-          </span>
-          
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => handlePageChange(currentPage - 1)}
-              disabled={currentPage <= 1}
-              className="p-1.5 border border-border rounded hover:bg-muted disabled:opacity-50 transition-colors"
-              aria-label="Previous page"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            
-            <button
-              onClick={() => handlePageChange(currentPage + 1)}
-              disabled={currentPage >= totalPages}
-              className="p-1.5 border border-border rounded hover:bg-muted disabled:opacity-50 transition-colors"
-              aria-label="Next page"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
+        <PaginationControls pagination={{ ...pagination, currentPage }} pageSize={currentLimit} />
       )}
 
       {/* UPI QR Display Popup */}

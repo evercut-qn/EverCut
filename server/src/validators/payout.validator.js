@@ -51,20 +51,6 @@ export const createManualPayoutSchema = Joi.object({
     notes: Joi.string().trim().max(500).allow('').optional(),
 });
 
-export const updatePayoutStatusSchema = Joi.object({
-    status: Joi.string()
-        .valid('FAILED')
-        .required()
-        .messages({
-            'any.only': 'Only FAILED status transition is supported via PATCH',
-        }),
-    reason: Joi.string().trim().min(3).max(500).required().messages({
-        'any.required': 'Failure reason is required when marking as failed',
-        'string.min': 'Failure reason must be at least 3 characters',
-    }),
-    notes: Joi.string().trim().max(500).allow('').optional(),
-});
-
 export const listPayoutsQuerySchema = paginationSchema.keys({
     status: Joi.string().valid(...ALL_PAYOUT_TRANSACTION_STATUSES).optional(),
     gateway: Joi.string().valid(...ALL_PAYOUT_GATEWAYS).optional(),

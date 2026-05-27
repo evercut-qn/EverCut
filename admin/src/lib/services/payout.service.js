@@ -9,10 +9,23 @@ import { apiFetch } from '@/lib/api-client';
  * @param {string} [params.status] - Filter by transaction status
  * @param {string} [params.gateway] - Filter by gateway
  * @param {string} [params.barberId] - Filter by barber ID
+ * @param {string} [params.startDate] - Inclusive creation date lower bound
+ * @param {string} [params.endDate] - Inclusive creation date upper bound
+ * @param {string} [params.sort] - Backend sort expression
  * @param {string} params.token - Session JWT
- * @returns {Promise<{success: boolean, message: string, data?: {items: Array, pagination: Object}, errors?: Array}>} Response list
+ * @returns {Promise<{success: boolean, message: string, data?: Array, meta?: Object, errors?: Array}>} Response list
  */
-export async function getPayouts({ page = 1, limit = 20, status = '', gateway = '', barberId = '', token }) {
+export async function getPayouts({
+  page = 1,
+  limit = 20,
+  status = '',
+  gateway = '',
+  barberId = '',
+  startDate = '',
+  endDate = '',
+  sort = 'createdAt:desc',
+  token,
+} = {}) {
   const query = new URLSearchParams({
     page: String(page),
     limit: String(limit),
@@ -21,6 +34,9 @@ export async function getPayouts({ page = 1, limit = 20, status = '', gateway = 
   if (status) query.set('status', status);
   if (gateway) query.set('gateway', gateway);
   if (barberId) query.set('barberId', barberId);
+  if (startDate) query.set('startDate', startDate);
+  if (endDate) query.set('endDate', endDate);
+  if (sort) query.set('sort', sort);
 
   // Map directly to backend `/payouts`
   return apiFetch(`/payouts?${query.toString()}`, {
@@ -37,7 +53,7 @@ export async function getPayouts({ page = 1, limit = 20, status = '', gateway = 
  * @param {number} [params.limit=20] - Size limit
  * @param {string} [params.search] - Search keywords
  * @param {string} params.token - Session JWT
- * @returns {Promise<{success: boolean, message: string, data?: {items: Array, pagination: Object}}>} Response list
+ * @returns {Promise<{success: boolean, message: string, data?: Array, meta?: Object}>} Response list
  */
 export async function getPendingPayouts({ page = 1, limit = 20, search = '', token }) {
   const query = new URLSearchParams({
@@ -48,6 +64,20 @@ export async function getPendingPayouts({ page = 1, limit = 20, search = '', tok
   if (search) query.set('search', search);
 
   return apiFetch(`/payouts/pending?${query.toString()}`, {
+    method: 'GET',
+    token,
+  });
+}
+
+/**
+ * Retrieves a single payout transaction with populated relations.
+ *
+ * @param {string} payoutId - Payout transaction ID
+ * @param {string} token - Session JWT
+ * @returns {Promise<{success: boolean, message: string, data?: Object, errors?: Array}>}
+ */
+export async function getPayoutDetail(payoutId, token) {
+  return apiFetch(`/payouts/${payoutId}`, {
     method: 'GET',
     token,
   });
@@ -85,33 +115,4 @@ export async function retryPayout(payoutId, token) {
     method: 'POST',
     token,
   });
-}
-
-/**
- * Marks a manual payout as FAILED.
- *
- * @param {string} payoutId - Payout transaction ID
- * @param {Object} payload - Update parameters
- * @param {string} payload.reason - Failure reason explanation
- * @param {string} [payload.notes] - Optional admin notes
- * @param {string} token - Session JWT
- * @returns {Promise<{success: boolean, message: string, data?: Object}>} Response payload
- */
-export async function markPayoutFailed(payoutId, { reason, notes }, token) {
-  return apiFetch(`/payouts/${payoutId}`, {
-    method: 'PATCH',
-    body: { status: 'FAILED', reason, notes },
-    token,
-  });
-}
-
-/**
- * Approves a pending payout request (Mapped to retryPayout for backward compatibility with UI).
- *
- * @param {string} payoutId - Payout transaction ID
- * @param {string} token - Session JWT
- * @returns {Promise<{success: boolean, message: string, data?: Object}>} Response payload
- */
-export async function approvePayoutService(payoutId, token) {
-  return retryPayout(payoutId, token);
 }

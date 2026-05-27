@@ -153,6 +153,7 @@ export async function apiFetch(endpoint, options = {}) {
       success: true,
       message: payload.message || 'Request completed successfully',
       data: payload.data,
+      meta: payload.meta,
     };
   } catch (error) {
     clearTimeout(timeoutId);

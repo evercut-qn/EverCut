@@ -1,7 +1,8 @@
 'use client';
 
 import { useTransition, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
+import { useRouter } from 'next/navigation';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'sonner';
 import { Loader2, X, CheckCircle } from 'lucide-react';
@@ -9,14 +10,7 @@ import { Loader2, X, CheckCircle } from 'lucide-react';
 import { FormInput, FormSelect, FormTextarea } from '@/components/forms';
 import { createPayoutSchema } from '@/lib/schemas/payout.schema';
 import { handleRequestPayoutAction } from '../_actions/payout.action';
-
-const METHOD_OPTIONS = [
-  { value: 'upi', label: 'UPI (Unified Payments Interface)' },
-  { value: 'imps', label: 'IMPS (Immediate Payment Service)' },
-  { value: 'neft', label: 'NEFT (National Electronic Funds Transfer)' },
-  { value: 'rtgs', label: 'RTGS (Real Time Gross Settlement)' },
-  { value: 'banktransfer', label: 'Bank Direct Transfer' },
-];
+import { TRANSFER_MODE_OPTIONS } from './shared/payout-format';
 
 /**
  * Modal dialog to record manual payout settlements.
@@ -27,6 +21,7 @@ const METHOD_OPTIONS = [
  * @param {Object} props.pendingPayout - Selected pending payout balance details
  */
 export function PayoutRequestModal({ isOpen, onClose, pendingPayout }) {
+  const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
   const {
@@ -34,7 +29,7 @@ export function PayoutRequestModal({ isOpen, onClose, pendingPayout }) {
     handleSubmit,
     setError,
     reset,
-    watch,
+    control,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(createPayoutSchema),
@@ -47,6 +42,7 @@ export function PayoutRequestModal({ isOpen, onClose, pendingPayout }) {
     },
     mode: 'onSubmit',
   });
+  const watchedNotes = useWatch({ control, name: 'notes' });
 
   // Automatically load selected payout identifiers into form state
   useEffect(() => {
@@ -80,6 +76,7 @@ export function PayoutRequestModal({ isOpen, onClose, pendingPayout }) {
         }
 
         toast.success(result.message || 'Manual payout recorded successfully.');
+        router.refresh();
         reset();
         onClose();
       } catch (e) {
@@ -161,7 +158,7 @@ export function PayoutRequestModal({ isOpen, onClose, pendingPayout }) {
             <FormSelect
               label="Payment Method"
               placeholder="Select mode..."
-              options={METHOD_OPTIONS}
+              options={TRANSFER_MODE_OPTIONS}
               error={errors.transferMode?.message}
               required
               {...register('transferMode')}
@@ -173,7 +170,7 @@ export function PayoutRequestModal({ isOpen, onClose, pendingPayout }) {
             label="Audit Notes"
             placeholder="Optional details, e.g. Paid via PhonePe bank transfer..."
             maxLength={500}
-            value={watch('notes')}
+            value={watchedNotes}
             error={errors.notes?.message}
             {...register('notes')}
           />

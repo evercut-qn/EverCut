@@ -1,55 +1,67 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { requestPayout, approvePayoutService } from '@/lib/services/payout.service';
+import { requestPayout, retryPayout } from '@/lib/services/payout.service';
 import { createPayoutSchema } from '@/lib/schemas/payout.schema';
+import { objectIdSchema } from '@/lib/schemas/common.schema';
 import { getValidAccessToken } from '@/lib/auth';
 
+async function requireAdminToken() {
+  const token = await getValidAccessToken();
+
+  if (!token) {
+    return { error: { success: false, message: 'Unauthenticated session.' } };
+  }
+
+  try {
+    const parts = token.split('.');
+    const claims = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf-8'));
+    if (claims.role !== 'ADMIN') {
+      return {
+        error: {
+          success: false,
+          message: 'Forbidden: You do not have permission to manage payouts.',
+        },
+      };
+    }
+  } catch {
+    return { error: { success: false, message: 'Invalid administrative session.' } };
+  }
+
+  return { token };
+}
+
 /**
- * Server Action: Submits a manual payout request.
+ * Server Action: Records a completed manual payout settlement.
  *
- * @param {Object} formData - Form parameters containing barberId, amount, note, and payoutMethod
+ * @param {Object} formData - Form parameters containing barberId, bookingIds, UTR, transfer mode, and notes
  * @returns {Promise<{success: boolean, message: string, errors?: Array}>} Response state
  */
 export async function handleRequestPayoutAction(formData) {
   try {
-    const token = await getValidAccessToken();
-
-    if (!token) {
-      return { success: false, message: 'Unauthenticated session.' };
-    }
-
-    // Role check: superadmin or finance
-    const parts = token.split('.');
-    const claims = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf-8'));
-    const ALLOWED_ROLES = ['ADMIN'];
-    if (!ALLOWED_ROLES.includes(claims.role)) {
-      return {
-        success: false,
-        message: 'Forbidden: You do not have permission to execute payout requests.',
-      };
-    }
+    const { token, error } = await requireAdminToken();
+    if (error) return error;
 
     // Validate parameters
     const validation = createPayoutSchema.safeParse(formData);
     if (!validation.success) {
+      const issues = validation.error.issues || validation.error.errors || [];
       return {
         success: false,
         message: 'Validation failed.',
-        errors: validation.error.errors.map((err) => ({
+        errors: issues.map((err) => ({
           field: err.path.join('.'),
           message: err.message,
         })),
       };
     }
 
-    // Call service dispatch
     const result = await requestPayout(validation.data, token);
 
     if (!result.success) {
       return {
         success: false,
-        message: result.message || 'Failed to request payout.',
+        message: result.message || 'Failed to record manual payout.',
         errors: result.errors,
       };
     }
@@ -57,59 +69,54 @@ export async function handleRequestPayoutAction(formData) {
     revalidatePath('/payouts');
     return {
       success: true,
-      message: 'Payout request successfully dispatched.',
+      message: 'Manual payout recorded successfully.',
     };
   } catch (error) {
     return {
       success: false,
-      message: 'A server error occurred while processing payout requests.',
+      message: 'A server error occurred while recording manual payout.',
     };
   }
 }
 
 /**
- * Server Action: Approves a pending payout.
+ * Server Action: Retries a failed or reversed automatic payout.
  *
- * @param {string} payoutId - Target transaction ID
+ * @param {string} payoutId - Target payout transaction ID
  * @returns {Promise<{success: boolean, message: string}>} Response state
  */
-export async function handleApprovePayoutAction(payoutId) {
+export async function handleRetryPayoutAction(payoutId) {
   try {
-    const token = await getValidAccessToken();
-
-    if (!token) {
-      return { success: false, message: 'Unauthenticated session.' };
-    }
-
-    // Role check: superadmin or finance
-    const parts = token.split('.');
-    const claims = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf-8'));
-    const ALLOWED_ROLES = ['ADMIN'];
-    if (!ALLOWED_ROLES.includes(claims.role)) {
+    const payoutIdValidation = objectIdSchema.safeParse(payoutId);
+    if (!payoutIdValidation.success) {
       return {
         success: false,
-        message: 'Forbidden: You do not have permission to approve payout transactions.',
+        message: 'Invalid payout ID.',
       };
     }
 
-    const result = await approvePayoutService(payoutId, token);
+    const { token, error } = await requireAdminToken();
+    if (error) return error;
+
+    const result = await retryPayout(payoutIdValidation.data, token);
 
     if (!result.success) {
       return {
         success: false,
-        message: result.message || 'Failed to approve payout.',
+        message: result.message || 'Failed to retry payout.',
       };
     }
 
     revalidatePath('/payouts');
+    revalidatePath(`/payouts/${payoutIdValidation.data}`);
     return {
       success: true,
-      message: 'Payout transaction successfully approved.',
+      message: 'Payout retry initiated.',
     };
   } catch (error) {
     return {
       success: false,
-      message: 'A server error occurred while approving payout.',
+      message: 'A server error occurred while retrying payout.',
     };
   }
 }
