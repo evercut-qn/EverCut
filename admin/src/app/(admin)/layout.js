@@ -50,7 +50,7 @@ export default async function AdminLayout({ children }) {
           <Header className="w-full shrink-0" />
 
           {/* Main content viewport */}
-          <main className="flex-1 overflow-y-auto p-4 lg:p-8 max-w-7xl w-full mx-auto">
+          <main className="flex-1 overflow-y-auto p-4 lg:p-8 max-w-8xl w-full mx-auto">
             {children}
           </main>
         </div>

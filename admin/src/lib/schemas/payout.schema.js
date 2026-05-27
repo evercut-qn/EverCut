@@ -48,14 +48,14 @@ export const createPayoutSchema = z.object({
 
 /** Schema to validate payout history filter query parameters */
 export const payoutListQuerySchema = paginationSchema.extend({
-  tab: z.enum(['pending', 'history']).default('pending'),
-  status: z.union([payoutStatusSchema, z.literal('')]).optional(),
-  gateway: z.union([payoutGatewaySchema, z.literal('')]).optional(),
-  barberId: z.union([objectIdSchema, z.literal('')]).optional(),
-  startDate: z.union([z.iso.date(), z.literal('')]).optional(),
-  endDate: z.union([z.iso.date(), z.literal('')]).optional(),
-  sort: payoutSortSchema.default('createdAt:desc'),
-  search: searchSchema.or(z.literal('')).optional(),
+  tab: z.enum(['pending', 'history']).catch('pending'),
+  status: payoutStatusSchema.or(z.literal('')).catch(''),
+  gateway: payoutGatewaySchema.or(z.literal('')).catch(''),
+  barberId: objectIdSchema.or(z.literal('')).catch(''),
+  startDate: z.iso.date().or(z.literal('')).catch(''),
+  endDate: z.iso.date().or(z.literal('')).catch(''),
+  sort: payoutSortSchema.catch('createdAt:desc'),
+  search: searchSchema.or(z.literal('')).catch(''),
 }).refine(
   (value) => !value.startDate || !value.endDate || value.endDate >= value.startDate,
   {

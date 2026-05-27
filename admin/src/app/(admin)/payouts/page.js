@@ -160,12 +160,14 @@ export default async function PayoutsPage({ searchParams }) {
               <div className="h-40 bg-muted animate-pulse rounded-md" />
             </div>
           }>
-            <PayoutFilters />
-            <PayoutsTable 
-              initialData={historyData} 
-              pagination={historyPagination}
-              defaultLimit={limit} 
-            />
+            <div className="space-y-6">
+              <PayoutFilters query={query} />
+              <PayoutsTable 
+                initialData={historyData} 
+                pagination={historyPagination}
+                defaultLimit={limit} 
+              />
+            </div>
           </Suspense>
         )}
       </div>

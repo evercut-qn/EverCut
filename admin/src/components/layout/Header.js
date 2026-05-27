@@ -35,7 +35,7 @@ export function Header({ className }) {
           <Menu className="h-5 w-5" />
         </button>
         
-        <div className="text-sm font-semibold font-display text-muted-foreground hidden md:block">
+        <div className="text-base font-semibold font-display text-muted-foreground hidden md:block">
           {breadcrumbText || 'Overview'}
         </div>
       </div>
