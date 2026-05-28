@@ -4,6 +4,7 @@ import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { MobileNavigationDrawer } from '@/components/layout/MobileNavigationDrawer';
 import { getValidAccessToken } from '@/lib/auth';
+import { decodeJWTPayload } from '@/lib/jwt';
 
 /**
  * Administrative shell enclosing Sidebar, Header, and Mobile Navigation components.
@@ -20,17 +21,7 @@ export default async function AdminLayout({ children }) {
   }
 
   // Decode JWT payload on server
-  let userProfile = null;
-  try {
-    const parts = token.split('.');
-    if (parts.length === 3) {
-      userProfile = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf-8'));
-    }
-  } catch (e) {
-    // Malformed token, redirect to login
-    redirect('/login');
-  }
-
+  const userProfile = decodeJWTPayload(token);
   if (!userProfile) {
     redirect('/login');
   }

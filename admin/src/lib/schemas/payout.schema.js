@@ -52,8 +52,8 @@ export const payoutListQuerySchema = paginationSchema.extend({
   status: payoutStatusSchema.or(z.literal('')).catch(''),
   gateway: payoutGatewaySchema.or(z.literal('')).catch(''),
   barberId: objectIdSchema.or(z.literal('')).catch(''),
-  startDate: z.iso.date().or(z.literal('')).catch(''),
-  endDate: z.iso.date().or(z.literal('')).catch(''),
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD format').or(z.literal('')).catch(''),
+  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD format').or(z.literal('')).catch(''),
   sort: payoutSortSchema.catch('createdAt:desc'),
   search: searchSchema.or(z.literal('')).catch(''),
 }).refine(

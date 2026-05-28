@@ -3,6 +3,7 @@
 import { cookies } from 'next/headers';
 import { verifyOTP } from '@/lib/services/auth.service';
 import { verifyOTPSchema } from '@/lib/schemas/auth.schema';
+import { decodeJWTPayload } from '@/lib/jwt';
 
 /**
  * Server Action to check the OTP verification code and create the session cookie.
@@ -39,9 +40,8 @@ export async function handleLoginAction({ phone, code }) {
     }
 
     // Decode token to verify administrative role
-    const parts = result.data.accessToken.split('.');
-    const claims = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf-8'));
-    if (claims.role !== 'ADMIN') {
+    const claims = decodeJWTPayload(result.data.accessToken);
+    if (!claims || claims.role !== 'ADMIN') {
       return {
         success: false,
         message: 'Access denied: Only platform administrators are allowed.',

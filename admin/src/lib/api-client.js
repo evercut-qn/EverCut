@@ -27,61 +27,24 @@ function clearSessionAndRedirect() {
   window.location.href = `/login?returnTo=${encodeURIComponent(window.location.pathname)}`;
 }
 
-/**
- * Attempts a silent token refresh using the refresh token cookie on the client side.
- * Only runs in browser context.
- *
- * NOTE: auth.js (getValidAccessToken / refreshTokens) handles server-side refresh.
- * This handles the client-side equivalent for 401 responses from the API client.
- *
- * @returns {Promise<string|null>} New access token or null if refresh failed
- */
-async function tryClientSideRefresh() {
-  // Read the refresh token from the cookie (it is httpOnly, so this will be empty
-  // in production — client-side refresh is only possible if the cookie is not httpOnly,
-  // or if a dedicated client-facing refresh endpoint exists).
-  // The primary refresh path is the edge middleware (proxy.js).
-  // This is a best-effort fallback for in-page 401s.
-  try {
-    const res = await fetch(`${BASE_URL}/auth/token/refresh`, {
-      method: 'POST',
-      credentials: 'include', // sends the httpOnly refresh token cookie automatically
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
-      // No body needed — the backend reads the refresh token from cookies if configured,
-      // OR the proxy middleware will have already refreshed before the request reached here.
-      body: JSON.stringify({}),
-    });
-
-    if (!res.ok) return null;
-    const payload = await res.json();
-    return payload.data?.accessToken || null;
-  } catch {
-    return null;
-  }
-}
 
 /**
  * Standardized fetch client wrapper for backend API operations.
- * Handles auth bearer insertion, timeout guards, 401 token refresh, and server error parsing.
+ * Handles auth bearer insertion, timeout guards, and server error parsing.
  *
  * Token management architecture:
- * - Server-side refresh: handled by proxy.js (Edge middleware) via auth.js
- * - Client-side refresh: attempted here on 401, before falling back to login redirect
- * - auth.js uses raw fetch (not this client) to avoid circular imports and edge runtime issues
+ * - Session refresh: handled strictly by proxy.js (Edge middleware)
+ * - auth.js uses raw fetch to avoid circular imports and edge runtime issues
  *
  * @param {string} endpoint - API path relative to the Base URL (must start with /)
  * @param {Object} [options] - Standard Request Init configurations
  * @param {Object} [options.body] - Request body (will be automatically JSON stringified)
  * @param {string} [options.token] - Explicit JWT token to forward (required in Server Components)
  * @param {number} [options.timeout=10000] - Request timeout duration in milliseconds
- * @param {boolean} [options._isRetry=false] - Internal flag to prevent infinite refresh loops
  * @returns {Promise<{success: boolean, message: string, data?: any, errors?: Array<{field: string, message: string}>}>} Unified API response payload
  */
 export async function apiFetch(endpoint, options = {}) {
-  const { body, token, timeout = 10000, headers = {}, _isRetry = false, ...rest } = options;
+  const { body, token, timeout = 10000, headers = {}, ...rest } = options;
   const url = `${BASE_URL}${endpoint}`;
 
   // 1. Setup headers configuration
@@ -124,17 +87,6 @@ export async function apiFetch(endpoint, options = {}) {
 
     // 4. Handle token expiry (401 Unauthorized) — client-side only
     if (response.status === 401 && typeof window !== 'undefined') {
-      if (!_isRetry) {
-        // Attempt one silent refresh before giving up.
-        // Server-side refresh is handled by proxy.js middleware on every page navigation.
-        // This handles in-page API calls after a token expires mid-session.
-        const newToken = await tryClientSideRefresh();
-        if (newToken) {
-          // Retry the original request with the new token
-          return apiFetch(endpoint, { ...options, token: newToken, _isRetry: true });
-        }
-      }
-      // Refresh failed or already retried — clear and redirect
       clearSessionAndRedirect();
       return { success: false, message: 'Session expired. Please log in again.' };
     }

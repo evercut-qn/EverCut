@@ -86,7 +86,8 @@ export function LoginForm() {
         }
 
         toast.success('Access verified. Loading overview...');
-        const returnTo = searchParams.get('returnTo') || '/overview';
+        const rawReturnTo = searchParams.get('returnTo') || '/overview';
+        const returnTo = (rawReturnTo.startsWith('/') && !rawReturnTo.startsWith('//')) ? rawReturnTo : '/overview';
         router.push(returnTo);
       } catch (error) {
         toast.error('Session configuration error.');

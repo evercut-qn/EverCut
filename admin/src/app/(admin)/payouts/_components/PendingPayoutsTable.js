@@ -3,10 +3,9 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { QrCode, ExternalLink, CheckCircle2 } from 'lucide-react';
-import QRCode from 'qrcode';
 import { PayoutRequestModal } from './PayoutRequestModal';
 import { TableSearchBar } from '@/components/ui/TableSearchBar';
-import { PaginationControls } from './shared/PaginationControls';
+import { PaginationControls } from '@/components/ui/PaginationControls';
 
 /**
  * Modal to display the generated UPI QR Code.
@@ -16,10 +15,15 @@ function QRCodeModal({ isOpen, onClose, upiDeepLink, amount, barberName }) {
 
   useEffect(() => {
     if (upiDeepLink && isOpen) {
-      QRCode.toDataURL(upiDeepLink, { width: 256, margin: 2 })
+      import('qrcode')
+        .then((lib) => lib.default.toDataURL(upiDeepLink, { width: 256, margin: 2 }))
         .then((url) => setQrCodeUrl(url))
         .catch((err) => console.error('Failed to generate QR code:', err));
     }
+
+    return () => {
+      setQrCodeUrl('');
+    };
   }, [upiDeepLink, isOpen]);
 
   if (!isOpen) return null;

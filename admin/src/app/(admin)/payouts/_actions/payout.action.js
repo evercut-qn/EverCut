@@ -5,6 +5,7 @@ import { requestPayout, retryPayout } from '@/lib/services/payout.service';
 import { createPayoutSchema } from '@/lib/schemas/payout.schema';
 import { objectIdSchema } from '@/lib/schemas/common.schema';
 import { getValidAccessToken } from '@/lib/auth';
+import { decodeJWTPayload } from '@/lib/jwt';
 
 async function requireAdminToken() {
   const token = await getValidAccessToken();
@@ -13,19 +14,17 @@ async function requireAdminToken() {
     return { error: { success: false, message: 'Unauthenticated session.' } };
   }
 
-  try {
-    const parts = token.split('.');
-    const claims = JSON.parse(Buffer.from(parts[1], 'base64').toString('utf-8'));
-    if (claims.role !== 'ADMIN') {
-      return {
-        error: {
-          success: false,
-          message: 'Forbidden: You do not have permission to manage payouts.',
-        },
-      };
-    }
-  } catch {
+  const claims = decodeJWTPayload(token);
+  if (!claims) {
     return { error: { success: false, message: 'Invalid administrative session.' } };
+  }
+  if (claims.role !== 'ADMIN') {
+    return {
+      error: {
+        success: false,
+        message: 'Forbidden: You do not have permission to manage payouts.',
+      },
+    };
   }
 
   return { token };

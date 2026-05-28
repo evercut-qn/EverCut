@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 
 import { handleRetryPayoutAction } from '../_actions/payout.action';
 import { PayoutGatewayBadge, PayoutStatusBadge } from './shared/PayoutBadges';
-import { PaginationControls } from './shared/PaginationControls';
+import { PaginationControls } from '@/components/ui/PaginationControls';
 import { formatCurrency, formatDateTime, getPayoutRecipientName } from './shared/payout-format';
 
 export function PayoutsTable({ initialData = [], pagination, defaultLimit = 20 }) {
