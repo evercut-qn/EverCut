@@ -168,7 +168,7 @@ GET    /api/v1/bookings                        List with `period`, `favorite`, `
 GET    /api/v1/bookings/:id                    Get booking details
 PATCH  /api/v1/bookings/:id                    Update schedule or status
 PATCH  /api/v1/bookings/:id/favorite           Set favorite state
-GET    /api/v1/bookings/analytics              Booking summary, milestones, today pulse, and queue
+GET    /api/v1/bookings/overview               Booking summary, milestones, today pulse, and queue
 ```
 
 ### Scheduling Engine

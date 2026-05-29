@@ -252,7 +252,8 @@ test('booking discovery and payment routes use final resource-oriented URLs', as
     assert.doesNotMatch(bookingRoutes, /analytics\/milestones/);
     assert.doesNotMatch(bookingRoutes, /analytics\/today/);
     assert.doesNotMatch(bookingRoutes, /analytics\/queue/);
-    assert.match(bookingRoutes, /router\.get\('\/analytics'/);
+    assert.doesNotMatch(bookingRoutes, /router\.get\('\/analytics'/);
+    assert.match(bookingRoutes, /router\.get\('\/overview'/);
     assert.match(bookingRoutes, /router\.patch\('\/:id\/favorite'/);
     assert.doesNotMatch(bookingRoutes, /router\.put\('\/:id\/favorite'/);
     assert.doesNotMatch(bookingRoutes, /router\.delete\('\/:id\/favorite'/);
@@ -378,7 +379,7 @@ test('changed resource routes require the expected authentication and role guard
     assert.match(bookingRoutes, /router\.use\(authenticate\)/);
     assert.match(bookingRoutes, /router\.post\('\/', authorize\(ROLES\.CUSTOMER\)/);
     assert.match(bookingRoutes, /router\.get\('\/', authorize\(ROLES\.CUSTOMER, ROLES\.BARBER\)/);
-    assert.match(bookingRoutes, /router\.get\('\/analytics', authorize\(ROLES\.BARBER\)/);
+    assert.match(bookingRoutes, /router\.get\('\/overview', authorize\(ROLES\.BARBER\)/);
     assert.match(bookingRoutes, /router\.patch\('\/:id\/favorite', authorize\(ROLES\.CUSTOMER\)/);
     assert.match(bookingRoutes, /router\.post\('\/:id\/refunds', authorize\(ROLES\.ADMIN, ROLES\.BARBER\)/);
 

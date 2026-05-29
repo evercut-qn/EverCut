@@ -99,7 +99,7 @@ This document describes the comprehensive dashboard implementation for the EverC
 
 ### 3. Today's Queue
 
-**Endpoint:** `GET /api/v1/bookings/analytics`
+**Endpoint:** `GET /api/v1/bookings/overview`
 
 **Query Parameters:**
 - `date range`: `active` or `upcoming` (default: `active`)
@@ -236,10 +236,10 @@ No database schema changes required. The dashboard uses existing booking, employ
 All dashboard routes require authentication and BARBER role:
 
 ```
-GET /api/v1/bookings/analytics + /api/v1/employees/analytics + /api/v1/earnings                         - Complete dashboard data
-GET /api/v1/bookings/analytics                  - Today's pulse metrics
+GET /api/v1/bookings/overview + /api/v1/employees/analytics + /api/v1/earnings                         - Complete dashboard data
+GET /api/v1/bookings/overview                  - Today's pulse metrics
 GET /api/v1/employees/analytics          - Staff availability
-GET /api/v1/bookings/analytics - Today's queue
+GET /api/v1/bookings/overview - Today's queue
 ```
 
 ---
@@ -293,13 +293,13 @@ GET /api/v1/bookings/analytics - Today's queue
 
 5. **Get Active Queue:**
    ```
-   GET /api/v1/bookings/analytics
+   GET /api/v1/bookings/overview
    Headers: { "Authorization": "Bearer <token>" }
    ```
 
 6. **Get Upcoming Queue:**
    ```
-   GET /api/v1/bookings/analytics
+   GET /api/v1/bookings/overview
    Headers: { "Authorization": "Bearer <token>" }
    ```
 

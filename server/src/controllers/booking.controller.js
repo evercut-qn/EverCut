@@ -101,11 +101,11 @@ export const setFavoriteBooking = async (req, res, next) => {
     }
 };
 
-export const getBookingAnalytics = async (req, res, next) => {
+export const getBookingOverview = async (req, res, next) => {
     try {
         const query = getValidatedRequestData(req, 'query');
-        const analytics = await bookingService.getBookingAnalytics(req.user._id, query);
-        return res.status(200).json(ApiResponse.success(analytics, 'Booking analytics fetched'));
+        const overview = await bookingService.getBookingOverview(req.user._id, query);
+        return res.status(200).json(ApiResponse.success(overview, 'Booking overview fetched'));
     } catch (err) {
         next(err);
     }

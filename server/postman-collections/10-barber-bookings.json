@@ -156,11 +156,11 @@
       ]
     },
     {
-      "name": "2. Get Booking Analytics",
+      "name": "2. Get Booking Overview",
       "request": {
         "method": "GET",
         "header": [],
-        "url": "{{base_url}}/{{api_prefix}}/bookings/analytics",
+        "url": "{{base_url}}/{{api_prefix}}/bookings/overview",
         "description": "Returns booking summary, monthly milestone progress, today pulse metrics, and both active/upcoming queue buckets."
       },
       "event": [

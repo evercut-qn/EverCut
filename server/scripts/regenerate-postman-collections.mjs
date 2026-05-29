@@ -1520,10 +1520,10 @@ const barberBookingsCollection = {
       }),
     },
     {
-      name: '2. Get Booking Analytics',
+      name: '2. Get Booking Overview',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/bookings/analytics',
+        url: '{{base_url}}/{{api_prefix}}/bookings/overview',
         description: 'Returns booking summary, monthly milestone progress, today pulse metrics, and both active/upcoming queue buckets.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -2330,10 +2330,10 @@ const analyticsCollection = {
   variable: [...baseVariables()],
   item: [
     {
-      name: '1. Get Booking Analytics',
+      name: '1. Get Booking Overview',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/bookings/analytics',
+        url: '{{base_url}}/{{api_prefix}}/bookings/overview',
         description: 'Returns booking summary, monthly milestone progress, today pulse metrics, and both active/upcoming queue buckets.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",

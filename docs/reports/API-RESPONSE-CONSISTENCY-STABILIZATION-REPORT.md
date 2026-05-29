@@ -141,13 +141,13 @@ After `/shops/me` has one source of truth:
 Before queue:
 
 ```text
-GET /api/v1/bookings/analytics?filter=active
+GET /api/v1/bookings/overview?filter=active
 ```
 
 After queue:
 
 ```text
-GET /api/v1/bookings/analytics
+GET /api/v1/bookings/overview
 ```
 
 Before payment initiation:

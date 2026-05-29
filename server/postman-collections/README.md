@@ -34,7 +34,7 @@ All collections now assume the backend returns the same JSON envelope for both s
 | `07-barber-profile-shop.json` | EverCut - Barber Profile & Shop | Shop management: current profile, payout details, open state, media, security, and account actions |
 | `08-barber-employees.json` | EverCut - Barber Employees | Employee CRUD with optional R2 photo media IDs and 24-hour employee schedule examples |
 | `09-barber-services.json` | EverCut - Barber Services | Service catalogue CRUD (single and bundled services) |
-| `10-barber-bookings.json` | EverCut - Barber Bookings | Booking administration: list filters, analytics, status update, cancellation |
+| `10-barber-bookings.json` | EverCut - Barber Bookings | Booking administration: list filters, overview, status update, cancellation |
 | `11-barber-media.json` | EverCut - Barber Media | R2 media workflow: presign, direct upload, confirm, gallery attach, analytics, delete |
 | `12-barber-earnings.json` | EverCut - Barber Earnings | Earnings summary (requires completed bookings for non-zero values) |
 | `13-barber-ratings.json` | EverCut - Barber Ratings | Rating listing, analytics, reply management, and rating removal |
@@ -169,7 +169,7 @@ Employee `workingHours.start` and `workingHours.end` remain `HH:MM` 24-hour valu
 | # | Method | Endpoint | Description |
 |---|---|---|---|
 | 1 | GET | `/api/v1/bookings` | List all bookings - captures IDs for status update and cancellation |
-| 2 | GET | `/api/v1/bookings/analytics` | Get combined booking analytics |
+| 2 | GET | `/api/v1/bookings/overview` | Get combined booking overview |
 | 4 | GET | `/api/v1/bookings?status=awaiting_confirmation&paymentStatus=success` | List pending confirmations |
 | 5 | GET | `/api/v1/bookings?status=confirmed` | Filter bookings by status |
 | 6 | PATCH | `/api/v1/bookings/{{booking_id_status}}` | Confirm a booking |
@@ -210,7 +210,7 @@ Employee `workingHours.start` and `workingHours.end` remain `HH:MM` 24-hour valu
 
 | # | Method | Endpoint | Description |
 |---|---|---|---|
-| 1 | GET | `/api/v1/bookings/analytics` | Get booking summary, milestones, today pulse, and queue |
+| 1 | GET | `/api/v1/bookings/overview` | Get booking summary, milestones, today pulse, and queue |
 | 2 | GET | `/api/v1/employees/analytics` | Get staff availability and progress tracking |
 | 3 | GET | `/api/v1/earnings` | Get earnings analytics |
 

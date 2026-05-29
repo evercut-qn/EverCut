@@ -1462,7 +1462,7 @@ const buildMilestoneAnalytics = async (ownerId, query = {}) => {
     };
 };
 
-export const getBookingAnalytics = async (ownerId, query = {}) => {
+export const getBookingOverview = async (ownerId, query = {}) => {
     const [summary, milestones, today, queue] = await Promise.all([
         buildBookingSummaryAnalytics(ownerId),
         buildMilestoneAnalytics(ownerId, query),

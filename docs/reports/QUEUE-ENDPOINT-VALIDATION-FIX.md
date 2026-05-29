@@ -80,7 +80,7 @@ router.get('/analytics', authorize(ROLES.BARBER), validate(bookingAnalyticsQuery
 
 **Request 1: With date range parameter**
 ```
-GET /api/v1/bookings/analytics
+GET /api/v1/bookings/overview
 Authorization: Bearer {barber_token}
 ```
 
@@ -105,7 +105,7 @@ Authorization: Bearer {barber_token}
 
 **Request 2: Without date range parameter (uses default)**
 ```
-GET /api/v1/bookings/analytics
+GET /api/v1/bookings/overview
 Authorization: Bearer {barber_token}
 ```
 
@@ -113,7 +113,7 @@ Authorization: Bearer {barber_token}
 
 **Request 3: With upcoming date range**
 ```
-GET /api/v1/bookings/analytics
+GET /api/v1/bookings/overview
 Authorization: Bearer {barber_token}
 ```
 
@@ -140,7 +140,7 @@ Authorization: Bearer {barber_token}
 
 **Request: Invalid date range value**
 ```
-GET /api/v1/bookings/analytics?date range=invalid
+GET /api/v1/bookings/overview?date range=invalid
 Authorization: Bearer {barber_token}
 ```
 
@@ -240,9 +240,9 @@ Consider adding:
 ## Related Issues
 
 This fix also ensures:
-- `/bookings/analytics` works correctly (no query params needed)
+- `/bookings/overview` works correctly (no query params needed)
 - `/employees/availability` works correctly (no query params needed)
-- `/bookings/analytics + /employees/analytics + /earnings` works correctly (no query params needed)
+- `/bookings/overview + /employees/analytics + /earnings` works correctly (no query params needed)
 
 All other migrated endpoints were already properly validated.
 
