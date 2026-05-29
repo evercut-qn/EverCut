@@ -18,15 +18,15 @@ Manual payouts are recorded only after a successful external transfer has alread
 
 ## Collection Flow
 
-Use `15-payments-payouts.json`.
+Use `16-payouts.json`.
 
 | Request | Purpose |
 |---|---|
-| `6. List Pending Manual Payouts` | Captures `manual_payout_barber_id` and `manual_payout_booking_ids_json` |
-| `7. Create Manual Payout` | Records completed manual payout and captures `payout_id` |
-| `8. List Manual Payout History` | Lists manual payout records |
-| `9. Get Payout Detail` | Reads payout detail for `payout_id` |
-| `10. Retry Failed Cashfree Payout` | Retries failed/reversed automatic Cashfree payout only |
+| `1. List Pending Manual Payouts` | Captures `manual_payout_barber_id` and `manual_payout_booking_ids_json` |
+| `2. Create Manual Payout` | Records completed manual payout and captures `payout_id` |
+| `3. List Manual Payout History` | Lists manual payout records |
+| `4. Get Payout Detail` | Reads payout detail for `payout_id` |
+| `5. Retry Failed Cashfree Payout` | Retries failed/reversed automatic Cashfree payout only |
 
 ## Manual Payout Creation
 

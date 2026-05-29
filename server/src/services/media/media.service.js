@@ -285,7 +285,7 @@ export const getGalleryByShopId = async (shopId) => (
     mediaRepository.findByEntity(shopId, MEDIA_ENTITY_TYPE.SHOP, { purpose: MEDIA_PURPOSE.GALLERY })
 );
 
-export const getGalleryStats = async (ownerId) => {
+export const getGalleryUsage = async (ownerId) => {
     const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop profile');
     return mediaRepository.getStatsByEntity(shop._id, MEDIA_ENTITY_TYPE.SHOP);

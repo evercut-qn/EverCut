@@ -61,7 +61,7 @@ This document describes the comprehensive dashboard implementation for the EverC
 
 ### 2. Staff Availability
 
-**Endpoint:** `GET /api/v1/employees/analytics`
+**Endpoint:** `GET /api/v1/employees/daily-progress`
 
 **Description:** Shows each employee's daily appointment progress and availability.
 
@@ -236,10 +236,10 @@ No database schema changes required. The dashboard uses existing booking, employ
 All dashboard routes require authentication and BARBER role:
 
 ```
-GET /api/v1/bookings/overview + /api/v1/employees/analytics + /api/v1/earnings                         - Complete dashboard data
+GET /api/v1/bookings/overview + /api/v1/employees/daily-progress + /api/v1/earnings                     - Complete dashboard data
 GET /api/v1/bookings/overview                  - Today's pulse metrics
-GET /api/v1/employees/analytics          - Staff availability
-GET /api/v1/bookings/overview - Today's queue
+GET /api/v1/employees/daily-progress           - Staff availability
+GET /api/v1/bookings/overview                  - Today's queue
 ```
 
 ---
@@ -287,7 +287,7 @@ GET /api/v1/bookings/overview - Today's queue
 
 4. **Get Staff Availability:**
    ```
-   GET /api/v1/employees/analytics
+   GET /api/v1/employees/daily-progress
    Headers: { "Authorization": "Bearer <token>" }
    ```
 

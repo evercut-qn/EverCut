@@ -176,7 +176,7 @@ Use `id` to correlate with `/notifications`. Use `entityType/entityId` to fetch 
 POST   /api/v1/notifications/tokens
 DELETE /api/v1/notifications/tokens
 GET    /api/v1/notifications
-GET    /api/v1/notifications/summary
+GET    /api/v1/notifications/unread-count
 PATCH  /api/v1/notifications/:id
 PATCH  /api/v1/notifications
 ```

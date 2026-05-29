@@ -34,10 +34,10 @@ export const listNotifications = async (req, res, next) => {
     }
 };
 
-export const getNotificationSummary = async (req, res, next) => {
+export const getNotificationUnreadCount = async (req, res, next) => {
     try {
-        const result = await notificationService.getNotificationSummary(req.user._id);
-        return res.status(200).json(ApiResponse.success(result, 'Notification summary fetched'));
+        const result = await notificationService.getNotificationUnreadCount(req.user._id);
+        return res.status(200).json(ApiResponse.success(result, 'Notification unread count fetched'));
     } catch (err) {
         next(err);
     }

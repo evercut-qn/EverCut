@@ -66,7 +66,7 @@ The production implementation in `server/` follows this architecture with these 
 - Scheduled subscription maintenance lives in `server/src/jobs/subscription.cron.js`, matching the existing server job pattern.
 - The default-subscription migration lives in `server/scripts/migrate-subscription-defaults.mjs`, is dry-run by default, and requires `--execute` to write data.
 - Webhook raw body capture is installed before global JSON parsing in `server/src/app.js`; `server/src/middleware/raw-body.middleware.js` then normalizes access to `req.rawBody` for the route.
-- The Postman generator emits `server/postman-collections/17-subscriptions.json` from `server/scripts/regenerate-postman-collections.mjs`; generated collections should not be hand-patched.
+- The Postman generator emits `server/postman-collections/18-subscriptions.json` from `server/scripts/regenerate-postman-collections.mjs`; generated collections should not be hand-patched.
 - Upload quota enforcement is applied to authenticated barber gallery uploads while keeping the existing media upload endpoint available to other owned media workflows.
 
 ---

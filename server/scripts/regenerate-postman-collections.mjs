@@ -36,8 +36,21 @@ const textVariable = (key, value = '', description) => {
   return variable;
 };
 
+const formatDescription = (desc) => {
+  if (desc && typeof desc === 'object') {
+    return [
+      `**Description:** ${desc.text}`,
+      `**Auth Role:** ${desc.role || 'Public / Hybrid'}`,
+      `**Prerequisites:** ${desc.prereqs && desc.prereqs.length > 0 ? desc.prereqs.map(p => `\`${p}\``).join(', ') : 'None'}`,
+      `**Captured Variables:** ${desc.captured && desc.captured.length > 0 ? desc.captured.map(c => `\`${c}\``).join(', ') : 'None'}`
+    ].join('\n\n');
+  }
+  return desc;
+};
+
 const request = ({ method, url, description, headers = [], body, auth, event }) => {
-  const requestObject = { method, header: headers, url, description };
+  const resolvedDescription = formatDescription(description);
+  const requestObject = { method, header: headers, url, description: resolvedDescription };
   if (body) requestObject.body = body;
   if (auth) requestObject.auth = auth;
   const item = { request: requestObject };
@@ -48,20 +61,43 @@ const request = ({ method, url, description, headers = [], body, auth, event }) 
 const jsonBody = (raw) => ({ mode: 'raw', raw, options: { raw: { language: 'json' } } });
 
 const standardEnvelopeAssertions = [
-  "pm.test('response uses the standard envelope', function () {",
-  '  const response = pm.response.json();',
-  "  pm.expect(response).to.be.an('object');",
-  "  pm.expect(response).to.have.property('success');",
-  "  pm.expect(response.success).to.be.a('boolean');",
-  "  pm.expect(response).to.have.property('message');",
-  "  pm.expect(response.message).to.be.a('string');",
-  "  pm.expect(response).to.have.property('data');",
-  "  if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
-  "  const responseText = JSON.stringify(response);",
-  "  ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
-  "    pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+  "const requestUrl = pm.request.url.toString();",
+  "const resolvedUrl = pm.variables.replaceIn(requestUrl);",
+  "const isApiUrl = resolvedUrl.includes('/api/v1/');",
+  "const skipEnvelope = !isApiUrl || ['/earnings/transactions/statement'].some(path => resolvedUrl.includes(path));",
+  "const skipObjectId = ['/subscriptions/plans'].some(path => resolvedUrl.includes(path));",
+  "",
+  "if (!skipEnvelope) {",
+  "  pm.test('response uses the standard envelope', function () {",
+  "    const response = pm.response.json();",
+  "    pm.expect(response).to.be.an('object');",
+  "    pm.expect(response).to.have.property('success');",
+  "    pm.expect(response.success).to.be.a('boolean');",
+  "    pm.expect(response).to.have.property('message');",
+  "    pm.expect(response.message).to.be.a('string');",
+  "    pm.expect(response).to.have.property('data');",
+  "    if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+  "    ",
+  "    if (response.data && !skipObjectId) {",
+  "      const checkId = (obj) => {",
+  "        if (obj && typeof obj === 'object' && obj.id !== undefined && obj.id !== null) {",
+  "          pm.expect(obj.id, 'Resource id must be a string').to.be.a('string');",
+  "          pm.expect(obj.id, 'Resource id must be a valid 24-character hex MongoDB ObjectID').to.match(/^[a-fA-F0-9]{24}$/);",
+  "        }",
+  "      };",
+  "      if (Array.isArray(response.data)) {",
+  "        response.data.forEach(item => checkId(item));",
+  "      } else {",
+  "        checkId(response.data);",
+  "      }",
+  "    }",
+  "    ",
+  "    const responseText = JSON.stringify(response);",
+  "    ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+  "      pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+  "    });",
   "  });",
-  '});',
+  "}"
 ];
 
 const testEvent = (...exec) => [{ listen: 'test', script: { type: 'text/javascript', exec: [...standardEnvelopeAssertions, ...exec] } }];
@@ -145,8 +181,42 @@ const baseVariables = (...extra) => [
   ...extra,
 ];
 
+const formatCollectionItemNames = (items) => {
+  if (!Array.isArray(items)) return;
+  items.forEach((item) => {
+    if (item.request && item.request.method && item.name) {
+      const method = item.request.method.toUpperCase();
+      const match = item.name.match(/^(\d+\.\s+)?(.*)$/);
+      if (match) {
+        const numberPrefix = match[1] || '';
+        let nameWithoutNumber = match[2];
+        
+        // Strip leading redundant verb matching the method name (case-insensitive)
+        const redundantVerbRegex = new RegExp(`^${method}\\s+`, 'i');
+        if (redundantVerbRegex.test(nameWithoutNumber)) {
+          nameWithoutNumber = nameWithoutNumber.replace(redundantVerbRegex, '');
+        } else if (method === 'GET' && /^Get\s+/i.test(nameWithoutNumber)) {
+          nameWithoutNumber = nameWithoutNumber.replace(/^Get\s+/i, '');
+        } else if (method === 'POST' && /^Post\s+/i.test(nameWithoutNumber)) {
+          nameWithoutNumber = nameWithoutNumber.replace(/^Post\s+/i, '');
+        } else if (method === 'DELETE' && /^Delete\s+/i.test(nameWithoutNumber)) {
+          nameWithoutNumber = nameWithoutNumber.replace(/^Delete\s+/i, '');
+        } else if (method === 'PUT' && /^Put\s+/i.test(nameWithoutNumber)) {
+          nameWithoutNumber = nameWithoutNumber.replace(/^Put\s+/i, '');
+        }
+        
+        item.name = `${numberPrefix}${nameWithoutNumber.trim()}`;
+      }
+    }
+    if (item.item) {
+      formatCollectionItemNames(item.item);
+    }
+  });
+};
+
 const writeCollection = (filename, collection) => {
   const filePath = resolve(COLLECTIONS_DIR, filename);
+  formatCollectionItemNames(collection.item);
   writeFileSync(filePath, `${JSON.stringify(collection, null, 2)}\n`);
 };
 
@@ -621,7 +691,12 @@ const customerBookingsCollection = {
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/bookings?dateFrom={{booking_date}}',
-        description: 'Lists bookings from the generated booking date onward and captures the first booking ID and first service ID when they already exist.',
+        description: {
+          text: 'Lists bookings from the generated booking date onward and captures the first booking ID and first service ID when they already exist.',
+          role: 'Customer',
+          prereqs: ['customer_access_token', 'booking_date'],
+          captured: ['booking_id']
+        },
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           "const response = pm.response.json();",
@@ -646,7 +721,12 @@ const customerBookingsCollection = {
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/employees/{{employee_id}}/availability?date={{availability_date}}&serviceId={{service_id}}',
-        description: 'Checks exact-range availability for the captured employee on the generated booking date.',
+        description: {
+          text: 'Checks exact-range availability for the captured employee on the generated booking date.',
+          role: 'Customer',
+          prereqs: ['customer_access_token', 'employee_id', 'availability_date', 'service_id'],
+          captured: []
+        },
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
     },
@@ -657,7 +737,12 @@ const customerBookingsCollection = {
         url: '{{base_url}}/{{api_prefix}}/bookings',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
         body: jsonBody(`{\n  "serviceIds": ["{{service_id}}"],\n  "employeeId": "{{employee_id}}",\n  "shopId": "{{shop_id}}",\n  "date": "{{booking_date}}",\n  "time": "{{booking_time}}",\n  "idempotencyKey": "{{booking_idempotency_key}}"\n}`),
-        description: 'Creates a new future booking using exact time-range locking. The optional idempotency key makes client retries safe without creating duplicate bookings.',
+        description: {
+          text: 'Creates a new future booking using exact time-range locking. The optional idempotency key makes client retries safe without creating duplicate bookings.',
+          role: 'Customer',
+          prereqs: ['customer_access_token', 'service_id', 'employee_id', 'shop_id', 'booking_date', 'booking_time', 'booking_idempotency_key'],
+          captured: ['booking_id']
+        },
         event: mergedEvents(
           [
             "pm.collectionVariables.set('booking_idempotency_key', `postman-booking-${Date.now()}`);"
@@ -682,11 +767,44 @@ const customerBookingsCollection = {
       }),
     },
     {
-      name: '4. Get Booking Details',
+      name: '4. Book Salon - Idempotency Replay',
+      ...request({
+        method: 'POST',
+        url: '{{base_url}}/{{api_prefix}}/bookings',
+        headers: [{ key: 'Content-Type', value: 'application/json' }],
+        body: jsonBody(`{\n  "serviceIds": ["{{service_id}}"],\n  "employeeId": "{{employee_id}}",\n  "shopId": "{{shop_id}}",\n  "date": "{{booking_date}}",\n  "time": "{{booking_time}}",\n  "idempotencyKey": "{{booking_idempotency_key}}"\n}`),
+        description: {
+          text: 'Tests the idempotency safety layer by sending the exact same booking body and idempotency key. Backend should return the existing booking details rather than creating a new transaction.',
+          role: 'Customer',
+          prereqs: ['customer_access_token', 'service_id', 'employee_id', 'shop_id', 'booking_date', 'booking_time', 'booking_idempotency_key'],
+          captured: []
+        },
+        event: testEvent(
+          "pm.test('status is 200 or 201', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+          "const response = pm.response.json();",
+          "pm.test('returns same booking ID as the original creation', function () {",
+          "  const bookingId = response.data && response.data.id;",
+          "  const originalBookingId = pm.collectionVariables.get('booking_id');",
+          "  pm.expect(bookingId).to.equal(originalBookingId);",
+          "});",
+          "pm.test('indicates idempotent replay occurred in response data', function () {",
+          "  const data = response.data || {};",
+          "  pm.expect(data.idempotentReplay).to.equal(true);",
+          "});"
+        ),
+      }),
+    },
+    {
+      name: '5. Get Booking Details',
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id}}',
-        description: 'Reads the full booking detail payload for the captured booking.',
+        description: {
+          text: 'Reads the full booking detail payload for the captured booking.',
+          role: 'Customer / Barber',
+          prereqs: ['customer_access_token', 'booking_id'],
+          captured: []
+        },
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           "const response = pm.response.json();",
@@ -703,44 +821,64 @@ const customerBookingsCollection = {
       }),
     },
     {
-      name: '5. Add Booking Favorite',
+      name: '6. Add Booking Favorite',
       ...request({
         method: 'PATCH',
         url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id}}/favorite',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
         body: jsonBody(`{\n  "favorite": true\n}`),
-        description: 'Adds the current booking to the customer favorites list through the booking resource.',
+        description: {
+          text: 'Adds the current booking to the customer favorites list through the booking resource.',
+          role: 'Customer',
+          prereqs: ['customer_access_token', 'booking_id'],
+          captured: []
+        },
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
     },
     {
-      name: '6. Get Favorite Bookings',
+      name: '7. Get Favorite Bookings',
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/bookings?favorite=true',
-        description: 'Lists the authenticated customer favorite bookings through the booking list flow.',
+        description: {
+          text: 'Lists the authenticated customer favorite bookings through the booking list flow.',
+          role: 'Customer',
+          prereqs: ['customer_access_token'],
+          captured: []
+        },
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
     },
     {
-      name: '7. Update Booking Schedule',
+      name: '8. Update Booking Schedule',
       ...request({
         method: 'PATCH',
         url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id}}',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
         body: jsonBody(`{\n  "employeeId": "{{employee_id}}",\n  "date": "{{booking_update_date}}",\n  "time": "{{booking_update_time}}"\n}`),
-        description: 'Updates the booking schedule using the real validator shape: all three fields are required. Note: 7-day advance booking window applies.',
+        description: {
+          text: 'Updates the booking schedule using the real validator shape: all three fields are required. Note: 7-day advance booking window applies.',
+          role: 'Customer',
+          prereqs: ['customer_access_token', 'booking_id', 'employee_id', 'booking_update_date', 'booking_update_time'],
+          captured: []
+        },
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
     },
     {
-      name: '8. Reorder Booking',
+      name: '9. Reorder Booking',
       ...request({
         method: 'POST',
         url: '{{base_url}}/{{api_prefix}}/bookings',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
         body: jsonBody(`{\n  "sourceBookingId": "{{booking_id}}",\n  "date": "{{booking_reorder_date}}",\n  "time": "{{booking_reorder_time}}"\n}`),
-        description: 'Creates a fresh booking from the current one through the booking collection create endpoint. 7-day advance booking window applies.',
+        description: {
+          text: 'Creates a fresh booking from the current one through the booking collection create endpoint. 7-day advance booking window applies.',
+          role: 'Customer',
+          prereqs: ['customer_access_token', 'booking_id', 'booking_reorder_date', 'booking_reorder_time'],
+          captured: ['reordered_booking_id']
+        },
         event: testEvent(
           "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
           "const response = pm.response.json();",
@@ -750,24 +888,34 @@ const customerBookingsCollection = {
       }),
     },
     {
-      name: '9. Remove Booking Favorite',
+      name: '10. Remove Booking Favorite',
       ...request({
         method: 'PATCH',
         url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id}}/favorite',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
         body: jsonBody(`{\n  "favorite": false\n}`),
-        description: 'Removes the current booking from the customer favorites list.',
+        description: {
+          text: 'Removes the current booking from the customer favorites list.',
+          role: 'Customer',
+          prereqs: ['customer_access_token', 'booking_id'],
+          captured: []
+        },
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
     },
     {
-      name: '10. Cancel Booking',
+      name: '11. Cancel Booking',
       ...request({
         method: 'PATCH',
         url: '{{base_url}}/{{api_prefix}}/bookings/{{booking_id}}',
         headers: [{ key: 'Content-Type', value: 'application/json' }],
         body: jsonBody(`{\n  "status": "cancelled"\n}`),
-        description: 'Cancels the currently captured booking and releases its exact locked time range. This stays last because it is destructive.',
+        description: {
+          text: 'Cancels the currently captured booking and releases its exact locked time range. This stays last because it is destructive.',
+          role: 'Customer',
+          prereqs: ['customer_access_token', 'booking_id'],
+          captured: []
+        },
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
     },
@@ -1015,7 +1163,7 @@ const customerRatingsCollection = {
       name: '4. Get Rating Summary',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/shops/{{shop_id}}/ratings/analytics',
+        url: '{{base_url}}/{{api_prefix}}/shops/{{shop_id}}/ratings/summary',
         description: 'Returns the rating summary payload for the captured shop.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -1727,10 +1875,10 @@ const barberMediaCollection = {
       }),
     },
     {
-      name: '6. Get Gallery Stats',
+      name: '6. Get Gallery Usage',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/media/gallery/stats',
+        url: '{{base_url}}/{{api_prefix}}/media/gallery/usage',
         description: 'Returns gallery media counts and storage totals.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -1952,15 +2100,17 @@ const barberEarningsCollection = {
             { key: 'endDate', value: '2026-12-31', description: 'End date (ISO format, required)' },
           ],
         },
-        description: 'Downloads a professionally formatted PDF statement of all transactions within the specified date range. The PDF includes shop information, summary statistics, and a detailed transaction table.',
-        event: mergedEvents(
-          [],
-          [
-            "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
-            "pm.test('response is PDF', function () {",
-            "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/pdf');",
-            "});",
-          ]
+        description: {
+          text: 'Downloads a professionally formatted PDF statement of all transactions within the specified date range. The PDF includes shop information, summary statistics, and a detailed transaction table.',
+          role: 'Barber',
+          prereqs: ['barber_access_token'],
+          captured: []
+        },
+        event: rawTestEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          "pm.test('response is PDF', function () {",
+          "  pm.expect(pm.response.headers.get('Content-Type')).to.include('application/pdf');",
+          "});"
         ),
       }),
     },
@@ -2011,7 +2161,7 @@ const barberRatingsCollection = {
       name: '2. Get Rating Summary',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/ratings/analytics',
+        url: '{{base_url}}/{{api_prefix}}/ratings/summary',
         description: 'Returns aggregate rating metrics for the authenticated barber shop.',
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
@@ -2057,12 +2207,10 @@ const barberRatingsCollection = {
       }),
     },
   ],
-};
-
-const paymentsPayoutsCollection = {
+};const paymentsCollection = {
   info: {
-    name: 'EverCut - Payments & Payouts',
-    description: 'Native PhonePe SDK payment initiation/verification, refund processing, manual payout recording, payout history, and Cashfree retry support for the EverCut dual-provider payment system.',
+    name: 'EverCut - Payments',
+    description: 'Native PhonePe SDK payment initiation/verification and refund processing for the EverCut customer payment flow.',
     schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
   },
   auth: bearerAuth('customer_access_token'),
@@ -2073,10 +2221,6 @@ const paymentsPayoutsCollection = {
       ['merchant_order_id', 'merchant_order_id'],
       ['merchant_refund_id', 'merchant_refund_id'],
       ['refund_id', 'refund_id'],
-      ['payout_id', 'payout_id'],
-      ['admin_access_token', 'admin_access_token'],
-      ['manual_payout_barber_id', 'manual_payout_barber_id'],
-      ['manual_payout_booking_ids_json', 'manual_payout_booking_ids_json'],
     ],
     extra: [
       "// Ensure payment_booking_id is synced ONLY if it hasn't been set manually.",
@@ -2091,16 +2235,11 @@ const paymentsPayoutsCollection = {
   }),
   variable: [
     ...baseVariables(
-      textVariable('admin_access_token', '', 'Required for payout retry. Use a JWT for a user whose role is ADMIN.'),
       textVariable('payment_booking_id', '', 'Booking ID for payment - auto-synced from shared_booking_id or booking_id'),
       textVariable('payment_id', '', 'Auto-captured from payment initiation'),
       textVariable('merchant_order_id', '', 'Auto-captured from payment initiation'),
       textVariable('merchant_refund_id', '', 'Auto-captured from refund initiation'),
       textVariable('refund_id', '', 'Auto-captured from refund initiation'),
-      textVariable('manual_payout_barber_id', '', 'Auto-captured from GET /payouts/pending'),
-      textVariable('manual_payout_booking_ids_json', '[]', 'JSON array of booking IDs captured from GET /payouts/pending'),
-      textVariable('manual_payout_utr', 'POSTMANUTR{{$timestamp}}', 'Unique UTR/reference for creating a manual payout'),
-      textVariable('payout_id', '', 'Payout ID for manual payout detail or Cashfree retry operations'),
     ),
   ],
   item: [
@@ -2109,10 +2248,14 @@ const paymentsPayoutsCollection = {
       ...request({
         method: 'POST',
         url: '{{base_url}}/{{api_prefix}}/payments',
-        auth: bearerAuth('customer_access_token'),
         headers: [{ key: 'Content-Type', value: 'application/json' }],
         body: jsonBody(`{\n  "bookingId": "{{payment_booking_id}}"\n}`),
-        description: 'Creates a PhonePe native SDK checkout order for the authenticated customer\'s pending booking. The response returns id, orderId, token, merchantId, and merchantOrderId for the Flutter PhonePe SDK. No redirect URL is returned.',
+        description: {
+          text: 'Creates a PhonePe native SDK checkout order for the authenticated customer\'s pending booking. The response returns id, orderId, token, merchantId, and merchantOrderId for the Flutter PhonePe SDK.',
+          role: 'Customer',
+          prereqs: ['customer_access_token', 'payment_booking_id'],
+          captured: ['payment_id', 'merchant_order_id']
+        },
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           "pm.test('captures native payment references', function () {",
@@ -2139,8 +2282,12 @@ const paymentsPayoutsCollection = {
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/payments/{{payment_id}}',
-        auth: bearerAuth('customer_access_token'),
-        description: 'Reads payment details and polls PhonePe once when the payment is still pending. Settlement includes serviceAmount, platformFee, barberPayout, and isBundle; the top-level payment response includes waiverApplied.',
+        description: {
+          text: 'Reads payment details and polls PhonePe once when the payment is still pending. Settlement includes serviceAmount, platformFee, barberPayout, and isBundle; the top-level payment response includes waiverApplied.',
+          role: 'Customer / Barber / Admin',
+          prereqs: ['customer_access_token', 'payment_id'],
+          captured: []
+        },
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           "pm.test('payment exposes platform-fee fields when payment exists', function () {",
@@ -2164,8 +2311,12 @@ const paymentsPayoutsCollection = {
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/payments',
-        auth: bearerAuth('customer_access_token'),
-        description: 'Lists payment transactions visible to the authenticated actor. Customers see their own payments, barbers see their shop payments, admins see all payments.',
+        description: {
+          text: 'Lists payment transactions visible to the authenticated actor. Customers see their own payments, barbers see their shop payments, admins see all payments.',
+          role: 'Customer / Barber / Admin',
+          prereqs: ['customer_access_token'],
+          captured: []
+        },
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
     },
@@ -2174,10 +2325,14 @@ const paymentsPayoutsCollection = {
       ...request({
         method: 'POST',
         url: '{{base_url}}/{{api_prefix}}/payments/{{payment_id}}/verify',
-        auth: bearerAuth('customer_access_token'),
         headers: [{ key: 'Content-Type', value: 'application/json' }],
         body: jsonBody(`{\n  "sdkStatus": "SUCCESS",\n  "sdkResponseCode": "SDK_CALLBACK",\n  "sdkMessage": "Flutter SDK callback received"\n}`),
-        description: 'Verifies the PhonePe SDK callback with the backend. The SDK callback is informational only; this endpoint calls PhonePe Order Status and returns the authoritative state.',
+        description: {
+          text: 'Verifies the PhonePe SDK callback with the backend. The SDK callback is informational only; this endpoint calls PhonePe Order Status and returns the authoritative state.',
+          role: 'Customer',
+          prereqs: ['customer_access_token', 'payment_id'],
+          captured: []
+        },
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           "pm.test('verified response has authoritative status fields', function () {",
@@ -2198,7 +2353,12 @@ const paymentsPayoutsCollection = {
         auth: bearerAuth('barber_access_token'),
         headers: [{ key: 'Content-Type', value: 'application/json' }],
         body: jsonBody(`{\n  "reason": "Customer cancelled before payout batch"\n}`),
-        description: 'Initiates a refund for a completed payment when payout has not started. Allowed roles: BARBER or ADMIN.',
+        description: {
+          text: 'Initiates a refund for a completed payment when payout has not started. Allowed roles: BARBER or ADMIN.',
+          role: 'Barber / Admin',
+          prereqs: ['barber_access_token', 'payment_booking_id'],
+          captured: ['merchant_refund_id', 'refund_id']
+        },
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           "pm.test('captures refund references', function () {",
@@ -2216,13 +2376,43 @@ const paymentsPayoutsCollection = {
         ),
       }),
     },
+  ],
+};
+
+const payoutsCollection = {
+  info: {
+    name: 'EverCut - Payouts',
+    description: 'Manual payout recording, pending payout listings, payout history, and Cashfree retry support for the EverCut admin dashboard.',
+    schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
+  },
+  auth: bearerAuth('admin_access_token'),
+  event: collectionPreRequest({
+    syncPairs: [
+      ['payout_id', 'payout_id'],
+      ['manual_payout_barber_id', 'manual_payout_barber_id'],
+      ['manual_payout_booking_ids_json', 'manual_payout_booking_ids_json'],
+    ],
+  }),
+  variable: [
+    ...baseVariables(
+      textVariable('manual_payout_barber_id', '', 'Auto-captured from GET /payouts/pending'),
+      textVariable('manual_payout_booking_ids_json', '[]', 'JSON array of booking IDs captured from GET /payouts/pending'),
+      textVariable('manual_payout_utr', 'POSTMANUTR{{$timestamp}}', 'Unique UTR/reference for creating a manual payout'),
+      textVariable('payout_id', '', 'Payout ID for manual payout detail or Cashfree retry operations'),
+    ),
+  ],
+  item: [
     {
-      name: '6. List Pending Manual Payouts',
+      name: '1. List Pending Manual Payouts',
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/payouts/pending?page=1&limit=20',
-        auth: bearerAuth('admin_access_token'),
-        description: 'Admin-only derived payout queue. Captures the first barber group and booking IDs for manual payout creation.',
+        description: {
+          text: 'Admin-only derived payout queue. Captures the first barber group and booking IDs for manual payout creation.',
+          role: 'Admin',
+          prereqs: ['admin_access_token'],
+          captured: ['manual_payout_barber_id', 'manual_payout_booking_ids_json']
+        },
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           "const response = pm.response.json();",
@@ -2243,14 +2433,18 @@ const paymentsPayoutsCollection = {
       }),
     },
     {
-      name: '7. Create Manual Payout',
+      name: '2. Create Manual Payout',
       ...request({
         method: 'POST',
         url: '{{base_url}}/{{api_prefix}}/payouts',
-        auth: bearerAuth('admin_access_token'),
         headers: [{ key: 'Content-Type', value: 'application/json' }],
         body: jsonBody(`{\n  "barberId": "{{manual_payout_barber_id}}",\n  "bookingIds": {{manual_payout_booking_ids_json}},\n  "utr": "{{manual_payout_utr}}",\n  "transferMode": "upi",\n  "notes": "Recorded through Postman manual payout flow"\n}`),
-        description: 'Records an already-completed external payout. Amount is computed server-side from completed payment transactions; UTR must be unique.',
+        description: {
+          text: 'Records an already-completed external payout. Amount is computed server-side from completed payment transactions; UTR must be unique.',
+          role: 'Admin',
+          prereqs: ['admin_access_token', 'manual_payout_barber_id', 'manual_payout_booking_ids_json', 'manual_payout_utr'],
+          captured: ['payout_id']
+        },
         event: mergedEvents(
           [
             "const utr = pm.collectionVariables.get('manual_payout_utr');",
@@ -2259,49 +2453,61 @@ const paymentsPayoutsCollection = {
             "}",
           ],
           [
-          "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
-          "const response = pm.response.json();",
-          "const payoutId = response.data && response.data.id;",
-          "if (payoutId) {",
-          "  pm.collectionVariables.set('payout_id', payoutId);",
-          "  pm.globals.set('payout_id', payoutId);",
-          "}",
-          "pm.test('manual payout was recorded as success', function () {",
-          "  pm.expect(response.data.gateway).to.equal('manual');",
-          "  pm.expect(response.data.status).to.equal('SUCCESS');",
-          "  pm.expect(response.data).to.have.property('utr');",
-          "});"
+            "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
+            "const response = pm.response.json();",
+            "const payoutId = response.data && response.data.id;",
+            "if (payoutId) {",
+            "  pm.collectionVariables.set('payout_id', payoutId);",
+            "  pm.globals.set('payout_id', payoutId);",
+            "}",
+            "pm.test('manual payout was recorded as success', function () {",
+            "  pm.expect(response.data.gateway).to.equal('manual');",
+            "  pm.expect(response.data.status).to.equal('SUCCESS');",
+            "  pm.expect(response.data).to.have.property('utr');",
+            "});"
           ]
         ),
       }),
     },
     {
-      name: '8. List Manual Payout History',
+      name: '3. List Manual Payout History',
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/payouts?gateway=manual&sort=createdAt:desc&page=1&limit=20',
-        auth: bearerAuth('admin_access_token'),
-        description: 'Lists manual payout transactions with standard pagination. Add status, barberId, startDate, and endDate query params as needed.',
+        description: {
+          text: 'Lists manual payout transactions with standard pagination. Add status, barberId, startDate, and endDate query params as needed.',
+          role: 'Admin',
+          prereqs: ['admin_access_token'],
+          captured: []
+        },
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
     },
     {
-      name: '9. Get Payout Detail',
+      name: '4. Get Payout Detail',
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/payouts/{{payout_id}}',
-        auth: bearerAuth('admin_access_token'),
-        description: 'Reads a single payout transaction with serialized payout metadata and populated detail when available.',
+        description: {
+          text: 'Reads a single payout transaction with serialized payout metadata and populated detail when available.',
+          role: 'Admin',
+          prereqs: ['admin_access_token', 'payout_id'],
+          captured: []
+        },
         event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
       }),
     },
     {
-      name: '10. Retry Failed Cashfree Payout',
+      name: '5. Retry Failed Cashfree Payout',
       ...request({
         method: 'POST',
         url: '{{base_url}}/{{api_prefix}}/payouts/{{payout_id}}/retry',
-        auth: bearerAuth('admin_access_token'),
-        description: 'Retries a failed or reversed Cashfree payout. Requires an ADMIN token and a payout ID for a legacy/automatic Cashfree payout.',
+        description: {
+          text: 'Retries a failed or reversed Cashfree payout. Requires an ADMIN token and a payout ID for a legacy/automatic Cashfree payout.',
+          role: 'Admin',
+          prereqs: ['admin_access_token', 'payout_id'],
+          captured: []
+        },
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           "pm.test('captures retry payout references when present', function () {",
@@ -2315,14 +2521,13 @@ const paymentsPayoutsCollection = {
         ),
       }),
     },
-
   ],
 };
 
 const analyticsCollection = {
   info: {
     name: 'EverCut - Operational Analytics',
-    description: 'Operational analytics collection for barber shop owners. Provides booking analytics, employee availability analytics, and earnings through resource-owned endpoints.',
+    description: 'Operational analytics collection for barber shop owners. Provides bookings, employee progress, earnings, ratings aggregates, and media gallery usage.',
     schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
   },
   auth: bearerAuth('barber_access_token'),
@@ -2347,10 +2552,10 @@ const analyticsCollection = {
       }),
     },
     {
-      name: '2. Get Employee Analytics',
+      name: '2. Get Employee Daily Progress',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/employees/analytics',
+        url: '{{base_url}}/{{api_prefix}}/employees/daily-progress',
         description: 'Returns staff availability and progress tracking for today. Shows each employee\'s completed vs total appointments with progress percentage.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
@@ -2380,6 +2585,37 @@ const analyticsCollection = {
           "const response = pm.response.json();",
           "const data = response.data || {};",
           "pm.test('response includes monthlyRevenue', function () { pm.expect(data).to.have.property('monthlyRevenue'); });"
+        ),
+      }),
+    },
+    {
+      name: '4. Get Rating Summary',
+      ...request({
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/ratings/summary',
+        description: 'Returns aggregate rating metrics for the authenticated barber shop.',
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          "const response = pm.response.json();",
+          "const data = response.data || {};",
+          "pm.test('response includes averageRating', function () { pm.expect(data).to.have.property('averageRating'); });",
+          "pm.test('response includes totalReviews', function () { pm.expect(data).to.have.property('totalReviews'); });"
+        ),
+      }),
+    },
+    {
+      name: '5. Get Gallery Usage',
+      ...request({
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/media/gallery/usage',
+        description: 'Returns gallery media counts and storage totals.',
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          "const response = pm.response.json();",
+          "const data = response.data || {};",
+          "pm.test('response includes totalItems', function () { pm.expect(data).to.have.property('totalItems'); });",
+          "pm.test('response includes totalPhotos', function () { pm.expect(data).to.have.property('totalPhotos'); });",
+          "pm.test('response includes totalSize', function () { pm.expect(data).to.have.property('totalSize'); });"
         ),
       }),
     },
@@ -2459,10 +2695,10 @@ const notificationsCollection = {
       }),
     },
     {
-      name: '3. Get Notification Summary',
+      name: '3. Get Notification Unread Count',
       ...request({
         method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/notifications/summary',
+        url: '{{base_url}}/{{api_prefix}}/notifications/unread-count',
         description: 'Returns the unread notification count for the authenticated user.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
@@ -2515,127 +2751,17 @@ const notificationsCollection = {
   ],
 };
 
-const subscriptionWebhookBody = `{
-  "id": "evt_subscription_activated_postman",
-  "entity": "event",
-  "event": "subscription.activated",
-  "created_at": 1770000000,
-  "payload": {
-    "subscription": {
-      "entity": {
-        "id": "{{razorpay_subscription_id}}",
-        "plan_id": "{{razorpay_plan_id_popular}}",
-        "customer_id": "cust_postman_123",
-        "status": "active",
-        "current_start": 1770000000,
-        "current_end": 1772592000,
-        "notes": {
-          "barber_id": "{{barber_profile_id}}",
-          "plan_type": "PLAN_POPULAR"
-        }
-      }
-    },
-    "payment": {
-      "entity": {
-        "id": "pay_postman_123",
-        "amount": 29900,
-        "currency": "INR",
-        "status": "captured",
-        "method": "upi"
-      }
-    }
-  }
-}`;
 
-const subscriptionRenewalWebhookBody = `{
-  "id": "evt_subscription_charged_postman",
-  "entity": "event",
-  "event": "subscription.charged",
-  "created_at": 1772592000,
-  "payload": {
-    "subscription": {
-      "entity": {
-        "id": "{{razorpay_subscription_id}}",
-        "plan_id": "{{razorpay_plan_id_popular}}",
-        "status": "active",
-        "current_start": 1772592000,
-        "current_end": 1775184000
-      }
-    },
-    "payment": {
-      "entity": {
-        "id": "pay_postman_renewal_123",
-        "amount": 29900,
-        "currency": "INR",
-        "status": "captured",
-        "invoice_id": "inv_postman_renewal_123"
-      }
-    }
-  }
-}`;
-
-const subscriptionUpdatedWebhookBody = `{
-  "id": "evt_subscription_updated_postman",
-  "entity": "event",
-  "event": "subscription.updated",
-  "created_at": 1772592000,
-  "payload": {
-    "subscription": {
-      "entity": {
-        "id": "{{razorpay_subscription_id}}",
-        "plan_id": "{{razorpay_plan_id_advanced}}",
-        "status": "active",
-        "current_start": 1772592000,
-        "current_end": 1775184000
-      }
-    }
-  }
-}`;
-
-const subscriptionPaymentFailedWebhookBody = `{
-  "id": "evt_subscription_payment_failed_postman",
-  "entity": "event",
-  "event": "payment.failed",
-  "created_at": 1772592000,
-  "payload": {
-    "payment": {
-      "entity": {
-        "id": "pay_postman_failed_123",
-        "subscription_id": "{{razorpay_subscription_id}}",
-        "amount": 29900,
-        "currency": "INR",
-        "status": "failed",
-        "error_code": "BAD_REQUEST_ERROR",
-        "error_description": "Payment failed"
-      }
-    }
-  }
-}`;
-
-const razorpayWebhookSignatureEvent = mergedEvents(
-  [
-    "const secret = pm.environment.get('razorpay_webhook_secret') || pm.collectionVariables.get('razorpay_webhook_secret');",
-    "const body = pm.request.body && pm.request.body.raw ? pm.request.body.raw : '';",
-    "if (secret && typeof CryptoJS !== 'undefined') {",
-    "  const signature = CryptoJS.HmacSHA256(body, secret).toString(CryptoJS.enc.Hex);",
-    "  pm.request.headers.upsert({ key: 'x-razorpay-signature', value: signature });",
-    "}",
-  ],
-  [
-    "pm.test('webhook is acknowledged or signature is rejected', function () { pm.expect(pm.response.code).to.be.oneOf([200, 400]); });",
-  ],
-);
 
 const subscriptionsCollection = {
   info: {
     name: 'EverCut - Subscriptions',
-    description: 'Barber subscription lifecycle collection covering plan listing, Razorpay subscription checkout, upgrade/downgrade, cancellation, transactions, and webhook simulation. Run authentication and onboarding first to capture barber_access_token.',
+    description: 'Barber subscription lifecycle collection covering plan listing, Razorpay subscription checkout, upgrade/downgrade, cancellation, and transactions. Run authentication and onboarding first to capture barber_access_token.',
     schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
   },
   auth: bearerAuth('barber_access_token'),
   event: collectionPreRequest({
     syncPairs: [
-      ['barber_profile_id', 'barber_profile_id'],
       ['razorpay_subscription_id', 'razorpay_subscription_id'],
     ],
   }),
@@ -2644,11 +2770,7 @@ const subscriptionsCollection = {
       textVariable('subscription_plan_id', 'PLAN_POPULAR', 'Plan to subscribe to or downgrade to. Use PLAN_POPULAR or PLAN_ADVANCED for paid plans.'),
       textVariable('subscription_upgrade_plan_id', 'PLAN_ADVANCED', 'Plan used by the upgrade request.'),
       textVariable('subscription_downgrade_plan_id', 'PLAN_POPULAR', 'Plan used by the downgrade request.'),
-      textVariable('razorpay_subscription_id', 'sub_postman_123', 'Razorpay subscription id used in webhook examples.'),
-      textVariable('razorpay_plan_id_popular', 'plan_test_popular', 'Razorpay Popular plan id for webhook examples.'),
-      textVariable('razorpay_plan_id_advanced', 'plan_test_advanced', 'Razorpay Advanced plan id for webhook examples.'),
-      textVariable('razorpay_webhook_secret', '', 'Webhook secret configured in Razorpay dashboard and server env.'),
-      textVariable('barber_profile_id', '', 'Mongo Barber _id used in Razorpay notes for local webhook simulations.'),
+      textVariable('razorpay_subscription_id', 'sub_postman_123', 'Razorpay subscription id used in examples.'),
     ),
   ],
   item: [
@@ -2771,11 +2893,7 @@ const environmentTemplate = {
     { key: 'admin_access_token', value: '', enabled: true },
     { key: 'admin_refresh_token', value: '', enabled: true },
     { key: 'fcm_token', value: 'postman-fcm-token-{{$timestamp}}', enabled: true },
-    { key: 'razorpay_webhook_secret', value: '', enabled: true },
     { key: 'razorpay_subscription_id', value: '', enabled: true },
-    { key: 'razorpay_plan_id_popular', value: '', enabled: true },
-    { key: 'razorpay_plan_id_advanced', value: '', enabled: true },
-    { key: 'barber_profile_id', value: '', enabled: true },
   ],
   _postman_variable_scope: 'environment',
   _postman_exported_at: new Date().toISOString(),
@@ -2796,7 +2914,8 @@ writeCollection('11-barber-media.json', barberMediaCollection);
 writeCollection('12-barber-earnings.json', barberEarningsCollection);
 writeCollection('13-barber-ratings.json', barberRatingsCollection);
 writeCollection('14-operational-analytics.json', analyticsCollection);
-writeCollection('15-payments-payouts.json', paymentsPayoutsCollection);
-writeCollection('16-notifications.json', notificationsCollection);
-writeCollection('17-subscriptions.json', subscriptionsCollection);
+writeCollection('15-payments.json', paymentsCollection);
+writeCollection('16-payouts.json', payoutsCollection);
+writeCollection('17-notifications.json', notificationsCollection);
+writeCollection('18-subscriptions.json', subscriptionsCollection);
 writeFileSync(resolve(COLLECTIONS_DIR, 'EverCut.postman_environment.json'), `${JSON.stringify(environmentTemplate, null, 2)}\n`);

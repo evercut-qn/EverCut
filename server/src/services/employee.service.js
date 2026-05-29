@@ -531,7 +531,7 @@ export const deleteEmployee = async (ownerId, employeeId) => {
  * Get staff availability and progress
  * Shows each employee's daily appointment progress
  */
-export const getStaffAvailability = async (ownerId) => {
+export const getStaffDailyProgress = async (ownerId) => {
     const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop');
 

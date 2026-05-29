@@ -24,7 +24,7 @@ router.post('/upload-url', validate(uploadUrlSchema, 'body'), checkUploadQuota()
 router.post('/confirm', validate(confirmUploadSchema, 'body'), mediaController.confirmUpload);
 router.post('/gallery', authorize(ROLES.BARBER), validate(attachGallerySchema, 'body'), mediaController.attachGallery);
 router.get('/gallery', authorize(ROLES.BARBER), mediaController.getGallery);
-router.get('/gallery/stats', authorize(ROLES.BARBER), mediaController.getGalleryStats);
+router.get('/gallery/usage', authorize(ROLES.BARBER), mediaController.getGalleryUsage);
 router.get('/:id', validate(mediaIdParamSchema, 'params'), mediaController.getMedia);
 router.delete('/:id', validate(mediaIdParamSchema, 'params'), mediaController.deleteMedia);
 

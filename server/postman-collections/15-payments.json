@@ -1,0 +1,479 @@
+{
+  "info": {
+    "name": "EverCut - Payments",
+    "description": "Native PhonePe SDK payment initiation/verification and refund processing for the EverCut customer payment flow.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{customer_access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Automatically pull IDs from Globals ONLY if user hasn't manually set them in Collection Variables.",
+          "const syncGlobalToCollection = (globalKey, collectionKey = globalKey) => {",
+          "  const globalVal = pm.globals.get(globalKey);",
+          "  const collVal = pm.collectionVariables.get(collectionKey);",
+          "  if (globalVal && !collVal) {",
+          "    pm.collectionVariables.set(collectionKey, globalVal);",
+          "  }",
+          "};",
+          "syncGlobalToCollection('shared_booking_id', 'payment_booking_id');",
+          "syncGlobalToCollection('payment_id', 'payment_id');",
+          "syncGlobalToCollection('merchant_order_id', 'merchant_order_id');",
+          "syncGlobalToCollection('merchant_refund_id', 'merchant_refund_id');",
+          "syncGlobalToCollection('refund_id', 'refund_id');",
+          "// Ensure payment_booking_id is synced ONLY if it hasn't been set manually.",
+          "const currentPaymentBookingId = pm.collectionVariables.get('payment_booking_id');",
+          "if (!currentPaymentBookingId) {",
+          "  const bookingId = pm.globals.get('shared_booking_id') || pm.globals.get('booking_id');",
+          "  if (bookingId) {",
+          "    pm.collectionVariables.set('payment_booking_id', bookingId);",
+          "  }",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:5000",
+      "type": "string",
+      "description": "Default local API server"
+    },
+    {
+      "key": "api_prefix",
+      "value": "api/v1",
+      "type": "string",
+      "description": "API prefix used by every request"
+    },
+    {
+      "key": "payment_booking_id",
+      "value": "",
+      "type": "string",
+      "description": "Booking ID for payment - auto-synced from shared_booking_id or booking_id"
+    },
+    {
+      "key": "payment_id",
+      "value": "",
+      "type": "string",
+      "description": "Auto-captured from payment initiation"
+    },
+    {
+      "key": "merchant_order_id",
+      "value": "",
+      "type": "string",
+      "description": "Auto-captured from payment initiation"
+    },
+    {
+      "key": "merchant_refund_id",
+      "value": "",
+      "type": "string",
+      "description": "Auto-captured from refund initiation"
+    },
+    {
+      "key": "refund_id",
+      "value": "",
+      "type": "string",
+      "description": "Auto-captured from refund initiation"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Create Native SDK Payment Order",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/{{api_prefix}}/payments",
+        "description": "**Description:** Creates a PhonePe native SDK checkout order for the authenticated customer's pending booking. The response returns id, orderId, token, merchantId, and merchantOrderId for the Flutter PhonePe SDK.\n\n**Auth Role:** Customer\n\n**Prerequisites:** `customer_access_token`, `payment_booking_id`\n\n**Captured Variables:** `payment_id`, `merchant_order_id`",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"bookingId\": \"{{payment_booking_id}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const requestUrl = pm.request.url.toString();",
+              "const resolvedUrl = pm.variables.replaceIn(requestUrl);",
+              "const isApiUrl = resolvedUrl.includes('/api/v1/');",
+              "const skipEnvelope = !isApiUrl || ['/earnings/transactions/statement'].some(path => resolvedUrl.includes(path));",
+              "const skipObjectId = ['/subscriptions/plans'].some(path => resolvedUrl.includes(path));",
+              "",
+              "if (!skipEnvelope) {",
+              "  pm.test('response uses the standard envelope', function () {",
+              "    const response = pm.response.json();",
+              "    pm.expect(response).to.be.an('object');",
+              "    pm.expect(response).to.have.property('success');",
+              "    pm.expect(response.success).to.be.a('boolean');",
+              "    pm.expect(response).to.have.property('message');",
+              "    pm.expect(response.message).to.be.a('string');",
+              "    pm.expect(response).to.have.property('data');",
+              "    if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "    ",
+              "    if (response.data && !skipObjectId) {",
+              "      const checkId = (obj) => {",
+              "        if (obj && typeof obj === 'object' && obj.id !== undefined && obj.id !== null) {",
+              "          pm.expect(obj.id, 'Resource id must be a string').to.be.a('string');",
+              "          pm.expect(obj.id, 'Resource id must be a valid 24-character hex MongoDB ObjectID').to.match(/^[a-fA-F0-9]{24}$/);",
+              "        }",
+              "      };",
+              "      if (Array.isArray(response.data)) {",
+              "        response.data.forEach(item => checkId(item));",
+              "      } else {",
+              "        checkId(response.data);",
+              "      }",
+              "    }",
+              "    ",
+              "    const responseText = JSON.stringify(response);",
+              "    ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "      pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "    });",
+              "  });",
+              "}",
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "pm.test('captures native payment references', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response.success).to.equal(true);",
+              "  pm.expect(response.data).to.have.property('id');",
+              "  pm.expect(response.data).to.have.property('merchantOrderId');",
+              "  pm.expect(response.data).to.have.property('orderId');",
+              "  pm.expect(response.data).to.have.property('token');",
+              "  pm.expect(response.data).to.have.property('merchantId');",
+              "  pm.expect(response.data).to.have.property('amountInPaisa');",
+              "  pm.expect(response.data).to.have.property('amountInRupees');",
+              "  pm.expect(response.data).to.not.have.property('redirectUrl');",
+              "  pm.collectionVariables.set('payment_id', response.data.id);",
+              "  pm.collectionVariables.set('merchant_order_id', response.data.merchantOrderId);",
+              "  pm.globals.set('payment_id', response.data.id);",
+              "  pm.globals.set('merchant_order_id', response.data.merchantOrderId);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Payment",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/{{api_prefix}}/payments/{{payment_id}}",
+        "description": "**Description:** Reads payment details and polls PhonePe once when the payment is still pending. Settlement includes serviceAmount, platformFee, barberPayout, and isBundle; the top-level payment response includes waiverApplied.\n\n**Auth Role:** Customer / Barber / Admin\n\n**Prerequisites:** `customer_access_token`, `payment_id`\n\n**Captured Variables:** None"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const requestUrl = pm.request.url.toString();",
+              "const resolvedUrl = pm.variables.replaceIn(requestUrl);",
+              "const isApiUrl = resolvedUrl.includes('/api/v1/');",
+              "const skipEnvelope = !isApiUrl || ['/earnings/transactions/statement'].some(path => resolvedUrl.includes(path));",
+              "const skipObjectId = ['/subscriptions/plans'].some(path => resolvedUrl.includes(path));",
+              "",
+              "if (!skipEnvelope) {",
+              "  pm.test('response uses the standard envelope', function () {",
+              "    const response = pm.response.json();",
+              "    pm.expect(response).to.be.an('object');",
+              "    pm.expect(response).to.have.property('success');",
+              "    pm.expect(response.success).to.be.a('boolean');",
+              "    pm.expect(response).to.have.property('message');",
+              "    pm.expect(response.message).to.be.a('string');",
+              "    pm.expect(response).to.have.property('data');",
+              "    if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "    ",
+              "    if (response.data && !skipObjectId) {",
+              "      const checkId = (obj) => {",
+              "        if (obj && typeof obj === 'object' && obj.id !== undefined && obj.id !== null) {",
+              "          pm.expect(obj.id, 'Resource id must be a string').to.be.a('string');",
+              "          pm.expect(obj.id, 'Resource id must be a valid 24-character hex MongoDB ObjectID').to.match(/^[a-fA-F0-9]{24}$/);",
+              "        }",
+              "      };",
+              "      if (Array.isArray(response.data)) {",
+              "        response.data.forEach(item => checkId(item));",
+              "      } else {",
+              "        checkId(response.data);",
+              "      }",
+              "    }",
+              "    ",
+              "    const responseText = JSON.stringify(response);",
+              "    ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "      pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "    });",
+              "  });",
+              "}",
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "pm.test('payment exposes platform-fee fields when payment exists', function () {",
+              "  const response = pm.response.json();",
+              "  const settlement = response.data && response.data.settlement;",
+              "  if (response.data) {",
+              "    pm.expect(response.data).to.have.property('waiverApplied');",
+              "  }",
+              "  if (settlement) {",
+              "    pm.expect(settlement).to.have.property('serviceAmount');",
+              "    pm.expect(settlement).to.have.property('platformFee');",
+              "    pm.expect(settlement).to.have.property('barberPayout');",
+              "    pm.expect(settlement).to.have.property('isBundle');",
+              "  }",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. All Payments",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/{{api_prefix}}/payments",
+        "description": "**Description:** Lists payment transactions visible to the authenticated actor. Customers see their own payments, barbers see their shop payments, admins see all payments.\n\n**Auth Role:** Customer / Barber / Admin\n\n**Prerequisites:** `customer_access_token`\n\n**Captured Variables:** None"
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const requestUrl = pm.request.url.toString();",
+              "const resolvedUrl = pm.variables.replaceIn(requestUrl);",
+              "const isApiUrl = resolvedUrl.includes('/api/v1/');",
+              "const skipEnvelope = !isApiUrl || ['/earnings/transactions/statement'].some(path => resolvedUrl.includes(path));",
+              "const skipObjectId = ['/subscriptions/plans'].some(path => resolvedUrl.includes(path));",
+              "",
+              "if (!skipEnvelope) {",
+              "  pm.test('response uses the standard envelope', function () {",
+              "    const response = pm.response.json();",
+              "    pm.expect(response).to.be.an('object');",
+              "    pm.expect(response).to.have.property('success');",
+              "    pm.expect(response.success).to.be.a('boolean');",
+              "    pm.expect(response).to.have.property('message');",
+              "    pm.expect(response.message).to.be.a('string');",
+              "    pm.expect(response).to.have.property('data');",
+              "    if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "    ",
+              "    if (response.data && !skipObjectId) {",
+              "      const checkId = (obj) => {",
+              "        if (obj && typeof obj === 'object' && obj.id !== undefined && obj.id !== null) {",
+              "          pm.expect(obj.id, 'Resource id must be a string').to.be.a('string');",
+              "          pm.expect(obj.id, 'Resource id must be a valid 24-character hex MongoDB ObjectID').to.match(/^[a-fA-F0-9]{24}$/);",
+              "        }",
+              "      };",
+              "      if (Array.isArray(response.data)) {",
+              "        response.data.forEach(item => checkId(item));",
+              "      } else {",
+              "        checkId(response.data);",
+              "      }",
+              "    }",
+              "    ",
+              "    const responseText = JSON.stringify(response);",
+              "    ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "      pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "    });",
+              "  });",
+              "}",
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Verify Native SDK Payment",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/{{api_prefix}}/payments/{{payment_id}}/verify",
+        "description": "**Description:** Verifies the PhonePe SDK callback with the backend. The SDK callback is informational only; this endpoint calls PhonePe Order Status and returns the authoritative state.\n\n**Auth Role:** Customer\n\n**Prerequisites:** `customer_access_token`, `payment_id`\n\n**Captured Variables:** None",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"sdkStatus\": \"SUCCESS\",\n  \"sdkResponseCode\": \"SDK_CALLBACK\",\n  \"sdkMessage\": \"Flutter SDK callback received\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const requestUrl = pm.request.url.toString();",
+              "const resolvedUrl = pm.variables.replaceIn(requestUrl);",
+              "const isApiUrl = resolvedUrl.includes('/api/v1/');",
+              "const skipEnvelope = !isApiUrl || ['/earnings/transactions/statement'].some(path => resolvedUrl.includes(path));",
+              "const skipObjectId = ['/subscriptions/plans'].some(path => resolvedUrl.includes(path));",
+              "",
+              "if (!skipEnvelope) {",
+              "  pm.test('response uses the standard envelope', function () {",
+              "    const response = pm.response.json();",
+              "    pm.expect(response).to.be.an('object');",
+              "    pm.expect(response).to.have.property('success');",
+              "    pm.expect(response.success).to.be.a('boolean');",
+              "    pm.expect(response).to.have.property('message');",
+              "    pm.expect(response.message).to.be.a('string');",
+              "    pm.expect(response).to.have.property('data');",
+              "    if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "    ",
+              "    if (response.data && !skipObjectId) {",
+              "      const checkId = (obj) => {",
+              "        if (obj && typeof obj === 'object' && obj.id !== undefined && obj.id !== null) {",
+              "          pm.expect(obj.id, 'Resource id must be a string').to.be.a('string');",
+              "          pm.expect(obj.id, 'Resource id must be a valid 24-character hex MongoDB ObjectID').to.match(/^[a-fA-F0-9]{24}$/);",
+              "        }",
+              "      };",
+              "      if (Array.isArray(response.data)) {",
+              "        response.data.forEach(item => checkId(item));",
+              "      } else {",
+              "        checkId(response.data);",
+              "      }",
+              "    }",
+              "    ",
+              "    const responseText = JSON.stringify(response);",
+              "    ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "      pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "    });",
+              "  });",
+              "}",
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "pm.test('verified response has authoritative status fields', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response.success).to.equal(true);",
+              "  pm.expect(response.data).to.have.property('status');",
+              "  pm.expect(response.data).to.have.property('gatewayState');",
+              "  pm.expect(response.data).to.have.property('paymentStatus');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Initiate Refund",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/{{api_prefix}}/bookings/{{payment_booking_id}}/refunds",
+        "description": "**Description:** Initiates a refund for a completed payment when payout has not started. Allowed roles: BARBER or ADMIN.\n\n**Auth Role:** Barber / Admin\n\n**Prerequisites:** `barber_access_token`, `payment_booking_id`\n\n**Captured Variables:** `merchant_refund_id`, `refund_id`",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"reason\": \"Customer cancelled before payout batch\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{barber_access_token}}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const requestUrl = pm.request.url.toString();",
+              "const resolvedUrl = pm.variables.replaceIn(requestUrl);",
+              "const isApiUrl = resolvedUrl.includes('/api/v1/');",
+              "const skipEnvelope = !isApiUrl || ['/earnings/transactions/statement'].some(path => resolvedUrl.includes(path));",
+              "const skipObjectId = ['/subscriptions/plans'].some(path => resolvedUrl.includes(path));",
+              "",
+              "if (!skipEnvelope) {",
+              "  pm.test('response uses the standard envelope', function () {",
+              "    const response = pm.response.json();",
+              "    pm.expect(response).to.be.an('object');",
+              "    pm.expect(response).to.have.property('success');",
+              "    pm.expect(response.success).to.be.a('boolean');",
+              "    pm.expect(response).to.have.property('message');",
+              "    pm.expect(response.message).to.be.a('string');",
+              "    pm.expect(response).to.have.property('data');",
+              "    if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "    ",
+              "    if (response.data && !skipObjectId) {",
+              "      const checkId = (obj) => {",
+              "        if (obj && typeof obj === 'object' && obj.id !== undefined && obj.id !== null) {",
+              "          pm.expect(obj.id, 'Resource id must be a string').to.be.a('string');",
+              "          pm.expect(obj.id, 'Resource id must be a valid 24-character hex MongoDB ObjectID').to.match(/^[a-fA-F0-9]{24}$/);",
+              "        }",
+              "      };",
+              "      if (Array.isArray(response.data)) {",
+              "        response.data.forEach(item => checkId(item));",
+              "      } else {",
+              "        checkId(response.data);",
+              "      }",
+              "    }",
+              "    ",
+              "    const responseText = JSON.stringify(response);",
+              "    ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "      pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "    });",
+              "  });",
+              "}",
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "pm.test('captures refund references', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response.success).to.equal(true);",
+              "  if (response.data?.merchantRefundId) {",
+              "    pm.collectionVariables.set('merchant_refund_id', response.data.merchantRefundId);",
+              "    pm.globals.set('merchant_refund_id', response.data.merchantRefundId);",
+              "  }",
+              "  if (response.data?.refundId) {",
+              "    pm.collectionVariables.set('refund_id', response.data.refundId);",
+              "    pm.globals.set('refund_id', response.data.refundId);",
+              "  }",
+              "});"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -508,7 +508,7 @@ Future<void> attachToGallery(List<String> mediaIds) async {
 | 4 | `POST` | `/api/v1/media/confirm` | `Access` | Any logged-in | `application/json` | Finalize upload |
 | 5 | `POST` | `/api/v1/media/gallery` | `Access` | `BARBER` | `application/json` | Attach confirmed media to gallery |
 | 6 | `GET` | `/api/v1/media/gallery` | `Access` | `BARBER` | — | Fetch shop gallery |
-| 7 | `GET` | `/api/v1/media/gallery/stats` | `Access` | `BARBER` | — | Get gallery stats (count, size) |
+| 7 | `GET` | `/api/v1/media/gallery/usage` | `Access` | `BARBER` | — | Get gallery usage (count, size) |
 | 8 | `GET` | `/api/v1/media/:id` | `Access` | Owner | — | Get media by ID |
 | 9 | `DELETE` | `/api/v1/media/:id` | `Access` | Owner | — | Soft-delete media + R2 object |
 | 10 | `PATCH` | `/api/v1/customers/me/media/picture` | `Access` | Customer | `application/json` | Set customer profile picture |

@@ -229,7 +229,8 @@ test('booking discovery and payment routes use final resource-oriented URLs', as
     assert.match(shopRoutes, /router\.get\('\/:id\/employees'/);
     assert.match(shopRoutes, /router\.get\('\/:id\/availability'/);
     assert.match(shopRoutes, /router\.get\('\/:id\/ratings'/);
-    assert.match(shopRoutes, /router\.get\('\/:id\/ratings\/analytics'/);
+    assert.match(shopRoutes, /router\.get\('\/:id\/ratings\/summary'/);
+    assert.doesNotMatch(shopRoutes, /\/analytics/);
     assert.doesNotMatch(bookingRoutes, /\/shops\/:id\/availability/);
     assert.doesNotMatch(bookingRoutes, /\/shops\/:id\/employees/);
 
@@ -339,11 +340,12 @@ test('shops and employees expose the normalized me, payout, availability, and an
     assert.match(accountRoutes, /router\.delete\(\s*'\/'/);
 
     assert.match(employeeRoutes, /\/:id\/availability/);
-    assert.match(employeeRoutes, /\/analytics/);
+    assert.match(employeeRoutes, /\/daily-progress/);
+    assert.doesNotMatch(employeeRoutes, /\/analytics/);
     assert.match(employeeRoutes, /\/:id\/blocked-dates/);
     assert.ok(
-        employeeRoutes.indexOf("router.get('/analytics'") < employeeRoutes.indexOf("router.get(\n    '/:id/availability'"),
-        'GET /employees/analytics must be registered before GET /employees/:id/availability',
+        employeeRoutes.indexOf("router.get('/daily-progress'") < employeeRoutes.indexOf("router.get(\n    '/:id/availability'"),
+        'GET /employees/daily-progress must be registered before GET /employees/:id/availability',
     );
     assert.doesNotMatch(employeeRoutes, /available-slots/);
     assert.doesNotMatch(employeeRoutes, /\/:id\/calendar/);
@@ -375,6 +377,8 @@ test('changed resource routes require the expected authentication and role guard
     const notificationRoutes = await readSource('routes/notifications.routes.js');
     const paymentRoutes = await readSource('routes/payment.routes.js');
     const payoutRoutes = await readSource('routes/payout.routes.js');
+    const earningsRoutes = await readSource('routes/earnings.routes.js');
+    const mediaRoutes = await readSource('routes/media.routes.js');
 
     assert.match(bookingRoutes, /router\.use\(authenticate\)/);
     assert.match(bookingRoutes, /router\.post\('\/', authorize\(ROLES\.CUSTOMER\)/);
@@ -390,9 +394,12 @@ test('changed resource routes require the expected authentication and role guard
     assert.match(shopRoutes, /router\.patch\('\/me\/media\/cover', authenticate, authorize\(ROLES\.BARBER\)/);
     assert.match(shopRoutes, /router\.get\('\/:id\/availability', authenticate, authorize\(ROLES\.CUSTOMER, ROLES\.BARBER\)/);
     assert.match(shopRoutes, /router\.patch\('\/:id\/favorite', authenticate, authorize\(ROLES\.CUSTOMER\)/);
+    assert.match(shopRoutes, /router\.get\('\/:id\/ratings\/summary', validate\(shopIdParamSchema, 'params'\), ratingController\.getShopRatingSummary\)/);
+    assert.doesNotMatch(shopRoutes, /\/analytics/);
 
     assert.match(ratingRoutes, /router\.use\(authenticate\)/);
-    assert.match(ratingRoutes, /router\.get\('\/analytics', authorize\(ROLES\.BARBER\)/);
+    assert.match(ratingRoutes, /router\.get\('\/summary', authorize\(ROLES\.BARBER\)/);
+    assert.doesNotMatch(ratingRoutes, /\/analytics/);
     assert.match(ratingRoutes, /router\.get\('\/', authorize\(ROLES\.BARBER\)/);
     assert.match(ratingRoutes, /router\.post\('\/', authorize\(ROLES\.CUSTOMER\)/);
     assert.match(ratingRoutes, /router\.put\('\/:id\/reply', authorize\(ROLES\.BARBER\)/);
@@ -400,7 +407,7 @@ test('changed resource routes require the expected authentication and role guard
     assert.match(ratingRoutes, /router\.delete\('\/:id', authorize\(ROLES\.BARBER\)/);
 
     assert.match(employeeRoutes, /router\.use\(authenticate\)/);
-    assert.match(employeeRoutes, /router\.get\('\/analytics', authorize\(ROLES\.BARBER\)/);
+    assert.match(employeeRoutes, /router\.get\('\/daily-progress', authorize\(ROLES\.BARBER\)/);
     assert.match(employeeRoutes, /router\.get\(\s*'\/:id\/availability',\s*authorize\(ROLES\.CUSTOMER, ROLES\.BARBER\)/);
     assert.match(employeeRoutes, /router\.use\(authorize\(ROLES\.BARBER\)\)/);
 
@@ -412,6 +419,12 @@ test('changed resource routes require the expected authentication and role guard
     assert.match(paymentRoutes, /authorize\(ROLES\.CUSTOMER\)/);
     assert.match(payoutRoutes, /router\.post\('\/webhook', payoutController\.handlePayoutWebhook\)/);
     assert.match(payoutRoutes, /authorize\(ROLES\.ADMIN\)/);
+
+    assert.match(earningsRoutes, /router\.get\('\/', earningsController\.getEarnings\)/);
+    assert.doesNotMatch(earningsRoutes, /\/summary/);
+
+    assert.match(mediaRoutes, /router\.get\('\/gallery\/usage', authorize\(ROLES\.BARBER\), mediaController\.getGalleryUsage\)/);
+    assert.doesNotMatch(mediaRoutes, /\/stats/);
 });
 
 test('payout routes expose a compact immutable manual-payout workflow without duplicate list endpoints', async () => {

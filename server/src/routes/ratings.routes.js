@@ -13,7 +13,7 @@ const router = Router();
 // All rating routes require authentication
 router.use(authenticate);
 
-router.get('/analytics', authorize(ROLES.BARBER), ratingController.getOwnedRatingSummary);
+router.get('/summary', authorize(ROLES.BARBER), ratingController.getBarberRatingSummary);
 router.get('/', authorize(ROLES.BARBER), validate(paginationSchema, 'query'), ratingController.getOwnedRatings);
 router.post('/', authorize(ROLES.CUSTOMER), validate(addRatingSchema, 'body'), ratingController.addRating);
 router.put('/:id/reply', authorize(ROLES.BARBER), validate(objectIdParamSchema, 'params'), validate(addReplySchema, 'body'), ratingController.updateReply);

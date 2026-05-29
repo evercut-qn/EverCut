@@ -81,10 +81,10 @@ export const getGallery = async (req, res, next) => {
     }
 };
 
-export const getGalleryStats = async (req, res, next) => {
+export const getGalleryUsage = async (req, res, next) => {
     try {
-        const result = await mediaService.getGalleryStats(req.user._id);
-        return res.status(200).json(ApiResponse.success(result, 'Gallery stats'));
+        const result = await mediaService.getGalleryUsage(req.user._id);
+        return res.status(200).json(ApiResponse.success(result, 'Gallery usage fetched'));
     } catch (err) {
         next(err);
     }

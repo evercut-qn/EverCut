@@ -709,7 +709,7 @@ cd server
 node scripts/regenerate-postman-collections.mjs
 ```
 
-The generator emits `postman-collections/17-subscriptions.json` with plan, lifecycle, transaction, and signed Razorpay webhook requests.
+The generator emits `postman-collections/18-subscriptions.json` with plan, lifecycle, and transaction requests.
 
 ### 10.5 Test Scenarios Checklist
 

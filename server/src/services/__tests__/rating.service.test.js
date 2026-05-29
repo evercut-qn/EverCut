@@ -63,7 +63,7 @@ test('getRatingsByShop returns 404 when the shop does not exist', async (t) => {
     );
 });
 
-test('getRatingSummaryForBarber resolves the owned shop before aggregating ratings', async (t) => {
+test('getBarberRatingSummary resolves the owned shop before aggregating ratings', async (t) => {
     const shopId = '64b7f4c2a9d3f1b2c8e4d001';
 
     t.mock.method(shopRepository, 'findByBarberUserId', async () => ({ _id: shopId }));
@@ -75,7 +75,7 @@ test('getRatingSummaryForBarber resolves the owned shop before aggregating ratin
         stars: { 1: 0, 2: 0, 3: 1, 4: 1, 5: 10 },
     }));
 
-    const result = await ratingService.getRatingSummaryForBarber('owner-1');
+    const result = await ratingService.getBarberRatingSummary('owner-1');
 
     assert.deepEqual(result, {
         shopId,

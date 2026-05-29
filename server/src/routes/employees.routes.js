@@ -19,7 +19,7 @@ const router = Router();
 // All employee routes require authentication
 router.use(authenticate);
 
-router.get('/analytics', authorize(ROLES.BARBER), employeeController.getStaffAvailability);
+router.get('/daily-progress', authorize(ROLES.BARBER), employeeController.getStaffDailyProgress);
 
 // Routes accessible by both CUSTOMER and BARBER
 router.get(

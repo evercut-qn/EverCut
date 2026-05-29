@@ -50,7 +50,7 @@ router.get('/:id', validate(shopIdParamSchema, 'params'), shopController.getShop
 router.get('/:id/services', validate(shopIdParamSchema, 'params'), validate(shopServicesQuerySchema, 'query'), shopController.getShopServices);
 router.get('/:id/employees', validate(shopIdParamSchema, 'params'), shopController.getShopEmployees);
 router.get('/:id/ratings', validate(shopIdParamSchema, 'params'), validate(paginationSchema, 'query'), ratingController.getShopRatings);
-router.get('/:id/ratings/analytics', validate(shopIdParamSchema, 'params'), ratingController.getShopRatingSummary);
+router.get('/:id/ratings/summary', validate(shopIdParamSchema, 'params'), ratingController.getShopRatingSummary);
 
 // Customer-specific resource routes
 router.patch('/:id/favorite', authenticate, authorize(ROLES.CUSTOMER), validate(shopIdParamSchema, 'params'), validate(shopFavoritePatchSchema, 'body'), shopController.setFavoriteShop);

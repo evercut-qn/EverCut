@@ -114,7 +114,7 @@ export const getRatingSummary = async (shopId) => {
     return ratingRepository.getShopSummary(shopId);
 };
 
-export const getRatingSummaryForBarber = async (ownerId) => {
+export const getBarberRatingSummary = async (ownerId) => {
     const shop = await getOwnedShop(ownerId);
     return getRatingSummary(shop.id);
 };
