@@ -9,13 +9,12 @@ export const createCustomerOnboarding = async (req, res) => {
     const { phoneNumber } = req.onboardingContext;
     const body = getValidatedRequestData(req, 'body');
     const result = await onboardingService.createCustomerOnboarding(phoneNumber, body);
-    const { user, profile, tokens } = result;
+    const { user, tokens } = result;
 
     return res.status(201).json(
         ApiResponse.success(
             {
                 user,
-                profile,
                 tokenType: tokens.tokenType,
                 accessToken: tokens.accessToken,
                 expiresIn: tokens.expiresIn,
@@ -31,13 +30,12 @@ export const createBarberOnboarding = async (req, res) => {
     const { phoneNumber } = req.onboardingContext;
     const body = getValidatedRequestData(req, 'body');
     const result = await onboardingService.createBarberOnboarding(phoneNumber, body);
-    const { user, shop, tokens } = result;
+    const { user, tokens } = result;
 
     return res.status(201).json(
         ApiResponse.success(
             {
                 user,
-                shop,
                 tokenType: tokens.tokenType,
                 accessToken: tokens.accessToken,
                 expiresIn: tokens.expiresIn,

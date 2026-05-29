@@ -150,8 +150,6 @@
               "pm.test('status is 201 or 409', function () { pm.expect(pm.response.code).to.be.oneOf([201, 409]); });",
               "if (pm.response.code === 201) {",
               "  const data = pm.response.json().data || {};",
-              "  const shopId = data.shop && data.shop.id;",
-              "  if (shopId) pm.globals.set('shared_shop_id', shopId);",
               "  if (data.accessToken) pm.environment.set('barber_access_token', data.accessToken);",
               "  if (data.refreshToken) pm.environment.set('barber_refresh_token', data.refreshToken);",
               "  pm.environment.unset('barber_onboarding_token');",
