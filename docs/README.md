@@ -53,6 +53,12 @@ Security assessments, vulnerability reports, and audit findings.
 
 Detailed guides for implementing specific features.
 
+### Analytics
+
+| Document | Description | Status |
+|----------|-------------|--------|
+| [APPOINTMENTS-INCOME-ANALYTICS.md](./features/analytics/APPOINTMENTS-INCOME-ANALYTICS.md) | Appointment and income analytics response contracts, data rules, and testing notes | âœ… Production Ready |
+
 ### Authentication & Authorization
 
 | Document | Description | Status |
@@ -142,6 +148,7 @@ Reports documenting issues found and fixes applied.
 | [REQUEST-VALIDATION-QUERY-FIX-REPORT.md](./reports/REQUEST-VALIDATION-QUERY-FIX-REPORT.md) | Express 5 query-validation runtime fix report | ✅ Completed |
 | [SERVICE-CATALOG-FIXES-REPORT.md](./reports/SERVICE-CATALOG-FIXES-REPORT.md) | Service catalog backend fixes | ✅ Completed |
 | [2026-05-26-MANUAL-PAYOUT-IMPLEMENTATION-REPORT.md](./reports/2026-05-26-MANUAL-PAYOUT-IMPLEMENTATION-REPORT.md) | Manual payout implementation, validation, and compatibility report | ✅ Completed |
+| [2026-05-30-APPOINTMENTS-INCOME-ANALYTICS-IMPLEMENTATION-REPORT.md](./reports/2026-05-30-APPOINTMENTS-INCOME-ANALYTICS-IMPLEMENTATION-REPORT.md) | Appointments and income analytics implementation, validation, and compatibility report | ✅ Completed |
 | [notification-system-report.md](./reports/notification-system-report.md) | Hybrid FCM + REST notification system implementation report | ✅ Completed |
 
 ---

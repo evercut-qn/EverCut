@@ -275,6 +275,39 @@ class BookingRepository {
         }));
     }
 
+    async aggregateAppointmentAnalyticsByMonth(shopId, startDate, endDate) {
+        return Booking.aggregate([
+            {
+                $match: {
+                    shopId,
+                    status: { $in: [BOOKING_STATUS.COMPLETED, BOOKING_STATUS.NO_SHOW] },
+                    date: {
+                        $gte: startDate,
+                        $lt: endDate,
+                    },
+                },
+            },
+            {
+                $group: {
+                    _id: {
+                        year: { $year: { date: '$date', timezone: 'UTC' } },
+                        month: { $month: { date: '$date', timezone: 'UTC' } },
+                    },
+                    count: { $sum: 1 },
+                },
+            },
+            {
+                $project: {
+                    _id: 0,
+                    year: '$_id.year',
+                    month: '$_id.month',
+                    count: 1,
+                },
+            },
+            { $sort: { year: 1, month: 1 } },
+        ]);
+    }
+
     async findByStatusPopulated(status, employeeIds, options = {}) {
         const query = Booking.find(trustQueryOperators({ status, employeeId: { $in: employeeIds } }))
             .populate('customerId', CUSTOMER_NAME_FIELDS)

@@ -1672,8 +1672,24 @@ const barberBookingsCollection = {
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/bookings/overview',
-        description: 'Returns booking summary, monthly milestone progress, today pulse metrics, and both active/upcoming queue buckets.',
-        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
+        description: 'Returns booking summary, monthly milestone progress, today pulse metrics, active/upcoming queue buckets, and six completed months of closed appointment analytics.',
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          "const response = pm.response.json();",
+          "const data = response.data || {};",
+          "pm.test('response includes appointments analytics', function () {",
+          "  pm.expect(data).to.have.property('appointments');",
+          "  pm.expect(data.appointments).to.have.property('total').that.is.a('number');",
+          "  pm.expect(data.appointments).to.have.property('growth').that.is.a('number');",
+          "  pm.expect(data.appointments).to.have.property('statistics').that.is.an('array').with.lengthOf(6);",
+          "});",
+          "pm.test('appointment statistics use full month names and zero-safe counts', function () {",
+          "  data.appointments.statistics.forEach((item) => {",
+          "    pm.expect(item.month).to.match(/^[A-Z][a-z]+$/);",
+          "    pm.expect(item.count).to.be.a('number');",
+          "  });",
+          "});"
+        ),
       }),
     },
     {
@@ -2011,8 +2027,24 @@ const barberEarningsCollection = {
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/earnings',
-        description: 'Returns `totalEarning`, `lastMonthEarning`, `todayEarning`, and `monthlyRevenue` with percentage change.',
-        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
+        description: 'Returns `totalEarning`, `lastMonthEarning`, `todayEarning`, current-month `monthlyRevenue`, and last-six-completed-month `income` analytics.',
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          "const response = pm.response.json();",
+          "const data = response.data || {};",
+          "pm.test('response includes income analytics', function () {",
+          "  pm.expect(data).to.have.property('income');",
+          "  pm.expect(data.income).to.have.property('total').that.is.a('number');",
+          "  pm.expect(data.income).to.have.property('growth').that.is.a('number');",
+          "  pm.expect(data.income).to.have.property('statistics').that.is.an('array').with.lengthOf(6);",
+          "});",
+          "pm.test('income statistics use full month names and zero-safe amounts', function () {",
+          "  data.income.statistics.forEach((item) => {",
+          "    pm.expect(item.month).to.match(/^[A-Z][a-z]+$/);",
+          "    pm.expect(item.amount).to.be.a('number');",
+          "  });",
+          "});"
+        ),
       }),
     },
     {
@@ -2539,7 +2571,7 @@ const analyticsCollection = {
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/bookings/overview',
-        description: 'Returns booking summary, monthly milestone progress, today pulse metrics, and both active/upcoming queue buckets.',
+        description: 'Returns booking summary, monthly milestone progress, today pulse metrics, active/upcoming queue buckets, and last-six-completed-month closed appointment analytics.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           "const response = pm.response.json();",
@@ -2547,7 +2579,11 @@ const analyticsCollection = {
           "pm.test('response includes summary', function () { pm.expect(data).to.have.property('summary'); });",
           "pm.test('response includes milestones', function () { pm.expect(data).to.have.property('milestones'); });",
           "pm.test('response includes today', function () { pm.expect(data).to.have.property('today'); });",
-          "pm.test('response includes queue', function () { pm.expect(data).to.have.property('queue'); });"
+          "pm.test('response includes queue', function () { pm.expect(data).to.have.property('queue'); });",
+          "pm.test('response includes appointments analytics', function () {",
+          "  pm.expect(data).to.have.property('appointments');",
+          "  pm.expect(data.appointments.statistics).to.be.an('array').with.lengthOf(6);",
+          "});"
         ),
       }),
     },
@@ -2579,12 +2615,16 @@ const analyticsCollection = {
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/earnings',
-        description: 'Returns financial earnings totals and monthly revenue for the authenticated barber shop.',
+        description: 'Returns financial earnings totals, current-month revenue, and last-six-completed-month income analytics for the authenticated barber shop.',
         event: testEvent(
           "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
           "const response = pm.response.json();",
           "const data = response.data || {};",
-          "pm.test('response includes monthlyRevenue', function () { pm.expect(data).to.have.property('monthlyRevenue'); });"
+          "pm.test('response includes monthlyRevenue', function () { pm.expect(data).to.have.property('monthlyRevenue'); });",
+          "pm.test('response includes income analytics', function () {",
+          "  pm.expect(data).to.have.property('income');",
+          "  pm.expect(data.income.statistics).to.be.an('array').with.lengthOf(6);",
+          "});"
         ),
       }),
     },

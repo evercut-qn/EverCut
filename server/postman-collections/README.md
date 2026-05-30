@@ -34,11 +34,11 @@ All collections now assume the backend returns the same JSON envelope for both s
 | `07-barber-profile-shop.json` | EverCut - Barber Profile & Shop | Shop management: current profile, payout details, open state, media, security, and account actions |
 | `08-barber-employees.json` | EverCut - Barber Employees | Employee CRUD with optional R2 photo media IDs and 24-hour employee schedule examples |
 | `09-barber-services.json` | EverCut - Barber Services | Service catalogue CRUD (single and bundled services) |
-| `10-barber-bookings.json` | EverCut - Barber Bookings | Booking administration: list filters, overview, status update, cancellation |
+| `10-barber-bookings.json` | EverCut - Barber Bookings | Booking administration: list filters, overview with six-month appointment analytics, status update, cancellation |
 | `11-barber-media.json` | EverCut - Barber Media | R2 media workflow: presign, direct upload, confirm, gallery attach, analytics, delete |
-| `12-barber-earnings.json` | EverCut - Barber Earnings | Earnings summary (requires completed bookings for non-zero values) |
+| `12-barber-earnings.json` | EverCut - Barber Earnings | Earnings summary, current-month revenue, and six-month income analytics |
 | `13-barber-ratings.json` | EverCut - Barber Ratings | Rating listing, analytics, reply management, and rating removal |
-| `14-operational-analytics.json` | EverCut - Operational Analytics | Booking, employee, and earnings analytics through resource-owned endpoints |
+| `14-operational-analytics.json` | EverCut - Operational Analytics | Booking, appointment, employee, income, earnings, and rating analytics through resource-owned endpoints |
 | `15-payments.json` | EverCut - Payments | Native PhonePe SDK payment initiation/verification/status/refunds |
 | `16-payouts.json` | EverCut - Payouts | Manual payout recording, payout history, and Cashfree payout retry |
 | `17-notifications.json` | EverCut - Notifications | FCM token management, notification history, unread count, and read-state updates |
@@ -171,7 +171,7 @@ Employee `workingHours.start` and `workingHours.end` remain `HH:MM` 24-hour valu
 | # | Method | Endpoint | Description |
 |---|---|---|---|
 | 1 | GET | `/api/v1/bookings` | Get all bookings - captures status and delete IDs |
-| 2 | GET | `/api/v1/bookings/overview` | Get combined booking overview |
+| 2 | GET | `/api/v1/bookings/overview` | Get combined booking overview with last-six-completed-month appointment analytics |
 | 3 | GET | `/api/v1/bookings?status=awaiting_confirmation&paymentStatus=success` | List pending confirmations |
 | 4 | GET | `/api/v1/bookings?status=confirmed` | Filter bookings by status |
 | 5 | GET | `/api/v1/bookings?employeeId={{employee_id}}` | Get bookings by employee |
@@ -199,7 +199,7 @@ Employee `workingHours.start` and `workingHours.end` remain `HH:MM` 24-hour valu
 
 | # | Method | Endpoint | Description |
 |---|---|---|---|
-| 1 | GET | `/api/v1/earnings` | Get earnings summary |
+| 1 | GET | `/api/v1/earnings` | Get earnings summary with current-month revenue and last-six-completed-month income analytics |
 
 ### `13-barber-ratings.json`
 
@@ -216,9 +216,9 @@ Employee `workingHours.start` and `workingHours.end` remain `HH:MM` 24-hour valu
 
 | # | Method | Endpoint | Description |
 |---|---|---|---|
-| 1 | GET | `/api/v1/bookings/overview` | Get booking summary, milestones, today pulse, and queue |
+| 1 | GET | `/api/v1/bookings/overview` | Get booking summary, milestones, today pulse, queue, and appointment analytics |
 | 2 | GET | `/api/v1/employees/daily-progress` | Get staff availability and progress tracking |
-| 3 | GET | `/api/v1/earnings` | Get earnings summary |
+| 3 | GET | `/api/v1/earnings` | Get earnings summary, current-month revenue, and income analytics |
 | 4 | GET | `/api/v1/ratings/summary` | Get rating summary |
 | 5 | GET | `/api/v1/media/gallery/usage` | Get gallery usage |
 

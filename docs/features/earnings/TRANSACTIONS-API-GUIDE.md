@@ -8,6 +8,7 @@ The Transactions API provides barbers with comprehensive access to their earning
 
 - **Transaction History**: Paginated list of all completed payment transactions
 - **Monthly Revenue Summary**: Current month revenue with percentage change from last month
+- **Income Analytics**: Last 6 completed months of income, excluding the current month
 - **Transaction Details**: Comprehensive view of individual transactions
 - **Statement Download**: Export transactions as professional PDF for accounting purposes
 - **Filtering**: Filter transactions by status, date range
@@ -29,7 +30,7 @@ Authorization: Bearer <access_token>
 
 ### 1. Get Earnings Summary
 
-Retrieve earnings summary with monthly revenue breakdown.
+Retrieve earnings summary with current-month revenue and six completed months of income analytics.
 
 **Endpoint**: `GET /api/v1/earnings`
 
@@ -48,6 +49,18 @@ Retrieve earnings summary with monthly revenue breakdown.
       "changePercentage": 12.5,
       "changeDirection": "up",
       "period": "December 2024"
+    },
+    "income": {
+      "total": 78500,
+      "growth": 18.6,
+      "statistics": [
+        { "month": "November", "amount": 10500 },
+        { "month": "December", "amount": 11800 },
+        { "month": "January", "amount": 12400 },
+        { "month": "February", "amount": 12100 },
+        { "month": "March", "amount": 14500 },
+        { "month": "April", "amount": 17200 }
+      ]
     }
   }
 }
@@ -63,6 +76,12 @@ Retrieve earnings summary with monthly revenue breakdown.
   - `changePercentage`: Absolute percentage change from last month
   - `changeDirection`: "up", "down", or "neutral"
   - `period`: Current month and year
+- `income`: Last 6 completed months of barber payout income
+  - `total`: Total income across those 6 completed months
+  - `growth`: Signed percentage growth between the two most recent completed months
+  - `statistics`: Exactly 6 monthly entries in chronological order
+  - `statistics[].month`: Full month name
+  - `statistics[].amount`: Monthly income in rupees, `0` when no income exists
 
 **Example Request**:
 
@@ -330,6 +349,16 @@ All endpoints follow the standard error format:
 | `changeDirection` | string | "up", "down", or "neutral" |
 | `period` | string | Month and year (e.g., "December 2024") |
 
+### Income Analytics
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `total` | number | Total income across the last 6 completed months |
+| `growth` | number | Signed growth percentage between the latest 2 completed months |
+| `statistics` | array | Exactly 6 chronological monthly entries |
+| `statistics[].month` | string | Full month name |
+| `statistics[].amount` | number | Monthly barber payout income in rupees |
+
 ---
 
 ## Business Logic
@@ -347,6 +376,17 @@ The transaction amount shown to barbers is the **barber payout** amount, which i
 2. Sum all completed transactions in last month
 3. Calculate percentage change: `((current - last) / last) * 100`
 4. Determine direction: positive = "up", negative = "down", zero = "neutral"
+
+### Six-Month Income Analytics
+
+1. Build the last 6 completed UTC month buckets.
+2. Exclude the current month entirely.
+3. Sum completed payment transactions by `createdAt` month.
+4. Use `settlement.barberPayout` as the primary income amount, falling back to `settlement.serviceAmount` and then `amount` only for legacy records.
+5. Return missing months as `0`.
+6. Calculate `growth` from the two most recent completed months.
+
+If the previous completed month is `0`, growth is `100` when the latest completed month is positive and `0` when both months are zero. Otherwise the signed formula result is rounded to one decimal place.
 
 ### Transaction ID Format
 

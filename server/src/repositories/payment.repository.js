@@ -86,6 +86,46 @@ class PaymentRepository {
         return PaymentTransaction.countDocuments(trustQueryOperators(filter));
     }
 
+    async aggregateIncomeByMonth(shopId, startDate, endDate) {
+        return PaymentTransaction.aggregate([
+            {
+                $match: {
+                    shopId,
+                    status: PAYMENT_TRANSACTION_STATUS.COMPLETED,
+                    createdAt: {
+                        $gte: startDate,
+                        $lt: endDate,
+                    },
+                },
+            },
+            {
+                $group: {
+                    _id: {
+                        year: { $year: { date: '$createdAt', timezone: 'UTC' } },
+                        month: { $month: { date: '$createdAt', timezone: 'UTC' } },
+                    },
+                    amountInPaisa: {
+                        $sum: {
+                            $ifNull: [
+                                '$settlement.barberPayout',
+                                { $ifNull: ['$settlement.serviceAmount', '$amount'] },
+                            ],
+                        },
+                    },
+                },
+            },
+            {
+                $project: {
+                    _id: 0,
+                    year: '$_id.year',
+                    month: '$_id.month',
+                    amount: { $divide: ['$amountInPaisa', 100] },
+                },
+            },
+            { $sort: { year: 1, month: 1 } },
+        ]);
+    }
+
     async countActiveWaiverReservations(customerId) {
         return PaymentTransaction.countDocuments(trustQueryOperators({
             customerId,

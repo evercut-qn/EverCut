@@ -50,7 +50,7 @@
         "method": "GET",
         "header": [],
         "url": "{{base_url}}/{{api_prefix}}/earnings",
-        "description": "Returns `totalEarning`, `lastMonthEarning`, `todayEarning`, and `monthlyRevenue` with percentage change."
+        "description": "Returns `totalEarning`, `lastMonthEarning`, `todayEarning`, current-month `monthlyRevenue`, and last-six-completed-month `income` analytics."
       },
       "event": [
         {
@@ -95,7 +95,21 @@
               "    });",
               "  });",
               "}",
-              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "const response = pm.response.json();",
+              "const data = response.data || {};",
+              "pm.test('response includes income analytics', function () {",
+              "  pm.expect(data).to.have.property('income');",
+              "  pm.expect(data.income).to.have.property('total').that.is.a('number');",
+              "  pm.expect(data.income).to.have.property('growth').that.is.a('number');",
+              "  pm.expect(data.income).to.have.property('statistics').that.is.an('array').with.lengthOf(6);",
+              "});",
+              "pm.test('income statistics use full month names and zero-safe amounts', function () {",
+              "  data.income.statistics.forEach((item) => {",
+              "    pm.expect(item.month).to.match(/^[A-Z][a-z]+$/);",
+              "    pm.expect(item.amount).to.be.a('number');",
+              "  });",
+              "});"
             ]
           }
         }

@@ -184,7 +184,7 @@
         "method": "GET",
         "header": [],
         "url": "{{base_url}}/{{api_prefix}}/bookings/overview",
-        "description": "Returns booking summary, monthly milestone progress, today pulse metrics, and both active/upcoming queue buckets."
+        "description": "Returns booking summary, monthly milestone progress, today pulse metrics, active/upcoming queue buckets, and six completed months of closed appointment analytics."
       },
       "event": [
         {
@@ -229,7 +229,21 @@
               "    });",
               "  });",
               "}",
-              "pm.test('status is 200', function () { pm.response.to.have.status(200); });"
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "const response = pm.response.json();",
+              "const data = response.data || {};",
+              "pm.test('response includes appointments analytics', function () {",
+              "  pm.expect(data).to.have.property('appointments');",
+              "  pm.expect(data.appointments).to.have.property('total').that.is.a('number');",
+              "  pm.expect(data.appointments).to.have.property('growth').that.is.a('number');",
+              "  pm.expect(data.appointments).to.have.property('statistics').that.is.an('array').with.lengthOf(6);",
+              "});",
+              "pm.test('appointment statistics use full month names and zero-safe counts', function () {",
+              "  data.appointments.statistics.forEach((item) => {",
+              "    pm.expect(item.month).to.match(/^[A-Z][a-z]+$/);",
+              "    pm.expect(item.count).to.be.a('number');",
+              "  });",
+              "});"
             ]
           }
         }

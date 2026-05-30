@@ -44,7 +44,7 @@
         "method": "GET",
         "header": [],
         "url": "{{base_url}}/{{api_prefix}}/bookings/overview",
-        "description": "Returns booking summary, monthly milestone progress, today pulse metrics, and both active/upcoming queue buckets."
+        "description": "Returns booking summary, monthly milestone progress, today pulse metrics, active/upcoming queue buckets, and last-six-completed-month closed appointment analytics."
       },
       "event": [
         {
@@ -95,7 +95,11 @@
               "pm.test('response includes summary', function () { pm.expect(data).to.have.property('summary'); });",
               "pm.test('response includes milestones', function () { pm.expect(data).to.have.property('milestones'); });",
               "pm.test('response includes today', function () { pm.expect(data).to.have.property('today'); });",
-              "pm.test('response includes queue', function () { pm.expect(data).to.have.property('queue'); });"
+              "pm.test('response includes queue', function () { pm.expect(data).to.have.property('queue'); });",
+              "pm.test('response includes appointments analytics', function () {",
+              "  pm.expect(data).to.have.property('appointments');",
+              "  pm.expect(data.appointments.statistics).to.be.an('array').with.lengthOf(6);",
+              "});"
             ]
           }
         }
@@ -176,7 +180,7 @@
         "method": "GET",
         "header": [],
         "url": "{{base_url}}/{{api_prefix}}/earnings",
-        "description": "Returns financial earnings totals and monthly revenue for the authenticated barber shop."
+        "description": "Returns financial earnings totals, current-month revenue, and last-six-completed-month income analytics for the authenticated barber shop."
       },
       "event": [
         {
@@ -224,7 +228,11 @@
               "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
               "const response = pm.response.json();",
               "const data = response.data || {};",
-              "pm.test('response includes monthlyRevenue', function () { pm.expect(data).to.have.property('monthlyRevenue'); });"
+              "pm.test('response includes monthlyRevenue', function () { pm.expect(data).to.have.property('monthlyRevenue'); });",
+              "pm.test('response includes income analytics', function () {",
+              "  pm.expect(data).to.have.property('income');",
+              "  pm.expect(data.income.statistics).to.be.an('array').with.lengthOf(6);",
+              "});"
             ]
           }
         }
