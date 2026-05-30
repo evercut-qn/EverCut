@@ -29,8 +29,8 @@ export async function proxy(request) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // 2. Expired session but refresh token is present -> trigger refresh
-  if (isExpired && refreshTokenVal) {
+  // 2. Expired or missing session but refresh token is present -> trigger refresh
+  if ((!token || isExpired) && refreshTokenVal) {
     const newTokens = await refreshTokens(refreshTokenVal);
 
     if (newTokens?.accessToken) {
