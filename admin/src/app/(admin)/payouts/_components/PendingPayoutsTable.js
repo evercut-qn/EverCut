@@ -1,63 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { QrCode, ExternalLink, CheckCircle2 } from 'lucide-react';
 import { PayoutRequestModal } from './PayoutRequestModal';
+import { QRCodeModal } from './QRCodeModal';
 import { TableSearchBar } from '@/components/ui/TableSearchBar';
 import { PaginationControls } from '@/components/ui/PaginationControls';
-
-/**
- * Modal to display the generated UPI QR Code.
- */
-function QRCodeModal({ isOpen, onClose, upiDeepLink, amount, barberName }) {
-  const [qrCodeUrl, setQrCodeUrl] = useState('');
-
-  useEffect(() => {
-    if (upiDeepLink && isOpen) {
-      import('qrcode')
-        .then((lib) => lib.default.toDataURL(upiDeepLink, { width: 256, margin: 2 }))
-        .then((url) => setQrCodeUrl(url))
-        .catch((err) => console.error('Failed to generate QR code:', err));
-    }
-
-    return () => {
-      setQrCodeUrl('');
-    };
-  }, [upiDeepLink, isOpen]);
-
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div onClick={onClose} className="fixed inset-0 bg-black/50 backdrop-blur-sm" />
-      <div className="relative w-full max-w-sm bg-card border border-border text-card-foreground rounded-lg shadow-2xl p-6 flex flex-col items-center z-10 text-center animate-in fade-in zoom-in duration-200">
-        <h3 className="font-bold text-lg mb-1 font-display text-foreground">UPI Payment QR</h3>
-        <p className="text-xs text-muted-foreground mb-4">
-          Scan to transfer <strong className="text-primary font-mono">₹{amount}</strong> to <strong className="text-foreground">{barberName}</strong>
-        </p>
-        
-        <div className="bg-white p-3 rounded-lg border border-border shadow-md">
-          {qrCodeUrl ? (
-            /* eslint-disable-next-line @next/next/no-img-element */
-            <img src={qrCodeUrl} alt="UPI QR Code" className="w-52 h-52 block" />
-          ) : (
-            <div className="w-52 h-52 flex items-center justify-center text-muted-foreground font-mono text-xs">
-              Generating Code...
-            </div>
-          )}
-        </div>
-
-        <button
-          onClick={onClose}
-          className="mt-6 w-full py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded text-sm font-semibold transition-colors"
-        >
-          Close
-        </button>
-      </div>
-    </div>
-  );
-}
 
 /**
  * Display grid for listing pending payout balances.
@@ -143,7 +92,8 @@ export function PendingPayoutsTable({ initialData = [], pagination, defaultLimit
                         onClick={() => setQrModalData({
                           upiDeepLink: item.upiDeepLink,
                           amount: item.totalAmountInRupees,
-                          barberName: item.barberName
+                          barberName: item.barberName,
+                          upiId: item.upiId,
                         })}
                         className="inline-flex items-center gap-1.5 h-8 px-2.5 text-xs font-semibold border border-border bg-muted text-foreground hover:bg-accent hover:text-accent-foreground rounded transition-colors"
                         title="Display UPI Payment QR"
@@ -210,6 +160,7 @@ export function PendingPayoutsTable({ initialData = [], pagination, defaultLimit
         upiDeepLink={qrModalData?.upiDeepLink}
         amount={qrModalData?.amount}
         barberName={qrModalData?.barberName}
+        upiId={qrModalData?.upiId}
       />
 
       {/* Mark As Paid Dialog */}
