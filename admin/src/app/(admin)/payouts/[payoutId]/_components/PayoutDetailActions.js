@@ -15,11 +15,7 @@ export function PayoutDetailActions({ payout }) {
   const isCashfreeRetryable = payout?.gateway === 'cashfree' && ['FAILED', 'REVERSED'].includes(status);
 
   if (!isCashfreeRetryable) {
-    return (
-      <div className="rounded-md border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
-        No administrative action is available for this payout state.
-      </div>
-    );
+    return null;
   }
 
   function retry() {
@@ -35,16 +31,14 @@ export function PayoutDetailActions({ payout }) {
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-card p-4">
-      <button
-        onClick={retry}
-        disabled={isPending}
-        className="inline-flex h-9 items-center gap-2 rounded border border-amber-500/30 bg-amber-500/10 px-3 text-sm font-semibold text-amber-600 hover:bg-amber-500/20 disabled:opacity-50"
-      >
-        {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-        Retry Cashfree payout
-      </button>
-    </div>
+    <button
+      onClick={retry}
+      disabled={isPending}
+      className="inline-flex h-8 items-center gap-1.5 rounded border border-amber-500/30 bg-amber-500/10 px-2.5 text-xs font-semibold text-amber-600 hover:bg-amber-500/20 disabled:opacity-50 cursor-pointer"
+    >
+      {isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+      Retry Cashfree Payout
+    </button>
   );
 }
 

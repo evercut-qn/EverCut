@@ -56,6 +56,10 @@ export default async function PayoutDetailPage({ params }) {
   const bookings = payout.bookings || [];
   const payments = payout.payments || [];
 
+  // Calculate totals for financial breakdown
+  const totalBookingAmountInPaisa = payments.reduce((acc, curr) => acc + (curr.amountInPaisa || 0), 0);
+  const totalPlatformFeeInPaisa = payments.reduce((acc, curr) => acc + (curr.settlement?.platformFee || 0), 0);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-3">
@@ -114,6 +118,41 @@ export default async function PayoutDetailPage({ params }) {
         </div>
       </div>
 
+      {/* Settlement Financial Breakdown Panel */}
+      <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-3">
+        <div>
+          <h2 className="font-display text-base font-bold text-foreground">Settlement Financial Breakdown</h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Clear balance reconciliation between customer billing, platform service fees, and net payouts.
+          </p>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-3">
+          <div className="rounded-lg border border-border bg-muted/20 p-4 space-y-1.5">
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Total Customer Paid (Gross)</p>
+            <p className="text-xl font-bold font-mono text-foreground">
+              {formatCurrency(undefined, totalBookingAmountInPaisa)}
+            </p>
+            <p className="text-[10px] text-muted-foreground">Combined billing collected from customers</p>
+          </div>
+          
+          <div className="rounded-lg border border-border bg-muted/20 p-4 space-y-1.5">
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Total Service Fee (Platform Cut)</p>
+            <p className="text-xl font-bold font-mono text-destructive dark:text-red-400">
+              {formatCurrency(undefined, totalPlatformFeeInPaisa)}
+            </p>
+            <p className="text-[10px] text-muted-foreground">Convenience fees retained by EverCut</p>
+          </div>
+          
+          <div className="rounded-lg border border-border bg-muted/20 p-4 space-y-1.5">
+            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Total Barber Payout (Net)</p>
+            <p className="text-xl font-bold font-mono text-primary">
+              {formatCurrency(payout.amountInRupees, payout.amount)}
+            </p>
+            <p className="text-[10px] text-muted-foreground">Net settled amount transferred to recipient</p>
+          </div>
+        </div>
+      </div>
+
       <PayoutDetailActions payout={payout} />
 
       <div className="grid gap-6 xl:grid-cols-2">
@@ -148,7 +187,7 @@ export default async function PayoutDetailPage({ params }) {
       <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
         <h2 className="font-display text-base font-bold text-foreground">Linked Bookings</h2>
         <div className="mt-4 overflow-x-auto">
-          <table className="w-full min-w-[720px] text-left text-sm">
+          <table className="w-full min-w-180 text-left text-sm">
             <thead>
               <tr className="border-b border-border text-xs text-muted-foreground">
                 <th className="pb-3 font-semibold">Booking</th>
@@ -179,28 +218,49 @@ export default async function PayoutDetailPage({ params }) {
       </section>
 
       <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
-        <h2 className="font-display text-base font-bold text-foreground">Linked Payments</h2>
+        <h2 className="font-display text-base font-bold text-foreground">Linked Payments Details</h2>
         <div className="mt-4 overflow-x-auto">
-          <table className="w-full min-w-[720px] text-left text-sm">
+          <table className="w-full min-w-210 text-left text-sm">
             <thead>
               <tr className="border-b border-border text-xs text-muted-foreground">
-                <th className="pb-3 font-semibold">Payment</th>
-                <th className="pb-3 font-semibold">Order</th>
+                <th className="pb-3 font-semibold">Payment Transaction</th>
+                <th className="pb-3 font-semibold">Merchant Order</th>
                 <th className="pb-3 font-semibold">Status</th>
-                <th className="pb-3 font-semibold">Settled</th>
-                <th className="pb-3 text-right font-semibold">Amount</th>
+                <th className="pb-3 text-right font-semibold">Customer Paid</th>
+                <th className="pb-3 text-right font-semibold">Platform Fee</th>
+                <th className="pb-3 text-right font-semibold">Barber Payout</th>
+                <th className="pb-3 text-center font-semibold">Settled</th>
               </tr>
             </thead>
             <tbody>
               {(payments.length ? payments : payout.paymentTransactionIds || []).map((payment) => {
                 const paymentObject = typeof payment === 'object' ? payment : { id: payment };
+                const settlement = paymentObject.settlement || {};
                 return (
-                  <tr key={paymentObject.id} className="border-b border-border last:border-b-0">
+                  <tr key={paymentObject.id} className="border-b border-border last:border-b-0 hover:bg-muted/10 transition-colors">
                     <td className="py-3 font-mono text-xs">{paymentObject.id}</td>
                     <td className="py-3 font-mono text-xs text-muted-foreground">{paymentObject.merchantOrderId || '—'}</td>
-                    <td className="py-3">{paymentObject.status || '—'}</td>
-                    <td className="py-3">{paymentObject.settlement?.settled ? 'Yes' : 'No'}</td>
-                    <td className="py-3 text-right font-mono">{formatCurrency(paymentObject.amountInRupees, paymentObject.amount)}</td>
+                    <td className="py-3">
+                      <span className="capitalize">{paymentObject.status || '—'}</span>
+                    </td>
+                    <td className="py-3 text-right font-mono font-medium">
+                      {paymentObject.amountInPaisa ? formatCurrency(undefined, paymentObject.amountInPaisa) : '—'}
+                    </td>
+                    <td className="py-3 text-right font-mono text-muted-foreground">
+                      {settlement.platformFee ? formatCurrency(undefined, settlement.platformFee) : '—'}
+                    </td>
+                    <td className="py-3 text-right font-mono text-primary font-semibold">
+                      {settlement.barberPayout ? formatCurrency(undefined, settlement.barberPayout) : '—'}
+                    </td>
+                    <td className="py-3 text-center">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${
+                        settlement.settled 
+                          ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' 
+                          : 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
+                      }`}>
+                        {settlement.settled ? 'Yes' : 'No'}
+                      </span>
+                    </td>
                   </tr>
                 );
               })}
