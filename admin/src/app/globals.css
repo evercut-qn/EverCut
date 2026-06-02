@@ -38,16 +38,16 @@
 }
 
 .dark {
-  --background: 224 71% 4%;                 /* Elegant Night Slate */
-  --foreground: 210 20% 98%;                /* Bright Off-White */
-  --card: 224 71% 7%;                       /* Slightly lighter Card Slate */
-  --card-foreground: 210 20% 98%;
+  --background: 240 10% 4%;                 /* Premium Charcoal Black */
+  --foreground: 0 0% 98%;                   /* Soft Off-White */
+  --card: 240 10% 6.5%;                     /* Zinc Gray Card */
+  --card-foreground: 0 0% 98%;
   --primary: 154 94% 39%;                   /* EverCut Emerald Green #06C270 */
-  --primary-foreground: 224 71% 4%;
-  --muted: 224 71% 12%;                     /* Slate shadow */
-  --muted-foreground: 217.9 10.6% 64.9%;
-  --border: 224 71% 15%;
-  --accent: 154 94% 12%;                    /* Dark Green Shadow */
+  --primary-foreground: 240 10% 4%;
+  --muted: 240 6% 10%;                      /* Muted Slate Gray background */
+  --muted-foreground: 240 5% 65%;
+  --border: 240 6% 13%;                     /* Zinc border line separator */
+  --accent: 154 94% 8%;                     /* Dark Green Accent Shadow */
   --accent-foreground: 154 94% 75%;
   --destructive: 0 62.8% 30.6%;
   --destructive-foreground: 0 0% 98%;
