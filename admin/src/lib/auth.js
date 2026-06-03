@@ -1,4 +1,4 @@
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { decodeJWTPayload } from './jwt';
 
 /**
@@ -9,8 +9,15 @@ import { decodeJWTPayload } from './jwt';
  * @returns {Promise<string|null>} Valid access token or null if expired/absent
  */
 export async function getValidAccessToken() {
-  const cookieStore = await cookies();
-  const token = cookieStore.get('evercut_admin_session')?.value;
+  // 1. Try to read refreshed token set in request headers by proxy middleware
+  const headersList = await headers();
+  let token = headersList.get('x-user-token');
+
+  // 2. Fallback to reading cookies
+  if (!token) {
+    const cookieStore = await cookies();
+    token = cookieStore.get('evercut_admin_session')?.value;
+  }
 
   if (!token) return null;
 

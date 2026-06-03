@@ -3,12 +3,13 @@
 import { usePathname } from 'next/navigation';
 import { Menu } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
+import { UserProfileDropdown } from './UserProfileDropdown';
 import { useSidebarStore } from '@/hooks/useSidebarStore';
 import { cn } from '@/lib/utils/cn';
 
 /**
  * Top navigation header bar for administrative layouts.
- * Includes page locator breadcrumbs and user control actions.
+ * Includes page locator breadcrumbs, Theme Toggle, and User Profile Dropdown.
  *
  * @param {Object} props
  * @param {string} [props.className] - Header styling overrides
@@ -40,11 +41,13 @@ export function Header({ className }) {
         </div>
       </div>
 
-      {/* Global Utility Controls */}
-      <div className="flex items-center gap-4">
+      {/* Global Utility Controls: Theme toggle & Profile Avatar Dropdown */}
+      <div className="flex items-center gap-3">
         <ThemeToggle />
+        <UserProfileDropdown />
       </div>
     </header>
   );
 }
+
 export default Header;

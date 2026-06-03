@@ -8,6 +8,10 @@ export const config = {
 
 const PUBLIC_PATHS = ['/login'];
 
+/**
+ * Proxy Middleware to enforce administration authorization
+ * and perform background session/token refresh when access tokens expire.
+ */
 export async function proxy(request) {
   const { pathname } = request.nextUrl;
   const isPublicPath = PUBLIC_PATHS.some((path) => pathname.startsWith(path));
@@ -17,7 +21,7 @@ export async function proxy(request) {
 
   // Validate active session
   let payload = decodeJWTPayload(token);
-  let isExpired = payload ? payload.exp * 1000 - 30000 < Date.now() : false;
+  let isExpired = payload ? payload.exp * 1000 - 30000 < Date.now() : true;
   let isValidAdmin = payload && payload.role === 'ADMIN';
 
   // 1. Unauthenticated or expired with no refresh token -> redirect to /login
@@ -36,7 +40,9 @@ export async function proxy(request) {
     if (newTokens?.accessToken) {
       // Reconstruct cookies and write request headers for downstream RSCs
       request.cookies.set('evercut_admin_session', newTokens.accessToken);
-      request.cookies.set('evercut_admin_refresh_token', newTokens.refreshToken);
+      if (newTokens.refreshToken) {
+        request.cookies.set('evercut_admin_refresh_token', newTokens.refreshToken);
+      }
 
       const cookieHeader = request.cookies.getAll()
         .map((c) => `${c.name}=${c.value}`)
@@ -44,6 +50,7 @@ export async function proxy(request) {
 
       const requestHeaders = new Headers(request.headers);
       requestHeaders.set('cookie', cookieHeader);
+      requestHeaders.set('x-user-token', newTokens.accessToken);
 
       // Create the single response object passing the modified headers
       const response = isPublicPath 
@@ -59,14 +66,22 @@ export async function proxy(request) {
         sameSite: 'strict',
         path: '/',
       };
+      
+      const newClaims = decodeJWTPayload(newTokens.accessToken);
+      const tokenDuration = newTokens.expiresIn || (newClaims?.exp ? (newClaims.exp - (newClaims.iat || Math.floor(Date.now() / 1000))) : 900);
+
       response.cookies.set('evercut_admin_session', newTokens.accessToken, {
         ...cookieOptions,
-        maxAge: newTokens.expiresIn,
+        maxAge: tokenDuration,
       });
-      response.cookies.set('evercut_admin_refresh_token', newTokens.refreshToken, {
-        ...cookieOptions,
-        maxAge: newTokens.refreshExpiresIn,
-      });
+
+      if (newTokens.refreshToken) {
+        const refreshDuration = newTokens.refreshExpiresIn || (60 * 60 * 24 * 30);
+        response.cookies.set('evercut_admin_refresh_token', newTokens.refreshToken, {
+          ...cookieOptions,
+          maxAge: refreshDuration,
+        });
+      }
 
       return response;
     }
