@@ -3,6 +3,7 @@ import { objectId, dateString, timeString, paginationSchema } from './common.val
 
 const bookingStatuses = ['pending', 'awaiting_confirmation', 'confirmed', 'completed', 'cancelled', 'no-show'];
 const paymentStatuses = ['pending', 'initiated', 'success', 'failed', 'refund_pending', 'refunded', 'refund_failed'];
+const payoutStatuses = ['not_initiated', 'initiated', 'pending', 'completed', 'failed', 'reversed'];
 
 const commaSeparatedEnum = (allowedValues, fieldName) => Joi.alternatives()
     .try(
@@ -65,6 +66,12 @@ export const bookingListQuerySchema = paginationSchema.keys({
     
     // Barber-only filters
     employeeId: objectId,
+
+    // Admin-only filters
+    payoutStatus: commaSeparatedEnum(payoutStatuses, 'payoutStatus'),
+    shopId: objectId,
+    customerId: objectId,
+    search: Joi.string().trim().max(100).allow('').optional(),
 });
 
 export const bookingIdParamSchema = Joi.object({

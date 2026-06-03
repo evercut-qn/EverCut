@@ -158,6 +158,29 @@ export const getShops = async (req, res, next) => {
     }
 };
 
+export const getShopSummary = async (_req, res, next) => {
+    try {
+        const result = await shopService.getShopSummary();
+        return res.status(200).json(ApiResponse.success(result, 'Shop summary fetched'));
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const listBarbers = async (req, res, next) => {
+    try {
+        const query = getValidatedRequestData(req, 'query');
+        const result = await shopService.listBarbersForAdmin(query);
+        return res.status(200).json(ApiResponse.paginated(
+            result.items,
+            result.pagination,
+            'Barbers fetched',
+        ));
+    } catch (err) {
+        next(err);
+    }
+};
+
 export const getNearbyServices = async (req, res, next) => {
     try {
         const { longitude, latitude, gender, search } = getValidatedRequestData(req, 'query');

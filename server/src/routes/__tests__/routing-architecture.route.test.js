@@ -26,7 +26,9 @@ test('route index mounts feature-oriented resources instead of legacy role prefi
     for (const routePrefix of [
         '/auth',
         '/onboarding',
+        '/users',
         '/customers',
+        '/barbers',
         '/shops',
         '/employees',
         '/services',
@@ -100,6 +102,8 @@ test('feature routes and controllers use simple direct files instead of module i
         'routes/auth.routes.js',
         'routes/bookings.routes.js',
         'routes/customers.routes.js',
+        'routes/users.routes.js',
+        'routes/barbers.routes.js',
         'routes/earnings.routes.js',
         'routes/employees.routes.js',
         'routes/onboarding.routes.js',
@@ -113,6 +117,7 @@ test('feature routes and controllers use simple direct files instead of module i
         'controllers/auth.controller.js',
         'controllers/booking.controller.js',
         'controllers/customer.controller.js',
+        'controllers/user.controller.js',
         'controllers/earnings.controller.js',
         'controllers/employee.controller.js',
         'controllers/onboarding.controller.js',
@@ -254,6 +259,7 @@ test('booking discovery and payment routes use final resource-oriented URLs', as
     assert.doesNotMatch(bookingRoutes, /analytics\/today/);
     assert.doesNotMatch(bookingRoutes, /analytics\/queue/);
     assert.doesNotMatch(bookingRoutes, /router\.get\('\/analytics'/);
+    assert.match(bookingRoutes, /router\.get\('\/summary', authorize\(ROLES\.ADMIN\)/);
     assert.match(bookingRoutes, /router\.get\('\/overview'/);
     assert.match(bookingRoutes, /router\.patch\('\/:id\/favorite'/);
     assert.doesNotMatch(bookingRoutes, /router\.put\('\/:id\/favorite'/);
@@ -377,17 +383,23 @@ test('changed resource routes require the expected authentication and role guard
     const notificationRoutes = await readSource('routes/notifications.routes.js');
     const paymentRoutes = await readSource('routes/payment.routes.js');
     const payoutRoutes = await readSource('routes/payout.routes.js');
+    const userRoutes = await readSource('routes/users.routes.js');
+    const customerRoutes = await readSource('routes/customers.routes.js');
+    const barberRoutes = await readSource('routes/barbers.routes.js');
+    const subscriptionRoutes = await readSource('routes/subscription.routes.js');
     const earningsRoutes = await readSource('routes/earnings.routes.js');
     const mediaRoutes = await readSource('routes/media.routes.js');
 
     assert.match(bookingRoutes, /router\.use\(authenticate\)/);
     assert.match(bookingRoutes, /router\.post\('\/', authorize\(ROLES\.CUSTOMER\)/);
-    assert.match(bookingRoutes, /router\.get\('\/', authorize\(ROLES\.CUSTOMER, ROLES\.BARBER\)/);
+    assert.match(bookingRoutes, /router\.get\('\/', authorize\(ROLES\.CUSTOMER, ROLES\.BARBER, ROLES\.ADMIN\)/);
+    assert.match(bookingRoutes, /router\.get\('\/summary', authorize\(ROLES\.ADMIN\)/);
     assert.match(bookingRoutes, /router\.get\('\/overview', authorize\(ROLES\.BARBER\)/);
     assert.match(bookingRoutes, /router\.patch\('\/:id\/favorite', authorize\(ROLES\.CUSTOMER\)/);
     assert.match(bookingRoutes, /router\.post\('\/:id\/refunds', authorize\(ROLES\.ADMIN, ROLES\.BARBER\)/);
 
     assert.match(shopRoutes, /router\.get\('\/favorites', authenticate, authorize\(ROLES\.CUSTOMER\)/);
+    assert.match(shopRoutes, /router\.get\('\/summary', authenticate, authorize\(ROLES\.ADMIN\)/);
     assert.match(shopRoutes, /router\.patch\('\/me', authenticate, authorize\(ROLES\.BARBER\)/);
     assert.match(shopRoutes, /router\.patch\('\/me\/security', authenticate, authorize\(ROLES\.BARBER\)/);
     assert.match(shopRoutes, /router\.patch\('\/me\/media\/picture', authenticate, authorize\(ROLES\.BARBER\)/);
@@ -415,10 +427,21 @@ test('changed resource routes require the expected authentication and role guard
     assert.doesNotMatch(notificationRoutes, /authorize\(ROLES\./);
 
     assert.match(paymentRoutes, /router\.post\('\/webhook', paymentController\.handleWebhook\)/);
+    assert.match(paymentRoutes, /router\.get\(\s*'\/summary'[\s\S]*authorize\(ROLES\.ADMIN\)/);
+    assert.match(paymentRoutes, /router\.get\(\s*'\/refunds'[\s\S]*authorize\(ROLES\.ADMIN\)/);
     assert.match(paymentRoutes, /authorize\(ROLES\.CUSTOMER, ROLES\.BARBER, ROLES\.ADMIN\)/);
     assert.match(paymentRoutes, /authorize\(ROLES\.CUSTOMER\)/);
     assert.match(payoutRoutes, /router\.post\('\/webhook', payoutController\.handlePayoutWebhook\)/);
+    assert.match(payoutRoutes, /router\.get\(\s*'\/summary'[\s\S]*authorize\(ROLES\.ADMIN\)/);
     assert.match(payoutRoutes, /authorize\(ROLES\.ADMIN\)/);
+
+    assert.match(userRoutes, /router\.use\(authenticate, authorize\(ROLES\.ADMIN\)\)/);
+    assert.match(userRoutes, /router\.get\('\/summary'/);
+    assert.match(customerRoutes, /router\.get\(\s*'\/'[\s\S]*authorize\(ROLES\.ADMIN\)/);
+    assert.match(barberRoutes, /router\.use\(authenticate, authorize\(ROLES\.ADMIN\)\)/);
+    assert.match(barberRoutes, /router\.get\('\/'/);
+    assert.match(subscriptionRoutes, /router\.get\('\/', authenticate, authorize\(ROLES\.ADMIN\)/);
+    assert.match(subscriptionRoutes, /router\.get\('\/summary', authenticate, authorize\(ROLES\.ADMIN\)/);
 
     assert.match(earningsRoutes, /router\.get\('\/', earningsController\.getEarnings\)/);
     assert.doesNotMatch(earningsRoutes, /\/summary/);
@@ -431,6 +454,7 @@ test('payout routes expose a compact immutable manual-payout workflow without du
     const payoutRoutes = await readSource('routes/payout.routes.js');
 
     assert.match(payoutRoutes, /router\.get\(\s*'\/pending'/);
+    assert.match(payoutRoutes, /router\.get\(\s*'\/summary'/);
     assert.match(payoutRoutes, /router\.get\(\s*'\/'/);
     assert.match(payoutRoutes, /router\.post\(\s*'\/'/);
     assert.match(payoutRoutes, /router\.get\(\s*'\/:payoutId'/);
@@ -442,4 +466,39 @@ test('payout routes expose a compact immutable manual-payout workflow without du
         payoutRoutes.indexOf("router.get(\n    '/pending'") < payoutRoutes.indexOf("router.get(\n    '/:payoutId'"),
         'GET /payouts/pending must be registered before GET /payouts/:payoutId',
     );
+    assert.ok(
+        payoutRoutes.indexOf("router.get(\n    '/summary'") < payoutRoutes.indexOf("router.get(\n    '/:payoutId'"),
+        'GET /payouts/summary must be registered before GET /payouts/:payoutId',
+    );
+});
+
+test('admin monitoring APIs are resource summaries, not dashboard-oriented endpoints', async () => {
+    const routeSources = await Promise.all([
+        readSource('routes/users.routes.js'),
+        readSource('routes/shops.routes.js'),
+        readSource('routes/bookings.routes.js'),
+        readSource('routes/payment.routes.js'),
+        readSource('routes/payout.routes.js'),
+        readSource('routes/subscription.routes.js'),
+        readSource('routes/index.js'),
+    ]);
+    const combined = routeSources.join('\n');
+
+    for (const forbidden of [
+        '/analytics/platform',
+        '/dashboard/overview',
+        '/admin/analytics',
+        '/analytics',
+        '/dashboard',
+    ]) {
+        assert.doesNotMatch(combined, new RegExp(forbidden.replace(/\//g, '\\/')));
+    }
+
+    assert.match(await readSource('routes/index.js'), /router\.use\('\/users'/);
+    assert.match(await readSource('routes/users.routes.js'), /router\.get\('\/summary'/);
+    assert.match(await readSource('routes/shops.routes.js'), /router\.get\('\/summary'/);
+    assert.match(await readSource('routes/bookings.routes.js'), /router\.get\('\/summary'/);
+    assert.match(await readSource('routes/payment.routes.js'), /router\.get\(\s*'\/summary'/);
+    assert.match(await readSource('routes/payout.routes.js'), /router\.get\(\s*'\/summary'/);
+    assert.match(await readSource('routes/subscription.routes.js'), /router\.get\('\/summary'/);
 });

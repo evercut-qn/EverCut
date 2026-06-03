@@ -18,7 +18,7 @@ import * as mediaService from './media/media.service.js';
 import * as serviceCatalogService from './service-catalog.service.js';
 import { serializeEmployee } from '../serializers/employee.serializer.js';
 import { serializeServices } from '../serializers/service.serializer.js';
-import { serializeShopProfile, serializeShopSummary } from '../serializers/shop.serializer.js';
+import { serializeBarberDirectoryItem, serializeShopProfile, serializeShopSummary } from '../serializers/shop.serializer.js';
 import {
     ALL_SERVICE_FOR,
     ALL_GENDERS,
@@ -530,6 +530,28 @@ export const getShops = async (query = {}) => {
     }
 
     return [];
+};
+
+export const getShopSummary = async () => {
+    const [summary = {}] = await shopRepository.aggregateSummary();
+    return {
+        totalShops: summary.totalShops || 0,
+        activeShops: summary.activeShops || 0,
+        inactiveShops: summary.inactiveShops || 0,
+        openShops: summary.openShops || 0,
+        closedShops: summary.closedShops || 0,
+    };
+};
+
+export const listBarbersForAdmin = async (query = {}) => {
+    const total = await barberRepository.countAdminDirectory(query);
+    const { skip, limit, pagination } = buildPagination(query, total);
+    const barbers = await barberRepository.findAdminDirectory(query, { skip, limit });
+
+    return {
+        items: barbers.map(serializeBarberDirectoryItem).filter(Boolean),
+        pagination,
+    };
 };
 
 export const getNearbyShops = async (coordinates) => {

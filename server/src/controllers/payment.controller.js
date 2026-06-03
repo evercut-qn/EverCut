@@ -48,6 +48,25 @@ export const getPayments = async (req, res, next) => {
     }
 };
 
+export const getPaymentSummary = async (_req, res, next) => {
+    try {
+        const result = await paymentService.getPaymentSummary();
+        return res.status(200).json(ApiResponse.success(result, 'Payment summary fetched'));
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const getRefunds = async (req, res, next) => {
+    try {
+        const query = getValidatedRequestData(req, 'query');
+        const result = await paymentService.getRefundsForAdmin(query);
+        return res.status(200).json(ApiResponse.paginated(result.items, result.pagination, 'Refunds fetched'));
+    } catch (error) {
+        next(error);
+    }
+};
+
 export const getPaymentStatus = async (req, res, next) => {
     try {
         const { id } = getValidatedRequestData(req, 'params');

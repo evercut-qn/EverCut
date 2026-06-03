@@ -11,6 +11,20 @@ export const getMe = async (req, res, next) => {
     }
 };
 
+export const listCustomers = async (req, res, next) => {
+    try {
+        const query = getValidatedRequestData(req, 'query');
+        const result = await userService.listCustomersForAdmin(query);
+        return res.status(200).json(ApiResponse.paginated(
+            result.items,
+            result.pagination,
+            'Customers fetched',
+        ));
+    } catch (err) {
+        next(err);
+    }
+};
+
 export const updateMe = async (req, res, next) => {
     try {
         const body = getValidatedRequestData(req, 'body');

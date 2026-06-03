@@ -5,8 +5,8 @@ import { ROLES } from '../utils/constants.js';
 import { getValidatedRequestData } from '../utils/request-validation.utils.js';
 
 const assertSupportedBookingRole = (roleType) => {
-    if (![ROLES.CUSTOMER, ROLES.BARBER].includes(roleType)) {
-        throw new ForbiddenError('This endpoint is available only to customers and barbers');
+    if (![ROLES.CUSTOMER, ROLES.BARBER, ROLES.ADMIN].includes(roleType)) {
+        throw new ForbiddenError('This endpoint is available only to customers, barbers, and admins');
     }
 };
 
@@ -31,17 +31,22 @@ export const getBookings = async (req, res, next) => {
 
         if (req.user.roleType === ROLES.CUSTOMER) {
             // Customers cannot use barber-only filters
-            if (query.employeeId) {
-                throw new ForbiddenError('Employee filters are only available for barbers');
+            if (query.employeeId || query.payoutStatus || query.shopId || query.customerId || query.search) {
+                throw new ForbiddenError('These booking filters are not available for customers');
             }
             
             const result = await bookingService.getCustomerBookings(req.user._id, query);
             return res.status(200).json(ApiResponse.paginated(result.items, result.pagination, 'Bookings fetched'));
         }
 
+        if (req.user.roleType === ROLES.ADMIN) {
+            const result = await bookingService.getBookingsForAdmin(query);
+            return res.status(200).json(ApiResponse.paginated(result.items, result.pagination, 'Bookings fetched'));
+        }
+
         // Barbers cannot use customer-only filters
-        if (query.favorite) {
-            throw new ForbiddenError('Favorite filters are only available for customers');
+        if (query.favorite || query.payoutStatus || query.shopId || query.customerId || query.search) {
+            throw new ForbiddenError('These booking filters are not available for barbers');
         }
         
         const result = await bookingService.getBookingsByShop(req.user._id, query);
@@ -56,6 +61,15 @@ export const getBookings = async (req, res, next) => {
                 },
             ),
         );
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const getBookingSummary = async (_req, res, next) => {
+    try {
+        const result = await bookingService.getBookingSummary();
+        return res.status(200).json(ApiResponse.success(result, 'Booking summary fetched'));
     } catch (err) {
         next(err);
     }

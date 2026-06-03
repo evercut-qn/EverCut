@@ -86,6 +86,100 @@ class PaymentRepository {
         return PaymentTransaction.countDocuments(trustQueryOperators(filter));
     }
 
+    async aggregateAdminSummary({ trendStartDate } = {}) {
+        const [statusRows, [totals = {}], monthlyTrend] = await Promise.all([
+            PaymentTransaction.aggregate([
+                { $group: { _id: '$status', count: { $sum: 1 } } },
+                { $project: { _id: 0, status: '$_id', count: 1 } },
+                { $sort: { status: 1 } },
+            ]),
+            PaymentTransaction.aggregate([
+                {
+                    $group: {
+                        _id: null,
+                        totalPayments: { $sum: 1 },
+                        successCount: {
+                            $sum: { $cond: [{ $eq: ['$status', PAYMENT_TRANSACTION_STATUS.COMPLETED] }, 1, 0] },
+                        },
+                        failedCount: {
+                            $sum: { $cond: [{ $eq: ['$status', PAYMENT_TRANSACTION_STATUS.FAILED] }, 1, 0] },
+                        },
+                        customerPaymentsCollectedInPaisa: {
+                            $sum: {
+                                $cond: [
+                                    { $eq: ['$status', PAYMENT_TRANSACTION_STATUS.COMPLETED] },
+                                    '$amount',
+                                    0,
+                                ],
+                            },
+                        },
+                        platformFeesCollectedInPaisa: {
+                            $sum: {
+                                $cond: [
+                                    { $eq: ['$status', PAYMENT_TRANSACTION_STATUS.COMPLETED] },
+                                    { $ifNull: ['$settlement.platformFee', 0] },
+                                    0,
+                                ],
+                            },
+                        },
+                    },
+                },
+            ]),
+            PaymentTransaction.aggregate([
+                {
+                    $match: {
+                        status: PAYMENT_TRANSACTION_STATUS.COMPLETED,
+                        createdAt: { $gte: trendStartDate || new Date(Date.now() - 365 * 24 * 60 * 60 * 1000) },
+                    },
+                },
+                {
+                    $group: {
+                        _id: {
+                            year: { $year: { date: '$createdAt', timezone: 'UTC' } },
+                            month: { $month: { date: '$createdAt', timezone: 'UTC' } },
+                        },
+                        amountInPaisa: { $sum: '$amount' },
+                        platformFeeInPaisa: { $sum: { $ifNull: ['$settlement.platformFee', 0] } },
+                    },
+                },
+                {
+                    $project: {
+                        _id: 0,
+                        year: '$_id.year',
+                        month: '$_id.month',
+                        customerPaymentsCollectedInRupees: { $divide: ['$amountInPaisa', 100] },
+                        platformFeeInRupees: { $divide: ['$platformFeeInPaisa', 100] },
+                    },
+                },
+                { $sort: { year: 1, month: 1 } },
+            ]),
+        ]);
+
+        return { statusRows, totals, monthlyTrend };
+    }
+
+    async findRefunds(filter = {}, options = {}) {
+        const query = PaymentTransaction.find(trustQueryOperators({
+            ...filter,
+            refund: { $ne: null },
+        }))
+            .sort({ 'refund.initiatedAt': -1, createdAt: -1 })
+            .populate('bookingId', 'date time status paymentStatus payoutStatus totalAmount')
+            .populate('customerId', 'firstName lastName userId')
+            .populate('shopId', 'shopName barberId');
+
+        if (options.skip !== undefined) query.skip(options.skip);
+        if (options.limit !== undefined) query.limit(options.limit);
+        return query.lean();
+    }
+
+    async countRefunds(filter = {}) {
+        return PaymentTransaction.countDocuments(trustQueryOperators({
+            ...filter,
+            refund: { $ne: null },
+        }));
+    }
+
     async aggregateIncomeByMonth(shopId, startDate, endDate) {
         return PaymentTransaction.aggregate([
             {

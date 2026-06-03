@@ -42,6 +42,12 @@ router.get(
 );
 
 router.get(
+    '/summary',
+    authorize(ROLES.ADMIN),
+    payoutController.getPayoutSummary,
+);
+
+router.get(
     '/:payoutId',
     authorize(ROLES.ADMIN),
     validate(payoutIdParamSchema, 'params'),

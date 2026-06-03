@@ -53,6 +53,27 @@ class PayoutRepository {
         return PayoutTransaction.countDocuments(trustQueryOperators(filter));
     }
 
+    async aggregateAdminSummary() {
+        return PayoutTransaction.aggregate([
+            {
+                $group: {
+                    _id: '$status',
+                    count: { $sum: 1 },
+                    totalAmountInPaisa: { $sum: '$amount' },
+                },
+            },
+            {
+                $project: {
+                    _id: 0,
+                    status: '$_id',
+                    count: 1,
+                    totalAmountInRupees: { $divide: ['$totalAmountInPaisa', 100] },
+                },
+            },
+            { $sort: { status: 1 } },
+        ]);
+    }
+
     async findByIdPopulated(id) {
         return PayoutTransaction.findById(id)
             .populate('barberId', 'firstName lastName upiId accountHolderName')
