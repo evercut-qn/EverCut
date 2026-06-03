@@ -91,6 +91,29 @@ export const getTransactions = async (req, res, next) => {
     }
 };
 
+export const getSubscriptionSummary = async (_req, res, next) => {
+    try {
+        const result = await subscriptionService.getSubscriptionSummary();
+        return res.status(200).json(ApiResponse.success(result, 'Subscription summary fetched'));
+    } catch (error) {
+        return next(error);
+    }
+};
+
+export const listSubscriptions = async (req, res, next) => {
+    try {
+        const query = getValidatedRequestData(req, 'query');
+        const result = await subscriptionService.listSubscriptionsForAdmin(query);
+        return res.status(200).json(ApiResponse.paginated(
+            result.items,
+            result.pagination,
+            'Subscriptions fetched',
+        ));
+    } catch (error) {
+        return next(error);
+    }
+};
+
 export const handleWebhook = async (req, res) => {
     try {
         const result = await webhookService.handleWebhook(req.headers, req.rawBody || req.body);

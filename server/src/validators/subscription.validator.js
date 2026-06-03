@@ -1,5 +1,5 @@
 import Joi from 'joi';
-import { ALL_SUBSCRIPTION_PLANS } from '../utils/constants.js';
+import { ALL_SUBSCRIPTION_PLANS, ALL_SUBSCRIPTION_STATUSES } from '../utils/constants.js';
 import { paginationSchema } from './common.validator.js';
 
 const planIdSchema = Joi.string()
@@ -16,4 +16,9 @@ export const subscriptionPlanBodySchema = Joi.object({
 
 export const subscriptionTransactionQuerySchema = paginationSchema.keys({
     limit: Joi.number().integer().min(1).max(100).default(20),
+});
+
+export const adminSubscriptionListQuerySchema = paginationSchema.keys({
+    planId: Joi.string().valid(...ALL_SUBSCRIPTION_PLANS).optional(),
+    status: Joi.string().valid(...ALL_SUBSCRIPTION_STATUSES).optional(),
 });

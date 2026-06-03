@@ -8,6 +8,7 @@ import {
     initiatePaymentSchema,
     paymentIdParamSchema,
     paymentListQuerySchema,
+    refundListQuerySchema,
     verifyPaymentSchema,
 } from '../validators/payment.validator.js';
 import { ROLES } from '../utils/constants.js';
@@ -25,6 +26,19 @@ router.get(
     authorize(ROLES.CUSTOMER, ROLES.BARBER, ROLES.ADMIN),
     validate(paymentListQuerySchema, 'query'),
     paymentController.getPayments,
+);
+
+router.get(
+    '/summary',
+    authorize(ROLES.ADMIN),
+    paymentController.getPaymentSummary,
+);
+
+router.get(
+    '/refunds',
+    authorize(ROLES.ADMIN),
+    validate(refundListQuerySchema, 'query'),
+    paymentController.getRefunds,
 );
 
 router.post(

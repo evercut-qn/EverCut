@@ -709,6 +709,39 @@ export const getPayments = async (actorOrUserId, query = {}) => {
     };
 };
 
+export const getPaymentSummary = async () => {
+    const trendStartDate = new Date(Date.UTC(new Date().getUTCFullYear(), 0, 1));
+    const { statusRows, totals, monthlyTrend } = await paymentRepository.aggregateAdminSummary({ trendStartDate });
+    const successCount = totals.successCount || 0;
+    const failedCount = totals.failedCount || 0;
+    const attemptedPayments = successCount + failedCount;
+
+    return {
+        totalPayments: totals.totalPayments || 0,
+        successCount,
+        failedCount,
+        paymentSuccessRate: attemptedPayments > 0 ? Math.round((successCount / attemptedPayments) * 10000) / 100 : 0,
+        customerPaymentsCollectedInRupees: (totals.customerPaymentsCollectedInPaisa || 0) / 100,
+        platformFeesCollectedInRupees: (totals.platformFeesCollectedInPaisa || 0) / 100,
+        statusDistribution: statusRows,
+        monthlyTrends: monthlyTrend,
+    };
+};
+
+export const getRefundsForAdmin = async (query = {}) => {
+    const filter = {};
+    if (query.status) filter.status = query.status;
+    if (query.refundStatus) filter['refund.status'] = query.refundStatus;
+    const total = await paymentRepository.countRefunds(filter);
+    const { skip, limit, pagination } = buildPagination(query, total);
+    const refunds = await paymentRepository.findRefunds(filter, { skip, limit });
+
+    return {
+        items: refunds.map(buildPaymentListItem),
+        pagination,
+    };
+};
+
 export const getPaymentStatus = async (actorOrUserId, paymentId) => {
     const payment = await paymentRepository.findById(paymentId);
     if (!payment) {

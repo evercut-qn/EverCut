@@ -401,6 +401,12 @@ const MONTH_LABEL_FORMATTER = new Intl.DateTimeFormat('en-US', {
     timeZone: 'UTC',
 });
 
+const startOfUtcDay = (date) => new Date(Date.UTC(
+    date.getUTCFullYear(),
+    date.getUTCMonth(),
+    date.getUTCDate(),
+));
+
 const getOrdinalLabel = (index) => {
     const ordinals = ['1st', '2nd', '3rd'];
     return ordinals[index] || `${index + 1}th`;
@@ -421,7 +427,7 @@ const getDefaultProgressPeriod = () => {
     };
 };
 
-const buildBookingDetailsPayload = async (booking) => {
+const buildBookingDetailsPayload = async (booking, options = {}) => {
     const services = normalizeBookedServices(
         await serviceRepository.findByIds(
             booking.serviceIds,
@@ -435,6 +441,7 @@ const buildBookingDetailsPayload = async (booking) => {
         customer: booking.customerId,
         employee: booking.employeeId,
         shop: booking.shopId,
+        barber: booking.shopId?.barberId,
         date: booking.date,
         time: booking.time,
         endTime: booking.endTime,
@@ -451,7 +458,7 @@ const buildBookingDetailsPayload = async (booking) => {
         slotLockTimes: booking.slotLockTimes,
         paymentTransactionId: booking.paymentTransactionId,
         merchantOrderId: booking.merchantOrderId,
-    });
+    }, options);
 };
 
 export const createBooking = async (userId, data) => {
@@ -659,7 +666,62 @@ export const getBookingDetailsForUser = async (bookingId, user) => {
         return getBookingDetailsForShopOwner(bookingId, user._id);
     }
 
-    throw new ForbiddenError('This endpoint is available only to customers and barbers');
+    if (user.roleType === ROLES.ADMIN) {
+        const booking = await bookingRepository.findByIdPopulated(bookingId);
+        if (!booking) throw new NotFoundError('Booking');
+        return buildBookingDetailsPayload(await withPayableAmountSummary(booking), {
+            includeCustomerContact: true,
+            includeBarber: true,
+        });
+    }
+
+    throw new ForbiddenError('This endpoint is available only to customers, barbers, and admins');
+};
+
+export const getBookingSummary = async () => {
+    const now = new Date();
+    const weekStartDate = startOfUtcDay(new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000));
+    const monthStartDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+    const trendStartDate = startOfUtcDay(new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000));
+
+    const { totals, statusRows, dailyTrend, monthlyTrend, topShops } = await bookingRepository.aggregateAdminSummary({
+        weekStartDate,
+        monthStartDate,
+        trendStartDate,
+    });
+
+    return {
+        totalBookings: {
+            allTime: totals.allTime || 0,
+            thisMonth: totals.thisMonth || 0,
+            thisWeek: totals.thisWeek || 0,
+        },
+        statusDistribution: statusRows,
+        trends: {
+            daily: dailyTrend,
+            monthly: monthlyTrend,
+        },
+        topShops: topShops.map((shop) => ({
+            shopId: toObjectIdString(shop.shopId),
+            shopName: shop.shopName,
+            bookingCount: shop.bookingCount || 0,
+            paidServiceValueInRupees: shop.paidServiceValueInRupees || 0,
+        })),
+    };
+};
+
+export const getBookingsForAdmin = async (query = {}) => {
+    const total = await bookingRepository.countAdminList(query);
+    const { skip, limit, pagination } = buildPagination(query, total);
+    const bookings = await bookingRepository.findAdminList(query, { skip, limit });
+
+    return {
+        items: bookings.map((booking) => serializeBooking(booking, {
+            includeCustomerContact: true,
+            includeBarber: true,
+        })).filter(Boolean),
+        pagination,
+    };
 };
 
 // ── Customer: cancel booking ─────────────────────────────────────────────

@@ -1,9 +1,11 @@
 import customerRepository from '../repositories/customer.repository.js';
+import userRepository from '../repositories/user.repository.js';
 import { NotFoundError, BadRequestError } from '../utils/api-error.js';
 import notificationEvents from './notification-events.service.js';
-import { serializeCustomerProfile } from '../serializers/customer.serializer.js';
+import { serializeCustomerDirectoryItem, serializeCustomerProfile } from '../serializers/customer.serializer.js';
 import * as mediaService from './media/media.service.js';
-import { MEDIA_ENTITY_TYPE, MEDIA_PURPOSE } from '../utils/constants.js';
+import { MEDIA_ENTITY_TYPE, MEDIA_PURPOSE, ROLES } from '../utils/constants.js';
+import { buildPagination } from '../utils/pagination.utils.js';
 
 /**
  * Customer-facing profile service.
@@ -57,4 +59,17 @@ export const updateProfile = async (userId, data) => {
     });
 
     return serializeCustomerProfile(updated);
+};
+
+
+
+export const listCustomersForAdmin = async (query = {}) => {
+    const total = await customerRepository.countAdminDirectory(query);
+    const { skip, limit, pagination } = buildPagination(query, total);
+    const customers = await customerRepository.findAdminDirectory(query, { skip, limit });
+
+    return {
+        items: customers.map(serializeCustomerDirectoryItem).filter(Boolean),
+        pagination,
+    };
 };

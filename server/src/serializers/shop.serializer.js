@@ -137,3 +137,35 @@ export const serializeBarberProfile = ({ barber, shop, user, photos, entitlement
 
     return profile;
 };
+
+export const serializeBarberDirectoryItem = (entry) => {
+    const raw = toPlainObject(entry);
+    const plain = sanitizeForResponse(raw);
+    if (!plain) return null;
+    const user = sanitizeForResponse(toPlainObject(raw.user || plain.user)) || {};
+    const shop = sanitizeForResponse(toPlainObject(raw.shop || plain.shop)) || {};
+
+    return compact({
+        id: plain.id,
+        barberUserId: user.id || toPlainObject(raw.user)?._id?.toString?.() || null,
+        barberName: `${plain.firstName || ''} ${plain.lastName || ''}`.trim() || null,
+        shopId: shop.id || toPlainObject(raw.shop)?._id?.toString?.() || null,
+        shopName: shop.shopName ?? null,
+        payout: {
+            upiId: plain.upiId ?? null,
+            beneficiaryId: plain.payoutConfig?.beneficiaryId || null,
+            verificationStatus: plain.payoutConfig?.verificationStatus || 'pending',
+        },
+        address: shop.address ?? null,
+        location: shop.location ?? null,
+        rating: {
+            average: Number.isFinite(Number(plain.averageRating))
+                ? Math.round(Number(plain.averageRating) * 10) / 10
+                : null,
+            count: plain.ratingCount || 0,
+        },
+        isOpen: shop.isOpen ?? false,
+        isActive: user.isActive ?? false,
+        createdAt: user.createdAt ?? plain.createdAt,
+    });
+};

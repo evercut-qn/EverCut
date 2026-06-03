@@ -1,6 +1,9 @@
+import mongoose from 'mongoose';
+
 import Booking from '../models/booking.model.js';
 import { BOOKING_STATUS, PAYMENT_STATUS, PAYOUT_STATUS } from '../utils/constants.js';
 import { trustQueryOperators } from '../utils/mongoose-query.utils.js';
+import { escapeRegex } from '../utils/regex.utils.js';
 
 const ACTIVE_BOOKING_STATUSES = [
     BOOKING_STATUS.PENDING,
@@ -71,7 +74,11 @@ class BookingRepository {
 
     async findByIdPopulated(id) {
         return Booking.findById(id)
-            .populate('shopId', 'shopName coverR2Key address openTime closeTime')
+            .populate({
+                path: 'shopId',
+                select: 'shopName coverR2Key address openTime closeTime barberId',
+                populate: { path: 'barberId', select: 'firstName lastName upiId accountHolderName' },
+            })
             .populate(EMPLOYEE_POPULATE)
             .populate(PAYMENT_SUMMARY_POPULATE)
             .populate({
@@ -251,6 +258,239 @@ class BookingRepository {
 
     async countAll(filter = {}) {
         return Booking.countDocuments(trustQueryOperators(filter));
+    }
+
+    async aggregateAdminSummary({ fromDate, weekStartDate, monthStartDate, trendStartDate } = {}) {
+        const [
+            [totals = {}],
+            statusRows,
+            dailyTrend,
+            monthlyTrend,
+            topShops,
+        ] = await Promise.all([
+            Booking.aggregate([
+                { $match: {} },
+                {
+                    $group: {
+                        _id: null,
+                        allTime: { $sum: 1 },
+                        thisWeek: {
+                            $sum: {
+                                $cond: [{ $gte: ['$createdAt', weekStartDate || fromDate] }, 1, 0],
+                            },
+                        },
+                        thisMonth: {
+                            $sum: {
+                                $cond: [{ $gte: ['$createdAt', monthStartDate || fromDate] }, 1, 0],
+                            },
+                        },
+                    },
+                },
+            ]),
+            Booking.aggregate([
+                { $group: { _id: '$status', count: { $sum: 1 } } },
+                { $project: { _id: 0, status: '$_id', count: 1 } },
+                { $sort: { status: 1 } },
+            ]),
+            Booking.aggregate([
+                { $match: { createdAt: { $gte: trendStartDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } } },
+                {
+                    $group: {
+                        _id: {
+                            year: { $year: { date: '$createdAt', timezone: 'UTC' } },
+                            month: { $month: { date: '$createdAt', timezone: 'UTC' } },
+                            day: { $dayOfMonth: { date: '$createdAt', timezone: 'UTC' } },
+                        },
+                        count: { $sum: 1 },
+                    },
+                },
+                {
+                    $project: {
+                        _id: 0,
+                        date: {
+                            $dateToString: {
+                                format: '%Y-%m-%d',
+                                date: { $dateFromParts: { year: '$_id.year', month: '$_id.month', day: '$_id.day' } },
+                            },
+                        },
+                        count: 1,
+                    },
+                },
+                { $sort: { date: 1 } },
+            ]),
+            Booking.aggregate([
+                { $match: { createdAt: { $gte: trendStartDate || new Date(Date.now() - 365 * 24 * 60 * 60 * 1000) } } },
+                {
+                    $group: {
+                        _id: {
+                            year: { $year: { date: '$createdAt', timezone: 'UTC' } },
+                            month: { $month: { date: '$createdAt', timezone: 'UTC' } },
+                        },
+                        count: { $sum: 1 },
+                    },
+                },
+                {
+                    $project: {
+                        _id: 0,
+                        year: '$_id.year',
+                        month: '$_id.month',
+                        count: 1,
+                    },
+                },
+                { $sort: { year: 1, month: 1 } },
+            ]),
+            Booking.aggregate([
+                {
+                    $group: {
+                        _id: '$shopId',
+                        bookingCount: { $sum: 1 },
+                        paidServiceValueInRupees: {
+                            $sum: {
+                                $cond: [
+                                    { $in: ['$paymentStatus', [PAYMENT_STATUS.SUCCESS, PAYMENT_STATUS.REFUNDED, PAYMENT_STATUS.REFUND_PENDING, PAYMENT_STATUS.REFUND_FAILED]] },
+                                    '$totalAmount',
+                                    0,
+                                ],
+                            },
+                        },
+                    },
+                },
+                {
+                    $lookup: {
+                        from: 'shops',
+                        localField: '_id',
+                        foreignField: '_id',
+                        as: 'shop',
+                    },
+                },
+                { $unwind: '$shop' },
+                { $match: { 'shop.deletedAt': null } },
+                {
+                    $project: {
+                        _id: 0,
+                        shopId: '$_id',
+                        shopName: '$shop.shopName',
+                        bookingCount: 1,
+                        paidServiceValueInRupees: 1,
+                    },
+                },
+                { $sort: { bookingCount: -1, paidServiceValueInRupees: -1 } },
+                { $limit: 5 },
+            ]),
+        ]);
+
+        return { totals, statusRows, dailyTrend, monthlyTrend, topShops };
+    }
+
+    buildAdminListPipeline(query = {}) {
+        const match = {};
+        if (query.status) match.status = Array.isArray(query.status) ? { $in: query.status } : query.status;
+        if (query.paymentStatus) {
+            match.paymentStatus = Array.isArray(query.paymentStatus) ? { $in: query.paymentStatus } : query.paymentStatus;
+        }
+        if (query.payoutStatus) {
+            match.payoutStatus = Array.isArray(query.payoutStatus) ? { $in: query.payoutStatus } : query.payoutStatus;
+        }
+        if (query.shopId) match.shopId = new mongoose.Types.ObjectId(query.shopId);
+        if (query.customerId) match.customerId = new mongoose.Types.ObjectId(query.customerId);
+        if (query.dateFrom || query.dateTo) {
+            match.date = {};
+            if (query.dateFrom) match.date.$gte = new Date(`${query.dateFrom}T00:00:00.000Z`);
+            if (query.dateTo) match.date.$lte = new Date(`${query.dateTo}T23:59:59.999Z`);
+        }
+
+        const pipeline = [
+            { $match: match },
+            {
+                $lookup: {
+                    from: 'customers',
+                    localField: 'customerId',
+                    foreignField: '_id',
+                    as: 'customer',
+                },
+            },
+            { $unwind: { path: '$customer', preserveNullAndEmptyArrays: true } },
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'customer.userId',
+                    foreignField: '_id',
+                    as: 'customerUser',
+                },
+            },
+            { $unwind: { path: '$customerUser', preserveNullAndEmptyArrays: true } },
+            {
+                $lookup: {
+                    from: 'shops',
+                    localField: 'shopId',
+                    foreignField: '_id',
+                    as: 'shop',
+                },
+            },
+            { $unwind: { path: '$shop', preserveNullAndEmptyArrays: true } },
+            {
+                $lookup: {
+                    from: 'employees',
+                    localField: 'employeeId',
+                    foreignField: '_id',
+                    as: 'employee',
+                },
+            },
+            { $unwind: { path: '$employee', preserveNullAndEmptyArrays: true } },
+            {
+                $lookup: {
+                    from: 'barbers',
+                    localField: 'shop.barberId',
+                    foreignField: '_id',
+                    as: 'barber',
+                },
+            },
+            { $unwind: { path: '$barber', preserveNullAndEmptyArrays: true } },
+            {
+                $lookup: {
+                    from: 'services',
+                    localField: 'serviceIds',
+                    foreignField: '_id',
+                    as: 'services',
+                },
+            },
+        ];
+
+        if (query.search) {
+            const regex = new RegExp(escapeRegex(query.search), 'i');
+            const searchConditions = [
+                { 'customerUser.phoneNumber': regex },
+                { 'customerUser.email': regex },
+                { 'customer.firstName': regex },
+                { 'customer.lastName': regex },
+                { 'shop.shopName': regex },
+            ];
+            if (mongoose.Types.ObjectId.isValid(query.search)) {
+                searchConditions.push({ _id: new mongoose.Types.ObjectId(query.search) });
+            }
+            pipeline.push({ $match: { $or: searchConditions } });
+        }
+
+        return pipeline;
+    }
+
+    async countAdminList(query = {}) {
+        const [result] = await Booking.aggregate([
+            ...this.buildAdminListPipeline(query),
+            { $count: 'total' },
+        ]);
+        return result?.total || 0;
+    }
+
+    async findAdminList(query = {}, options = {}) {
+        const pipeline = [
+            ...this.buildAdminListPipeline(query),
+            { $sort: { date: -1, createdAt: -1 } },
+        ];
+
+        if (options.skip !== undefined) pipeline.push({ $skip: options.skip });
+        if (options.limit !== undefined) pipeline.push({ $limit: options.limit });
+        return Booking.aggregate(pipeline);
     }
 
     async countByStatus(status, employeeIds) {

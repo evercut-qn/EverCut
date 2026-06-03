@@ -501,6 +501,18 @@ export const listPayouts = async (query = {}) => {
     };
 };
 
+export const getPayoutSummary = async () => {
+    const rows = await payoutRepository.aggregateAdminSummary();
+    return {
+        statusDistribution: rows,
+        byStatus: rows.reduce((result, row) => {
+            result[row.status] = row.count || 0;
+            return result;
+        }, {}),
+        totalAmountInRupees: rows.reduce((sum, row) => sum + (row.totalAmountInRupees || 0), 0),
+    };
+};
+
 export const getPayoutDetail = async (payoutId) => {
     const payout = await payoutRepository.findByIdPopulated(payoutId);
     if (!payout) {

@@ -75,6 +75,30 @@ class ShopRepository {
     async softDelete(id) {
         return Shop.findByIdAndUpdate(id, { deletedAt: new Date() });
     }
+
+    async aggregateSummary() {
+        return Shop.aggregate([
+            { $match: { deletedAt: null } },
+            {
+                $group: {
+                    _id: null,
+                    totalShops: { $sum: 1 },
+                    openShops: { $sum: { $cond: ['$isOpen', 1, 0] } },
+                    closedShops: { $sum: { $cond: ['$isOpen', 0, 1] } },
+                },
+            },
+            {
+                $project: {
+                    _id: 0,
+                    totalShops: 1,
+                    activeShops: '$openShops',
+                    inactiveShops: '$closedShops',
+                    openShops: 1,
+                    closedShops: 1,
+                },
+            },
+        ]);
+    }
 }
 
 export default new ShopRepository();

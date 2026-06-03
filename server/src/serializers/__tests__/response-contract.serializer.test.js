@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 import config from '../../config/index.js';
 import { serializeBooking } from '../booking.serializer.js';
-import { serializeCustomerProfile, serializeCustomerSummary } from '../customer.serializer.js';
+import { serializeCustomerDirectoryItem, serializeCustomerProfile, serializeCustomerSummary } from '../customer.serializer.js';
 import { serializeEmployee } from '../employee.serializer.js';
 import { serializeNotification, serializeFcmTokenRegistration } from '../notification.serializer.js';
 import { serializePayment, serializePaymentInitiation, serializePaymentStatus } from '../payment.serializer.js';
@@ -14,7 +14,7 @@ import { serializePayout } from '../payout.serializer.js';
 import { serializeMedia } from '../media.serializer.js';
 import { serializeRating } from '../rating.serializer.js';
 import { serializeService } from '../service.serializer.js';
-import { serializeBarberProfile, serializeShopProfile, serializeShopSummary } from '../shop.serializer.js';
+import { serializeBarberDirectoryItem, serializeBarberProfile, serializeShopProfile, serializeShopSummary } from '../shop.serializer.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const srcDir = path.resolve(__dirname, '..', '..');
@@ -253,6 +253,108 @@ test('booking serializer keeps bare ObjectId refs as ids instead of empty relati
     assert.equal('customer' in booking, false);
     assert.equal('shop' in booking, false);
     assert.equal('employee' in booking, false);
+});
+
+test('admin directory and payout serializers expose complete admin-visible contact and payout fields', () => {
+    const customer = serializeCustomerDirectoryItem({
+        _id: '507f1f77bcf86cd799439011',
+        firstName: 'Mina',
+        lastName: 'Shah',
+        totalBookings: 3,
+        user: {
+            _id: '507f1f77bcf86cd799439012',
+            email: 'mina@example.com',
+            phoneNumber: '+919876543210',
+            isActive: true,
+            createdAt: '2026-01-01T00:00:00.000Z',
+        },
+    });
+    const barber = serializeBarberDirectoryItem({
+        _id: '507f1f77bcf86cd799439013',
+        firstName: 'Asha',
+        lastName: 'Rao',
+        upiId: 'asha.rao@upi',
+        payoutConfig: { beneficiaryId: 'BARBER_123', verificationStatus: 'verified' },
+        user: { _id: '507f1f77bcf86cd799439014', isActive: true },
+        shop: {
+            _id: '507f1f77bcf86cd799439015',
+            shopName: 'Trim Studio',
+            isOpen: true,
+        },
+    });
+    const payout = serializePayout({
+        _id: '507f1f77bcf86cd799439016',
+        barberId: {
+            _id: '507f1f77bcf86cd799439017',
+            firstName: 'Asha',
+            upiId: 'asha.rao@upi',
+        },
+    });
+
+    assert.equal(customer.contact.phoneNumber, '+919876543210');
+    assert.equal(customer.contact.email, 'mina@example.com');
+    assert.equal(barber.payout.upiId, 'asha.rao@upi');
+    assert.equal(payout.barber.upiId, 'asha.rao@upi');
+});
+
+test('admin booking serializer prefers business display relations over raw ids', () => {
+    const booking = serializeBooking({
+        _id: '507f1f77bcf86cd799439011',
+        customerId: {
+            _bsontype: 'ObjectId',
+            toHexString: () => '507f1f77bcf86cd799439012',
+        },
+        shopId: {
+            _bsontype: 'ObjectId',
+            toHexString: () => '507f1f77bcf86cd799439013',
+        },
+        employeeId: {
+            _bsontype: 'ObjectId',
+            toHexString: () => '507f1f77bcf86cd799439014',
+        },
+        customer: {
+            _id: '507f1f77bcf86cd799439012',
+            firstName: 'Mina',
+            lastName: 'Shah',
+        },
+        customerUser: {
+            _id: '507f1f77bcf86cd799439020',
+            phoneNumber: '+919876543210',
+            email: 'mina@example.com',
+        },
+        shop: {
+            _id: '507f1f77bcf86cd799439013',
+            shopName: 'EverCut Studio',
+        },
+        employee: {
+            _id: '507f1f77bcf86cd799439014',
+            firstName: 'Dev',
+            lastName: 'Patel',
+        },
+        barber: {
+            _id: '507f1f77bcf86cd799439015',
+            firstName: 'Asha',
+            lastName: 'Rao',
+        },
+        services: [
+            {
+                _id: '507f1f77bcf86cd799439016',
+                serviceName: 'Haircut',
+                serviceType: 'single',
+                duration: 30,
+                finalPrice: 450,
+            },
+        ],
+    }, { includeCustomerContact: true, includeBarber: true });
+
+    assert.equal(booking.customer.firstName, 'Mina');
+    assert.equal(booking.customer.contact.phoneNumber, '+919876543210');
+    assert.equal(booking.shop.shopName, 'EverCut Studio');
+    assert.equal(booking.employee.firstName, 'Dev');
+    assert.equal(booking.barber.fullName, 'Asha Rao');
+    assert.equal(booking.services[0].serviceName, 'Haircut');
+    assert.equal('customerId' in booking, false);
+    assert.equal('shopId' in booking, false);
 });
 
 test('booking serializer exposes service amount and payable total when payment is populated', () => {

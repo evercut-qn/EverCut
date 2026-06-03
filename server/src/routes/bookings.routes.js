@@ -29,14 +29,15 @@ router.use(authenticate);
 // ============================================================================
 
 router.post('/', authorize(ROLES.CUSTOMER), validate(createBookingSchema, 'body'), bookingController.createBooking);
-router.get('/', authorize(ROLES.CUSTOMER, ROLES.BARBER), validate(bookingListQuerySchema, 'query'), bookingController.getBookings);
+router.get('/', authorize(ROLES.CUSTOMER, ROLES.BARBER, ROLES.ADMIN), validate(bookingListQuerySchema, 'query'), bookingController.getBookings);
+router.get('/summary', authorize(ROLES.ADMIN), bookingController.getBookingSummary);
 router.get('/overview', authorize(ROLES.BARBER), validate(bookingOverviewQuerySchema, 'query'), bookingController.getBookingOverview);
 
 // ============================================================================
 // Resource Routes (with :id parameter)
 // ============================================================================
 
-router.get('/:id', authorize(ROLES.CUSTOMER, ROLES.BARBER), validate(bookingIdParamSchema, 'params'), bookingController.getBookingById);
+router.get('/:id', authorize(ROLES.CUSTOMER, ROLES.BARBER, ROLES.ADMIN), validate(bookingIdParamSchema, 'params'), bookingController.getBookingById);
 router.patch('/:id', authorize(ROLES.CUSTOMER, ROLES.BARBER), validate(bookingIdParamSchema, 'params'), validate(bookingPatchSchema, 'body'), bookingController.patchBooking);
 router.patch('/:id/favorite', authorize(ROLES.CUSTOMER), validate(bookingIdParamSchema, 'params'), validate(favoritePatchSchema, 'body'), bookingController.setFavoriteBooking);
 router.post('/:id/refunds', authorize(ROLES.ADMIN, ROLES.BARBER), validate(bookingIdParamSchema, 'params'), validate(refundSchema, 'body'), paymentController.initiateRefund);

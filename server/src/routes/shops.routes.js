@@ -28,6 +28,7 @@ const router = Router();
 
 // Shop discovery and browsing
 router.get('/', validate(shopListQuerySchema, 'query'), shopController.getShops);
+router.get('/summary', authenticate, authorize(ROLES.ADMIN), shopController.getShopSummary);
 router.get('/services', validate(servicesByGenderQuerySchema, 'query'), shopController.getNearbyServices);
 router.get('/favorites', authenticate, authorize(ROLES.CUSTOMER), validate(paginationSchema, 'query'), shopController.getFavoriteShops);
 

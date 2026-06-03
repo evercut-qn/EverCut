@@ -1,4 +1,5 @@
 import barberRepository from '../../repositories/barber.repository.js';
+import shopRepository from '../../repositories/shop.repository.js';
 import subscriptionRepository from '../../repositories/subscription.repository.js';
 import subscriptionTransactionRepository from '../../repositories/subscription-transaction.repository.js';
 import entitlementService from './entitlement.service.js';
@@ -24,6 +25,7 @@ import {
 } from '../../utils/api-error.js';
 import { buildPagination } from '../../utils/pagination.utils.js';
 import logger from '../../utils/logger.js';
+import { serializeAdminSubscription } from '../../serializers/subscription.serializer.js';
 
 const LOG = '[SubscriptionService]';
 
@@ -299,6 +301,58 @@ class SubscriptionService {
             { skip, limit: normalizedLimit },
         );
         return { transactions, pagination };
+    }
+
+    async getSubscriptionSummary() {
+        const rows = await subscriptionRepository.aggregateAdminSummary();
+        const byPlan = {};
+        const byStatus = {};
+        let activeSubscriptions = 0;
+        let monthlyRecurringRevenueInPaisa = 0;
+
+        for (const row of rows) {
+            byPlan[row.planId] = (byPlan[row.planId] || 0) + row.count;
+            byStatus[row.status] = (byStatus[row.status] || 0) + row.count;
+
+            if (row.status === SUBSCRIPTION_STATUSES.ACTIVE) {
+                activeSubscriptions += row.count;
+                const plan = getPlan(row.planId);
+                monthlyRecurringRevenueInPaisa += (plan?.pricing?.amount || 0) * row.count;
+            }
+        }
+
+        return {
+            activeSubscriptions,
+            byPlan,
+            byStatus,
+            monthlyRecurringRevenueInRupees: monthlyRecurringRevenueInPaisa / 100,
+            distribution: rows,
+        };
+    }
+
+    async listSubscriptionsForAdmin(query = {}) {
+        const filter = {};
+        if (query.status) filter.status = query.status;
+        if (query.planId) filter.planId = query.planId;
+        const total = await subscriptionRepository.countAll(filter);
+        const { skip, limit, pagination } = buildPagination(query, total);
+        const subscriptions = await subscriptionRepository.findAllFiltered(filter, { skip, limit });
+        const shopsByBarberId = new Map();
+
+        await Promise.all(subscriptions.map(async (subscription) => {
+            const barberId = subscription.barberId?._id || subscription.barberId;
+            if (!barberId) return;
+            const shop = await shopRepository.findByBarberId(barberId);
+            shopsByBarberId.set(String(barberId), shop);
+        }));
+
+        return {
+            items: subscriptions.map((subscription) => serializeAdminSubscription({
+                subscription,
+                shop: shopsByBarberId.get(String(subscription.barberId?._id || subscription.barberId)),
+            })).filter(Boolean),
+            pagination,
+        };
     }
 }
 
