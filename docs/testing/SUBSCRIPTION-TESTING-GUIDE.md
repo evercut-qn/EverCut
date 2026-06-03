@@ -283,7 +283,7 @@ Downgrade to PLAN_BASIC:
 
 - Do NOT run subscription tests in `RAZORPAY_ENV=PRODUCTION` unless intentional
 - Do NOT use a live `rzp_live_*` key in sandbox mode (server startup will throw)
-- Do NOT test webhooks without setting `RAZORPAY_WEBHOOK_SECRET` in both `.env` and the Postman collection variable
+- Do NOT test webhooks without setting `RAZORPAY_WEBHOOK_SECRET` in the server `.env` file
 
 ---
 
@@ -360,23 +360,19 @@ Set or verify these environment variables in Postman:
 | `api_prefix` | `api/v1` | Static |
 | `test_barber_mobile` | `9876543211` | Your test barber number |
 | `test_otp` | `123456` | Fixed in config (test mode) |
-| `razorpay_webhook_secret` | (value of `RAZORPAY_WEBHOOK_SECRET` from `.env`) | Copy from server `.env` |
 
 Variables auto-set by collection scripts:
 - `barber_access_token` — captured after OTP verify
 - `barber_refresh_token` — captured after OTP verify
 - `razorpay_subscription_id` — captured after POST /subscribe
 
-### 5.4 Postman Collection Variables (in `17-subscriptions.json`)
+### 5.4 Postman Collection Variables (in `18-subscriptions.json`)
 
 | Variable | Default | Notes |
 |---|---|---|
 | `subscription_plan_id` | `PLAN_POPULAR` | Change to `PLAN_ADVANCED` to test Advanced checkout |
 | `subscription_upgrade_plan_id` | `PLAN_ADVANCED` | Plan to upgrade to |
 | `subscription_downgrade_plan_id` | `PLAN_POPULAR` | Plan to downgrade to |
-| `razorpay_plan_id_popular` | `plan_test_popular` | Must match `RAZORPAY_PLAN_ID_POPULAR` in `.env` |
-| `razorpay_plan_id_advanced` | `plan_test_advanced` | Must match `RAZORPAY_PLAN_ID_ADVANCED` in `.env` |
-| `barber_profile_id` | `` | Set from DB barber `_id` or auto-synced from global |
 
 ---
 
@@ -457,10 +453,6 @@ After barber onboarding, MongoDB must contain:
 ```
 [ ] Barber registered and onboarded
 [ ] barber_access_token captured in Postman
-[ ] barber_profile_id (Barber._id) known and set in collection variables
-[ ] RAZORPAY_PLAN_ID_POPULAR set in .env and in Postman collection variable
-[ ] RAZORPAY_PLAN_ID_ADVANCED set in .env and in Postman collection variable
-[ ] razorpay_webhook_secret matches .env RAZORPAY_WEBHOOK_SECRET in Postman
 [ ] Server running on localhost:5000
 ```
 
@@ -499,7 +491,7 @@ PHASE 5: Webhook Activation (simulate Razorpay)
 
 PHASE 6: Media Entitlement Verification (indirect subscription test)
   → POST /api/v1/media/upload-url                     (Test E-1, POPULAR quota = 30 photos)
-  → GET  /api/v1/media/gallery/stats                  (Test E-2, verify limits)
+  → GET  /api/v1/media/gallery/usage                  (Test E-2, verify limits)
 
 PHASE 7: Plan Upgrade
   → POST /api/v1/subscriptions/upgrade                (Test F-1, POPULAR → ADVANCED)
@@ -1299,9 +1291,9 @@ These routes do NOT appear in `/subscriptions/*` but have hidden subscription de
 **Route:** `POST /api/v1/media/gallery`
 **Note:** This route does NOT check quota directly (quota is checked at upload-url stage). However, `totalPhotosUploaded` counter is incremented in the subscription record after successful media confirmation.
 
-### 10.3 Gallery Stats
+### 10.3 Gallery Usage
 
-**Route:** `GET /api/v1/media/gallery/stats`
+**Route:** `GET /api/v1/media/gallery/usage`
 
 Returns stats with subscription-aware limits. After plan change, limits reflect new plan.
 
@@ -1774,27 +1766,11 @@ Run this checklist after any change to subscription-related files.
 
 **Fix:** Ensure the **exact bytes** of the request body are used for HMAC. The server receives raw bytes as Buffer (from `express.raw({ type: 'application/json' })`). The Postman body must be exactly as-is.
 
-### 16.2 Postman Missing Barber Profile ID
-
-**Problem:** Webhook test uses `{{barber_profile_id}}` but it's empty.
-
-**Fix:** Set `barber_profile_id` in Postman collection variables. Get it from:
-- MongoDB directly: `db.barbers.findOne({ userId: <your user id> })._id`
-- Or from `GET /api/v1/shops/me` response: the barber's ID is in the profile data
-
-### 16.3 Testing Upgrade Without Active Subscription
+### 16.2 Testing Upgrade Without Active Subscription
 
 **Problem:** `POST /upgrade` returns `400 "To upgrade from Basic, use the subscribe endpoint..."`
 
 **Root Cause:** The barber is on PLAN_BASIC and has no `razorpaySubscriptionId`. You cannot upgrade from Basic — you must `/subscribe` first, complete payment (or simulate activation webhook), then upgrade.
-
-### 16.4 Plan IDs Not Matching
-
-**Problem:** Webhook with `plan_id: "plan_test_popular"` doesn't match DB record.
-
-**Root Cause:** `resolveRazorpayPlanId()` maps Razorpay plan IDs (from `RAZORPAY_PLAN_ID_POPULAR` env var) to internal IDs (`PLAN_POPULAR`). If the Postman collection variable `razorpay_plan_id_popular` doesn't match what's in `.env`, the webhook won't find a matching plan.
-
-**Fix:** Ensure `razorpay_plan_id_popular` in Postman equals the value of `RAZORPAY_PLAN_ID_POPULAR` in `.env`.
 
 ### 16.5 Token Expiry During Long Sessions
 
@@ -2063,7 +2039,7 @@ No media should be permanently deleted by subscription changes (only hidden)
 |---|---|---|---|
 | `POST` | `/api/v1/media/upload-url` | `checkUploadQuota()` | Blocked if photo/video quota exceeded |
 | `POST` | `/api/v1/media/gallery` | None (indirect) | `totalPhotosUploaded` incremented |
-| `GET` | `/api/v1/media/gallery/stats` | None (indirect) | Shows plan-based limits |
+| `GET` | `/api/v1/media/gallery/usage` | None (indirect) | Shows plan-based limits |
 | `GET` | `/api/v1/earnings/transactions/statement` | `checkStatementQuota()` | Blocked if statement quota exceeded |
 | `GET` | `/api/v1/shops` | None | `visibilityTier` affects ordering |
 | `GET` | `/api/v1/shops/:id` | None | `badge` field reflects plan |
@@ -2121,6 +2097,6 @@ All API responses use this envelope:
 | `src/config/subscription-plan-definitions.js` | Plan capability definitions |
 | `src/adapters/razorpay/razorpay-subscription.adapter.js` | Razorpay API adapter |
 | `src/jobs/subscription.cron.js` | Background expiry and reconciliation |
-| `server/postman-collections/17-subscriptions.json` | Ready-to-import Postman collection |
+| `server/postman-collections/18-subscriptions.json` | Ready-to-import Postman collection |
 | `src/serializers/subscription.serializer.js` | Response serialization |
 | `src/repositories/subscription.repository.js` | MongoDB query layer |

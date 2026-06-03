@@ -56,8 +56,7 @@ All routes are mounted under `/api/v1`.
 | Bookings | GET | `/bookings` | Customer/Barber | `bookingController.getBookings` |
 | Bookings | GET | `/bookings/status` | Barber | `bookingController.getBookingsByStatus` |
 | Bookings | GET | `/bookings/pending-confirmations` | Barber | `bookingController.getPendingConfirmations` |
-| Bookings | GET | `/bookings/analytics` | Barber | `bookingController.getBookingAnalytics` |
-| Bookings | GET | `/bookings/analytics` | Barber | `bookingController.getBookingAnalytics` |
+| Bookings | GET | `/bookings/overview` | Barber | `bookingController.getBookingOverview` |
 | Bookings | GET | `/bookings/:id` | Customer/Barber | `bookingController.getBookingById` |
 | Bookings | GET | `/bookings/:id/confirmation` | Customer | `bookingController.getBookingConfirmation` |
 | Bookings | PUT | `/bookings/:id` | Customer | `bookingController.updateBooking` |

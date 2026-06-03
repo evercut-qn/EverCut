@@ -1,17 +1,11 @@
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import config from '../config/index.js';
-import customerRepository from '../repositories/customer.repository.js';
-import barberRepository from '../repositories/barber.repository.js';
-import shopRepository from '../repositories/shop.repository.js';
 import userRepository from '../repositories/user.repository.js';
 import { UnauthorizedError } from '../utils/api-error.js';
-import { serializeBarberProfile } from '../utils/barber-profile.utils.js';
 import { ROLES, TOKEN_TYPE } from '../utils/constants.js';
 import logger, { maskPhoneNumber } from '../utils/logger.js';
-import { serializeCustomerProfile } from '../serializers/customer.serializer.js';
 import { serializeUser } from '../serializers/user.serializer.js';
-import * as mediaService from './media/media.service.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -51,26 +45,6 @@ const assertAccountIsActive = (user) => {
     }
 };
 
-const loadUserProfile = async (user) => {
-    if (!user) return null;
-
-    if (user.roleType === ROLES.CUSTOMER) {
-        const customer = await customerRepository.findByUserId(user._id);
-        return serializeCustomerProfile(customer);
-    }
-
-    if (user.roleType === ROLES.BARBER) {
-        const barber = await barberRepository.findByUserId(user._id);
-        if (!barber) return null;
-        const shop = await shopRepository.findByBarberId(barber._id);
-        if (!shop) return null;
-
-        const photos = await mediaService.getGalleryByShopId(shop._id);
-        return serializeBarberProfile({ barber, shop, user, photos });
-    }
-
-    return null;
-};
 
 /** Generate a short-lived onboarding token (signed with dedicated onboarding secret). */
 export const generateOnboardingToken = (phoneNumber) => jwt.sign(
@@ -221,12 +195,10 @@ export const resolveOtpSession = async (phoneNumber) => {
         });
 
         const user = authenticatedUser || existingUser;
-        const profile = await loadUserProfile(user);
 
         return {
             isNewUser: false,
             user: serializeUser(user),
-            profile,
             tokens,
         };
     }

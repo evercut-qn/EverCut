@@ -46,6 +46,7 @@ const bookingService = await import('../booking.service.js');
 
 test.beforeEach((t) => {
     t.mock.method(paymentRepository, 'countActiveWaiverReservations', async () => 0);
+    bookingRepository.aggregateAppointmentAnalyticsByMonth ??= async () => [];
 });
 
 const getInWindowBookingDate = (daysFromNow = 1) => {
@@ -162,12 +163,13 @@ test('getBookingsByShop rejects employee filters outside the owned shop', async 
     );
 });
 
-test('getBookingAnalytics returns the monthly completed-booking target state for the requested period', async (t) => {
+test('getBookingOverview returns the monthly completed-booking target state for the requested period', async (t) => {
     t.mock.method(shopRepository, 'findByBarberUserId', async () => ({ _id: 'shop-1' }));
     t.mock.method(employeeRepository, 'findByShopId', async () => []);
     t.mock.method(bookingRepository, 'countAll', async () => 0);
     t.mock.method(bookingRepository, 'countByStatusForShop', async () => 0);
     t.mock.method(bookingRepository, 'findByShopId', async () => []);
+    t.mock.method(bookingRepository, 'aggregateAppointmentAnalyticsByMonth', async () => []);
 
     let capturedArgs = null;
     t.mock.method(bookingRepository, 'countCompletedForShopInDateRange', async (shopId, startDate, endDate) => {
@@ -175,7 +177,7 @@ test('getBookingAnalytics returns the monthly completed-booking target state for
         return 500;
     });
 
-    const result = await bookingService.getBookingAnalytics('owner-1', { month: 3, year: 2026 });
+    const result = await bookingService.getBookingOverview('owner-1', { month: 3, year: 2026 });
 
     assert.deepEqual(capturedArgs, {
         shopId: 'shop-1',
@@ -230,15 +232,16 @@ test('getBookingAnalytics returns the monthly completed-booking target state for
     });
 });
 
-test('getBookingAnalytics returns no next milestone once all visible targets are completed', async (t) => {
+test('getBookingOverview returns no next milestone once all visible targets are completed', async (t) => {
     t.mock.method(shopRepository, 'findByBarberUserId', async () => ({ _id: 'shop-1' }));
     t.mock.method(employeeRepository, 'findByShopId', async () => []);
     t.mock.method(bookingRepository, 'countAll', async () => 0);
     t.mock.method(bookingRepository, 'countByStatusForShop', async () => 0);
     t.mock.method(bookingRepository, 'findByShopId', async () => []);
     t.mock.method(bookingRepository, 'countCompletedForShopInDateRange', async () => 1200);
+    t.mock.method(bookingRepository, 'aggregateAppointmentAnalyticsByMonth', async () => []);
 
-    const result = await bookingService.getBookingAnalytics('owner-1', { month: 3, year: 2026 });
+    const result = await bookingService.getBookingOverview('owner-1', { month: 3, year: 2026 });
 
     assert.equal(result.milestones.progress.value, 1000);
     assert.equal(result.milestones.progress.percentage, 100);
@@ -250,7 +253,7 @@ test('getBookingAnalytics returns no next milestone once all visible targets are
     assert.equal(result.milestones.nextMilestone, null);
 });
 
-test('getBookingAnalytics returns summary, milestones, today pulse, and both queue buckets', async (t) => {
+test('getBookingOverview returns summary, milestones, today pulse, and both queue buckets', async (t) => {
     t.mock.timers.enable({
         apis: ['Date'],
         now: new Date('2026-03-15T12:00:00.000Z'),
@@ -281,6 +284,7 @@ test('getBookingAnalytics returns summary, milestones, today pulse, and both que
         cancelled: 1,
     }[status] || 0));
     t.mock.method(bookingRepository, 'countCompletedForShopInDateRange', async () => 500);
+    t.mock.method(bookingRepository, 'aggregateAppointmentAnalyticsByMonth', async () => []);
     t.mock.method(bookingRepository, 'findByShopId', async (_shopId, filters) => {
         if (filters.status?.$nin) {
             return [
@@ -316,7 +320,7 @@ test('getBookingAnalytics returns summary, milestones, today pulse, and both que
         ];
     });
 
-    const result = await bookingService.getBookingAnalytics('owner-1', { month: 3, year: 2026 });
+    const result = await bookingService.getBookingOverview('owner-1', { month: 3, year: 2026 });
 
     assert.deepEqual(result.summary, {
         total: 12,
@@ -331,6 +335,62 @@ test('getBookingAnalytics returns summary, milestones, today pulse, and both que
     assert.equal(result.queue.upcoming.count, 1);
     assert.equal(result.queue.active.items[0].id, 'active-booking');
     assert.equal(result.queue.upcoming.items[0].id, 'upcoming-booking');
+});
+
+test('getBookingOverview returns six-month closed appointment analytics as a sibling section', async (t) => {
+    t.mock.timers.enable({
+        apis: ['Date'],
+        now: new Date('2026-05-30T12:00:00.000Z'),
+    });
+
+    t.mock.method(shopRepository, 'findByBarberUserId', async () => ({
+        _id: 'shop-1',
+        openTime: '09:00',
+        closeTime: '10:00',
+        breakTimes: [],
+    }));
+    t.mock.method(employeeRepository, 'findByShopId', async () => []);
+    t.mock.method(bookingRepository, 'countAll', async () => 0);
+    t.mock.method(bookingRepository, 'countByStatusForShop', async () => 0);
+    t.mock.method(bookingRepository, 'countCompletedForShopInDateRange', async () => 0);
+    t.mock.method(bookingRepository, 'findByShopId', async () => []);
+
+    let capturedRange = null;
+    t.mock.method(bookingRepository, 'aggregateAppointmentAnalyticsByMonth', async (shopId, startDate, endDate) => {
+        capturedRange = { shopId, startDate, endDate };
+        return [
+            { year: 2025, month: 11, count: 110 },
+            { year: 2025, month: 12, count: 125 },
+            { year: 2026, month: 1, count: 135 },
+            { year: 2026, month: 2, count: 128 },
+            { year: 2026, month: 3, count: 150 },
+            { year: 2026, month: 4, count: 197 },
+        ];
+    });
+
+    const result = await bookingService.getBookingOverview('owner-1');
+
+    assert.deepEqual(capturedRange, {
+        shopId: 'shop-1',
+        startDate: new Date('2025-11-01T00:00:00.000Z'),
+        endDate: new Date('2026-05-01T00:00:00.000Z'),
+    });
+    assert.deepEqual(result.appointments, {
+        total: 845,
+        growth: 31.3,
+        statistics: [
+            { month: 'November', count: 110 },
+            { month: 'December', count: 125 },
+            { month: 'January', count: 135 },
+            { month: 'February', count: 128 },
+            { month: 'March', count: 150 },
+            { month: 'April', count: 197 },
+        ],
+    });
+    assert.equal(result.summary !== undefined, true);
+    assert.equal(result.milestones !== undefined, true);
+    assert.equal(result.today !== undefined, true);
+    assert.equal(result.queue !== undefined, true);
 });
 
 test('createBooking creates a pending booking that requires payment before confirmation', async (t) => {

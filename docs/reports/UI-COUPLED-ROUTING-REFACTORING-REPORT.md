@@ -75,8 +75,8 @@ All other route files (`auth`, `bookings`, `employees`, `earnings`, `shops`, `se
 
 | Old Endpoint | New Endpoint | Status |
 |-------------|--------------|--------|
-| `GET /dashboard/overview` | `GET /bookings/analytics + /employees/analytics + /earnings` | ✅ Migrated |
-| `GET /dashboard/pulse` | `GET /bookings/analytics` | ✅ Migrated |
+| `GET /dashboard/overview` | `GET /bookings/overview + /employees/analytics + /earnings` | ✅ Migrated |
+| `GET /dashboard/pulse` | `GET /bookings/overview` | ✅ Migrated |
 | `GET /dashboard/staff` | `GET /employees/availability` | ✅ Migrated |
 | `GET /dashboard/queue` | `GET /bookings/queue` | ✅ Migrated |
 | `GET /customers/me/home` | `GET /customers/me` | ❌ Removed |
@@ -179,11 +179,11 @@ All migrated endpoints maintain their original authorization requirements:
 
 ### Integration Tests Needed
 
-- [ ] Test `GET /bookings/analytics` returns correct pulse metrics
+- [ ] Test `GET /bookings/overview` returns correct pulse metrics
 - [ ] Test `GET /employees/availability` returns correct staff data
-- [ ] Test `GET /bookings/queue?filter=active` filters correctly
-- [ ] Test `GET /bookings/queue?filter=upcoming` filters correctly
-- [ ] Test `GET /bookings/analytics + /employees/analytics + /earnings` aggregates all dashboard data
+- [ ] Test `GET /bookings/overview` filters correctly
+- [ ] Test `GET /bookings/overview` filters correctly
+- [ ] Test `GET /bookings/overview + /employees/analytics + /earnings` aggregates all dashboard data
 - [ ] Test `GET /customers/me` returns complete profile
 
 ### End-to-End Tests Needed
@@ -276,10 +276,10 @@ grep -r "booking analytics queue data" server/src/controllers/
 npm start
 
 # 4. Test new endpoints
-curl http://localhost:5000/api/v1/bookings/analytics -H "Authorization: Bearer {token}"
+curl http://localhost:5000/api/v1/bookings/overview -H "Authorization: Bearer {token}"
 curl http://localhost:5000/api/v1/employees/availability -H "Authorization: Bearer {token}"
-curl http://localhost:5000/api/v1/bookings/queue?filter=active -H "Authorization: Bearer {token}"
-curl http://localhost:5000/api/v1/bookings/analytics + /api/v1/employees/analytics + /api/v1/earnings -H "Authorization: Bearer {token}"
+curl http://localhost:5000/api/v1/bookings/overview -H "Authorization: Bearer {token}"
+curl http://localhost:5000/api/v1/bookings/overview + /api/v1/employees/analytics + /api/v1/earnings -H "Authorization: Bearer {token}"
 ```
 
 ### Postman Verification
@@ -421,7 +421,7 @@ Regenerated:
 }
 ```
 
-### After: `/bookings/analytics + /employees/analytics + /earnings`
+### After: `/bookings/overview + /employees/analytics + /earnings`
 
 ```json
 {

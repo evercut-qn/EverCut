@@ -78,13 +78,13 @@ test('registerFcmToken upserts a token for the authenticated user and device', a
     assert.equal(result.revokedAt, null);
 });
 
-test('getNotificationSummary returns normalized unread metrics', async (t) => {
+test('getNotificationUnreadCount returns normalized unread metrics', async (t) => {
     t.mock.method(notificationRepository, 'countUnread', async (userId) => {
         assert.equal(userId, 'user-1');
         return 7;
     });
 
-    const result = await notificationService.getNotificationSummary('user-1');
+    const result = await notificationService.getNotificationUnreadCount('user-1');
 
     assert.deepEqual(result, {
         unreadCount: 7,

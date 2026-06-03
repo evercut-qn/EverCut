@@ -1,7 +1,7 @@
 # Postman Testing Guide: Booking & Payment Flow
 
-**Version:** 2.0  
-**Last Updated:** April 29, 2026  
+**Version:** 2.1  
+**Last Updated:** May 30, 2026  
 **Status:** ✅ Production Ready
 
 ---
@@ -47,7 +47,10 @@ Import from `server/postman-collections/`:
 ✅ 08-barber-employees.json
 ✅ 09-barber-services.json
 ✅ 10-barber-bookings.json
-✅ 14-payments-payouts.json
+✅ 12-barber-earnings.json
+✅ 14-operational-analytics.json
+✅ 15-payments.json
+✅ 16-payouts.json
 ```
 
 ### 2. Start Server
@@ -199,7 +202,7 @@ Expected Response:
 
 ### Step 5: Payment Flow (Native SDK)
 
-**Collection:** `14-payments-payouts.json`
+**Collection:** `15-payments.json`
 
 #### 5.1 Initiate Payment
 
@@ -322,6 +325,18 @@ What Happens:
 ---
 
 ## Verification & Troubleshooting
+
+### Check Analytics Contracts
+
+The generated Postman collections include assertions for the barber-facing analytics contracts:
+
+- `10-barber-bookings.json` request 2 validates `GET /api/v1/bookings/overview` returns `data.appointments.total`, `data.appointments.growth`, and exactly six monthly `{ month, count }` rows.
+- `12-barber-earnings.json` request 1 validates `GET /api/v1/earnings` returns `data.income.total`, `data.income.growth`, and exactly six monthly `{ month, amount }` rows.
+- `14-operational-analytics.json` repeats the dashboard-level analytics checks through the operational analytics collection.
+
+Both analytics blocks use the last six completed months, exclude the current month, return full month names in chronological order, and zero-fill months without data.
+
+---
 
 ### Check Payment Status
 

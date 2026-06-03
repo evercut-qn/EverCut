@@ -235,6 +235,61 @@ test('paymentRepository.findCompletedByBookingIds preserves its internal $in ope
     assert.deepEqual(capturedFilter.bookingId.$in, ['booking-1', 'booking-2']);
 });
 
+test('bookingRepository.aggregateAppointmentAnalyticsByMonth groups completed and no-show bookings by UTC month', async (t) => {
+    let capturedPipeline = null;
+    const startDate = new Date('2025-11-01T00:00:00.000Z');
+    const endDate = new Date('2026-05-01T00:00:00.000Z');
+
+    t.mock.method(Booking, 'aggregate', async (pipeline) => {
+        capturedPipeline = pipeline;
+        return [{ year: 2026, month: 4, count: 2 }];
+    });
+
+    const result = await bookingRepository.aggregateAppointmentAnalyticsByMonth('shop-1', startDate, endDate);
+
+    assert.deepEqual(result, [{ year: 2026, month: 4, count: 2 }]);
+    assert.equal(capturedPipeline[0].$match.shopId, 'shop-1');
+    assert.deepEqual(capturedPipeline[0].$match.status.$in, ['completed', 'no-show']);
+    assert.equal(capturedPipeline[0].$match.date.$gte, startDate);
+    assert.equal(capturedPipeline[0].$match.date.$lt, endDate);
+    assert.deepEqual(capturedPipeline[1].$group._id.year, {
+        $year: { date: '$date', timezone: 'UTC' },
+    });
+    assert.deepEqual(capturedPipeline[1].$group._id.month, {
+        $month: { date: '$date', timezone: 'UTC' },
+    });
+    assert.deepEqual(capturedPipeline.at(-1), { $sort: { year: 1, month: 1 } });
+});
+
+test('paymentRepository.aggregateIncomeByMonth groups completed barber payout by UTC payment month', async (t) => {
+    let capturedPipeline = null;
+    const startDate = new Date('2025-11-01T00:00:00.000Z');
+    const endDate = new Date('2026-05-01T00:00:00.000Z');
+
+    t.mock.method(PaymentTransaction, 'aggregate', async (pipeline) => {
+        capturedPipeline = pipeline;
+        return [{ year: 2026, month: 4, amount: 17200 }];
+    });
+
+    const result = await paymentRepository.aggregateIncomeByMonth('shop-1', startDate, endDate);
+
+    assert.deepEqual(result, [{ year: 2026, month: 4, amount: 17200 }]);
+    assert.equal(capturedPipeline[0].$match.shopId, 'shop-1');
+    assert.equal(capturedPipeline[0].$match.status, 'completed');
+    assert.equal(capturedPipeline[0].$match.createdAt.$gte, startDate);
+    assert.equal(capturedPipeline[0].$match.createdAt.$lt, endDate);
+    assert.deepEqual(capturedPipeline[1].$group._id.year, {
+        $year: { date: '$createdAt', timezone: 'UTC' },
+    });
+    assert.deepEqual(capturedPipeline[1].$group.amountInPaisa.$sum, {
+        $ifNull: [
+            '$settlement.barberPayout',
+            { $ifNull: ['$settlement.serviceAmount', '$amount'] },
+        ],
+    });
+    assert.deepEqual(capturedPipeline.at(-1), { $sort: { year: 1, month: 1 } });
+});
+
 test('paymentRepository.markSettledByIds preserves its internal $in operator under sanitizeFilter', async (t) => {
     let capturedFilter = null;
 

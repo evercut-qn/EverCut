@@ -85,16 +85,16 @@ This report documents the comprehensive implementation of the barber dashboard f
 │  GET /api/dashboard/overview                                 │
 │  GET /api/dashboard/pulse                                    │
 │  GET /api/dashboard/staff                                    │
-│  GET /api/v1/bookings/analytics|upcoming │
+│  GET /api/v1/bookings/overview|upcoming                     │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
-│                  Dashboard Controller                        │
-│  - booking analytics today data                                          │
-│  - getStaffAvailability()                                    │
-│  - booking analytics queue data                                          │
-│  - getOperationalAnalytics()                                    │
+│                  Dashboard Controller                       │
+│  - booking analytics today data                             │
+│  - getStaffAvailability()                                   │
+│  - booking analytics queue data                             │
+│  - getOperationalAnalytics()                                │
 └─────────────────────────────────────────────────────────────┘
                               │
                               ▼
@@ -173,7 +173,7 @@ This report documents the comprehensive implementation of the barber dashboard f
 }
 ```
 
-#### GET /api/v1/bookings/analytics
+#### GET /api/v1/bookings/overview
 
 **Response:**
 ```json

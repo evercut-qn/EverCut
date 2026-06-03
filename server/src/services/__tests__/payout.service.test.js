@@ -45,6 +45,158 @@ const shopRepository = (await import('../../repositories/shop.repository.js')).d
 const userRepository = (await import('../../repositories/user.repository.js')).default;
 const cashfreePayoutAdapter = (await import('../../adapters/cashfree/cashfree-payout.adapter.js')).default;
 
+test('createManualPayout claims bookings, records a manual success, settles payments, and notifies the barber', async (t) => {
+    const bookingIds = ['booking-1', 'booking-2'];
+    const payments = [
+        { _id: 'payment-1', bookingId: 'booking-1', settlement: { barberPayout: 9900, settled: false } },
+        { _id: 'payment-2', bookingId: 'booking-2', settlement: { serviceAmount: 5100, settled: false } },
+    ];
+
+    t.mock.method(payoutRepository, 'findByUtr', async (utr) => {
+        assert.equal(utr, 'MANUAL123');
+        return null;
+    });
+    t.mock.method(bookingRepository, 'findByIds', async () => ([
+        {
+            _id: 'booking-1',
+            shopId: { _id: 'shop-1', barberId: 'barber-1', shopName: 'Trim Studio' },
+            status: 'completed',
+            paymentStatus: 'success',
+            payoutStatus: 'not_initiated',
+        },
+        {
+            _id: 'booking-2',
+            shopId: { _id: 'shop-1', barberId: 'barber-1', shopName: 'Trim Studio' },
+            status: 'no-show',
+            paymentStatus: 'success',
+            payoutStatus: 'failed',
+        },
+    ]));
+    t.mock.method(barberRepository, 'findById', async () => ({
+        _id: 'barber-1',
+        userId: 'user-1',
+        firstName: 'Asha',
+        lastName: 'Rao',
+        accountHolderName: 'Asha Rao',
+        upiId: 'asha@upi',
+    }));
+    t.mock.method(paymentRepository, 'findCompletedByBookingIds', async () => payments);
+
+    let claimCall = null;
+    t.mock.method(bookingRepository, 'claimManualPayoutBookings', async (args) => {
+        claimCall = args;
+        return { matchedCount: 2, modifiedCount: 2 };
+    });
+
+    let createdPayout = null;
+    t.mock.method(payoutRepository, 'create', async (data) => {
+        createdPayout = { ...data };
+        return createdPayout;
+    });
+
+    let completeCall = null;
+    t.mock.method(bookingRepository, 'completeManualPayoutBookings', async (...args) => {
+        completeCall = args;
+        return { matchedCount: 2, modifiedCount: 2 };
+    });
+
+    let settledCall = null;
+    t.mock.method(paymentRepository, 'markSettledByIds', async (...args) => {
+        settledCall = args;
+        return { acknowledged: true, modifiedCount: 2 };
+    });
+
+    let notificationPayload = null;
+    t.mock.method(notificationEvents, 'notifyPayoutStatus', async (payload) => {
+        notificationPayload = payload;
+        return { notification: null };
+    });
+
+    const result = await payoutService.createManualPayout({
+        barberId: 'barber-1',
+        bookingIds,
+        utr: ' manual123 ',
+        transferMode: 'upi',
+        notes: ' Paid from bank portal ',
+    }, 'admin-1');
+
+    assert.deepEqual(claimCall.bookingIds, bookingIds);
+    assert.equal(String(claimCall.payoutId), String(createdPayout._id));
+    assert.equal(createdPayout.gateway, 'manual');
+    assert.equal(createdPayout.status, 'SUCCESS');
+    assert.equal(createdPayout.utr, 'MANUAL123');
+    assert.equal(createdPayout.amount, 15000);
+    assert.equal(createdPayout.amountInRupees, 150);
+    assert.equal(createdPayout.completedByAdminId, 'admin-1');
+    assert.equal(createdPayout.adminNotes, 'Paid from bank portal');
+    assert.deepEqual(completeCall[0], bookingIds);
+    assert.equal(String(completeCall[1]), String(createdPayout._id));
+    assert.equal(completeCall[2].utr, 'MANUAL123');
+    assert.deepEqual(settledCall[0], ['payment-1', 'payment-2']);
+    assert.equal(notificationPayload.barberId, 'user-1');
+    assert.equal(notificationPayload.status, 'SUCCESS');
+    assert.equal(result.gateway, 'manual');
+    assert.equal(result.utr, 'MANUAL123');
+});
+
+test('createManualPayout rejects stale booking claims before creating a payout record', async (t) => {
+    t.mock.method(payoutRepository, 'findByUtr', async () => null);
+    t.mock.method(bookingRepository, 'findByIds', async () => ([
+        {
+            _id: 'booking-1',
+            shopId: { _id: 'shop-1', barberId: 'barber-1', shopName: 'Trim Studio' },
+            status: 'completed',
+            paymentStatus: 'success',
+            payoutStatus: 'not_initiated',
+        },
+        {
+            _id: 'booking-2',
+            shopId: { _id: 'shop-1', barberId: 'barber-1', shopName: 'Trim Studio' },
+            status: 'completed',
+            paymentStatus: 'success',
+            payoutStatus: 'not_initiated',
+        },
+    ]));
+    t.mock.method(barberRepository, 'findById', async () => ({
+        _id: 'barber-1',
+        userId: 'user-1',
+        firstName: 'Asha',
+        lastName: 'Rao',
+        upiId: 'asha@upi',
+    }));
+    t.mock.method(paymentRepository, 'findCompletedByBookingIds', async () => ([
+        { _id: 'payment-1', bookingId: 'booking-1', settlement: { barberPayout: 9900 } },
+        { _id: 'payment-2', bookingId: 'booking-2', settlement: { barberPayout: 5100 } },
+    ]));
+    t.mock.method(bookingRepository, 'claimManualPayoutBookings', async () => ({
+        matchedCount: 1,
+        modifiedCount: 1,
+    }));
+    const createMock = t.mock.method(payoutRepository, 'create', async () => {
+        throw new Error('create should not run');
+    });
+    t.mock.method(bookingRepository, 'releaseManualPayoutClaim', async () => ({ acknowledged: true }));
+
+    await assert.rejects(
+        payoutService.createManualPayout({
+            barberId: 'barber-1',
+            bookingIds: ['booking-1', 'booking-2'],
+            utr: 'UTR123',
+        }, 'admin-1'),
+        /already being processed|already has an active payout|modified by another admin/i,
+    );
+
+    assert.equal(createMock.mock.calls.length, 0);
+});
+
+test('payout service does not expose manual payout status mutation', () => {
+    assert.equal(
+        Object.hasOwn(payoutService, 'updatePayoutStatus'),
+        false,
+        'manual payouts are immutable successful ledger records',
+    );
+});
+
 test('triggerBarberPayout stores generic beneficiary and gateway transfer identifiers', async (t) => {
     t.mock.method(bookingRepository, 'findByIds', async () => ([
         {
@@ -201,6 +353,73 @@ test('triggerBarberPayout rejects caller-supplied payout totals that do not matc
     );
 
     assert.equal(transferMock.mock.calls.length, 0);
+});
+
+test('triggerBarberPayout accepts no-show bookings from the automatic batch lifecycle', async (t) => {
+    t.mock.method(bookingRepository, 'findByIds', async () => ([
+        {
+            _id: 'booking-1',
+            shopId: 'shop-1',
+            status: 'no-show',
+            paymentStatus: 'success',
+            payoutStatus: 'not_initiated',
+        },
+    ]));
+
+    const shop = {
+        _id: 'shop-1',
+        barberId: 'barber-1',
+        shopName: 'Trim Studio',
+    };
+    const barber = {
+        _id: 'barber-1',
+        userId: 'user-1',
+        firstName: 'Barber',
+        lastName: 'One',
+        accountHolderName: 'Barber One',
+        upiId: 'barber@upi',
+        payoutConfig: {
+            beneficiaryId: 'BARBER_barber-1',
+        },
+    };
+
+    t.mock.method(shopRepository, 'findById', async () => shop);
+    t.mock.method(barberRepository, 'findById', async () => barber);
+    t.mock.method(userRepository, 'findById', async () => ({
+        _id: 'user-1',
+        phoneNumber: '9999999999',
+        email: 'barber@example.com',
+    }));
+    t.mock.method(paymentRepository, 'findCompletedByBookingIds', async () => ([
+        {
+            _id: 'payment-1',
+            bookingId: 'booking-1',
+            settlement: {
+                barberPayout: 9900,
+            },
+        },
+    ]));
+    t.mock.method(cashfreePayoutAdapter, 'getBeneficiary', async () => ({
+        beneficiary_id: 'BARBER_barber-1',
+    }));
+    t.mock.method(payoutRepository, 'create', async (data) => ({
+        _id: 'payout-1',
+        ...data,
+    }));
+    t.mock.method(payoutRepository, 'updateById', async (id, updates) => ({
+        _id: id,
+        gatewayTransferId: 'provider-transfer-1',
+        ...updates,
+    }));
+    t.mock.method(bookingRepository, 'updateManyByIds', async () => ({ acknowledged: true }));
+    t.mock.method(cashfreePayoutAdapter, 'initiateTransfer', async () => ({
+        gatewayTransferId: 'provider-transfer-1',
+        status: 'PENDING',
+    }));
+
+    const result = await payoutService.triggerBarberPayout('barber-1', ['booking-1']);
+
+    assert.equal(result.gatewayTransferId, 'provider-transfer-1');
 });
 
 test('triggerBarberPayout rejects bank-only payout destinations without UPI', async (t) => {

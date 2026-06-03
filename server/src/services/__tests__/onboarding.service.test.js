@@ -123,7 +123,7 @@ test('createBarberOnboarding links media as COVER and does NOT return photos arr
 
     assert.strictEqual(linkedPurpose, 'cover'); // Verified fix
     assert.strictEqual(defaultSubscriptionBarberId, 'barber-1');
-    assert.strictEqual(result.shop.photos, undefined); // Verified sanitization
+    assert.strictEqual(result.shop, undefined); // Profile decoupled from response
 });
 
 test('createBarberOnboarding requires upiId and stores null optional bank fields when omitted', async (t) => {

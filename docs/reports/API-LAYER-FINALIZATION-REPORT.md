@@ -109,8 +109,7 @@ All endpoints are mounted under `/api/v1`.
 - `GET /bookings?type=favorites` - customer, list favorite bookings
 - `GET /bookings/status` - barber
 - `GET /bookings/pending-confirmations` - barber
-- `GET /bookings/analytics` - barber
-- `GET /bookings/analytics` - barber
+- `GET /bookings/overview` - barber
 - `GET /bookings/:id` - customer/barber
 - `GET /bookings/:id/confirmation` - customer
 - `PUT /bookings/:id` - customer

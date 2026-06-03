@@ -37,6 +37,12 @@ import {
 } from '../utils/platform-fee.utils.js';
 import { buildSlotLockTimes, toDateOnlyString } from '../utils/slot-lock.utils.js';
 import { calculateAvailableSlots, getAvailableSlotTimes, normalizeBookedRanges } from '../utils/slot-calculator.utils.js';
+import {
+    buildMonthlyStatistics,
+    calculateGrowthPercentage,
+    getLastCompletedMonths,
+    sumMonthlyStatistics,
+} from '../utils/month-analytics.utils.js';
 import logger from '../utils/logger.js';
 import notificationEvents from './notification-events.service.js';
 import {
@@ -1462,12 +1468,39 @@ const buildMilestoneAnalytics = async (ownerId, query = {}) => {
     };
 };
 
-export const getBookingAnalytics = async (ownerId, query = {}) => {
-    const [summary, milestones, today, queue] = await Promise.all([
+const buildAppointmentAnalytics = async (ownerId) => {
+    const shop = await shopRepository.findByBarberUserId(ownerId);
+    if (!shop) throw new NotFoundError('Shop');
+
+    const months = getLastCompletedMonths();
+    const rows = await bookingRepository.aggregateAppointmentAnalyticsByMonth(
+        shop._id,
+        months[0].startDate,
+        months.at(-1).endDate,
+    );
+    const statistics = buildMonthlyStatistics({
+        months,
+        rows,
+        valueKey: 'count',
+        outputKey: 'count',
+    });
+    const previousMonth = statistics.at(-2)?.count || 0;
+    const currentMonth = statistics.at(-1)?.count || 0;
+
+    return {
+        total: sumMonthlyStatistics(statistics, 'count'),
+        growth: calculateGrowthPercentage(previousMonth, currentMonth),
+        statistics,
+    };
+};
+
+export const getBookingOverview = async (ownerId, query = {}) => {
+    const [summary, milestones, today, queue, appointments] = await Promise.all([
         buildBookingSummaryAnalytics(ownerId),
         buildMilestoneAnalytics(ownerId, query),
         buildTodayAnalytics(ownerId),
         buildQueueAnalytics(ownerId),
+        buildAppointmentAnalytics(ownerId),
     ]);
 
     return {
@@ -1475,6 +1508,7 @@ export const getBookingAnalytics = async (ownerId, query = {}) => {
         milestones,
         today,
         queue,
+        appointments,
     };
 };
 

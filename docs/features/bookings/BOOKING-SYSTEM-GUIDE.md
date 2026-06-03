@@ -161,7 +161,7 @@ Frontend clients should show an informational warning when `employee.isAvailable
 | GET | `/api/v1/bookings` | BARBER | List all bookings (supports: employeeId, dateFrom, dateTo, status, paymentStatus) |
 | GET | `/api/v1/bookings?status=awaiting_confirmation&paymentStatus=success` | BARBER | List pending confirmations |
 | GET | `/api/v1/bookings?employeeId=X&dateFrom=Y&dateTo=Z` | BARBER | Filter by employee and date range |
-| GET | `/api/v1/bookings/analytics` | BARBER | Get summary, milestone, today pulse, and queue analytics |
+| GET | `/api/v1/bookings/overview` | BARBER | Get summary, milestone, today pulse, and queue overview |
 | PATCH | `/api/v1/bookings/:id` | BARBER | Confirm, complete, no-show, or cancel |
 
 ### Payment & Refunds

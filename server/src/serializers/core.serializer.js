@@ -35,6 +35,7 @@ export const toIdString = (value) => {
     if (typeof value === 'string') return value;
     if (isObjectIdLike(value)) return value.toHexString ? value.toHexString() : String(value);
     if (value?._id) return toIdString(value._id);
+    if (value?.id) return toIdString(value.id);
     return String(value);
 };
 

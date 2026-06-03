@@ -38,3 +38,47 @@ export const retryPayout = async (req, res, next) => {
         next(error);
     }
 };
+
+export const getPendingPayouts = async (req, res, next) => {
+    try {
+        const query = getValidatedRequestData(req, 'query');
+        const result = await payoutService.getPendingPayoutsForAdmin(query);
+        return res.status(200).json(
+            ApiResponse.paginated(result.items, result.pagination, 'Pending payouts retrieved'),
+        );
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const listPayouts = async (req, res, next) => {
+    try {
+        const query = getValidatedRequestData(req, 'query');
+        const result = await payoutService.listPayouts(query);
+        return res.status(200).json(
+            ApiResponse.paginated(result.items, result.pagination, 'Payouts retrieved'),
+        );
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const getPayoutDetail = async (req, res, next) => {
+    try {
+        const { payoutId } = getValidatedRequestData(req, 'params');
+        const result = await payoutService.getPayoutDetail(payoutId);
+        return res.status(200).json(ApiResponse.success(result, 'Payout retrieved'));
+    } catch (error) {
+        next(error);
+    }
+};
+
+export const createManualPayout = async (req, res, next) => {
+    try {
+        const body = getValidatedRequestData(req, 'body');
+        const result = await payoutService.createManualPayout(body, req.user._id);
+        return res.status(201).json(ApiResponse.success(result, 'Payout created successfully'));
+    } catch (error) {
+        next(error);
+    }
+};

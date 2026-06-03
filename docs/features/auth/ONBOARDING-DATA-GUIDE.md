@@ -172,7 +172,7 @@ Content-Type: application/json
 
 ## Success Response Shape
 
-Both onboarding endpoints return the created `user`, the created `profile` (for customers) or `shop` (for barbers), and session tokens. Note that the `shop` profile returned during onboarding does not include the `photos` (gallery) array.
+Both onboarding endpoints return the created `user` and session tokens.
 
 ```json
 {
@@ -185,12 +185,6 @@ Both onboarding endpoints return the created `user`, the created `profile` (for 
       "email": "john.doe@example.com",
       "roleType": "CUSTOMER",
       "isActive": true
-    },
-    "profile": {
-      "id": "507f1f77bcf86cd799439012",
-      "firstName": "John",
-      "lastName": "Doe",
-      "photoUrl": "https://media.evercut.in/images/avatars/..."
     },
     "accessToken": "jwt-access-token",
     "refreshToken": "jwt-refresh-token"

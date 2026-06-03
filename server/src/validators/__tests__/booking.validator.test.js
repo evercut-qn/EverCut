@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
-    bookingAnalyticsQuerySchema,
+    bookingOverviewQuerySchema,
     bookingListQuerySchema,
     bookingPatchSchema,
     createBookingSchema,
@@ -56,8 +56,8 @@ test('bookingPatchSchema rejects mixed schedule and status changes', () => {
     assert.match(error?.message || '', /does not match any of the allowed types/);
 });
 
-test('bookingAnalyticsQuerySchema accepts a complete explicit month/year period', () => {
-    const { error, value } = bookingAnalyticsQuerySchema.validate({
+test('bookingOverviewQuerySchema accepts a complete explicit month/year period', () => {
+    const { error, value } = bookingOverviewQuerySchema.validate({
         month: '3',
         year: '2026',
     });
@@ -69,8 +69,8 @@ test('bookingAnalyticsQuerySchema accepts a complete explicit month/year period'
     });
 });
 
-test('bookingAnalyticsQuerySchema rejects incomplete periods', () => {
-    const { error } = bookingAnalyticsQuerySchema.validate({
+test('bookingOverviewQuerySchema rejects incomplete periods', () => {
+    const { error } = bookingOverviewQuerySchema.validate({
         month: 3,
     });
 

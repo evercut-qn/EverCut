@@ -170,10 +170,10 @@ No backward compatibility was retained. Removed endpoints are intentionally unav
 | PUT | `/api/v1/bookings/:id/favorite` | Add favorite booking |
 | DELETE | `/api/v1/bookings/:id/favorite` | Remove favorite booking |
 | POST | `/api/v1/bookings/:id/refunds` | Initiate a refund |
-| GET | `/api/v1/bookings/analytics` | Booking status summary |
-| GET | `/api/v1/bookings/analytics` | Monthly completed-booking milestone progress |
-| GET | `/api/v1/bookings/analytics` | Today's pulse metrics |
-| GET | `/api/v1/bookings/analytics` | Today's queue |
+| GET | `/api/v1/bookings/overview` | Booking status summary |
+| GET | `/api/v1/bookings/overview` | Monthly completed-booking milestone progress |
+| GET | `/api/v1/bookings/overview` | Today's pulse metrics |
+| GET | `/api/v1/bookings/overview` | Today's queue |
 
 ### Shops
 

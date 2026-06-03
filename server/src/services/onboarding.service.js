@@ -3,7 +3,6 @@ import shopRepository from '../repositories/shop.repository.js';
 import barberRepository from '../repositories/barber.repository.js';
 import userRepository from '../repositories/user.repository.js';
 import subscriptionRepository from '../repositories/subscription.repository.js';
-import { serializeBarberProfile } from '../utils/barber-profile.utils.js';
 import {
     ALL_SERVICE_FOR,
     ALL_SHOP_AMENITIES,
@@ -16,7 +15,6 @@ import { BadRequestError, ConflictError } from '../utils/api-error.js';
 import { normalizeShopSchedule } from '../utils/shop-schedule.utils.js';
 import * as authService from './auth.service.js';
 import { hashPin, validatePinCreation } from './pin.service.js';
-import { serializeCustomerProfile } from '../serializers/customer.serializer.js';
 import { serializeUser } from '../serializers/user.serializer.js';
 import * as mediaService from './media/media.service.js';
 import { isValidUpiId, normalizePayoutString } from '../utils/payout-details.utils.js';
@@ -289,7 +287,6 @@ export const createCustomerOnboarding = async (phoneNumber, profileData) => {
 
     return {
         user: serializeUser(user),
-        profile: serializeCustomerProfile(profile),
         tokens,
     };
 };
@@ -364,7 +361,6 @@ export const createBarberOnboarding = async (phoneNumber, shopData) => {
 
     return {
         user: serializeUser(user),
-        shop: serializeBarberProfile({ barber, shop: createdShop, user }),
         tokens,
     };
 };

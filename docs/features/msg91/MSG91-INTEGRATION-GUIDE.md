@@ -76,7 +76,7 @@
 6. Backend calls MSG91 Verify OTP API
 7. OTP valid → find existing User by phoneNumber
 8. Update lastLoginAt → issue { accessToken, refreshToken }
-9. Response: { isNewUser: false, user, profile, accessToken, refreshToken }
+9. Response: { isNewUser: false, user, accessToken, refreshToken }
 10. All subsequent requests use Bearer <accessToken>
 11. POST /api/v1/auth/token/refresh for new access token
 
@@ -89,7 +89,7 @@
 11. App → POST /api/v1/onboarding/customers  (or /barbers)
         with header `Authorization: Bearer <onboardingToken>`
 12. `authenticateOnboarding` validates the `onboardingToken`, extracts `phoneNumber`, and the backend creates the User and Profile records simultaneously.
-13. Response returns the standard { user, profile, accessToken, refreshToken }.
+13. Response returns the standard { user, accessToken, refreshToken }.
 14. All subsequent requests use Bearer <accessToken>
 ```
 
@@ -559,7 +559,7 @@ export const hashToken = (token) => {
  * We DO NOT create a database record for incomplete user profiles.
  *
  * @param {string} phoneNumber — verified phone number (10-digit)
- * @returns {{ isNewUser: boolean, user?: object, profile?: object, tokens?: object, onboardingToken?: string }}
+ * @returns {{ isNewUser: boolean, user?: object, tokens?: object, onboardingToken?: string }}
  */
 export const resolveOtpSession = async (phoneNumber) => {
     const formattedPhone = phoneNumber.startsWith('+91')
@@ -576,18 +576,7 @@ export const resolveOtpSession = async (phoneNumber) => {
         const refreshHash = hashToken(tokens.refreshToken);
         await userRepository.updateById(existingUser._id, { refreshTokenHash: refreshHash });
 
-        let profile = null;
-        if (existingUser.roleType === ROLES.CUSTOMER) {
-            profile = await customerRepository.findByUserId(existingUser._id);
-        } else if (existingUser.roleType === ROLES.BARBER) {
-            const barber = await barberRepository.findByUserId(existingUser._id);
-            const shop = barber ? await shopRepository.findByBarberId(barber._id) : null;
-            if (barber && shop) {
-                const photos = await photoRepository.findByShopId(shop._id, {});
-                profile = serializeBarberProfile({ barber, shop, user: existingUser, photos });
-            }
-        }
-        return { isNewUser: false, user: existingUser, profile, tokens };
+        return { isNewUser: false, user: existingUser, tokens };
     }
 
     // ── New user — issue onboarding token ──────────────────────────────
@@ -779,7 +768,6 @@ export const verifyOtp = async (req, res) => {
         responseData = {
             isNewUser: false,
             user: session.user,
-            profile: session.profile,
             accessToken: session.tokens.accessToken,
             refreshToken: session.tokens.refreshToken,
         };
@@ -1215,9 +1203,9 @@ The Firebase Admin SDK is no longer imported by any auth or onboarding code afte
 -         return res.status(201).json(ApiResponse.success(result, 'Customer created'));
 +         const { phoneNumber } = req.onboardingContext;
 +         const result = await onboardingService.createCustomerOnboarding(phoneNumber, req.body, req.file);
-+         const { user, profile, tokens } = result;
++         const { user, tokens } = result;
 +         return res.status(201).json(ApiResponse.success(
-+             { user, profile, accessToken: tokens.accessToken, refreshToken: tokens.refreshToken },
++             { user, accessToken: tokens.accessToken, refreshToken: tokens.refreshToken },
 +             'Customer created'
 +         ));
   };
@@ -1228,15 +1216,15 @@ The Firebase Admin SDK is no longer imported by any auth or onboarding code afte
 -         return res.status(201).json(ApiResponse.success(result, 'Barber profile created'));
 +         const { phoneNumber } = req.onboardingContext;
 +         const result = await onboardingService.createBarberOnboarding(phoneNumber, req.body, req.files);
-+         const { user, shop, photos, tokens } = result;
++         const { user, tokens } = result;
 +         return res.status(201).json(ApiResponse.success(
-+             { user, shop, photos, accessToken: tokens.accessToken, refreshToken: tokens.refreshToken },
++             { user, accessToken: tokens.accessToken, refreshToken: tokens.refreshToken },
 +             'Barber profile created'
 +         ));
   };
 ```
 
-> **Response format:** Both onboarding endpoints return a flat `{ user, profile/shop/photos, accessToken, refreshToken }` structure — identical in shape to the `verifyOtp` returning-user response. The client receives `accessToken` and `refreshToken` at the top level and can immediately authenticate without any additional requests. The internal service returns `{ ..., tokens: { accessToken, refreshToken } }`; the controller is responsible for flattening before sending the API response.
+> **Response format:** Both onboarding endpoints return a flat `{ user, accessToken, refreshToken }` structure — identical in shape to the `verifyOtp` returning-user response. The client receives `accessToken` and `refreshToken` at the top level and can immediately authenticate without any additional requests. The internal service returns `{ ..., tokens: { accessToken, refreshToken } }`; the controller is responsible for flattening before sending the API response.
 
 ### 7.4 Refactor Onboarding Service
 
@@ -1301,7 +1289,7 @@ export const createCustomerOnboarding = async (phoneNumber, profileData, file) =
     const refreshHash = authService.hashToken(tokens.refreshToken);
     await userRepository.updateById(user._id, { refreshTokenHash: refreshHash });
 
-    return { user, profile, tokens };
+    return { user, tokens };
 };
 ```
 
@@ -1338,7 +1326,7 @@ export const createBarberOnboarding = async (phoneNumber, shopData, files) => {
     const refreshHash = authService.hashToken(tokens.refreshToken);
     await userRepository.updateById(user._id, { refreshTokenHash: refreshHash });
 
-    return { user, shop: serializeBarberProfile(createdShop, user, { photos }), photos, tokens };
+    return { user, tokens };
 };
 ```
 

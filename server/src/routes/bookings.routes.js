@@ -11,7 +11,7 @@ import {
     bookingListQuerySchema,
     createBookingSchema,
     bookingIdParamSchema,
-    bookingAnalyticsQuerySchema,
+    bookingOverviewQuerySchema,
     favoritePatchSchema,
 } from '../validators/booking.validator.js';
 import { refundSchema } from '../validators/payment.validator.js';
@@ -30,7 +30,7 @@ router.use(authenticate);
 
 router.post('/', authorize(ROLES.CUSTOMER), validate(createBookingSchema, 'body'), bookingController.createBooking);
 router.get('/', authorize(ROLES.CUSTOMER, ROLES.BARBER), validate(bookingListQuerySchema, 'query'), bookingController.getBookings);
-router.get('/analytics', authorize(ROLES.BARBER), validate(bookingAnalyticsQuerySchema, 'query'), bookingController.getBookingAnalytics);
+router.get('/overview', authorize(ROLES.BARBER), validate(bookingOverviewQuerySchema, 'query'), bookingController.getBookingOverview);
 
 // ============================================================================
 // Resource Routes (with :id parameter)

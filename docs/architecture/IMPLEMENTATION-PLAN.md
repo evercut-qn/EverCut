@@ -683,8 +683,8 @@ Thin controllers that:
 /api/v1/barber/services              GET, POST
 /api/v1/barber/services/:id          PUT, DELETE
 /api/v1/barber/bookings              GET (all by shop)
-/api/v1/bookings/analytics             GET (combined booking analytics)
-/api/v1/bookings/analytics             GET (summary, milestones, today, queue)
+/api/v1/bookings/overview             GET (combined booking overview)
+/api/v1/bookings/overview             GET (summary, milestones, today, queue)
 /api/v1/barber/bookings/:id/status   PUT (update status)
 /api/v1/barber/bookings/:id          DELETE (after payment)
 /api/v1/barber/bookings/users/:id    GET (user booking details)

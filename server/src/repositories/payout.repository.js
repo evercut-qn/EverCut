@@ -3,12 +3,24 @@ import { PAYOUT_TRANSACTION_STATUS } from '../utils/constants.js';
 import { trustQueryOperators } from '../utils/mongoose-query.utils.js';
 
 class PayoutRepository {
-    async create(data) {
+    createId() {
+        return new PayoutTransaction()._id;
+    }
+
+    async create(data, options = {}) {
+        if (options.session) {
+            const [doc] = await PayoutTransaction.create([data], options);
+            return doc;
+        }
         return PayoutTransaction.create(data);
     }
 
-    async findById(id) {
-        return PayoutTransaction.findById(id);
+    async findById(id, options = {}) {
+        return PayoutTransaction.findById(id).session(options.session || null);
+    }
+
+    async findByUtr(utr) {
+        return PayoutTransaction.findOne({ utr });
     }
 
     async findLatestByBookingId(bookingId) {
@@ -21,8 +33,33 @@ class PayoutRepository {
         return PayoutTransaction.findOne({ transferId });
     }
 
-    async updateById(id, updates) {
-        return PayoutTransaction.findByIdAndUpdate(id, { $set: updates }, { returnDocument: 'after' });
+    async updateById(id, updates, options = {}) {
+        const queryOptions = { returnDocument: 'after' };
+        if (options.session) queryOptions.session = options.session;
+        return PayoutTransaction.findByIdAndUpdate(id, { $set: updates }, queryOptions);
+    }
+
+    async findAllFiltered(filter = {}, { skip, limit, sort } = {}) {
+        const query = PayoutTransaction.find(trustQueryOperators(filter))
+            .populate('barberId', 'firstName lastName upiId accountHolderName')
+            .populate('shopId', 'shopName')
+            .sort(sort || { createdAt: -1 });
+        if (skip !== undefined) query.skip(skip);
+        if (limit !== undefined) query.limit(limit);
+        return query;
+    }
+
+    async countAll(filter = {}) {
+        return PayoutTransaction.countDocuments(trustQueryOperators(filter));
+    }
+
+    async findByIdPopulated(id) {
+        return PayoutTransaction.findById(id)
+            .populate('barberId', 'firstName lastName upiId accountHolderName')
+            .populate('shopId', 'shopName')
+            .populate('bookingIds', 'date time status paymentStatus payoutStatus totalAmount barberUtr payoutCompletedAt')
+            .populate('paymentTransactionIds', 'bookingId customerId shopId merchantOrderId amount amountInRupees status settlement')
+            .populate('completedByAdminId', 'email phoneNumber roleType');
     }
 
     async findStuckPayouts(olderThan) {

@@ -25,7 +25,7 @@ All collections now assume the backend returns the same JSON envelope for both s
 
 | File | Collection name | Description |
 |---|---|---|
-| `01-authentication.json` | EverCut - Authentication | OTP authentication for customer and barber test users, token capture, and health check |
+| `01-authentication.json` | EverCut - Authentication | OTP authentication for customer, barber, and admin test users, token capture, and health check |
 | `02-onboarding.json` | EverCut - Onboarding | First-run customer and barber onboarding using onboarding JWTs, with shop schedule normalization to 24-hour storage |
 | `03-customer-profile.json` | EverCut - Customer | Profile read/update and service discovery ID capture |
 | `04-customer-bookings.json` | EverCut - Customer Bookings | Full booking lifecycle: create, schedule update, favorite state, reorder, cancel |
@@ -34,14 +34,15 @@ All collections now assume the backend returns the same JSON envelope for both s
 | `07-barber-profile-shop.json` | EverCut - Barber Profile & Shop | Shop management: current profile, payout details, open state, media, security, and account actions |
 | `08-barber-employees.json` | EverCut - Barber Employees | Employee CRUD with optional R2 photo media IDs and 24-hour employee schedule examples |
 | `09-barber-services.json` | EverCut - Barber Services | Service catalogue CRUD (single and bundled services) |
-| `10-barber-bookings.json` | EverCut - Barber Bookings | Booking administration: list filters, analytics, status update, cancellation |
+| `10-barber-bookings.json` | EverCut - Barber Bookings | Booking administration: list filters, overview with six-month appointment analytics, status update, cancellation |
 | `11-barber-media.json` | EverCut - Barber Media | R2 media workflow: presign, direct upload, confirm, gallery attach, analytics, delete |
-| `12-barber-earnings.json` | EverCut - Barber Earnings | Earnings summary (requires completed bookings for non-zero values) |
+| `12-barber-earnings.json` | EverCut - Barber Earnings | Earnings summary, current-month revenue, and six-month income analytics |
 | `13-barber-ratings.json` | EverCut - Barber Ratings | Rating listing, analytics, reply management, and rating removal |
-| `14-operational-analytics.json` | EverCut - Operational Analytics | Booking, employee, and earnings analytics through resource-owned endpoints |
-| `15-payments-payouts.json` | EverCut - Payments & Payouts | Native PhonePe SDK payment initiation/verification/status/refunds and Cashfree payout retry |
-| `16-notifications.json` | EverCut - Notifications | FCM token management, notification history, summary, and read-state updates |
-| `17-subscriptions.json` | EverCut - Subscriptions | Razorpay subscription lifecycle, plan changes, transaction history, and signed webhook simulation |
+| `14-operational-analytics.json` | EverCut - Operational Analytics | Booking, appointment, employee, income, earnings, and rating analytics through resource-owned endpoints |
+| `15-payments.json` | EverCut - Payments | Native PhonePe SDK payment initiation/verification/status/refunds |
+| `16-payouts.json` | EverCut - Payouts | Manual payout recording, payout history, and Cashfree payout retry |
+| `17-notifications.json` | EverCut - Notifications | FCM token management, notification history, unread count, and read-state updates |
+| `18-subscriptions.json` | EverCut - Subscriptions | Razorpay subscription lifecycle, plan changes, and transaction history |
 | `EverCut.postman_environment.json` | — | Active environment with OTP/JWT variables for local testing |
 | `assets/sample-upload.png` | — | Sample image for direct R2 PUT requests |
 
@@ -57,11 +58,17 @@ All collections now assume the backend returns the same JSON envelope for both s
 | 2 | POST | `/api/v1/auth/otp/verify` | Verify customer OTP - captures onboarding or session tokens |
 | 3 | POST | `/api/v1/auth/otp/send` | Send OTP to barber |
 | 4 | POST | `/api/v1/auth/otp/verify` | Verify barber OTP - captures onboarding or session tokens |
-| 5 | POST | `/api/v1/auth/token/refresh` | Refresh customer access token |
-| 6 | POST | `/api/v1/auth/token/refresh` | Refresh barber access token |
-| 7 | POST | `/api/v1/auth/logout` | Logout customer *(Terminal)* |
-| 8 | POST | `/api/v1/auth/otp/resend` | Resend OTP (text channel) |
-| 9 | GET | `/api/v1/health` | Health check |
+| 5 | POST | `/api/v1/auth/otp/send` | Send OTP to admin |
+| 6 | POST | `/api/v1/auth/otp/verify` | Verify admin OTP - captures admin session tokens |
+| 7 | POST | `/api/v1/auth/token/refresh` | Refresh customer access token |
+| 8 | POST | `/api/v1/auth/token/refresh` | Refresh barber access token |
+| 9 | POST | `/api/v1/auth/token/refresh` | Refresh admin access token |
+| 10 | POST | `/api/v1/auth/logout` | Logout customer *(Terminal)* |
+| 11 | POST | `/api/v1/auth/otp/resend` | Resend OTP (text channel) |
+| 12 | POST | `/api/v1/account/phone/send-otp` | Send phone update OTP |
+| 13 | POST | `/api/v1/account/phone/verify-otp` | Verify phone update OTP |
+| 14 | PATCH | `/api/v1/account/email` | Update customer email |
+| 15 | GET | `/api/v1/health` | Health check |
 
 ### `02-onboarding.json`
 
@@ -87,13 +94,14 @@ Shop opening, closing, and break times may be sent as either `HH:MM` or `hh:mm A
 | 1 | GET | `/api/v1/bookings?dateFrom={{booking_date}}` | List bookings from the generated date - captures booking ID |
 | 2 | GET | `/api/v1/employees/{{employee_id}}/availability` | Get employee availability |
 | 3 | POST | `/api/v1/bookings` | Create a booking |
-| 4 | GET | `/api/v1/bookings/{{booking_id}}` | Get booking details |
-| 5 | PATCH | `/api/v1/bookings/{{booking_id}}/favorite` | Set booking favorite true |
-| 6 | GET | `/api/v1/bookings?favorite=true` | List favorite bookings |
-| 7 | PATCH | `/api/v1/bookings/{{booking_id}}` | Update booking schedule |
-| 8 | POST | `/api/v1/bookings` | Reorder from `sourceBookingId` |
-| 9 | PATCH | `/api/v1/bookings/{{booking_id}}/favorite` | Set booking favorite false |
-| 10 | PATCH | `/api/v1/bookings/{{booking_id}}` | Cancel booking with `status=cancelled` |
+| 4 | POST | `/api/v1/bookings` | Book Salon - Idempotency Replay |
+| 5 | GET | `/api/v1/bookings/{{booking_id}}` | Get booking details |
+| 6 | PATCH | `/api/v1/bookings/{{booking_id}}/favorite` | Set booking favorite true |
+| 7 | GET | `/api/v1/bookings?favorite=true` | List favorite bookings |
+| 8 | PATCH | `/api/v1/bookings/{{booking_id}}` | Update booking schedule |
+| 9 | POST | `/api/v1/bookings` | Reorder from `sourceBookingId` |
+| 10 | PATCH | `/api/v1/bookings/{{booking_id}}/favorite` | Set booking favorite false |
+| 11 | PATCH | `/api/v1/bookings/{{booking_id}}` | Cancel booking with `status=cancelled` |
 
 ### `05-customer-shop-discovery.json`
 
@@ -118,7 +126,7 @@ Shop opening, closing, and break times may be sent as either `HH:MM` or `hh:mm A
 | 1 | GET | `/api/v1/bookings?dateTo={{booking_date}}&status=completed&limit=100` | Bootstrap: capture a shop ID from a completed booking |
 | 2 | POST | `/api/v1/ratings` | Submit a rating *(once per customer/shop - returns 409 on rerun)* |
 | 3 | GET | `/api/v1/shops/{{shop_id}}/ratings` | List shop ratings |
-| 4 | GET | `/api/v1/shops/{{shop_id}}/ratings/analytics` | Get rating analytics |
+| 4 | GET | `/api/v1/shops/{{shop_id}}/ratings/summary` | Get rating summary |
 
 ### `07-barber-profile-shop.json`
 
@@ -162,13 +170,17 @@ Employee `workingHours.start` and `workingHours.end` remain `HH:MM` 24-hour valu
 
 | # | Method | Endpoint | Description |
 |---|---|---|---|
-| 1 | GET | `/api/v1/bookings` | List all bookings - captures IDs for status update and cancellation |
-| 2 | GET | `/api/v1/bookings/analytics` | Get combined booking analytics |
-| 4 | GET | `/api/v1/bookings?status=awaiting_confirmation&paymentStatus=success` | List pending confirmations |
-| 5 | GET | `/api/v1/bookings?status=confirmed` | Filter bookings by status |
-| 6 | PATCH | `/api/v1/bookings/{{booking_id_status}}` | Confirm a booking |
-| 7 | PATCH | `/api/v1/bookings/{{booking_id_status}}` | Update booking status |
-| 8 | PATCH | `/api/v1/bookings/{{booking_id_delete}}` | Cancel a paid booking *(Terminal)* |
+| 1 | GET | `/api/v1/bookings` | Get all bookings - captures status and delete IDs |
+| 2 | GET | `/api/v1/bookings/overview` | Get combined booking overview with last-six-completed-month appointment analytics |
+| 3 | GET | `/api/v1/bookings?status=awaiting_confirmation&paymentStatus=success` | List pending confirmations |
+| 4 | GET | `/api/v1/bookings?status=confirmed` | Filter bookings by status |
+| 5 | GET | `/api/v1/bookings?employeeId={{employee_id}}` | Get bookings by employee |
+| 6 | GET | `/api/v1/bookings?dateFrom={{booking_date}}&dateTo={{booking_date}}` | Get bookings by date range |
+| 7 | GET | `/api/v1/bookings?employeeId={{employee_id}}&dateFrom={{booking_date}}&dateTo={{booking_date}}` | Get employee bookings in date range |
+| 8 | GET | `/api/v1/bookings?employeeId={{employee_id}}&status=confirmed,awaiting_confirmation` | Get employee bookings with status filter |
+| 9 | PATCH | `/api/v1/bookings/{{booking_id_status}}` | Confirm a booking |
+| 10 | PATCH | `/api/v1/bookings/{{booking_id_status}}` | Update booking status |
+| 11 | PATCH | `/api/v1/bookings/{{booking_id_delete}}` | Cancel a paid booking *(Terminal)* |
 
 ### `11-barber-media.json`
 
@@ -179,7 +191,7 @@ Employee `workingHours.start` and `workingHours.end` remain `HH:MM` 24-hour valu
 | 3 | POST | `/api/v1/media/confirm` | Confirm and validate the upload |
 | 4 | POST | `/api/v1/media/gallery` | Attach confirmed media to gallery |
 | 5 | GET | `/api/v1/media/gallery` | List gallery media |
-| 6 | GET | `/api/v1/media/gallery/stats` | Get gallery analytics |
+| 6 | GET | `/api/v1/media/gallery/usage` | Get gallery usage |
 | 7 | GET | `/api/v1/media/{{media_id}}` | Get media by ID |
 | 8 | DELETE | `/api/v1/media/{{media_id}}` | Delete media *(Terminal)* |
 
@@ -187,14 +199,14 @@ Employee `workingHours.start` and `workingHours.end` remain `HH:MM` 24-hour valu
 
 | # | Method | Endpoint | Description |
 |---|---|---|---|
-| 1 | GET | `/api/v1/earnings` | Get earnings summary |
+| 1 | GET | `/api/v1/earnings` | Get earnings summary with current-month revenue and last-six-completed-month income analytics |
 
 ### `13-barber-ratings.json`
 
 | # | Method | Endpoint | Description |
 |---|---|---|---|
 | 1 | GET | `/api/v1/ratings` | List ratings - captures seeded IDs for reply/remove operations |
-| 2 | GET | `/api/v1/ratings/analytics` | Get the authenticated barber shop's rating analytics |
+| 2 | GET | `/api/v1/ratings/summary` | Get the authenticated barber shop's rating summary |
 | 3 | PUT | `/api/v1/ratings/{{rating_id_add_reply}}/reply` | Add or replace reply on a rating |
 | 4 | PUT | `/api/v1/ratings/{{rating_id_update_reply}}/reply` | Update an existing reply |
 | 5 | DELETE | `/api/v1/ratings/{{rating_id_update_reply}}/reply` | Delete a reply |
@@ -204,33 +216,44 @@ Employee `workingHours.start` and `workingHours.end` remain `HH:MM` 24-hour valu
 
 | # | Method | Endpoint | Description |
 |---|---|---|---|
-| 1 | GET | `/api/v1/bookings/analytics` | Get booking summary, milestones, today pulse, and queue |
-| 2 | GET | `/api/v1/employees/analytics` | Get staff availability and progress tracking |
-| 3 | GET | `/api/v1/earnings` | Get earnings analytics |
+| 1 | GET | `/api/v1/bookings/overview` | Get booking summary, milestones, today pulse, queue, and appointment analytics |
+| 2 | GET | `/api/v1/employees/daily-progress` | Get staff availability and progress tracking |
+| 3 | GET | `/api/v1/earnings` | Get earnings summary, current-month revenue, and income analytics |
+| 4 | GET | `/api/v1/ratings/summary` | Get rating summary |
+| 5 | GET | `/api/v1/media/gallery/usage` | Get gallery usage |
 
-### `15-payments-payouts.json`
+### `15-payments.json`
 
 | # | Method | Endpoint | Description |
 |---|---|---|---|
 | 1 | POST | `/api/v1/payments` | Create native PhonePe SDK order for a pending customer booking |
 | 2 | GET | `/api/v1/payments/{{payment_id}}` | Read and poll payment status |
-| 2B | GET | `/api/v1/payments` | List visible payments for the authenticated actor |
-| 3 | POST | `/api/v1/payments/{{payment_id}}/verify` | Verify Flutter SDK callback through backend/PhonePe Order Status |
-| 4 | POST | `/api/v1/bookings/{{payment_booking_id}}/refunds` | Initiate refund before payout starts |
-| 5 | POST | `/api/v1/payouts/{{payout_id}}/retry` | Retry failed or reversed payout as admin |
+| 3 | GET | `/api/v1/payments` | List visible payments for the authenticated actor |
+| 4 | POST | `/api/v1/payments/{{payment_id}}/verify` | Verify Flutter SDK callback through backend/PhonePe Order Status |
+| 5 | POST | `/api/v1/bookings/{{payment_booking_id}}/refunds` | Initiate refund before payout starts |
 
-### `16-notifications.json`
+### `16-payouts.json`
+
+| # | Method | Endpoint | Description |
+|---|---|---|---|
+| 1 | GET | `/api/v1/payouts/pending` | List pending manual payout groups as admin |
+| 2 | POST | `/api/v1/payouts` | Create manual payout as admin |
+| 3 | GET | `/api/v1/payouts?gateway=manual` | List manual payout history |
+| 4 | GET | `/api/v1/payouts/{{payout_id}}` | Get payout detail |
+| 5 | POST | `/api/v1/payouts/{{payout_id}}/retry` | Retry failed or reversed Cashfree payout as admin |
+
+### `17-notifications.json`
 
 | # | Method | Endpoint | Description |
 |---|---|---|---|
 | 1 | POST | `/api/v1/notifications/tokens` | Register or refresh an FCM token for the authenticated user |
 | 2 | GET | `/api/v1/notifications?page=1&limit=20` | List notification history and capture a notification ID |
-| 3 | GET | `/api/v1/notifications/summary` | Get notification summary |
+| 3 | GET | `/api/v1/notifications/unread-count` | Get notification unread count |
 | 4 | PATCH | `/api/v1/notifications/{{notification_id}}` | Mark one notification read |
 | 5 | PATCH | `/api/v1/notifications` | Mark all notifications read |
 | 6 | DELETE | `/api/v1/notifications/tokens` | Revoke the authenticated user's FCM token |
 
-### `17-subscriptions.json`
+### `18-subscriptions.json`
 
 | # | Method | Endpoint | Description |
 |---|---|---|---|
@@ -241,13 +264,12 @@ Employee `workingHours.start` and `workingHours.end` remain `HH:MM` 24-hour valu
 | 5 | POST | `/api/v1/subscriptions/downgrade` | Schedule a paid downgrade at next renewal, or cancel when downgrading to Basic |
 | 6 | POST | `/api/v1/subscriptions/cancel` | Cancel the paid subscription at cycle end |
 | 7 | GET | `/api/v1/subscriptions/transactions?page=1&limit=20` | List immutable subscription lifecycle/audit records |
-| 8 | POST | `/api/v1/subscriptions/webhook` | Simulate a signed Razorpay subscription webhook |
 
 ---
 
 ### Prerequisites
 
-1. In `src/config/index.js`, set `testMode: true` inside the `msg91` config block to skip real SMS in development. The default is `false`; the inline comment says `flip to true in dev to skip real SMS`.
+1. In non-production, `src/config/index.js` has MSG91 `testMode` enabled so local OTP requests use the configured test OTP instead of sending real SMS.
 2. The test OTP is hardcoded as `123456` via `testOtp: '123456'` in the same config block - no env var needed.
 3. From `server/`, start the API with `npm run dev`.
 
@@ -257,12 +279,13 @@ No manual token generation needed - the authentication and onboarding collection
 
 1. Import every `.json` collection from this folder.
 2. Import `EverCut.postman_environment.json` as the active environment.
-3. Verify `test_customer_mobile`, `test_barber_mobile`, and `test_otp` are set in the environment.
-4. Run `01-authentication.json` requests 1-4 to send and verify OTP for both test users.
-5. Returning users get access tokens immediately; brand-new users get onboarding tokens first and then receive access tokens from `02-onboarding.json`.
-6. Run the other collections in order.
+3. Verify `test_customer_mobile`, `test_barber_mobile`, `test_admin_mobile`, and `test_otp` are set in the environment.
+4. Create the admin user with `node scripts/create-admin-user.mjs --phone 9876543212 --email admin@example.com`.
+5. Run `01-authentication.json` requests 1-6 to send and verify OTP for customer, barber, and admin users.
+6. Returning users get access tokens immediately; brand-new users get onboarding tokens first and then receive access tokens from `02-onboarding.json`.
+7. Run the other collections in order.
 
-> Access tokens expire after 15 minutes once onboarding is complete. Run the **Refresh Token** requests (5-6) or re-run requests 1-4 to get fresh tokens. Tokens are auto-captured - no manual copy-paste.
+> Access tokens expire after 15 minutes once onboarding is complete. Run the **Refresh Token** requests (7-9) or re-run OTP verification to get fresh tokens. Tokens are auto-captured - no manual copy-paste.
 
 ### Test Users
 
@@ -270,6 +293,7 @@ No manual token generation needed - the authentication and onboarding collection
 |---|---|---|---|
 | Customer | *(auto-generated on first successful onboarding)* | `test.customer@example.com` | `9876543210` |
 | Barber | *(auto-generated on first successful onboarding)* | `test.barber@example.com` | `9876543211` |
+| Admin | Created with `scripts/create-admin-user.mjs` | `admin@example.com` | `9876543212` |
 
 ### Environment Variables
 
@@ -279,6 +303,7 @@ No manual token generation needed - the authentication and onboarding collection
 | `api_prefix` | `api/v1` |
 | `test_customer_mobile` | `9876543210` |
 | `test_barber_mobile` | `9876543211` |
+| `test_admin_mobile` | `9876543212` |
 | `test_otp` | `123456` |
 | `customer_access_token` | *(auto-set by 01-authentication.json for returning users or by 02-onboarding.json after first-time signup)* |
 | `customer_refresh_token` | *(auto-set by 01-authentication.json for returning users or by 02-onboarding.json after first-time signup)* |
@@ -286,19 +311,21 @@ No manual token generation needed - the authentication and onboarding collection
 | `barber_refresh_token` | *(auto-set by 01-authentication.json for returning users or by 02-onboarding.json after first-time signup)* |
 | `customer_onboarding_token` | *(auto-set by 01-authentication.json)* |
 | `barber_onboarding_token` | *(auto-set by 01-authentication.json)* |
-| `admin_access_token` | Manual ADMIN JWT for payout retry |
+| `admin_access_token` | Auto-set by `01-authentication.json` request 6 for manual payout and Cashfree retry requests |
+| `admin_refresh_token` | Auto-set by `01-authentication.json` request 6 |
 | `payment_booking_id` | Booking ID to pay for; can be copied from `shared_booking_id` |
-| `payment_id` | Auto-set by `15-payments-payouts.json` request 1 |
-| `merchant_order_id` | Auto-set by `15-payments-payouts.json` request 1 |
-| `merchant_refund_id` | Auto-set by `15-payments-payouts.json` request 5 |
-| `refund_id` | Auto-set by `15-payments-payouts.json` request 5 |
-| `payout_id` | Manual payout transaction ID for retry tests |
+| `payment_id` | Auto-set by `15-payments.json` request 1 |
+| `merchant_order_id` | Auto-set by `15-payments.json` request 1 |
+| `merchant_refund_id` | Auto-set by `15-payments.json` request 5 |
+| `refund_id` | Auto-set by `15-payments.json` request 5 |
+| `manual_payout_barber_id` | Auto-set by `16-payouts.json` request 1 |
+| `manual_payout_booking_ids_json` | Auto-set by `16-payouts.json` request 1 |
+| `manual_payout_utr` | Unique UTR used by `16-payouts.json` request 2 |
+| `payout_id` | Manual payout transaction ID for detail lookup or Cashfree retry tests |
 | `subscription_plan_id` | `PLAN_POPULAR` by default; set to `PLAN_ADVANCED` to test Advanced checkout |
 | `subscription_upgrade_plan_id` | `PLAN_ADVANCED` |
 | `subscription_downgrade_plan_id` | `PLAN_POPULAR` |
-| `razorpay_subscription_id` | Auto-set by `17-subscriptions.json` request 3, or manually copied from Razorpay |
-| `razorpay_plan_id_popular` | Razorpay gateway plan ID from `RAZORPAY_PLAN_ID_POPULAR` |
-| `razorpay_webhook_secret` | Local/test Razorpay webhook secret used by the signed webhook simulation |
+| `razorpay_subscription_id` | Auto-set by `18-subscriptions.json` request 3, or manually copied from Razorpay |
 
 ### Auth Collection Requests
 
@@ -308,11 +335,17 @@ No manual token generation needed - the authentication and onboarding collection
 | 2 | POST | `/api/v1/auth/otp/verify` | Verify customer OTP - captures onboarding or session tokens |
 | 3 | POST | `/api/v1/auth/otp/send` | Send OTP to barber |
 | 4 | POST | `/api/v1/auth/otp/verify` | Verify barber OTP - captures onboarding or session tokens |
-| 5 | POST | `/api/v1/auth/token/refresh` | Refresh customer access token |
-| 6 | POST | `/api/v1/auth/token/refresh` | Refresh barber access token |
-| 7 | POST | `/api/v1/auth/logout` | Logout customer *(Terminal)* |
-| 8 | POST | `/api/v1/auth/otp/resend` | Resend OTP (text channel) |
-| 9 | GET | `/api/v1/health` | Health check |
+| 5 | POST | `/api/v1/auth/otp/send` | Send OTP to admin |
+| 6 | POST | `/api/v1/auth/otp/verify` | Verify admin OTP - captures admin session tokens |
+| 7 | POST | `/api/v1/auth/token/refresh` | Refresh customer access token |
+| 8 | POST | `/api/v1/auth/token/refresh` | Refresh barber access token |
+| 9 | POST | `/api/v1/auth/token/refresh` | Refresh admin access token |
+| 10 | POST | `/api/v1/auth/logout` | Logout customer *(Terminal)* |
+| 11 | POST | `/api/v1/auth/otp/resend` | Resend OTP (text channel) |
+| 12 | POST | `/api/v1/account/phone/send-otp` | Send phone update OTP |
+| 13 | POST | `/api/v1/account/phone/verify-otp` | Verify phone update OTP |
+| 14 | PATCH | `/api/v1/account/email` | Update customer email |
+| 15 | GET | `/api/v1/health` | Health check |
 
 ### Recommended Run Order
 
@@ -327,8 +360,16 @@ No manual token generation needed - the authentication and onboarding collection
 1. `01-authentication.json` → **1. Send Customer OTP** → **2. Verify Customer OTP**
 2. `02-onboarding.json` → **1. Complete Customer** *(first run only)*
 3. Continue with customer collections in order.
-4. Run `15-payments-payouts.json` after a pending booking has been created. Request 1 captures the payment references needed by the status, refund, and webhook requests.
-5. Run `17-subscriptions.json` after barber onboarding. Request 3 captures `razorpay_subscription_id`; request 8 signs its body with `razorpay_webhook_secret` before calling the webhook endpoint.
+4. Run `15-payments.json` after a pending booking has been created. Request 1 captures the payment references needed by the status and refund requests.
+5. Run `18-subscriptions.json` after barber onboarding. Request 3 captures `razorpay_subscription_id`.
+
+**Admin manual payout side:**
+
+1. Create an admin user with `node scripts/create-admin-user.mjs --phone 9876543212 --email admin@example.com`.
+2. `01-authentication.json` → **5. Send Admin OTP** → **6. Verify Admin OTP**.
+3. Prepare at least one completed/no-show, paid booking with pending payout status.
+4. `16-payouts.json` → **1. List Pending Manual Payouts** → **2. Create Manual Payout**.
+5. Use requests 3-4 for payout history/detail testing. Request 5 is only for legacy Cashfree payout retry.
 
 > Requests marked ***(Terminal)*** are destructive. Run them last within their collection and avoid them if you still need the related account or data for later requests.
 
@@ -346,7 +387,10 @@ Collections capture and share the following Postman globals automatically:
 | `shared_booking_id` | `04-customer-bookings.json` requests 1 and 3 | Booking detail requests |
 | `shared_media_id` | `11-barber-media.json` requests 1 and 5 | Media attachment, detail, and delete |
 | `shared_barber_pin` | `07-barber-profile-shop.json` request 8 | Future PIN-gated requests |
-| `razorpay_subscription_id` | `17-subscriptions.json` request 3 | Subscription status and webhook simulation |
+| `razorpay_subscription_id` | `18-subscriptions.json` request 3 | Subscription status check |
+| `manual_payout_barber_id` | `16-payouts.json` request 1 | Manual payout creation |
+| `manual_payout_booking_ids_json` | `16-payouts.json` request 1 | Manual payout creation |
+| `payout_id` | `16-payouts.json` request 2 | Payout detail or Cashfree retry |
 
 ---
 
@@ -375,7 +419,7 @@ Barber onboarding and shop schedule updates accept either `HH:MM` or `hh:mm AM/P
 
 ### `13-barber-ratings.json` — Add Reply (Request 2)
 
-In the current collection this is request 3, because request 2 now fetches `GET /ratings/analytics`.
+This is request 3, because request 2 now fetches `GET /ratings/summary`.
 
 This succeeds once for the seeded no-reply fixture. It returns `409 Conflict` on subsequent runs if the service rejects replacing an existing reply.
 

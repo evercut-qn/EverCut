@@ -66,7 +66,7 @@ The image shows a barber-facing progress card for a booking incentive or reward 
 The backend already had barber booking management fundamentals:
 
 - `GET /api/v1/barber/bookings` for booking listing
-- `GET /api/v1/bookings/analytics` for counts by status
+- `GET /api/v1/bookings/overview` for counts by status
 - `GET /api/v1/barber/bookings/status` for status-filtered lists
 - `PUT /api/v1/barber/bookings/:id/status` for status changes
 - `DELETE /api/v1/barber/bookings/:id` for paid-booking deletion
@@ -95,7 +95,7 @@ The backend did **not** have a dedicated endpoint that returned:
 
 ### New endpoint added
 
-- `GET /api/v1/bookings/analytics`
+- `GET /api/v1/bookings/overview`
 
 ### What it returns
 
@@ -168,7 +168,7 @@ Added booking-domain milestone logic in `booking.service.js`:
 
 Updated the barber bookings collection generator to:
 
-- add `GET /api/v1/bookings/analytics`
+- add `GET /api/v1/bookings/overview`
 - describe the new milestone-progress request
 - fix booking ID capture to read `response.data.items`
 

@@ -6,6 +6,12 @@ import subscriptionRepository from '../repositories/subscription.repository.js';
 import { NotFoundError, ForbiddenError } from '../utils/api-error.js';
 import { buildPagination } from '../utils/pagination.utils.js';
 import { PAYMENT_TRANSACTION_STATUS } from '../utils/constants.js';
+import {
+    buildMonthlyStatistics,
+    calculateGrowthPercentage,
+    getLastCompletedMonths,
+    sumMonthlyStatistics,
+} from '../utils/month-analytics.utils.js';
 
 /**
  * Earnings service — calculates barber earnings and manages transactions.
@@ -107,6 +113,29 @@ const calculateMonthlyRevenue = async (shopId) => {
         changePercentage: Math.abs(parseFloat(changePercentage.toFixed(1))),
         changeDirection,
         period: now.toLocaleString('en-US', { month: 'long', year: 'numeric' }),
+    };
+};
+
+const buildIncomeAnalytics = async (shopId) => {
+    const months = getLastCompletedMonths();
+    const rows = await paymentRepository.aggregateIncomeByMonth(
+        shopId,
+        months[0].startDate,
+        months.at(-1).endDate,
+    );
+    const statistics = buildMonthlyStatistics({
+        months,
+        rows,
+        valueKey: 'amount',
+        outputKey: 'amount',
+    });
+    const previousMonth = statistics.at(-2)?.amount || 0;
+    const currentMonth = statistics.at(-1)?.amount || 0;
+
+    return {
+        total: sumMonthlyStatistics(statistics, 'amount'),
+        growth: calculateGrowthPercentage(previousMonth, currentMonth),
+        statistics,
     };
 };
 
@@ -221,10 +250,12 @@ export const getEarnings = async (ownerId) => {
 
     // Calculate monthly revenue with percentage change (same as in transactions)
     const monthlyRevenue = await calculateMonthlyRevenue(shop._id);
+    const income = await buildIncomeAnalytics(shop._id);
 
     return {
         ...basicEarnings,
         monthlyRevenue,
+        income,
     };
 };
 

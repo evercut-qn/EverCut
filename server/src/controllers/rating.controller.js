@@ -43,10 +43,10 @@ export const getOwnedRatings = async (req, res, next) => {
     }
 };
 
-export const getOwnedRatingSummary = async (req, res, next) => {
+export const getBarberRatingSummary = async (req, res, next) => {
     try {
-        const summary = await ratingService.getRatingSummaryForBarber(req.user._id);
-        return res.status(200).json(ApiResponse.success(summary, 'Rating summary'));
+        const summary = await ratingService.getBarberRatingSummary(req.user._id);
+        return res.status(200).json(ApiResponse.success(summary, 'Rating summary fetched'));
     } catch (err) {
         next(err);
     }

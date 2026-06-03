@@ -1,0 +1,551 @@
+{
+  "info": {
+    "name": "EverCut - Subscriptions",
+    "description": "Barber subscription lifecycle collection covering plan listing, Razorpay subscription checkout, upgrade/downgrade, cancellation, and transactions. Run authentication and onboarding first to capture barber_access_token.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{barber_access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Automatically pull IDs from Globals ONLY if user hasn't manually set them in Collection Variables.",
+          "const syncGlobalToCollection = (globalKey, collectionKey = globalKey) => {",
+          "  const globalVal = pm.globals.get(globalKey);",
+          "  const collVal = pm.collectionVariables.get(collectionKey);",
+          "  if (globalVal && !collVal) {",
+          "    pm.collectionVariables.set(collectionKey, globalVal);",
+          "  }",
+          "};",
+          "syncGlobalToCollection('razorpay_subscription_id', 'razorpay_subscription_id');"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:5000",
+      "type": "string",
+      "description": "Default local API server"
+    },
+    {
+      "key": "api_prefix",
+      "value": "api/v1",
+      "type": "string",
+      "description": "API prefix used by every request"
+    },
+    {
+      "key": "subscription_plan_id",
+      "value": "PLAN_POPULAR",
+      "type": "string",
+      "description": "Plan to subscribe to or downgrade to. Use PLAN_POPULAR or PLAN_ADVANCED for paid plans."
+    },
+    {
+      "key": "subscription_upgrade_plan_id",
+      "value": "PLAN_ADVANCED",
+      "type": "string",
+      "description": "Plan used by the upgrade request."
+    },
+    {
+      "key": "subscription_downgrade_plan_id",
+      "value": "PLAN_POPULAR",
+      "type": "string",
+      "description": "Plan used by the downgrade request."
+    },
+    {
+      "key": "razorpay_subscription_id",
+      "value": "sub_postman_123",
+      "type": "string",
+      "description": "Razorpay subscription id used in examples."
+    }
+  ],
+  "item": [
+    {
+      "name": "1. List Plans",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/{{api_prefix}}/subscriptions/plans",
+        "description": "Public plan catalog with pricing and entitlement limits.",
+        "auth": {
+          "type": "noauth"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const requestUrl = pm.request.url.toString();",
+              "const resolvedUrl = pm.variables.replaceIn(requestUrl);",
+              "const isApiUrl = resolvedUrl.includes('/api/v1/');",
+              "const skipEnvelope = !isApiUrl || ['/earnings/transactions/statement'].some(path => resolvedUrl.includes(path));",
+              "const skipObjectId = ['/subscriptions/plans'].some(path => resolvedUrl.includes(path));",
+              "",
+              "if (!skipEnvelope) {",
+              "  pm.test('response uses the standard envelope', function () {",
+              "    const response = pm.response.json();",
+              "    pm.expect(response).to.be.an('object');",
+              "    pm.expect(response).to.have.property('success');",
+              "    pm.expect(response.success).to.be.a('boolean');",
+              "    pm.expect(response).to.have.property('message');",
+              "    pm.expect(response.message).to.be.a('string');",
+              "    pm.expect(response).to.have.property('data');",
+              "    if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "    ",
+              "    if (response.data && !skipObjectId) {",
+              "      const checkId = (obj) => {",
+              "        if (obj && typeof obj === 'object' && obj.id !== undefined && obj.id !== null) {",
+              "          pm.expect(obj.id, 'Resource id must be a string').to.be.a('string');",
+              "          pm.expect(obj.id, 'Resource id must be a valid 24-character hex MongoDB ObjectID').to.match(/^[a-fA-F0-9]{24}$/);",
+              "        }",
+              "      };",
+              "      if (Array.isArray(response.data)) {",
+              "        response.data.forEach(item => checkId(item));",
+              "      } else {",
+              "        checkId(response.data);",
+              "      }",
+              "    }",
+              "    ",
+              "    const responseText = JSON.stringify(response);",
+              "    ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "      pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "    });",
+              "  });",
+              "}",
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "const response = pm.response.json();",
+              "pm.test('three plans returned', function () { pm.expect(response.data.map((p) => p.id)).to.include.members(['PLAN_BASIC', 'PLAN_POPULAR', 'PLAN_ADVANCED']); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. My Subscription",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/{{api_prefix}}/subscriptions/me",
+        "description": "Returns current subscription state, usage counters, and resolved entitlements for the authenticated barber."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const requestUrl = pm.request.url.toString();",
+              "const resolvedUrl = pm.variables.replaceIn(requestUrl);",
+              "const isApiUrl = resolvedUrl.includes('/api/v1/');",
+              "const skipEnvelope = !isApiUrl || ['/earnings/transactions/statement'].some(path => resolvedUrl.includes(path));",
+              "const skipObjectId = ['/subscriptions/plans'].some(path => resolvedUrl.includes(path));",
+              "",
+              "if (!skipEnvelope) {",
+              "  pm.test('response uses the standard envelope', function () {",
+              "    const response = pm.response.json();",
+              "    pm.expect(response).to.be.an('object');",
+              "    pm.expect(response).to.have.property('success');",
+              "    pm.expect(response.success).to.be.a('boolean');",
+              "    pm.expect(response).to.have.property('message');",
+              "    pm.expect(response.message).to.be.a('string');",
+              "    pm.expect(response).to.have.property('data');",
+              "    if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "    ",
+              "    if (response.data && !skipObjectId) {",
+              "      const checkId = (obj) => {",
+              "        if (obj && typeof obj === 'object' && obj.id !== undefined && obj.id !== null) {",
+              "          pm.expect(obj.id, 'Resource id must be a string').to.be.a('string');",
+              "          pm.expect(obj.id, 'Resource id must be a valid 24-character hex MongoDB ObjectID').to.match(/^[a-fA-F0-9]{24}$/);",
+              "        }",
+              "      };",
+              "      if (Array.isArray(response.data)) {",
+              "        response.data.forEach(item => checkId(item));",
+              "      } else {",
+              "        checkId(response.data);",
+              "      }",
+              "    }",
+              "    ",
+              "    const responseText = JSON.stringify(response);",
+              "    ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "      pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "    });",
+              "  });",
+              "}",
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "const response = pm.response.json();",
+              "pm.test('subscription response includes usage', function () { pm.expect(response.data).to.have.property('usage'); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Subscribe To Paid Plan",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/{{api_prefix}}/subscriptions/subscribe",
+        "description": "Creates a Razorpay subscription and returns checkoutUrl, razorpaySubscriptionId, and razorpayKeyId.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"planId\": \"{{subscription_plan_id}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const requestUrl = pm.request.url.toString();",
+              "const resolvedUrl = pm.variables.replaceIn(requestUrl);",
+              "const isApiUrl = resolvedUrl.includes('/api/v1/');",
+              "const skipEnvelope = !isApiUrl || ['/earnings/transactions/statement'].some(path => resolvedUrl.includes(path));",
+              "const skipObjectId = ['/subscriptions/plans'].some(path => resolvedUrl.includes(path));",
+              "",
+              "if (!skipEnvelope) {",
+              "  pm.test('response uses the standard envelope', function () {",
+              "    const response = pm.response.json();",
+              "    pm.expect(response).to.be.an('object');",
+              "    pm.expect(response).to.have.property('success');",
+              "    pm.expect(response.success).to.be.a('boolean');",
+              "    pm.expect(response).to.have.property('message');",
+              "    pm.expect(response.message).to.be.a('string');",
+              "    pm.expect(response).to.have.property('data');",
+              "    if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "    ",
+              "    if (response.data && !skipObjectId) {",
+              "      const checkId = (obj) => {",
+              "        if (obj && typeof obj === 'object' && obj.id !== undefined && obj.id !== null) {",
+              "          pm.expect(obj.id, 'Resource id must be a string').to.be.a('string');",
+              "          pm.expect(obj.id, 'Resource id must be a valid 24-character hex MongoDB ObjectID').to.match(/^[a-fA-F0-9]{24}$/);",
+              "        }",
+              "      };",
+              "      if (Array.isArray(response.data)) {",
+              "        response.data.forEach(item => checkId(item));",
+              "      } else {",
+              "        checkId(response.data);",
+              "      }",
+              "    }",
+              "    ",
+              "    const responseText = JSON.stringify(response);",
+              "    ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "      pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "    });",
+              "  });",
+              "}",
+              "pm.test('status is 201 or conflict when already subscribed', function () { pm.expect(pm.response.code).to.be.oneOf([201, 400, 409]); });",
+              "const response = pm.response.json();",
+              "if (response.data?.razorpaySubscriptionId) {",
+              "  pm.collectionVariables.set('razorpay_subscription_id', response.data.razorpaySubscriptionId);",
+              "  pm.globals.set('razorpay_subscription_id', response.data.razorpaySubscriptionId);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Upgrade Subscription",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/{{api_prefix}}/subscriptions/upgrade",
+        "description": "Upgrades a paid Razorpay subscription immediately. Use subscribe first when currently on Basic.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"planId\": \"{{subscription_upgrade_plan_id}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const requestUrl = pm.request.url.toString();",
+              "const resolvedUrl = pm.variables.replaceIn(requestUrl);",
+              "const isApiUrl = resolvedUrl.includes('/api/v1/');",
+              "const skipEnvelope = !isApiUrl || ['/earnings/transactions/statement'].some(path => resolvedUrl.includes(path));",
+              "const skipObjectId = ['/subscriptions/plans'].some(path => resolvedUrl.includes(path));",
+              "",
+              "if (!skipEnvelope) {",
+              "  pm.test('response uses the standard envelope', function () {",
+              "    const response = pm.response.json();",
+              "    pm.expect(response).to.be.an('object');",
+              "    pm.expect(response).to.have.property('success');",
+              "    pm.expect(response.success).to.be.a('boolean');",
+              "    pm.expect(response).to.have.property('message');",
+              "    pm.expect(response.message).to.be.a('string');",
+              "    pm.expect(response).to.have.property('data');",
+              "    if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "    ",
+              "    if (response.data && !skipObjectId) {",
+              "      const checkId = (obj) => {",
+              "        if (obj && typeof obj === 'object' && obj.id !== undefined && obj.id !== null) {",
+              "          pm.expect(obj.id, 'Resource id must be a string').to.be.a('string');",
+              "          pm.expect(obj.id, 'Resource id must be a valid 24-character hex MongoDB ObjectID').to.match(/^[a-fA-F0-9]{24}$/);",
+              "        }",
+              "      };",
+              "      if (Array.isArray(response.data)) {",
+              "        response.data.forEach(item => checkId(item));",
+              "      } else {",
+              "        checkId(response.data);",
+              "      }",
+              "    }",
+              "    ",
+              "    const responseText = JSON.stringify(response);",
+              "    ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "      pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "    });",
+              "  });",
+              "}",
+              "pm.test('status is 200 or validation error', function () { pm.expect(pm.response.code).to.be.oneOf([200, 400, 404]); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Downgrade Subscription",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{base_url}}/{{api_prefix}}/subscriptions/downgrade",
+        "description": "Schedules paid downgrades for next renewal. Downgrade to PLAN_BASIC is handled as end-of-cycle cancellation.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"planId\": \"{{subscription_downgrade_plan_id}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const requestUrl = pm.request.url.toString();",
+              "const resolvedUrl = pm.variables.replaceIn(requestUrl);",
+              "const isApiUrl = resolvedUrl.includes('/api/v1/');",
+              "const skipEnvelope = !isApiUrl || ['/earnings/transactions/statement'].some(path => resolvedUrl.includes(path));",
+              "const skipObjectId = ['/subscriptions/plans'].some(path => resolvedUrl.includes(path));",
+              "",
+              "if (!skipEnvelope) {",
+              "  pm.test('response uses the standard envelope', function () {",
+              "    const response = pm.response.json();",
+              "    pm.expect(response).to.be.an('object');",
+              "    pm.expect(response).to.have.property('success');",
+              "    pm.expect(response.success).to.be.a('boolean');",
+              "    pm.expect(response).to.have.property('message');",
+              "    pm.expect(response.message).to.be.a('string');",
+              "    pm.expect(response).to.have.property('data');",
+              "    if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "    ",
+              "    if (response.data && !skipObjectId) {",
+              "      const checkId = (obj) => {",
+              "        if (obj && typeof obj === 'object' && obj.id !== undefined && obj.id !== null) {",
+              "          pm.expect(obj.id, 'Resource id must be a string').to.be.a('string');",
+              "          pm.expect(obj.id, 'Resource id must be a valid 24-character hex MongoDB ObjectID').to.match(/^[a-fA-F0-9]{24}$/);",
+              "        }",
+              "      };",
+              "      if (Array.isArray(response.data)) {",
+              "        response.data.forEach(item => checkId(item));",
+              "      } else {",
+              "        checkId(response.data);",
+              "      }",
+              "    }",
+              "    ",
+              "    const responseText = JSON.stringify(response);",
+              "    ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "      pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "    });",
+              "  });",
+              "}",
+              "pm.test('status is 200 or validation error', function () { pm.expect(pm.response.code).to.be.oneOf([200, 400, 404]); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Cancel Subscription",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": "{{base_url}}/{{api_prefix}}/subscriptions/cancel",
+        "description": "Cancels the current paid subscription at cycle end while retaining access until currentPeriodEnd."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const requestUrl = pm.request.url.toString();",
+              "const resolvedUrl = pm.variables.replaceIn(requestUrl);",
+              "const isApiUrl = resolvedUrl.includes('/api/v1/');",
+              "const skipEnvelope = !isApiUrl || ['/earnings/transactions/statement'].some(path => resolvedUrl.includes(path));",
+              "const skipObjectId = ['/subscriptions/plans'].some(path => resolvedUrl.includes(path));",
+              "",
+              "if (!skipEnvelope) {",
+              "  pm.test('response uses the standard envelope', function () {",
+              "    const response = pm.response.json();",
+              "    pm.expect(response).to.be.an('object');",
+              "    pm.expect(response).to.have.property('success');",
+              "    pm.expect(response.success).to.be.a('boolean');",
+              "    pm.expect(response).to.have.property('message');",
+              "    pm.expect(response.message).to.be.a('string');",
+              "    pm.expect(response).to.have.property('data');",
+              "    if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "    ",
+              "    if (response.data && !skipObjectId) {",
+              "      const checkId = (obj) => {",
+              "        if (obj && typeof obj === 'object' && obj.id !== undefined && obj.id !== null) {",
+              "          pm.expect(obj.id, 'Resource id must be a string').to.be.a('string');",
+              "          pm.expect(obj.id, 'Resource id must be a valid 24-character hex MongoDB ObjectID').to.match(/^[a-fA-F0-9]{24}$/);",
+              "        }",
+              "      };",
+              "      if (Array.isArray(response.data)) {",
+              "        response.data.forEach(item => checkId(item));",
+              "      } else {",
+              "        checkId(response.data);",
+              "      }",
+              "    }",
+              "    ",
+              "    const responseText = JSON.stringify(response);",
+              "    ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "      pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "    });",
+              "  });",
+              "}",
+              "pm.test('status is 200 or no active paid subscription', function () { pm.expect(pm.response.code).to.be.oneOf([200, 400, 404, 409]); });"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Subscription Transactions",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/{{api_prefix}}/subscriptions/transactions?page=1&limit=20",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "{{api_prefix}}",
+            "subscriptions",
+            "transactions"
+          ],
+          "query": [
+            {
+              "key": "page",
+              "value": "1"
+            },
+            {
+              "key": "limit",
+              "value": "20"
+            }
+          ]
+        },
+        "description": "Lists immutable subscription lifecycle audit records for the authenticated barber."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const requestUrl = pm.request.url.toString();",
+              "const resolvedUrl = pm.variables.replaceIn(requestUrl);",
+              "const isApiUrl = resolvedUrl.includes('/api/v1/');",
+              "const skipEnvelope = !isApiUrl || ['/earnings/transactions/statement'].some(path => resolvedUrl.includes(path));",
+              "const skipObjectId = ['/subscriptions/plans'].some(path => resolvedUrl.includes(path));",
+              "",
+              "if (!skipEnvelope) {",
+              "  pm.test('response uses the standard envelope', function () {",
+              "    const response = pm.response.json();",
+              "    pm.expect(response).to.be.an('object');",
+              "    pm.expect(response).to.have.property('success');",
+              "    pm.expect(response.success).to.be.a('boolean');",
+              "    pm.expect(response).to.have.property('message');",
+              "    pm.expect(response.message).to.be.a('string');",
+              "    pm.expect(response).to.have.property('data');",
+              "    if (response.meta !== undefined) pm.expect(response.meta).to.be.an('object');",
+              "    ",
+              "    if (response.data && !skipObjectId) {",
+              "      const checkId = (obj) => {",
+              "        if (obj && typeof obj === 'object' && obj.id !== undefined && obj.id !== null) {",
+              "          pm.expect(obj.id, 'Resource id must be a string').to.be.a('string');",
+              "          pm.expect(obj.id, 'Resource id must be a valid 24-character hex MongoDB ObjectID').to.match(/^[a-fA-F0-9]{24}$/);",
+              "        }",
+              "      };",
+              "      if (Array.isArray(response.data)) {",
+              "        response.data.forEach(item => checkId(item));",
+              "      } else {",
+              "        checkId(response.data);",
+              "      }",
+              "    }",
+              "    ",
+              "    const responseText = JSON.stringify(response);",
+              "    ['\"$__\"', '\"_doc\"', '\"$isNew\"', '\"__v\"', '\"parent\"', '\"populated\"'].forEach((field) => {",
+              "      pm.expect(responseText, `internal field ${field} must not appear`).to.not.include(field);",
+              "    });",
+              "  });",
+              "}",
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "const response = pm.response.json();",
+              "pm.test('paginated transaction response', function () { pm.expect(response).to.have.nested.property('meta.pagination'); });"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

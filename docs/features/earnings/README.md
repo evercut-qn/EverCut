@@ -7,6 +7,7 @@ The Earnings & Transactions feature provides barbers with comprehensive financia
 - View real-time earnings summaries
 - Access detailed transaction history
 - Track monthly revenue trends
+- Track last-six-completed-month income analytics
 - Download financial statements
 - Monitor payment statuses
 
@@ -70,7 +71,7 @@ The Earnings & Transactions feature provides barbers with comprehensive financia
 ```
 GET /api/v1/earnings
 ```
-Returns total, last month, and today's earnings.
+Returns total, last month, today's earnings, current-month revenue, and last-six-completed-month income analytics.
 
 ### 2. Transaction History
 ```
@@ -166,6 +167,18 @@ Downloads professional PDF statement of transactions.
 }
 ```
 
+### Income Analytics
+```javascript
+{
+  total: number,                 // Total income across the last 6 completed months
+  growth: number,                // Signed growth percentage between the latest 2 completed months
+  statistics: [{
+    month: string,               // Full month name
+    amount: number               // Monthly barber payout income in rupees
+  }]
+}
+```
+
 ## Business Logic
 
 ### Revenue Calculation
@@ -176,6 +189,17 @@ Downloads professional PDF statement of transactions.
    - "up" if positive change
    - "down" if negative change
    - "neutral" if no change
+
+### Six-Month Income Analytics
+
+1. Uses the last 6 completed UTC months and excludes the current month.
+2. Always returns exactly 6 month entries with full month names in chronological order.
+3. Missing months return `0`.
+4. Uses completed payment transactions grouped by `createdAt`.
+5. Uses `settlement.barberPayout` as the primary income amount, with legacy fallbacks to `settlement.serviceAmount` and `amount`.
+6. Calculates `growth` from the two most recent completed months.
+
+If the previous completed month is `0`, growth is `100` when the latest completed month is positive and `0` when both months are zero. Otherwise the signed formula result is rounded to one decimal place.
 
 ### Transaction Amount
 
@@ -476,6 +500,7 @@ For issues or questions:
 ## Changelog
 
 ### Version 2.1.0 (Current)
+- ✅ Added last-six-completed-month income analytics to earnings summary
 - ✅ Added transaction history endpoint
 - ✅ Added transaction detail endpoint
 - ✅ Added statement download endpoint

@@ -26,7 +26,6 @@ const buildSessionPayload = (session) => {
             refreshToken: tokens.refreshToken,
             refreshExpiresIn: tokens.refreshExpiresIn,
             user: session.user,
-            profile: session.profile,
         },
     };
 };

@@ -57,7 +57,7 @@ export const listNotifications = async (userId, query = {}) => {
     };
 };
 
-export const getNotificationSummary = async (userId) => ({
+export const getNotificationUnreadCount = async (userId) => ({
     unreadCount: await notificationRepository.countUnread(userId),
 });
 
@@ -222,7 +222,7 @@ const notificationService = {
     registerFcmToken,
     unregisterFcmToken,
     listNotifications,
-    getNotificationSummary,
+    getNotificationUnreadCount,
     patchNotification,
     patchNotifications,
     notifyUser,

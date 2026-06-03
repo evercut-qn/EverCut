@@ -19,7 +19,7 @@ router.use(authenticate);
 router.post('/tokens', validate(registerFcmTokenSchema, 'body'), notificationController.registerFcmToken);
 router.delete('/tokens', validate(unregisterFcmTokenSchema, 'body'), notificationController.unregisterFcmToken);
 router.get('/', validate(notificationListQuerySchema, 'query'), notificationController.listNotifications);
-router.get('/summary', notificationController.getNotificationSummary);
+router.get('/unread-count', notificationController.getNotificationUnreadCount);
 router.patch('/', validate(notificationPatchSchema, 'body'), notificationController.patchNotifications);
 router.patch('/:id', validate(notificationIdParamSchema, 'params'), validate(notificationPatchSchema, 'body'), notificationController.patchNotification);
 

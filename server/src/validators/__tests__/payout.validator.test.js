@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { payoutIdParamSchema } from '../payout.validator.js';
+import {
+    createManualPayoutSchema,
+    listPayoutsQuerySchema,
+    payoutIdParamSchema,
+    pendingPayoutsQuerySchema,
+} from '../payout.validator.js';
+import * as payoutValidators from '../payout.validator.js';
 
 test('payoutIdParamSchema accepts a valid payout id', () => {
     const { error, value } = payoutIdParamSchema.validate({
@@ -20,4 +26,71 @@ test('payoutIdParamSchema rejects invalid payout ids', () => {
     });
 
     assert.match(error?.message || '', /invalid value|must be/);
+});
+
+test('createManualPayoutSchema normalizes UTR and rejects duplicate booking IDs', () => {
+    const valid = createManualPayoutSchema.validate({
+        barberId: '507f1f77bcf86cd799439011',
+        bookingIds: ['507f1f77bcf86cd799439012'],
+        utr: ' abc123 ',
+        transferMode: 'upi',
+        notes: ' Paid from bank portal ',
+    });
+
+    assert.equal(valid.error, undefined);
+    assert.deepEqual(valid.value, {
+        barberId: '507f1f77bcf86cd799439011',
+        bookingIds: ['507f1f77bcf86cd799439012'],
+        utr: 'ABC123',
+        transferMode: 'upi',
+        notes: 'Paid from bank portal',
+    });
+
+    const duplicateBookings = createManualPayoutSchema.validate({
+        barberId: '507f1f77bcf86cd799439011',
+        bookingIds: [
+            '507f1f77bcf86cd799439012',
+            '507f1f77bcf86cd799439012',
+        ],
+        utr: 'ABC124',
+    });
+
+    assert.match(duplicateBookings.error?.message || '', /duplicate/i);
+});
+
+test('payout validators do not expose a manual payout status mutation schema', () => {
+    assert.equal(
+        Object.hasOwn(payoutValidators, 'updatePayoutStatusSchema'),
+        false,
+        'manual payout records are immutable and must not expose a status mutation validator',
+    );
+});
+
+test('listPayoutsQuerySchema validates filters and defaults pagination and sort', () => {
+    const { error, value } = listPayoutsQuerySchema.validate({
+        status: 'SUCCESS',
+        gateway: 'manual',
+        barberId: '507f1f77bcf86cd799439011',
+    });
+
+    assert.equal(error, undefined);
+    assert.equal(value.page, 1);
+    assert.equal(value.limit, 20);
+    assert.equal(value.sort, 'createdAt:desc');
+    assert.equal(value.gateway, 'manual');
+});
+
+test('pendingPayoutsQuerySchema keeps search small and paginated', () => {
+    const { error, value } = pendingPayoutsQuerySchema.validate({
+        page: '2',
+        limit: '10',
+        search: ' Trim ',
+    });
+
+    assert.equal(error, undefined);
+    assert.deepEqual(value, {
+        page: 2,
+        limit: 10,
+        search: 'Trim',
+    });
 });

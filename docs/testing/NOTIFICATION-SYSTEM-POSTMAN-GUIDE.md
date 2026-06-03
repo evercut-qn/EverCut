@@ -1,6 +1,6 @@
 # Notification System Postman Testing Guide
 
-Use Postman only for these backend checks. Import `server/postman-collections/16-notifications.json` and `server/postman-collections/EverCut.postman_environment.json` after regenerating collections.
+Use Postman only for these backend checks. Import `server/postman-collections/17-notifications.json` and `server/postman-collections/EverCut.postman_environment.json` after regenerating collections.
 
 ## Prerequisites
 
@@ -42,7 +42,7 @@ Expected:
 Use existing Postman collections:
 
 1. Customer creates a booking with `04-customer-bookings.json`.
-2. Customer initiates/verifies payment with `15-payments-payouts.json`.
+2. Customer initiates/verifies payment with `15-payments.json`.
 3. When payment succeeds, backend emits `booking.awaiting_confirmation` to the barber.
 4. Barber confirms booking with `10-barber-bookings.json`.
 5. Backend emits `booking.confirmed` to the customer.
@@ -87,7 +87,7 @@ Expected:
 Request:
 
 ```http
-GET /api/v1/notifications/summary
+GET /api/v1/notifications/unread-count
 Authorization: Bearer {{customer_access_token}}
 ```
 

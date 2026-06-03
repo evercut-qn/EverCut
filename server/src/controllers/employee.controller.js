@@ -79,10 +79,10 @@ export const getEmployeeAvailability = async (req, res, next) => {
     }
 };
 
-export const getStaffAvailability = async (req, res, next) => {
+export const getStaffDailyProgress = async (req, res, next) => {
     try {
-        const staff = await employeeService.getStaffAvailability(req.user._id);
-        return res.status(200).json(ApiResponse.success(staff, 'Staff availability fetched'));
+        const staff = await employeeService.getStaffDailyProgress(req.user._id);
+        return res.status(200).json(ApiResponse.success(staff, 'Staff daily progress fetched'));
     } catch (err) {
         next(err);
     }

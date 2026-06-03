@@ -2,333 +2,160 @@
 
 ## Overview
 
-This document describes the comprehensive dashboard implementation for the EverCut barber booking platform, providing real-time analytics and operational insights for barber shop owners.
+The barber dashboard is served through resource-owned API endpoints rather than a dedicated `/dashboard` route family. This keeps operational data close to the resource it describes and matches the current routing architecture.
 
-## Features Implemented
+## Dashboard Data Sources
 
-### 1. Today's Pulse - Executive Performance
+| Dashboard section | Endpoint | Source resource |
+|---|---|---|
+| Booking summary, milestones, today pulse, queue, appointment trend | `GET /api/v1/bookings/overview` | Bookings |
+| Staff daily progress | `GET /api/v1/employees/daily-progress` | Employees and bookings |
+| Earnings and income trend | `GET /api/v1/earnings` | Earnings and payment transactions |
+| Ratings summary | `GET /api/v1/ratings/summary` | Ratings |
+| Gallery usage | `GET /api/v1/media/gallery/usage` | Media |
 
-**Endpoint:** `GET /api/dashboard/pulse`
+All dashboard-facing endpoints require a valid JWT. Barber-owned dashboard resources require the `BARBER` role and are scoped to the authenticated barber's shop.
 
-**Description:** Provides real-time occupancy and booking status breakdown for the current day.
+## Booking Overview
 
-**Response Structure:**
+**Endpoint:** `GET /api/v1/bookings/overview`
+
+Returns existing dashboard sections plus historical appointment analytics:
+
 ```json
 {
   "success": true,
+  "message": "Booking overview fetched",
   "data": {
-    "occupancy": {
-      "booked": 45,
-      "total": 96,
-      "percentage": 47
+    "summary": {
+      "total": 120,
+      "pending": 4,
+      "awaitingConfirmation": 6,
+      "completed": 90,
+      "cancelled": 8
     },
-    "statusBreakdown": [
-      {
-        "label": "All",
-        "count": 102,
-        "color": "default"
-      },
-      {
-        "label": "Pending",
-        "count": 25,
-        "color": "warning"
-      },
-      {
-        "label": "Done",
-        "count": 65,
-        "color": "success"
-      },
-      {
-        "label": "Cancelled",
-        "count": 12,
-        "color": "muted"
-      }
-    ]
-  },
-  "message": "Today's pulse fetched"
-}
-```
-
-**Business Logic:**
-- **Occupancy Calculation:** Based on total available slots (employees × slots per day) vs booked slots
-- **Status Breakdown:**
-  - **All:** Total bookings for today
-  - **Pending:** PENDING, AWAITING_CONFIRMATION, CONFIRMED statuses
-  - **Done:** COMPLETED, NO_SHOW statuses
-  - **Cancelled:** CANCELLED status
-
----
-
-### 2. Staff Availability
-
-**Endpoint:** `GET /api/v1/employees/analytics`
-
-**Description:** Shows each employee's daily appointment progress and availability.
-
-**Response Structure:**
-```json
-{
-  "success": true,
-  "data": {
-    "staff": [
-      {
-        "id": "507f1f77bcf86cd799439011",
-        "name": "Ram Kumar",
-        "photoUrl": "https://...",
-        "progress": {
-          "completed": 4,
-          "total": 6,
-          "remaining": 2,
-          "percentage": 67
-        }
-      }
-    ],
-    "totalStaff": 3
-  },
-  "message": "Staff availability fetched"
-}
-```
-
-**Business Logic:**
-- Tracks completed vs total appointments for each employee
-- Calculates progress percentage
-- Shows remaining appointments
-- Only includes active, non-deleted employees
-
----
-
-### 3. Today's Queue
-
-**Endpoint:** `GET /api/v1/bookings/analytics`
-
-**Query Parameters:**
-- `date range`: `active` or `upcoming` (default: `active`)
-
-**Description:** Shows today's appointments organized by status (active/upcoming).
-
-**Response Structure:**
-```json
-{
-  "success": true,
-  "data": {
-    "date range": "active",
-    "active": {
-      "count": 3,
-      "items": [
-        {
-          "id": "507f1f77bcf86cd799439011",
-          "customer": {
-            "name": "Julian Thorne"
-          },
-          "employee": {
-            "name": "Ram Goswami"
-          },
-          "time": "11:30 AM",
-          "status": "confirmed",
-          "services": ["Haircut", "Beard Trim"]
-        }
+    "milestones": {},
+    "today": {},
+    "queue": {},
+    "appointments": {
+      "total": 845,
+      "growth": 31.3,
+      "statistics": [
+        { "month": "November", "count": 110 },
+        { "month": "December", "count": 125 },
+        { "month": "January", "count": 135 },
+        { "month": "February", "count": 128 },
+        { "month": "March", "count": 150 },
+        { "month": "April", "count": 197 }
       ]
-    },
-    "upcoming": {
-      "count": 8,
-      "items": []
     }
-  },
-  "message": "Today's queue fetched"
+  }
 }
 ```
 
-**Business Logic:**
-- **Active:** Appointments within ±30 minutes of current time
-- **Upcoming:** Appointments more than 30 minutes in the future
-- Excludes cancelled, completed, and no-show bookings
-- Sorted by appointment time
+### Appointment Analytics Rules
 
----
+- Uses the last 6 completed UTC months.
+- Excludes the current month entirely.
+- Always returns exactly 6 month entries.
+- Returns full month names in chronological order.
+- Missing months return `0`.
+- Counts closed appointment outcomes: `completed` and `no-show`.
+- Excludes `pending`, `awaiting_confirmation`, `confirmed`, and `cancelled`.
+- Growth compares the two most recent completed months.
 
-### 4. Dashboard Overview
+## Today's Pulse
 
-**Endpoint:** `GET /api/dashboard/overview`
+`data.today` is returned by `GET /api/v1/bookings/overview`.
 
-**Description:** Combines all dashboard sections into a single response for efficient loading.
+It includes:
 
-**Response Structure:**
+- `occupancy.booked`: booked minutes for today's non-cancelled bookings.
+- `occupancy.total`: available staff capacity in minutes.
+- `occupancy.percentage`: rounded occupancy percentage.
+- `statusBreakdown`: all, pending, done, and cancelled counts for today.
+
+`done` includes `completed` and `no-show`, matching staff progress and payout eligibility behavior.
+
+## Staff Daily Progress
+
+**Endpoint:** `GET /api/v1/employees/daily-progress`
+
+Returns active, non-deleted employees with today's completed, total, remaining, and percentage progress. Completed progress includes both `completed` and `no-show` bookings. Cancelled bookings are excluded from each employee's daily total.
+
+## Earnings And Income
+
+**Endpoint:** `GET /api/v1/earnings`
+
+The dashboard can use the `income` block for six completed months of barber payout income and the existing `monthlyRevenue` block for current-month revenue.
+
 ```json
 {
   "success": true,
+  "message": "Earnings fetched",
   "data": {
-    "pulse": { /* Today's Pulse data */ },
-    "staff": { /* Staff Availability data */ },
-    "queue": { /* Today's Queue data */ }
-  },
-  "message": "Dashboard overview fetched"
-}
-```
-
----
-
-## Display ID System
-
-**Note:** Display IDs have been removed from the implementation. Customer and employee identification uses MongoDB ObjectIds directly.
-
----
-
-## Enhanced Booking Details
-
-### Platform Fee Display
-
-The booking details endpoint now includes:
-- **Sub-Total:** Sum of all service prices
-- **Platform Fee:** 
-  - ₹4 for single service
-  - ₹10 for bundled services
-- **Total Amount:** Sub-total + Platform Fee
-
-### Customer & Employee Information
-
-Customer and employee objects expose public `id` plus the whitelisted display fields required by the screen. They do not include `_id`, `fullName`, or duplicated identifier aliases.
-
-**Example Response:**
-```json
-{
-  "id": "507f1f77bcf86cd799439011",
-  "customer": {
-    "id": "507f1f77bcf86cd799439012",
-    "firstName": "Alex",
-    "lastName": "Johnson"
-  },
-  "employee": {
-    "id": "507f1f77bcf86cd799439013",
-    "firstName": "Ram",
-    "lastName": "Kumar"
-  },
-  "services": [
-    {
-      "serviceName": "Haircut",
-      "finalPrice": 45,
-      "duration": 30
+    "totalEarning": 500000,
+    "lastMonthEarning": 145000,
+    "todayEarning": 5000,
+    "monthlyRevenue": {
+      "amount": 25000,
+      "currency": "INR",
+      "changePercentage": 12.5,
+      "changeDirection": "up",
+      "period": "May 2026"
     },
-    {
-      "serviceName": "Beard Trim",
-      "finalPrice": 20,
-      "duration": 15
+    "income": {
+      "total": 78500,
+      "growth": 18.6,
+      "statistics": [
+        { "month": "November", "amount": 10500 },
+        { "month": "December", "amount": 11800 },
+        { "month": "January", "amount": 12400 },
+        { "month": "February", "amount": 12100 },
+        { "month": "March", "amount": 14500 },
+        { "month": "April", "amount": 17200 }
+      ]
     }
-  ],
-  "serviceAmount": 65,
-  "platformFee": 10,
-  "totalAmount": 75,
-  "durationMinutes": 45,
-  "status": "confirmed",
-  "paymentStatus": "success"
+  }
 }
 ```
 
----
+## Growth Calculation
 
-## Database Schema Changes
+Historical appointment and income growth use the same rule:
 
-No database schema changes required. The dashboard uses existing booking, employee, and customer models.
-
----
-
-## API Routes
-
-All dashboard routes require authentication and BARBER role:
-
-```
-GET /api/v1/bookings/analytics + /api/v1/employees/analytics + /api/v1/earnings                         - Complete dashboard data
-GET /api/v1/bookings/analytics                  - Today's pulse metrics
-GET /api/v1/employees/analytics          - Staff availability
-GET /api/v1/bookings/analytics - Today's queue
+```text
+((CurrentCompletedMonth - PreviousCompletedMonth) / PreviousCompletedMonth) * 100
 ```
 
----
+If the previous month is `0`:
 
-## Security & Authorization
+- Current month greater than `0` returns `100`.
+- Current month equal to `0` returns `0`.
 
-- All endpoints require valid JWT authentication
-- Only users with `BARBER` role can access dashboard endpoints
-- Shop owners can only view data for their own shop
-
----
-
-## Performance Considerations
-
-1. **Caching:** Consider caching dashboard data for 1-2 minutes to reduce database load
-2. **Indexing:** Ensure proper indexes on:
-   - `Booking.shopId + date`
-   - `Booking.employeeId + date`
-3. **Pagination:** Queue endpoint returns all items for today (typically manageable)
-4. **Aggregation:** Use MongoDB aggregation pipelines for complex calculations
-
----
+The value is rounded to one decimal place and can be negative.
 
 ## Testing
 
-### Manual Testing with Postman
+Use the generated Postman collection:
 
-1. **Authenticate as Barber:**
-   ```
-   POST /api/auth/login
-   Body: { "phoneNumber": "+919876543210", "pin": "1234" }
-   ```
+```text
+server/postman-collections/14-operational-analytics.json
+```
 
-2. **Get Dashboard Overview:**
-   ```
-   GET /api/dashboard/overview
-   Headers: { "Authorization": "Bearer <token>" }
-   ```
+Relevant requests:
 
-3. **Get Today's Pulse:**
-   ```
-   GET /api/dashboard/pulse
-   Headers: { "Authorization": "Bearer <token>" }
-   ```
+- `GET /api/v1/bookings/overview`
+- `GET /api/v1/employees/daily-progress`
+- `GET /api/v1/earnings`
+- `GET /api/v1/ratings/summary`
+- `GET /api/v1/media/gallery/usage`
 
-4. **Get Staff Availability:**
-   ```
-   GET /api/v1/employees/analytics
-   Headers: { "Authorization": "Bearer <token>" }
-   ```
-
-5. **Get Active Queue:**
-   ```
-   GET /api/v1/bookings/analytics
-   Headers: { "Authorization": "Bearer <token>" }
-   ```
-
-6. **Get Upcoming Queue:**
-   ```
-   GET /api/v1/bookings/analytics
-   Headers: { "Authorization": "Bearer <token>" }
-   ```
-
----
-
-## Troubleshooting
-
-### Occupancy Shows 0/0
-
-**Problem:** No employees or incorrect calculation
-
-**Solution:** 
-- Ensure shop has active employees
-- Check employee `isActive` and `deletedAt` fields
-- Verify booking date filtering
-
-### Queue Shows Wrong Items
-
-**Problem:** Active/upcoming classification incorrect
-
-**Solution:**
-- Verify server timezone matches expected timezone
-- Check time parsing logic in `parseTimeToMinutes`
-- Ensure booking times are in correct format (HH:MM)
-
----
+The generated collection asserts that appointment and income analytics each return exactly 6 monthly statistics entries.
 
 ## Related Documentation
 
+- [Appointments and Income Analytics](../analytics/APPOINTMENTS-INCOME-ANALYTICS.md)
+- [Earnings & Transactions](../earnings/README.md)
+- [Transactions API Guide](../earnings/TRANSACTIONS-API-GUIDE.md)
 - [Booking System Guide](../bookings/BOOKING-SYSTEM-GUIDE.md)
-- [Employee Management](../employees/EMPLOYEE-MANAGEMENT.md)
-- [Authentication & Authorization](../../security/SECURITY-AUTH-AUDIT.md)

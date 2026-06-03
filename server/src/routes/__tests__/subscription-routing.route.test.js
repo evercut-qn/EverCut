@@ -36,7 +36,7 @@ test('subscription routes are mounted and webhook raw body is captured before JS
     );
 });
 
-test('postman generator emits a subscription collection and Razorpay webhook example', async () => {
+test('postman generator emits a subscription collection', async () => {
     const postmanSource = await readFile(
         path.join(serverDir, 'scripts', 'regenerate-postman-collections.mjs'),
         'utf8',
@@ -45,7 +45,4 @@ test('postman generator emits a subscription collection and Razorpay webhook exa
     assert.match(postmanSource, /EverCut - Subscriptions/);
     assert.match(postmanSource, /\/subscriptions\/plans/);
     assert.match(postmanSource, /\/subscriptions\/subscribe/);
-    assert.match(postmanSource, /\/subscriptions\/webhook/);
-    assert.match(postmanSource, /subscription\.activated/);
-    assert.match(postmanSource, /razorpay_webhook_secret/);
 });

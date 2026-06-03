@@ -30,6 +30,7 @@ Detailed, implementation-ready guides for Flutter developers and backend testing
 | [FLUTTER-BOOKING-PAYMENT-FLOW.md](./flows/FLUTTER-BOOKING-PAYMENT-FLOW.md) | Complete Flutter implementation guide for booking + native PhonePe SDK payment flow | ✅ Production Ready |
 | [flutter-notification-integration-guide.md](./flows/flutter-notification-integration-guide.md) | Flutter integration guide for FCM token handling and foreground/background/terminated notification handling | ✅ Production Ready |
 | [POSTMAN-BOOKING-PAYMENT-GUIDE.md](./testing/POSTMAN-BOOKING-PAYMENT-GUIDE.md) | Postman testing guide for booking & payment flow (auth → payment → barber approval) | ✅ Production Ready |
+| [MANUAL-PAYOUT-POSTMAN-TESTING-GUIDE.md](./testing/MANUAL-PAYOUT-POSTMAN-TESTING-GUIDE.md) | Complete Postman testing guide for admin manual payouts and Cashfree compatibility | ✅ Production Ready |
 | [notification-system-postman-guide.md](./testing/notification-system-postman-guide.md) | Postman-only notification backend testing guide | ✅ Production Ready |
 
 > **Note:** The `docs/flows/` directory contains detailed, step-by-step implementation guides for developers. The `docs/testing/` directory contains Postman API testing documentation.
@@ -51,6 +52,12 @@ Security assessments, vulnerability reports, and audit findings.
 ## 🔧 Feature Implementation
 
 Detailed guides for implementing specific features.
+
+### Analytics
+
+| Document | Description | Status |
+|----------|-------------|--------|
+| [APPOINTMENTS-INCOME-ANALYTICS.md](./features/analytics/APPOINTMENTS-INCOME-ANALYTICS.md) | Appointment and income analytics response contracts, data rules, and testing notes | âœ… Production Ready |
 
 ### Authentication & Authorization
 
@@ -96,6 +103,13 @@ Detailed guides for implementing specific features.
 
 > **Note:** EverCut migrated from web redirect payment flow to native PhonePe Flutter SDK in April 2026. Old redirect-based documentation is archived in `features/payments/old-method/` for historical reference only.
 
+### Payout System
+
+| Document | Description | Status |
+|----------|-------------|--------|
+| [MANUAL-PAYOUT-IMPLEMENTATION-GUIDE.md](./features/payouts/MANUAL-PAYOUT-IMPLEMENTATION-GUIDE.md) | Manual payout redesign architecture, RESTful API design, and implementation guide | 📋 Implementation Guide |
+| [MANUAL-PAYOUT-POSTMAN-TESTING-GUIDE.md](./testing/MANUAL-PAYOUT-POSTMAN-TESTING-GUIDE.md) | Postman guide for manual payout lifecycle, auth, edge cases, and compatibility checks | ✅ Production Ready |
+
 ### Notifications
 
 | Document | Description | Status |
@@ -133,6 +147,8 @@ Reports documenting issues found and fixes applied.
 | [PHOTO-GALLERY-FIXES-REPORT.md](./reports/PHOTO-GALLERY-FIXES-REPORT.md) | Photo gallery backend fixes | ✅ Completed |
 | [REQUEST-VALIDATION-QUERY-FIX-REPORT.md](./reports/REQUEST-VALIDATION-QUERY-FIX-REPORT.md) | Express 5 query-validation runtime fix report | ✅ Completed |
 | [SERVICE-CATALOG-FIXES-REPORT.md](./reports/SERVICE-CATALOG-FIXES-REPORT.md) | Service catalog backend fixes | ✅ Completed |
+| [2026-05-26-MANUAL-PAYOUT-IMPLEMENTATION-REPORT.md](./reports/2026-05-26-MANUAL-PAYOUT-IMPLEMENTATION-REPORT.md) | Manual payout implementation, validation, and compatibility report | ✅ Completed |
+| [2026-05-30-APPOINTMENTS-INCOME-ANALYTICS-IMPLEMENTATION-REPORT.md](./reports/2026-05-30-APPOINTMENTS-INCOME-ANALYTICS-IMPLEMENTATION-REPORT.md) | Appointments and income analytics implementation, validation, and compatibility report | ✅ Completed |
 | [notification-system-report.md](./reports/notification-system-report.md) | Hybrid FCM + REST notification system implementation report | ✅ Completed |
 
 ---
@@ -158,6 +174,7 @@ docs/
 │   └── flutter-notification-integration-guide.md
 ├── testing/                           # Postman API testing guides
 │   ├── POSTMAN-BOOKING-PAYMENT-GUIDE.md
+│   ├── MANUAL-PAYOUT-POSTMAN-TESTING-GUIDE.md
 │   └── notification-system-postman-guide.md
 ├── architecture/                      # Architecture & planning docs
 │   └── IMPLEMENTATION-PLAN.md
@@ -174,6 +191,9 @@ docs/
 │   │   └── README.md
 │   ├── payments/
 │   │   └── old-method/                # Archived redirect flow docs
+│   ├── payouts/
+│   │   ├── MANUAL-PAYOUT-IMPLEMENTATION-GUIDE.md
+│   │   └── parts/                     # Source documents
 │   ├── subscription/
 │   │   ├── EVERCUT-SUBSCRIPTION-DEVELOPER-DOCUMENTATION.md
 │   │   ├── SUBSCRIPTION-EXTERNAL-SETUP-DOCUMENTATION.md
@@ -226,8 +246,9 @@ docs/
 ### For Backend Testing
 
 1. **Booking & Payment Testing:** [POSTMAN-BOOKING-PAYMENT-GUIDE.md](./testing/POSTMAN-BOOKING-PAYMENT-GUIDE.md) — Test booking & payment flow from auth to barber approval
-2. **Notification Testing:** [notification-system-postman-guide.md](./testing/notification-system-postman-guide.md) — Test FCM token management, notification history, unread count, and read tracking
-3. **Postman Collections:** `server/postman-collections/` — Ready-to-use API test collections with auto-generated signatures
+2. **Manual Payout Testing:** [MANUAL-PAYOUT-POSTMAN-TESTING-GUIDE.md](./testing/MANUAL-PAYOUT-POSTMAN-TESTING-GUIDE.md) — Test admin auth, manual payout lifecycle, concurrency, and Cashfree compatibility
+3. **Notification Testing:** [notification-system-postman-guide.md](./testing/notification-system-postman-guide.md) — Test FCM token management, notification history, unread count, and read tracking
+4. **Postman Collections:** `server/postman-collections/` — Ready-to-use API test collections with auto-generated signatures
 
 ### For Security Review
 
@@ -240,6 +261,7 @@ docs/
 1. **Authentication:** [GOOGLE-OAUTH-UNIVERSAL-AUTH.MD](./features/auth/GOOGLE-OAUTH-UNIVERSAL-AUTH.MD)
 2. **OTP/SMS:** [MSG91-INTEGRATION-GUIDE.md](./features/msg91/MSG91-INTEGRATION-GUIDE.md)
 3. **Storage:** [OBJECT-STORAGE-RESEARCH.MD](./research/OBJECT-STORAGE-RESEARCH.MD)
+4. **Payouts:** [MANUAL-PAYOUT-IMPLEMENTATION-GUIDE.md](./features/payouts/MANUAL-PAYOUT-IMPLEMENTATION-GUIDE.md)
 
 ---
 

@@ -303,7 +303,7 @@ When MSG91 confirms the OTP, the OTP verify handler issues a `ready_for_profile`
  * onboarding token (new user).
  *
  * @param {string} phoneNumber - E.164 formatted, e.g. "+919876543210"
- * @returns {Promise<{ isNewUser: false, user, profile, tokens }
+ * @returns {Promise<{ isNewUser: false, user, tokens }
  *                  | { isNewUser: true, onboardingToken: string }>}
  */
 export const resolvePhoneSession = async (phoneNumber) => {
@@ -314,9 +314,8 @@ export const resolvePhoneSession = async (phoneNumber) => {
     await userRepository.updateLastLogin(existingUser._id);
     const tokens = generateTokenPair(existingUser._id, existingUser.roleType);
     await userRepository.updateRefreshTokenHash(existingUser._id, tokens.refreshToken);
-    const profile = await profileRepository.findByUserId(existingUser._id);
 
-    return { isNewUser: false, user: existingUser, profile, tokens };
+    return { isNewUser: false, user: existingUser, tokens };
   }
 
   // New user — issue a Step 2 token. Phone is now server-verified.
@@ -428,9 +427,8 @@ export const resolveGoogleSession = async (idToken) => {
     await userRepository.updateLastLogin(existingUser._id);
     const tokens = generateTokenPair(existingUser._id, existingUser.roleType);
     await userRepository.updateRefreshTokenHash(existingUser._id, tokens.refreshToken);
-    const profile = await profileRepository.findByUserId(existingUser._id);
 
-    return { isNewUser: false, user: existingUser, profile, tokens };
+    return { isNewUser: false, user: existingUser, tokens };
   }
 
   // ── Step 4: New user — issue a Step 1 token ──────────────────────────────
@@ -541,7 +539,6 @@ export const verifyOtp = asyncHandler(async (req, res) => {
   return res.status(200).json({
     isNewUser: false,
     user: result.user,
-    profile: result.profile,
     tokens: result.tokens,
   });
 });
@@ -551,7 +548,7 @@ export const verifyOtp = asyncHandler(async (req, res) => {
  * Body: { idToken: string }
  *
  * New user response:       { isNewUser: true, onboardingToken, step: 'needs_phone' }
- * Returning user response: { isNewUser: false, user, profile, tokens }
+ * Returning user response: { isNewUser: false, user, tokens }
  */
 export const googleSignIn = asyncHandler(async (req, res) => {
   const { idToken } = req.body;
@@ -569,7 +566,6 @@ export const googleSignIn = asyncHandler(async (req, res) => {
   return res.status(200).json({
     isNewUser: false,
     user: result.user,
-    profile: result.profile,
     tokens: result.tokens,
   });
 });
@@ -744,7 +740,7 @@ export const createCustomerOnboarding = async (onboardingContext, profileData, f
   const tokens = generateTokenPair(user._id, user.roleType);
   await userRepository.updateRefreshTokenHash(user._id, tokens.refreshToken);
 
-  return { user, profile, tokens };
+  return { user, tokens };
 };
 ```
 
@@ -776,7 +772,6 @@ export const onboardCustomer = asyncHandler(async (req, res) => {
   return res.status(201).json({
     message: 'Account created successfully.',
     user: result.user,
-    profile: result.profile,
     tokens: result.tokens,
   });
 });
@@ -1013,8 +1008,8 @@ Client                      Backend                     MSG91
   │                            ├─ userRepository.create(...)
   │                            ├─ profileRepository.create(...)
   │                            ├─ generateTokenPair(...)
-  │◄─ 201 { user, profile,     │
-  │          tokens } ─────────┤
+  │◄─ 201 { user, tokens }     │
+  │                            │
 ```
 
 ### Flow B — New User via Google (Google-First), All Phases
@@ -1070,8 +1065,8 @@ Client                      Backend                     Google / MSG91
   │                            ├─ userRepository.create({ emailVerified: true, googleId, ... })
   │                            ├─ profileRepository.create(...)
   │                            ├─ generateTokenPair(...)
-  │◄─ 201 { user, profile,     │
-  │          tokens } ─────────┤
+  │◄─ 201 { user, tokens }     │
+  │                            │
 ```
 
 ### Flow C — Returning User via Google (Account Linking)
@@ -1089,8 +1084,7 @@ Client                      Backend                     Google
   │                            ├─ generateTokenPair(...)
   │                            ├─ updateRefreshTokenHash(...)
   │◄─ 200 { isNewUser: false,  │
-  │          user, profile,    │
-  │          tokens } ─────────┤
+  │          user, tokens } ───┤
   │  [Logged in. No onboarding screen needed.]
 ```
 
@@ -1106,8 +1100,7 @@ Client                      Backend                     Google
   │                            │  (email lookup skipped entirely)
   │                            ├─ generateTokenPair(...)
   │◄─ 200 { isNewUser: false,  │
-  │          user, profile,    │
-  │          tokens } ─────────┤
+  │          user, tokens } ───┤
 ```
 
 ---
