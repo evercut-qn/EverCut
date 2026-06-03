@@ -9,40 +9,9 @@ const userService = await import('../user.service.js');
 const bookingService = await import('../booking.service.js');
 const paymentService = await import('../payment.service.js');
 const payoutService = await import('../payout.service.js');
-const userRepository = (await import('../../repositories/user.repository.js')).default;
 const bookingRepository = (await import('../../repositories/booking.repository.js')).default;
 const paymentRepository = (await import('../../repositories/payment.repository.js')).default;
 const payoutRepository = (await import('../../repositories/payout.repository.js')).default;
-
-test('getUserSummary exposes customer-specific totals for admin overview', async (t) => {
-    t.mock.method(userRepository, 'aggregateSummary', async () => ({
-        roleRows: [
-            { _id: 'CUSTOMER', count: 8 },
-            { _id: 'BARBER', count: 2 },
-            { _id: 'ADMIN', count: 1 },
-        ],
-        customerActiveRows: [
-            { _id: true, count: 7 },
-            { _id: false, count: 1 },
-        ],
-        registrationRows: [{ date: '2026-06-01', count: 3 }],
-    }));
-    t.mock.method(userRepository, 'countAll', async (filter) => {
-        assert.equal(filter.roleType, 'CUSTOMER');
-        return filter.createdAt ? 3 : 0;
-    });
-
-    const summary = await userService.getUserSummary();
-
-    assert.equal(summary.totalCustomers, 8);
-    assert.equal(summary.activeCustomers, 7);
-    assert.equal(summary.inactiveCustomers, 1);
-    assert.equal(summary.byRole.CUSTOMER, 8);
-    assert.equal(summary.newCustomerRegistrations.thisWeek, 3);
-    assert.deepEqual(summary.newCustomerRegistrations.trend, [{ date: '2026-06-01', count: 3 }]);
-    assert.equal('totalUsers' in summary, false);
-    assert.equal('activeUsers' in summary, false);
-});
 
 test('payment summary names completed customer payments separately from platform fees', async (t) => {
     t.mock.method(paymentRepository, 'aggregateAdminSummary', async () => ({

@@ -8,7 +8,6 @@ Implemented the pending Admin Dashboard capabilities from `docs/features/admin/A
 
 The revised API design avoids dashboard-specific endpoints. Admin overview data is composed from reusable resource summaries:
 
-- `GET /users/summary`
 - `GET /shops/summary`
 - `GET /bookings/summary`
 - `GET /payments/summary`
@@ -33,7 +32,7 @@ Follow-up re-review corrections completed on 2026-06-03:
 | Platform overview | Complete | Resource summaries | `/overview` |
 | Booking analytics | Complete | `/bookings/summary` | `/overview`, `/bookings` |
 | Financial analytics | Complete | `/payments/summary`, `/payouts/summary` | `/overview`, `/refunds`, `/payouts` |
-| User activity | Complete | `/users/summary`, `/customers` | `/overview`, `/customers` |
+| User activity | Complete | `/customers` | `/overview`, `/customers` |
 | Subscription analytics | Complete | `/subscriptions/summary`, `/subscriptions` | `/overview`, `/subscriptions` |
 | Customer directory | Complete | `/customers` | `/customers` |
 | Barber/shop directory | Complete | `/barbers` | `/barbers` |
@@ -45,7 +44,6 @@ Follow-up re-review corrections completed on 2026-06-03:
 
 Added domain-oriented admin reads:
 
-- `GET /users/summary`
 - `GET /customers`
 - `GET /barbers`
 - `GET /shops/summary`

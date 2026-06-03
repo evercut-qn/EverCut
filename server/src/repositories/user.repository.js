@@ -40,68 +40,7 @@ class UserRepository {
         return User.countDocuments(trustQueryOperators(filter));
     }
 
-    async aggregateSummary({ trendStartDate } = {}) {
-        const customerMatch = { deletedAt: null, roleType: ROLES.CUSTOMER };
-        const [roleRows, customerActiveRows, registrationRows] = await Promise.all([
-            User.aggregate([
-                { $match: { deletedAt: null } },
-                {
-                    $group: {
-                        _id: '$roleType',
-                        count: { $sum: 1 },
-                    },
-                },
-            ]),
-            User.aggregate([
-                { $match: customerMatch },
-                {
-                    $group: {
-                        _id: '$isActive',
-                        count: { $sum: 1 },
-                    },
-                },
-            ]),
-            User.aggregate([
-                {
-                    $match: {
-                        ...customerMatch,
-                        createdAt: { $gte: trendStartDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) },
-                    },
-                },
-                {
-                    $group: {
-                        _id: {
-                            year: { $year: { date: '$createdAt', timezone: 'UTC' } },
-                            month: { $month: { date: '$createdAt', timezone: 'UTC' } },
-                            day: { $dayOfMonth: { date: '$createdAt', timezone: 'UTC' } },
-                        },
-                        count: { $sum: 1 },
-                    },
-                },
-                {
-                    $project: {
-                        _id: 0,
-                        date: {
-                            $dateToString: {
-                                format: '%Y-%m-%d',
-                                date: {
-                                    $dateFromParts: {
-                                        year: '$_id.year',
-                                        month: '$_id.month',
-                                        day: '$_id.day',
-                                    },
-                                },
-                            },
-                        },
-                        count: 1,
-                    },
-                },
-                { $sort: { date: 1 } },
-            ]),
-        ]);
 
-        return { roleRows, customerActiveRows, registrationRows };
-    }
 
     async searchCustomerUsers(query = {}, options = {}) {
         const filter = { roleType: ROLES.CUSTOMER };

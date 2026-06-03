@@ -21,6 +21,36 @@ test('customer admin directory pipeline joins users and filters active customers
     assert.ok(pipeline.some((stage) => stage.$lookup?.from === 'bookings'));
 });
 
+test('customer admin directory pipeline supports full name, partial name, multi-space, and case-insensitive search matching', () => {
+    // 1. Simple search
+    const pipelineSimple = customerRepository.buildAdminDirectoryPipeline({
+        search: 'mina',
+    });
+    const addFieldsSimple = pipelineSimple.find(stage => stage.$addFields?.fullName);
+    const matchSimple = pipelineSimple.find(stage => stage.$match?.$or);
+    assert.ok(addFieldsSimple);
+    assert.ok(matchSimple);
+    assert.deepEqual(addFieldsSimple.$addFields.fullName, { $concat: ['$firstName', ' ', '$lastName'] });
+    const orSimple = matchSimple.$match.$or;
+    assert.ok(orSimple.some(cond => cond.firstName instanceof RegExp && cond.firstName.test('mina')));
+    assert.ok(orSimple.some(cond => cond.fullName instanceof RegExp && cond.fullName.test('mina')));
+
+    // 2. Full name search with multiple spaces and special characters
+    const pipelineComplex = customerRepository.buildAdminDirectoryPipeline({
+        search: "John-Paul   O'Connor ",
+    });
+    const addFieldsComplex = pipelineComplex.find(stage => stage.$addFields?.fullName);
+    const matchComplex = pipelineComplex.find(stage => stage.$match?.$or);
+    assert.ok(addFieldsComplex);
+    assert.ok(matchComplex);
+    const orComplex = matchComplex.$match.$or;
+    const fullNameCond = orComplex.find(cond => cond.fullName instanceof RegExp).fullName;
+    assert.ok(fullNameCond.test("John-Paul O'Connor"));
+    assert.ok(fullNameCond.test("john-paul   o'connor"));
+    assert.ok(fullNameCond.test("John-Paul  O'Connor"));
+    assert.ok(!fullNameCond.test("John-Paul OConnor"));
+});
+
 test('barber admin directory pipeline joins users, shops, ratings, and excludes internal security fields', () => {
     const pipeline = barberRepository.buildAdminDirectoryPipeline({
         search: 'trim',

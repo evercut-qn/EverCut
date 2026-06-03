@@ -140,17 +140,29 @@ class CustomerRepository {
         }
 
         if (query.search) {
-            const regex = new RegExp(escapeRegex(query.search), 'i');
-            pipeline.push({
-                $match: {
-                    $or: [
-                        { firstName: regex },
-                        { lastName: regex },
-                        { 'user.phoneNumber': regex },
-                        { 'user.email': regex },
-                    ],
+            const escaped = escapeRegex(query.search.trim());
+            const searchPattern = escaped.replace(/\s+/g, '\\s+');
+            const regex = new RegExp(searchPattern, 'i');
+            pipeline.push(
+                {
+                    $addFields: {
+                        fullName: {
+                            $concat: ['$firstName', ' ', '$lastName'],
+                        },
+                    },
                 },
-            });
+                {
+                    $match: {
+                        $or: [
+                            { firstName: regex },
+                            { lastName: regex },
+                            { fullName: regex },
+                            { 'user.phoneNumber': regex },
+                            { 'user.email': regex },
+                        ],
+                    },
+                },
+            );
         }
 
         pipeline.push(

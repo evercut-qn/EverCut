@@ -11,7 +11,7 @@ import {
 
 import { ErrorNotice, MetricCard, SectionHeader, TableShell } from '@/components/ui/AdminPrimitives';
 import { getValidAccessToken } from '@/lib/auth';
-import { getUserSummary } from '@/lib/services/user.service';
+import { getCustomers } from '@/lib/services/user.service';
 import { getShopSummary } from '@/lib/services/shop.service';
 import { getBookingSummary } from '@/lib/services/booking.service';
 import { getPaymentSummary } from '@/lib/services/payment.service';
@@ -29,7 +29,8 @@ export default async function OverviewPage() {
   if (!token) redirect('/login');
 
   const responses = await Promise.all([
-    getUserSummary(token),
+    getCustomers({ limit: 1, token }),
+    getCustomers({ limit: 1, isActive: 'true', token }),
     getShopSummary(token),
     getBookingSummary(token),
     getPaymentSummary(token),
@@ -37,8 +38,13 @@ export default async function OverviewPage() {
     getSubscriptionSummary(token),
   ]);
 
-  const [users, shops, bookings, payments, payouts, subscriptions] = responses.map(safeData);
+  const totalCustomersRes = responses[0];
+  const activeCustomersRes = responses[1];
+  const [shops, bookings, payments, payouts, subscriptions] = responses.slice(2).map(safeData);
   const error = responses.find((response) => !response.success)?.message;
+
+  const totalCustomers = totalCustomersRes?.success ? totalCustomersRes.meta?.pagination?.totalDocuments || 0 : 0;
+  const activeCustomers = activeCustomersRes?.success ? activeCustomersRes.meta?.pagination?.totalDocuments || 0 : 0;
 
   const topShops = bookings?.topShops || [];
   const bookingStatuses = bookings?.statusDistribution || [];
@@ -55,8 +61,8 @@ export default async function OverviewPage() {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         <MetricCard
           label="Total Customers"
-          value={count(users?.totalCustomers)}
-          detail={`${count(users?.activeCustomers)} active customers`}
+          value={count(totalCustomers)}
+          detail={`${count(activeCustomers)} active customers`}
           icon={Users}
           tone="sky"
         />

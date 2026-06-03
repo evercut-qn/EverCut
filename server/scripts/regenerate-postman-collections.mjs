@@ -2934,24 +2934,7 @@ const adminResourceReadsCollection = {
     ),
   ],
   item: [
-    {
-      name: '1. Users Summary',
-      ...request({
-        method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/users/summary',
-        description: {
-          text: 'Admin-only identity summary grouped by role, active state, and recent registration trend.',
-          role: 'Admin',
-          prereqs: ['admin_access_token'],
-          captured: []
-        },
-        event: testEvent(
-          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
-          "const response = pm.response.json();",
-          "pm.test('user summary has role totals', function () { pm.expect(response.data).to.have.property('byRole'); });"
-        ),
-      }),
-    },
+
     {
       name: '2. Shops Summary',
       ...request({
