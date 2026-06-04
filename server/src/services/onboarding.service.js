@@ -28,7 +28,11 @@ const normalizeVerifiedPhoneNumber = (phoneNumber) => String(phoneNumber ?? '').
 const issueAuthenticationTokens = async (user) => {
     const tokens = authService.generateTokenPair(user._id, user.roleType);
     const refreshHash = authService.hashToken(tokens.refreshToken);
-    await userRepository.updateById(user._id, { refreshTokenHash: refreshHash });
+    await userRepository.updateById(user._id, {
+        refreshTokenHash: refreshHash,
+        previousRefreshTokenHash: null,
+        rotatedAt: null,
+    });
     return tokens;
 };
 

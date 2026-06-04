@@ -13,7 +13,21 @@ class UserRepository {
     }
 
     async findByIdWithRefreshHash(id) {
-        return User.findById(id).select('+refreshTokenHash');
+        return User.findById(id).select('+refreshTokenHash +previousRefreshTokenHash +rotatedAt');
+    }
+
+    async rotateRefreshToken(id, expectedIncomingHash, newRefreshHash) {
+        return User.findOneAndUpdate(
+            { _id: id, refreshTokenHash: expectedIncomingHash },
+            {
+                $set: {
+                    refreshTokenHash: newRefreshHash,
+                    previousRefreshTokenHash: expectedIncomingHash,
+                    rotatedAt: new Date(),
+                }
+            },
+            { returnDocument: 'after' }
+        );
     }
 
     async findByEmail(email) {

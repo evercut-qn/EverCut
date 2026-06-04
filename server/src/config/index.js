@@ -147,6 +147,7 @@ const config = Object.freeze({
     accessExpiry: '15m',
     refreshExpiry: '180d',
     onboardingExpiry: '24h',
+    refreshRotationGracePeriodSeconds: 30,
   }),
 
   /** Pagination defaults */

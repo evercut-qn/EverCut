@@ -172,12 +172,15 @@ Body: { "refreshToken": "<stored_refresh_jwt>" }
 
 Server:
   1. verifyRefreshToken(token) → checks iss, aud, type claim, expiry
-  2. Load user + refreshTokenHash from DB (select: +refreshTokenHash)
+  2. Load user + hashes from DB (select: +refreshTokenHash +previousRefreshTokenHash +rotatedAt)
   3. SHA-256(incoming token) === storedHash?
-       NO  → wipe hash in DB, throw "Session invalidated" (theft detection)
-       YES → generateTokenPair() → new accessToken + refreshToken
-  4. Update DB: refreshTokenHash = SHA-256(newRefreshToken)
-  5. Return full token metadata
+       YES → Attempt atomic rotation (findOneAndUpdate with expected current hash):
+             - If success: Update DB (refreshTokenHash = hash(newRefresh), previousRefreshTokenHash = hash(oldRefresh), rotatedAt = now)
+               Return full token pair.
+             - If failure (lost concurrency race): Fall back to grace period flow.
+       NO  → SHA-256(incoming token) === previousRefreshTokenHash && rotatedAt <= 30 seconds?
+             YES → Grace period refresh: Generate new access token ONLY. Omit refreshToken and refreshExpiresIn.
+             NO  → Wipe all session state (theft detection), throw "Session invalidated".
 
 ← 200 {
     tokenType: "Bearer",
@@ -233,6 +236,8 @@ Server:
 
 ### POST `/auth/token/refresh`
 
+#### Case A: Standard Rotation Response
+Issued when a request rotates the token pair.
 ```json
 {
   "success": true,
@@ -243,6 +248,20 @@ Server:
     "expiresIn": 900,
     "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
     "refreshExpiresIn": 15552000
+  }
+}
+```
+
+#### Case B: Grace-Period / Parallel Request Response
+Issued during parallel/concurrent refreshes within the grace period (e.g. Next.js Edge Middleware or multi-tab). The refresh token fields are **omitted entirely** to prevent client cookie desynchronization.
+```json
+{
+  "success": true,
+  "message": "Token refreshed successfully",
+  "data": {
+    "tokenType": "Bearer",
+    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "expiresIn": 900
   }
 }
 ```
@@ -340,22 +359,22 @@ router.get('/earnings', authenticate, authorize('BARBER'), controller);
 
 ## 6. Token Rotation & Revocation
 
-### Refresh Token Rotation
+### Refresh Token Rotation & Concurrency Grace Period
 
-Every successful `/auth/token/refresh` call:
-1. Issues a **brand new** access + refresh pair
-2. SHA-256 hashes the new refresh token and writes it to `user.refreshTokenHash`
-3. The old refresh token is immediately invalid
+To support parallel request concurrency (e.g. SSR/RSC page loads or Next.js Edge Middleware), EverCut implements a 30-second concurrency grace period (Strategy 4):
+1. **Atomic Rotation:** Every sequential `/auth/token/refresh` call attempts to rotate the token pair by matching `user.refreshTokenHash` and updating the database atomically.
+2. **Grace-Period Bypass:** If a request presents the immediately previous refresh token within the 30-second grace period, or loses the atomic update race to a parallel refresh request, the server issues a **new access token only** and omits `refreshToken` and `refreshExpiresIn` from the response.
+3. This ensures parallel refresh requests succeed without triggering refresh-token reuse detection and prevents out-of-order responses from overwriting the active refresh token with a stale one.
 
-**Single-device model:** Only one refresh token hash is stored per user. A second login from a different device silently invalidates the first device's session. Multi-device support requires a separate `RefreshSession` collection (planned).
+**Single-device model:** Only one refresh token family is stored per user. A second login from a different device silently invalidates the first device's session. Multi-device support requires a separate `RefreshSession` collection (planned).
 
 ### Theft Detection (Reuse Attack)
 
-If a refresh token is presented that **doesn't match** the stored hash:
-- The stored hash is immediately wiped (`refreshTokenHash = null`)
-- All active sessions are terminated
-- `401 "Session invalidated. Please sign in again."` is returned
-- A `logger.warn` event is emitted for monitoring
+If a refresh token is presented that matches neither the current `refreshTokenHash` nor the `previousRefreshTokenHash` within the grace window:
+- All session fields (`refreshTokenHash`, `previousRefreshTokenHash`, and `rotatedAt`) are immediately wiped to `null`.
+- All active sessions are terminated.
+- `401 "Session invalidated. Please sign in again."` is returned.
+- A `logger.warn` event is emitted for monitoring.
 
 ### Logout Revocation
 
@@ -395,13 +414,19 @@ const storage = FlutterSecureStorage();
 
 Future<void> saveTokens(Map<String, dynamic> data) async {
   await storage.write(key: 'access_token',       value: data['accessToken']);
-  await storage.write(key: 'refresh_token',      value: data['refreshToken']);
   await storage.write(key: 'expires_at',         value:
       DateTime.now().add(Duration(seconds: data['expiresIn'] as int))
           .toIso8601String());
-  await storage.write(key: 'refresh_expires_at', value:
-      DateTime.now().add(Duration(seconds: data['refreshExpiresIn'] as int))
-          .toIso8601String());
+
+  // Refresh token fields are optional (omitted during concurrency grace periods)
+  if (data['refreshToken'] != null) {
+    await storage.write(key: 'refresh_token',      value: data['refreshToken']);
+  }
+  if (data['refreshExpiresIn'] != null) {
+    await storage.write(key: 'refresh_expires_at', value:
+        DateTime.now().add(Duration(seconds: data['refreshExpiresIn'] as int))
+            .toIso8601String());
+  }
 }
 ```
 

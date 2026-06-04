@@ -37,6 +37,16 @@ const userSchema = new mongoose.Schema(
             default: null,
             select: false,
         },
+        previousRefreshTokenHash: {
+            type: String,
+            default: null,
+            select: false,
+        },
+        rotatedAt: {
+            type: Date,
+            default: null,
+            select: false,
+        },
         isActive: {
             type: Boolean,
             default: true,

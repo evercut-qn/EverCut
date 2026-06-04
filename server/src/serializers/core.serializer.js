@@ -12,6 +12,8 @@ const INTERNAL_KEYS = new Set([
 const SENSITIVE_KEYS = new Set([
     'pinHash',
     'refreshTokenHash',
+    'previousRefreshTokenHash',
+    'rotatedAt',
     'r2Key',
     'r2Bucket',
     'coverR2Key',
