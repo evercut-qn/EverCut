@@ -341,18 +341,23 @@ class BookingRepository {
             ]),
             Booking.aggregate([
                 {
+                    $match: {
+                        status: {
+                            $in: [
+                                BOOKING_STATUS.COMPLETED,
+                                BOOKING_STATUS.CONFIRMED,
+                                BOOKING_STATUS.NO_SHOW,
+                                BOOKING_STATUS.AWAITING_CONFIRMATION,
+                            ],
+                        },
+                        paymentStatus: PAYMENT_STATUS.SUCCESS,
+                    },
+                },
+                {
                     $group: {
                         _id: '$shopId',
                         bookingCount: { $sum: 1 },
-                        paidServiceValueInRupees: {
-                            $sum: {
-                                $cond: [
-                                    { $in: ['$paymentStatus', [PAYMENT_STATUS.SUCCESS, PAYMENT_STATUS.REFUNDED, PAYMENT_STATUS.REFUND_PENDING, PAYMENT_STATUS.REFUND_FAILED]] },
-                                    '$totalAmount',
-                                    0,
-                                ],
-                            },
-                        },
+                        paidServiceValueInRupees: { $sum: '$totalAmount' },
                     },
                 },
                 {

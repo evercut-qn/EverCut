@@ -1004,3 +1004,47 @@ test('initiatePayment rejects bundle bookings below the corrected minimum servic
         new RegExp(`Minimum bundle booking amount is .${bundleMinimum}`),
     );
 });
+
+test('initiatePayment uses booking-time totalAmount even if current service prices have changed', async (t) => {
+    t.mock.method(customerRepository, 'findByUserId', async () => ({
+        _id: 'customer-1',
+        feeWaiverBookingsUsed: config.payment.feeWaiverQuota,
+    }));
+    t.mock.method(bookingRepository, 'findById', async () => ({
+        _id: 'booking-price-change',
+        customerId: 'customer-1',
+        shopId: 'shop-1',
+        serviceIds: ['single-1'],
+        totalAmount: 120,
+        status: 'pending',
+        paymentStatus: 'pending',
+    }));
+    t.mock.method(paymentRepository, 'findPendingByBookingId', async () => null);
+    t.mock.method(serviceRepository, 'findByIds', async () => ([
+        {
+            _id: 'single-1',
+            serviceType: 'single',
+            finalPrice: 150,
+        },
+    ]));
+    t.mock.method(paymentRepository, 'countActiveWaiverReservations', async () => 0);
+
+    let createdPayment = null;
+    t.mock.method(paymentRepository, 'create', async (payload) => {
+        createdPayment = payload;
+        return { _id: 'payment-1', ...payload };
+    });
+    t.mock.method(phonePeAdapter, 'createOrder', async () => ({
+        orderId: 'OMO-1',
+        token: 'sdk-token',
+        state: 'PENDING',
+    }));
+    t.mock.method(paymentRepository, 'updateById', async (id, updates) => ({ _id: id, ...updates }));
+    t.mock.method(bookingRepository, 'updateById', async (id, updates) => ({ _id: id, ...updates }));
+
+    const result = await paymentService.initiatePayment('user-1', 'booking-price-change');
+
+    assert.equal(createdPayment.settlement.serviceAmount, 12000);
+    assert.equal(result.amountInRupees, 120 + config.payment.platformFeeSingle);
+});
+
