@@ -18,7 +18,7 @@
  * node scripts/create-admin-user.mjs
  *
  * # Non-interactive mode (passing arguments directly):
- * node scripts/create-admin-user.mjs --phone=+919876543210 --email=admin@evercut.in
+ * node scripts/create-admin-user.mjs --phone=+919876543212 --email=admin@evercut.in
  *
  * ── Prerequisites ───────────────────────────────────────────────────────────
  * 1. .env must contain: MONGODB_URI
@@ -58,7 +58,7 @@ const normalizePhoneNumber = (phoneNumber) => {
 
 const assertValidInput = ({ phoneNumber, email }) => {
   if (!/^\+\d{10,15}$/.test(phoneNumber)) {
-    throw new Error('Phone number must be in international format, for example +919876543210');
+    throw new Error('Phone number must be in international format, for example +919876543212');
   }
 
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -77,7 +77,7 @@ try {
     throw new Error('MONGODB_URI is required in server/.env');
   }
 
-  const phoneInput = getArgValue('phone') || await rl.question('Admin phone number (for example +919876543210): ');
+  const phoneInput = getArgValue('phone') || await rl.question('Admin phone number (for example +919876543212): ');
   const emailInput = getArgValue('email') || await rl.question('Admin email: ');
   const phoneNumber = normalizePhoneNumber(phoneInput);
   const email = String(emailInput || '').trim().toLowerCase();
