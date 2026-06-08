@@ -13,6 +13,7 @@ import { objectIdSchema } from '@/lib/schemas/common.schema';
 import { PayoutGatewayBadge, PayoutStatusBadge } from '../_components/shared/PayoutBadges';
 import { formatCurrency, formatDateTime, getPayoutRecipientName } from '../_components/shared/payout-format';
 import { PayoutDetailActions } from './_components/PayoutDetailActions';
+import { SectionHeader } from '@/components/ui/AdminPrimitives';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,7 +24,7 @@ function InfoRow({ label, value, mono = false }) {
   return (
     <div className="flex justify-between items-center py-2 border-b border-border/40 last:border-b-0 gap-6">
       <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">{label}</span>
-      <span className={`text-xs text-foreground text-right truncate max-w-[180px] ${
+      <span className={`text-xs text-foreground text-right truncate max-w-45 ${
         mono ? 'font-mono text-muted-foreground bg-muted/40 px-1.5 py-0.5 rounded text-[10px] tracking-tight' : 'font-medium'
       }`} title={value || ''}>
         {value || '—'}
@@ -98,23 +99,11 @@ export default async function PayoutDetailPage({ params }) {
   return (
     <div className="space-y-6">
       
-      {/* Top Breadcrumb Navigation */}
-      <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-        <Link href="/payouts?tab=history&page=1" className="hover:text-foreground transition-colors flex items-center gap-1.5">
-          <ArrowLeft className="h-3.5 w-3.5" />
-          Payouts
-        </Link>
-        <ChevronRight className="h-3 w-3 text-muted-foreground/40" />
-        <span className="font-mono text-foreground/80 select-all normal-case tracking-normal">{payout.id}</span>
-      </div>
-
-      {/* Main Header Row */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-border pb-6">
-        <div className="space-y-1.5">
-          <h1 className="text-2xl lg:text-3xl font-bold font-display tracking-tight text-foreground">
-            Payout Detail
-          </h1>
-          <p className="text-xs text-muted-foreground flex flex-wrap items-center gap-2">
+      {/* Page Header */}
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div>
+          <SectionHeader title="Payout Detail" description={`Payout ID: ${payout.id}`} />
+          <p className="text-xs text-muted-foreground mt-2 flex flex-wrap items-center gap-2">
             <span>Recipient:</span>
             <span className="font-semibold text-foreground font-sans">{getPayoutRecipientName(payout)}</span>
             <span className="text-muted-foreground/30">•</span>
@@ -125,6 +114,10 @@ export default async function PayoutDetailPage({ params }) {
           <PayoutStatusBadge status={payout.status} />
           <PayoutGatewayBadge gateway={payout.gateway} />
           <PayoutDetailActions payout={payout} />
+          <Link href="/payouts?tab=history&page=1" className="group inline-flex h-6 items-center gap-1 rounded border border-border bg-card px-2 text-[11px] font-semibold uppercase tracking-normal text-foreground transition-colors hover:bg-muted active:scale-95">
+            <ArrowLeft className="h-3 w-3 transition-transform duration-200 group-hover:-translate-x-0.5" />
+            <span>Back to Payouts</span>
+          </Link>
         </div>
       </div>
 
@@ -220,7 +213,7 @@ export default async function PayoutDetailPage({ params }) {
               <span className="font-mono font-bold text-destructive dark:text-red-400">-{formatCurrency(totalPlatformFees)}</span>
             </div>
             
-            <div className="border-t border-dashed border-border pt-3 flex justify-between items-center bg-muted/20 p-2.5 rounded-lg border border-border/50 mt-1">
+            <div className="border-t border-dashed border-border pt-3 flex justify-between items-center bg-muted/20 p-2.5 rounded-lg border mt-1">
               <span className="font-bold text-foreground">Net Payee Disbursed</span>
               <span className="font-mono text-sm font-black text-primary">{formatCurrency(payout.amountInRupees, payout.amount)}</span>
             </div>
@@ -246,13 +239,13 @@ export default async function PayoutDetailPage({ params }) {
             {payout.barber?.accountHolderName && (
               <div className="flex justify-between">
                 <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">Holder</span>
-                <span className="text-foreground font-medium truncate max-w-[130px]">{payout.barber.accountHolderName}</span>
+                <span className="text-foreground font-medium truncate max-w-32.5">{payout.barber.accountHolderName}</span>
               </div>
             )}
             {payout.barber?.bankAccountNumber && (
               <div className="flex justify-between">
                 <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">Account</span>
-                <span className="text-foreground font-mono truncate max-w-[130px]">{payout.barber.bankAccountNumber}</span>
+                <span className="text-foreground font-mono truncate max-w-32.5">{payout.barber.bankAccountNumber}</span>
               </div>
             )}
             {payout.barber?.ifscCode && (
@@ -263,7 +256,7 @@ export default async function PayoutDetailPage({ params }) {
             )}
             <div className="flex justify-between border-t border-border/30 pt-1.5 mt-0.5">
               <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">Gateway User</span>
-              <span className="text-foreground font-mono truncate max-w-[130px]" title={payout.beneficiaryId || ''}>{payout.beneficiaryId || '—'}</span>
+              <span className="text-foreground font-mono truncate max-w-32.5" title={payout.beneficiaryId || ''}>{payout.beneficiaryId || '—'}</span>
             </div>
           </div>
         </div>
@@ -298,7 +291,7 @@ export default async function PayoutDetailPage({ params }) {
               
               {/* Event 1: Initiated */}
               <div className="relative">
-                <div className="absolute -left-[30px] top-0.5 h-4 w-4 rounded-full bg-card border-2 border-muted-foreground/30 flex items-center justify-center">
+                <div className="absolute -left-7.5 top-0.5 h-4 w-4 rounded-full bg-card border-2 border-muted-foreground/30 flex items-center justify-center">
                   <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground" />
                 </div>
                 <p className="font-semibold text-foreground">Payout Settlement Initiated</p>
@@ -308,7 +301,7 @@ export default async function PayoutDetailPage({ params }) {
               {/* Event 2: Retried (if retry count > 0) */}
               {payout.lastRetryAt && (
                 <div className="relative">
-                  <div className="absolute -left-[30px] top-0.5 h-4 w-4 rounded-full bg-card border-2 border-amber-500/30 flex items-center justify-center">
+                  <div className="absolute -left-7.5 top-0.5 h-4 w-4 rounded-full bg-card border-2 border-amber-500/30 flex items-center justify-center">
                     <div className="h-1.5 w-1.5 rounded-full bg-amber-500" />
                   </div>
                   <p className="font-semibold text-foreground">Gateway Retried Attempt</p>
@@ -318,7 +311,7 @@ export default async function PayoutDetailPage({ params }) {
 
               {/* Event 3: Processed */}
               <div className="relative">
-                <div className={`absolute -left-[30px] top-0.5 h-4 w-4 rounded-full bg-card border-2 flex items-center justify-center ${
+                <div className={`absolute -left-7.5 top-0.5 h-4 w-4 rounded-full bg-card border-2 flex items-center justify-center ${
                   payout.status === 'SUCCESS' 
                     ? 'border-emerald-500/30 text-emerald-500' 
                     : payout.status === 'FAILED' 
@@ -341,8 +334,6 @@ export default async function PayoutDetailPage({ params }) {
 
           {/* Admin approvals and comments */}
           <div className="space-y-4 text-xs">
-            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1 select-none">Audit Parameters & Comments</p>
-            
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1">
                 <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Approving Operator</span>
@@ -398,7 +389,7 @@ export default async function PayoutDetailPage({ params }) {
 
         {transactions.length > 0 ? (
           <div className="w-full overflow-x-auto">
-            <table className="w-full min-w-[960px] text-left text-sm border-collapse">
+            <table className="w-full min-w-240 text-left text-sm border-collapse">
               <thead>
                 <tr className="border-b border-border bg-muted/20 text-muted-foreground text-[10px] uppercase font-bold tracking-wider">
                   <th className="py-3 px-4">Booking ID</th>
@@ -416,7 +407,9 @@ export default async function PayoutDetailPage({ params }) {
                 {transactions.map((txn) => (
                   <tr key={txn.id} className="hover:bg-muted/15 transition-colors duration-150 group border-b border-border/40 last:border-b-0">
                     <td className="py-3.5 px-4 font-mono font-bold text-foreground text-xs select-all">
-                      {txn.id}
+                      <Link href={`/bookings/${txn.id}`} className="text-primary hover:underline">
+                        {txn.id}
+                      </Link>
                     </td>
                     <td className="py-3.5 px-4 font-mono text-xs text-muted-foreground select-all">
                       {txn.merchantOrderId || '—'}

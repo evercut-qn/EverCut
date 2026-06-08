@@ -1,5 +1,8 @@
 # Admin Dashboard Implementation Report
 
+> [!WARNING]
+> **Historical Reference Notice**: This is a historical implementation report from the initial prototype phase. Standalone `/shops` and `/payments` navigation nodes and page routes mentioned herein have since been consolidated to streamline the user experience. Shop views are now merged under Barber details (`/barbers/[id]`) and payment views are integrated directly under bookings lookup (`/bookings` and `/bookings/[bookingId]`).
+
 Date: 2026-06-03
 
 ## Executive Summary
@@ -165,3 +168,11 @@ Because this is a development database with no production users, the orphan Barb
 - Add seeded admin fixture data for deterministic browser/E2E screenshots.
 - Consider adding a formal API contract test layer for generated Postman examples.
 - Add audit-log UI only if the future spec explicitly expands admin actions.
+
+---
+
+## Final Release Status
+
+*   **Production Ready**: **YES**
+*   **Release Blockers**: **NONE**
+*   **Remaining Issues**: **Seed Data Backlog only** (Mock data gaps cataloged in the Seed Data Backlog).

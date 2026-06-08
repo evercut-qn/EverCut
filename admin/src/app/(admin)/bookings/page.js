@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { Eye } from 'lucide-react';
 
 import { EmptyState, ErrorNotice, SectionHeader, TableShell } from '@/components/ui/AdminPrimitives';
 import { FilterSelect } from '@/components/ui/FilterSelect';
@@ -90,7 +91,7 @@ export default async function BookingsPage({ searchParams }) {
         <EmptyState title="No bookings found" />
       ) : (
         <TableShell>
-          <table className="w-full min-w-[1180px] text-sm">
+          <table className="w-full min-w-295 text-sm">
             <thead className="bg-muted/40 text-xs text-muted-foreground">
               <tr>
                 <th className="px-4 py-3 text-left font-semibold">Customer</th>
@@ -101,15 +102,16 @@ export default async function BookingsPage({ searchParams }) {
                 <th className="px-4 py-3 text-left font-semibold">Booking</th>
                 <th className="px-4 py-3 text-left font-semibold">Payment</th>
                 <th className="px-4 py-3 text-left font-semibold">Payout</th>
+                <th className="px-4 py-3 text-right font-semibold">Actions</th>
               </tr>
             </thead>
             <tbody>
               {items.map((booking) => (
                 <tr key={booking.id} className="border-b border-border last:border-0">
                   <td className="px-4 py-3">
-                    <Link href={`/bookings/${booking.id}`} className="font-semibold text-foreground hover:text-primary hover:underline">
+                    <div className="font-semibold text-foreground">
                       {fullName(booking.customer) || 'Customer unavailable'}
-                    </Link>
+                    </div>
                     <div className="text-xs text-muted-foreground">{booking.customer?.contact?.phoneNumber || booking.customer?.contact?.email || 'Contact unavailable'}</div>
                     <div className="font-mono text-[10px] text-muted-foreground">Booking ...{secondaryId(booking.id)}</div>
                   </td>
@@ -123,6 +125,17 @@ export default async function BookingsPage({ searchParams }) {
                   <td className="px-4 py-3"><StatusBadge value={booking.status} /></td>
                   <td className="px-4 py-3"><StatusBadge value={booking.paymentStatus} /></td>
                   <td className="px-4 py-3"><StatusBadge value={booking.payoutStatus} /></td>
+                  <td className="px-4 py-3 align-middle">
+                    <div className="flex items-center justify-end gap-2">
+                      <Link 
+                        href={`/bookings/${booking.id}`} 
+                        className="inline-flex h-8 items-center gap-1.5 rounded border border-border px-2.5 text-xs font-semibold text-foreground hover:bg-muted whitespace-nowrap"
+                      >
+                        <Eye className="h-3.5 w-3.5" />
+                        View
+                      </Link>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>

@@ -1,4 +1,4 @@
-import { sanitizeForResponse, toPlainObject } from './core.serializer.js';
+import { sanitizeForResponse, toIdString, toPlainObject } from './core.serializer.js';
 import { serializeMediaList } from './media.serializer.js';
 import { serializeUser } from './user.serializer.js';
 import { buildMediaUrl } from '../services/media/media-url.service.js';
@@ -70,6 +70,7 @@ export const serializeShopSummary = (shop) => {
 
     return compact({
         id: plain.id,
+        barberId: toIdString(raw.barberId) || null,
         shopName: plain.shopName ?? null,
         address: plain.address ?? null,
         location: plain.location ?? null,

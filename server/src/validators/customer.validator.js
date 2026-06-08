@@ -1,6 +1,6 @@
 import Joi from 'joi';
 import { ALL_GENDERS } from '../utils/constants.js';
-import { locationSchema } from './common.validator.js';
+import { locationSchema, objectId } from './common.validator.js';
 
 export const updateCustomerSchema = Joi.object({
     firstName: Joi.string().trim().min(1).max(50),
@@ -11,3 +11,9 @@ export const updateCustomerSchema = Joi.object({
     location: Joi.alternatives().try(locationSchema, Joi.string()),
     photoMediaId: Joi.string(),
 }).min(1);
+
+export const customerIdParamSchema = Joi.object({
+    id: objectId.required().messages({
+        'any.required': 'Customer ID is required',
+    }),
+});

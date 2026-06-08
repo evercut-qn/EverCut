@@ -41,7 +41,7 @@ const CUSTOMER_SUMMARY_FIELDS = 'firstName lastName photoR2Key userId feeWaiverB
 const CUSTOMER_NAME_FIELDS = 'firstName lastName photoR2Key';
 const PAYMENT_SUMMARY_POPULATE = {
     path: 'paymentTransactionId',
-    select: 'amount amountInRupees waiverApplied settlement',
+    select: 'amount amountInRupees waiverApplied settlement merchantOrderId paymentMode status createdAt',
 };
 
 class BookingRepository {
@@ -85,6 +85,10 @@ class BookingRepository {
                 path: 'customerId',
                 select: CUSTOMER_SUMMARY_FIELDS,
                 populate: { path: 'userId', select: 'email phoneNumber' },
+            })
+            .populate({
+                path: 'payoutTransactionId',
+                select: 'utr status processedAt',
             })
             .lean();
     }
@@ -174,7 +178,7 @@ class BookingRepository {
         const query = Booking.find(trustQueryOperators({ customerId, ...filters }))
             .populate('serviceIds')
             .populate(EMPLOYEE_POPULATE)
-            .populate('shopId', 'shopName address coverR2Key')
+            .populate('shopId', 'shopName address coverR2Key barberId')
             .populate(PAYMENT_SUMMARY_POPULATE)
             .sort({ date: -1 });
 
@@ -190,7 +194,7 @@ class BookingRepository {
         }))
             .populate('serviceIds')
             .populate(EMPLOYEE_POPULATE)
-            .populate('shopId', 'shopName address coverR2Key')
+            .populate('shopId', 'shopName address coverR2Key barberId')
             .populate(PAYMENT_SUMMARY_POPULATE)
             .sort({ date: 1 });
 
@@ -210,7 +214,7 @@ class BookingRepository {
         }))
             .populate('serviceIds')
             .populate(EMPLOYEE_POPULATE)
-            .populate('shopId', 'shopName address coverR2Key')
+            .populate('shopId', 'shopName address coverR2Key barberId')
             .populate(PAYMENT_SUMMARY_POPULATE)
             .sort({ date: -1 });
 
@@ -462,18 +466,29 @@ class BookingRepository {
         ];
 
         if (query.search) {
-            const regex = new RegExp(escapeRegex(query.search), 'i');
-            const searchConditions = [
-                { 'customerUser.phoneNumber': regex },
-                { 'customerUser.email': regex },
-                { 'customer.firstName': regex },
-                { 'customer.lastName': regex },
-                { 'shop.shopName': regex },
-            ];
-            if (mongoose.Types.ObjectId.isValid(query.search)) {
-                searchConditions.push({ _id: new mongoose.Types.ObjectId(query.search) });
+            const tokens = String(query.search).trim().split(/\s+/).filter(Boolean);
+            if (tokens.length > 0) {
+                const matchConditions = tokens.map((token) => {
+                    const escaped = escapeRegex(token);
+                    const regex = new RegExp(escaped, 'i');
+                    const conditions = [
+                        { 'customerUser.phoneNumber': regex },
+                        { 'customerUser.email': regex },
+                        { 'customer.firstName': regex },
+                        { 'customer.lastName': regex },
+                        { 'shop.shopName': regex },
+                    ];
+                    if (mongoose.Types.ObjectId.isValid(token)) {
+                        conditions.push({ _id: new mongoose.Types.ObjectId(token) });
+                    }
+                    return { $or: conditions };
+                });
+                if (matchConditions.length === 1) {
+                    pipeline.push({ $match: matchConditions[0] });
+                } else {
+                    pipeline.push({ $match: { $and: matchConditions } });
+                }
             }
-            pipeline.push({ $match: { $or: searchConditions } });
         }
 
         return pipeline;
@@ -735,17 +750,25 @@ class BookingRepository {
         ];
 
         if (search) {
-            const escapedSearch = String(search).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            const searchRegex = new RegExp(escapedSearch, 'i');
-            pipeline.push({
-                $match: {
-                    $or: [
-                        { barberFirstName: searchRegex },
-                        { barberLastName: searchRegex },
-                        { shopName: searchRegex },
-                    ],
-                },
-            });
+            const tokens = String(search).trim().split(/\s+/).filter(Boolean);
+            if (tokens.length > 0) {
+                const matchConditions = tokens.map((token) => {
+                    const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                    const regex = new RegExp(escaped, 'i');
+                    return {
+                        $or: [
+                            { barberFirstName: regex },
+                            { barberLastName: regex },
+                            { shopName: regex },
+                        ],
+                    };
+                });
+                pipeline.push({
+                    $match: {
+                        $and: matchConditions,
+                    },
+                });
+            }
         }
 
         pipeline.push({ $sort: { totalAmountInPaisa: -1, oldestBookingDate: 1 } });
@@ -760,7 +783,7 @@ class BookingRepository {
         }))
             .populate('serviceIds', BOOKING_SERVICE_CARD_FIELDS)
             .populate(EMPLOYEE_NAME_POPULATE)
-            .populate('shopId', 'shopName address coverR2Key')
+            .populate('shopId', 'shopName address coverR2Key barberId')
             .populate(PAYMENT_SUMMARY_POPULATE)
             .lean();
     }

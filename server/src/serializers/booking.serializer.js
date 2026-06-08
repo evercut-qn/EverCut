@@ -247,6 +247,16 @@ export const serializeBookingDetails = (details, options = {}) => {
     const services = serializeServices(raw.services || []);
     const amountSummary = resolveAmountSummary({ raw, plain, services });
 
+    const paymentTx = isPopulatedRef(raw.paymentTransactionId) ? raw.paymentTransactionId : null;
+    const payoutTx = isPopulatedRef(raw.payoutTransactionId) ? raw.payoutTransactionId : null;
+
+    const merchantOrderId = plain.merchantOrderId || paymentTx?.merchantOrderId || null;
+    const paymentMode = plain.paymentMode || paymentTx?.paymentMode || null;
+    const paidAt = plain.paidAt || (paymentTx?.status === 'completed' || paymentTx?.status === 'refunded' ? paymentTx?.createdAt : null) || null;
+
+    const barberUtr = plain.barberUtr || payoutTx?.utr || null;
+    const payoutCompletedAt = plain.payoutCompletedAt || payoutTx?.processedAt || null;
+
     return compact({
         id: plain.id || toIdString(plain.bookingId),
         customer: raw.customer
@@ -272,7 +282,19 @@ export const serializeBookingDetails = (details, options = {}) => {
         startMinute: plain.startMinute,
         endMinute: plain.endMinute,
         slotLockTimes: plain.slotLockTimes ?? [],
-        paymentTransactionId: toIdString(plain.paymentTransactionId),
-        merchantOrderId: plain.merchantOrderId ?? null,
+        paymentTransactionId: toIdString(raw.paymentTransactionId),
+        merchantOrderId,
+        payoutTransactionId: toIdString(raw.payoutTransactionId),
+        barberUtr,
+        paymentMode,
+        paidAt,
+        payoutCompletedAt,
+        rescheduleCount: plain.rescheduleCount ?? 0,
+        cancelledAt: plain.cancelledAt ?? null,
+        barberCancelledAt: plain.barberCancelledAt ?? null,
+        autoCancelledAt: plain.autoCancelledAt ?? null,
+        noShowAt: plain.noShowAt ?? null,
+        completedAt: plain.completedAt ?? null,
+        cancellationNote: plain.cancellationNote ?? null,
     });
 };

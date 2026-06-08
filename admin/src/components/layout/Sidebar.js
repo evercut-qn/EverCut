@@ -57,9 +57,9 @@ export function Sidebar({ className, forceExpanded = false, onClose }) {
     { href: '/customers', label: 'Customers', icon: Users },
     { href: '/barbers', label: 'Barbers', icon: Scissors },
     { href: '/bookings', label: 'Bookings', icon: CalendarSearch },
-    { href: '/refunds', label: 'Refunds', icon: ReceiptText },
-    { href: '/subscriptions', label: 'Subscriptions', icon: BadgeIndianRupee },
     { href: '/payouts', label: 'Payouts', icon: CreditCard },
+    { href: '/subscriptions', label: 'Subscriptions', icon: BadgeIndianRupee },
+    { href: '/refunds', label: 'Refunds', icon: ReceiptText },
   ];
 
   const sidebarContent = (

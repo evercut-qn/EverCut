@@ -458,6 +458,17 @@ const buildBookingDetailsPayload = async (booking, options = {}) => {
         slotLockTimes: booking.slotLockTimes,
         paymentTransactionId: booking.paymentTransactionId,
         merchantOrderId: booking.merchantOrderId,
+        payoutTransactionId: booking.payoutTransactionId,
+        barberUtr: booking.barberUtr,
+        paymentMode: booking.paymentMode,
+        paidAt: booking.paidAt,
+        rescheduleCount: booking.rescheduleCount,
+        cancelledAt: booking.cancelledAt,
+        barberCancelledAt: booking.barberCancelledAt,
+        autoCancelledAt: booking.autoCancelledAt,
+        noShowAt: booking.noShowAt,
+        completedAt: booking.completedAt,
+        cancellationNote: booking.cancellationNote,
     }, options);
 };
 

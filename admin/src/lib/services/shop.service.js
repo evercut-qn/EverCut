@@ -11,3 +11,10 @@ export async function getBarbers({ page = 1, limit = 20, search = '', isOpen = '
     token,
   });
 }
+
+export async function getBarberDetail(barberId, token) {
+  return apiFetch(`/barbers/${barberId}`, {
+    method: 'GET',
+    token,
+  });
+}

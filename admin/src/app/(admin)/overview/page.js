@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import {
+  ArrowRight,
   BadgeIndianRupee,
   CalendarDays,
   CreditCard,
@@ -156,14 +157,17 @@ export default async function OverviewPage() {
       </div>
 
       <div className="flex flex-wrap gap-3">
-        <Link className="rounded-md border border-border px-3 py-2 text-sm font-semibold hover:bg-muted" href="/bookings">
-          Booking Lookup
+        <Link href="/bookings" className="group inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-card px-3 text-xs font-semibold text-foreground shadow-xs transition-all duration-200 hover:bg-muted hover:text-foreground active:scale-98">
+          <span>Booking Lookup</span>
+          <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5" />
         </Link>
-        <Link className="rounded-md border border-border px-3 py-2 text-sm font-semibold hover:bg-muted" href="/payouts">
-          Payouts
+        <Link href="/payouts" className="group inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-card px-3 text-xs font-semibold text-foreground shadow-xs transition-all duration-200 hover:bg-muted hover:text-foreground active:scale-98">
+          <span>Payouts</span>
+          <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5" />
         </Link>
-        <Link className="rounded-md border border-border px-3 py-2 text-sm font-semibold hover:bg-muted" href="/refunds">
-          Refunds
+        <Link href="/refunds" className="group inline-flex h-8 items-center gap-1.5 rounded-md border border-border bg-card px-3 text-xs font-semibold text-foreground shadow-xs transition-all duration-200 hover:bg-muted hover:text-foreground active:scale-98">
+          <span>Refunds</span>
+          <ArrowRight className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5" />
         </Link>
       </div>
     </div>

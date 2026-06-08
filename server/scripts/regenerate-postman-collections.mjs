@@ -2924,19 +2924,50 @@ const adminResourceReadsCollection = {
   event: collectionPreRequest({
     syncPairs: [
       ['booking_id', 'admin_booking_id'],
+      ['customer_id', 'admin_customer_id'],
+      ['barber_id', 'admin_barber_id'],
     ],
   }),
   variable: [
     ...baseVariables(
       textVariable('admin_search', '', 'Optional search term for admin directory and booking lookup requests.'),
+      textVariable('admin_customer_id', '', 'Customer ID used by admin customer detail lookup.'),
+      textVariable('admin_barber_id', '', 'Barber ID used by admin barber detail lookup.'),
       textVariable('admin_booking_id', '', 'Booking ID used by admin booking detail lookup.'),
       textVariable('admin_subscription_status', 'ACTIVE', 'Subscription status filter.'),
     ),
   ],
   item: [
-
     {
-      name: '2. Shops Summary',
+      name: '1. Get Customer Detail',
+      ...request({
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/customers/{{admin_customer_id}}',
+        description: {
+          text: 'Admin-only customer detail lookup. Exposes full profile info, recent bookings, and payments.',
+          role: 'Admin',
+          prereqs: ['admin_access_token', 'admin_customer_id'],
+          captured: []
+        },
+        event: testEvent("pm.test('status is 200 or 404', function () { pm.expect(pm.response.code).to.be.oneOf([200, 404]); });"),
+      }),
+    },
+    {
+      name: '2. Get Barber Detail',
+      ...request({
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/barbers/{{admin_barber_id}}',
+        description: {
+          text: 'Admin-only barber detail lookup. Exposes performance metrics, bank info, and consolidated shop venue details.',
+          role: 'Admin',
+          prereqs: ['admin_access_token', 'admin_barber_id'],
+          captured: []
+        },
+        event: testEvent("pm.test('status is 200 or 404', function () { pm.expect(pm.response.code).to.be.oneOf([200, 404]); });"),
+      }),
+    },
+    {
+      name: '3. Shops Summary',
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/shops/summary',
@@ -2950,7 +2981,7 @@ const adminResourceReadsCollection = {
       }),
     },
     {
-      name: '3. Bookings Summary',
+      name: '4. Bookings Summary',
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/bookings/summary',
@@ -2964,7 +2995,7 @@ const adminResourceReadsCollection = {
       }),
     },
     {
-      name: '4. Payments Summary',
+      name: '5. Payments Summary',
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/payments/summary',
@@ -2978,7 +3009,7 @@ const adminResourceReadsCollection = {
       }),
     },
     {
-      name: '5. Payouts Summary',
+      name: '6. Payouts Summary',
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/payouts/summary',
@@ -2992,7 +3023,7 @@ const adminResourceReadsCollection = {
       }),
     },
     {
-      name: '6. Subscriptions Summary',
+      name: '7. Subscriptions Summary',
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/subscriptions/summary',
@@ -3006,7 +3037,7 @@ const adminResourceReadsCollection = {
       }),
     },
     {
-      name: '7. Customer Directory',
+      name: '8. Customer Directory',
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/customers?page=1&limit=20&search={{admin_search}}',
@@ -3014,13 +3045,18 @@ const adminResourceReadsCollection = {
           text: 'Admin-only customer directory with full contact fields, account state, registration date, and booking count.',
           role: 'Admin',
           prereqs: ['admin_access_token'],
-          captured: []
+          captured: ['admin_customer_id']
         },
-        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          "const response = pm.response.json();",
+          "const first = Array.isArray(response.data) ? response.data[0] : null;",
+          "if (first?.id) { pm.collectionVariables.set('admin_customer_id', first.id); }"
+        ),
       }),
     },
     {
-      name: '8. Barber And Shop Directory',
+      name: '9. Barber And Shop Directory',
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/barbers?page=1&limit=20&search={{admin_search}}',
@@ -3028,13 +3064,18 @@ const adminResourceReadsCollection = {
           text: 'Admin-only barber/shop directory with full payout identifier, operating state, and rating summary.',
           role: 'Admin',
           prereqs: ['admin_access_token'],
-          captured: []
+          captured: ['admin_barber_id']
         },
-        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          "const response = pm.response.json();",
+          "const first = Array.isArray(response.data) ? response.data[0] : null;",
+          "if (first?.id) { pm.collectionVariables.set('admin_barber_id', first.id); }"
+        ),
       }),
     },
     {
-      name: '9. Booking Lookup',
+      name: '10. Booking Lookup',
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/bookings?page=1&limit=20&search={{admin_search}}',
@@ -3053,7 +3094,7 @@ const adminResourceReadsCollection = {
       }),
     },
     {
-      name: '10. Booking Detail',
+      name: '11. Booking Detail',
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/bookings/{{admin_booking_id}}',
@@ -3067,7 +3108,7 @@ const adminResourceReadsCollection = {
       }),
     },
     {
-      name: '11. Refund View',
+      name: '12. Refund View',
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/payments/refunds?page=1&limit=20',
@@ -3081,7 +3122,7 @@ const adminResourceReadsCollection = {
       }),
     },
     {
-      name: '12. Subscription View',
+      name: '13. Subscription View',
       ...request({
         method: 'GET',
         url: '{{base_url}}/{{api_prefix}}/subscriptions?page=1&limit=20&status={{admin_subscription_status}}',

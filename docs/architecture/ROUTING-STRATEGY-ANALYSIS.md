@@ -1,4 +1,4 @@
-﻿# EverCut Routing Strategy Analysis
+# EverCut Routing Strategy Analysis
 
 > Status: implemented on 2026-04-24
 > Scope audited: `server/src/routes`, `server/src/controllers`, `server/src/services`, `server/src/middleware`, `server/src/utils`
@@ -128,6 +128,24 @@ All current API routes are mounted from `server/src/routes/index.js`:
 - `earnings`: barber-only
 - `payments`: customer payment initiation, authenticated payment reads, barber/admin refunds, public webhook callbacks
 - `payouts`: admin retry plus public webhook callback
+
+### Admin Frontend Route Topology (admin/src/app)
+
+The admin panel routes are organized strictly around consolidated resources:
+- `/overview`: Main dashboard displaying aggregated operations KPIs and top shop/booking tables.
+- `/customers`: Customer directory table listing.
+- `/customers/[id]`: Customer details page showing profile summaries, metrics, and customer-specific booking list tables.
+- `/barbers`: Unified Barber & Shop directory table listing.
+- `/barbers/[id]`: Consolidated Barber profile details, shop locations details, Razorpay subscriptions status, and recent payments tables.
+- `/bookings`: Bookings lookup table.
+- `/bookings/[bookingId]`: Booking details view with high-density schedule details and cancelled banners.
+- `/refunds`: Read-only refunds directory table listing.
+- `/payouts`: Payout transactions tabs (Pending/History).
+- `/payouts/[payoutId]`: Payout details view showing UTR records, status, and beneficiary bank/UPI details.
+- `/subscriptions`: Subscriptions directory table.
+- `/settings`: Admin panel settings.
+
+*Consolidation Cleanup*: Standalone `/shops` and `/payments` frontend page routes have been completely removed. Their concerns are unified under `/barbers/[id]` and `/bookings` respectively.
 
 ## Architectural Rules
 

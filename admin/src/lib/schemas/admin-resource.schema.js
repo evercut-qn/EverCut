@@ -40,3 +40,12 @@ export const subscriptionQuerySchema = paginationSchema.extend({
 export const bookingDetailParamSchema = z.object({
   bookingId: objectIdSchema,
 });
+
+export const customerDetailParamSchema = z.object({
+  id: objectIdSchema,
+});
+
+export const barberDetailParamSchema = z.object({
+  id: objectIdSchema,
+});
+

@@ -216,3 +216,13 @@ export const getShopServices = async (req, res, next) => {
         next(err);
     }
 };
+
+export const getBarberById = async (req, res, next) => {
+    try {
+        const { id } = getValidatedRequestData(req, 'params');
+        const profile = await shopService.getBarberProfileForAdmin(id);
+        return res.status(200).json(ApiResponse.success(profile, 'Barber profile fetched'));
+    } catch (err) {
+        next(err);
+    }
+};

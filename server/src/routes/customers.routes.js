@@ -5,7 +5,7 @@ import authenticate from '../middleware/authenticate.middleware.js';
 import { authorize } from '../middleware/authorize.middleware.js';
 import { validate } from '../middleware/validate.middleware.js';
 import { ROLES } from '../utils/constants.js';
-import { updateCustomerSchema } from '../validators/customer.validator.js';
+import { updateCustomerSchema, customerIdParamSchema } from '../validators/customer.validator.js';
 import { mediaIdBodySchema } from '../validators/media.validator.js';
 import { customerDirectoryQuerySchema } from '../validators/user.validator.js';
 
@@ -18,6 +18,13 @@ router.get(
     authorize(ROLES.ADMIN),
     validate(customerDirectoryQuerySchema, 'query'),
     customerController.listCustomers,
+);
+
+router.get(
+    '/:id',
+    authorize(ROLES.ADMIN),
+    validate(customerIdParamSchema, 'params'),
+    customerController.getCustomerById,
 );
 
 router.get('/me', authorize(ROLES.CUSTOMER), customerController.getMe);

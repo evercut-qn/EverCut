@@ -39,6 +39,8 @@ const serializePayoutBarber = (barber) => {
         lastName: plain.lastName ?? null,
         accountHolderName: plain.accountHolderName ?? null,
         upiId: plain.upiId ?? null,
+        bankAccountNumber: plain.bankAccount ?? null,
+        ifscCode: plain.ifsc ?? null,
     });
 };
 

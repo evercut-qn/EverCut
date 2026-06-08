@@ -76,7 +76,7 @@ class PayoutRepository {
 
     async findByIdPopulated(id) {
         return PayoutTransaction.findById(id)
-            .populate('barberId', 'firstName lastName upiId accountHolderName')
+            .populate('barberId', 'firstName lastName upiId accountHolderName bankAccount ifsc')
             .populate('shopId', 'shopName')
             .populate('bookingIds', 'date time status paymentStatus payoutStatus totalAmount barberUtr payoutCompletedAt')
             .populate('paymentTransactionIds', 'bookingId customerId shopId merchantOrderId amount amountInRupees status settlement')

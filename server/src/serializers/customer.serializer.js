@@ -23,6 +23,7 @@ export const serializeCustomerSummary = (customer, options = {}) => {
         id: plain.id,
         firstName: plain.firstName ?? null,
         lastName: plain.lastName ?? null,
+        fullName: `${plain.firstName || ''} ${plain.lastName || ''}`.trim() || null,
         photoUrl: buildMediaUrl(raw.photoR2Key),
         contact: options.includeContact ? {
             phoneNumber: user.phoneNumber ?? null,
@@ -71,6 +72,7 @@ export const serializeCustomerDirectoryItem = (customer) => {
         fullName: `${plain.firstName || ''} ${plain.lastName || ''}`.trim() || null,
         firstName: plain.firstName ?? null,
         lastName: plain.lastName ?? null,
+        address: plain.address ?? null,
         contact: {
             phoneNumber: user.phoneNumber ?? null,
             email: user.email ?? null,

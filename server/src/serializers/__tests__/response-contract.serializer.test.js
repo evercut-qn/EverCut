@@ -5,7 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import config from '../../config/index.js';
-import { serializeBooking } from '../booking.serializer.js';
+import { serializeBooking, serializeBookingDetails } from '../booking.serializer.js';
 import { serializeCustomerDirectoryItem, serializeCustomerProfile, serializeCustomerSummary } from '../customer.serializer.js';
 import { serializeEmployee } from '../employee.serializer.js';
 import { serializeNotification, serializeFcmTokenRegistration } from '../notification.serializer.js';
@@ -391,4 +391,151 @@ test('serializers no longer export deprecated API aliases', async () => {
     assert.doesNotMatch(barberProfileUtils, /serializeUpiDetails/);
     assert.doesNotMatch(barberProfileUtils, /serializePayoutConfig/);
     assert.doesNotMatch(coreSerializer, /serializeList/);
+});
+
+test('booking details serializer fallback and nullish logic', () => {
+    const bookingId = '507f1f77bcf86cd799439011';
+    const paymentTxId = '507f1f77bcf86cd799439022';
+    const payoutTxId = '507f1f77bcf86cd799439033';
+
+    // 1. booking value present (preferred root values over transactions)
+    const detailsWithRootValues = {
+        _id: bookingId,
+        merchantOrderId: 'root-merchant-order-id',
+        paymentMode: 'root-payment-mode',
+        paidAt: '2026-06-01T10:00:00Z',
+        barberUtr: 'root-barber-utr',
+        payoutCompletedAt: '2026-06-02T10:00:00Z',
+        paymentTransactionId: {
+            _id: paymentTxId,
+            merchantOrderId: 'tx-merchant-order-id',
+            paymentMode: 'tx-payment-mode',
+            status: 'completed',
+            createdAt: '2026-06-01T11:00:00Z',
+        },
+        payoutTransactionId: {
+            _id: payoutTxId,
+            utr: 'tx-utr',
+            processedAt: '2026-06-02T11:00:00Z',
+        },
+    };
+
+    const res1 = serializeBookingDetails(detailsWithRootValues);
+    assert.equal(res1.merchantOrderId, 'root-merchant-order-id');
+    assert.equal(res1.paymentMode, 'root-payment-mode');
+    assert.equal(res1.paidAt, '2026-06-01T10:00:00Z');
+    assert.equal(res1.barberUtr, 'root-barber-utr');
+    assert.equal(res1.payoutCompletedAt, '2026-06-02T10:00:00Z');
+
+    // 2. booking value missing + transaction fallback
+    const detailsWithFallback = {
+        _id: bookingId,
+        paymentTransactionId: {
+            _id: paymentTxId,
+            merchantOrderId: 'tx-merchant-order-id',
+            paymentMode: 'tx-payment-mode',
+            status: 'completed',
+            createdAt: '2026-06-01T11:00:00Z',
+        },
+        payoutTransactionId: {
+            _id: payoutTxId,
+            utr: 'tx-utr',
+            processedAt: '2026-06-02T11:00:00Z',
+        },
+    };
+
+    const res2 = serializeBookingDetails(detailsWithFallback);
+    assert.equal(res2.merchantOrderId, 'tx-merchant-order-id');
+    assert.equal(res2.paymentMode, 'tx-payment-mode');
+    assert.equal(res2.paidAt, '2026-06-01T11:00:00Z');
+    assert.equal(res2.barberUtr, 'tx-utr');
+    assert.equal(res2.payoutCompletedAt, '2026-06-02T11:00:00Z');
+
+    // 3. payment transaction fallback only for 'completed' or 'refunded'
+    const detailsWithPendingPayment = {
+        _id: bookingId,
+        paymentTransactionId: {
+            _id: paymentTxId,
+            merchantOrderId: 'tx-merchant-order-id',
+            paymentMode: 'tx-payment-mode',
+            status: 'pending',
+            createdAt: '2026-06-01T11:00:00Z',
+        },
+    };
+
+    const res3 = serializeBookingDetails(detailsWithPendingPayment);
+    assert.equal(res3.merchantOrderId, 'tx-merchant-order-id');
+    assert.equal(res3.paymentMode, 'tx-payment-mode');
+    assert.equal(res3.paidAt, null, 'paidAt must be null when status is not completed/refunded');
+
+    const detailsWithRefundedPayment = {
+        _id: bookingId,
+        paymentTransactionId: {
+            _id: paymentTxId,
+            merchantOrderId: 'tx-merchant-order-id',
+            paymentMode: 'tx-payment-mode',
+            status: 'refunded',
+            createdAt: '2026-06-01T11:00:00Z',
+        },
+    };
+    const res3b = serializeBookingDetails(detailsWithRefundedPayment);
+    assert.equal(res3b.paidAt, '2026-06-01T11:00:00Z', 'paidAt must populate for refunded status');
+
+    // 4. missing transaction references (just IDs/strings)
+    const detailsWithPlainIds = {
+        _id: bookingId,
+        paymentTransactionId: paymentTxId,
+        payoutTransactionId: payoutTxId,
+    };
+
+    const res4 = serializeBookingDetails(detailsWithPlainIds);
+    assert.equal(res4.paymentTransactionId, paymentTxId);
+    assert.equal(res4.payoutTransactionId, payoutTxId);
+    assert.equal(res4.merchantOrderId, null);
+    assert.equal(res4.paymentMode, null);
+    assert.equal(res4.paidAt, null);
+    assert.equal(res4.barberUtr, null);
+    assert.equal(res4.payoutCompletedAt, null);
+
+    // 5. null values handled correctly
+    const detailsWithNulls = {
+        _id: bookingId,
+        merchantOrderId: null,
+        paymentMode: null,
+        paidAt: null,
+        barberUtr: null,
+        payoutCompletedAt: null,
+        paymentTransactionId: null,
+        payoutTransactionId: null,
+    };
+
+    const res5 = serializeBookingDetails(detailsWithNulls);
+    assert.equal(res5.merchantOrderId, null);
+    assert.equal(res5.paymentMode, null);
+    assert.equal(res5.paidAt, null);
+    assert.equal(res5.barberUtr, null);
+    assert.equal(res5.payoutCompletedAt, null);
+    assert.equal(res5.paymentTransactionId, null);
+    assert.equal(res5.payoutTransactionId, null);
+
+    // 6. undefined values handled correctly
+    const detailsWithUndefineds = {
+        _id: bookingId,
+        merchantOrderId: undefined,
+        paymentMode: undefined,
+        paidAt: undefined,
+        barberUtr: undefined,
+        payoutCompletedAt: undefined,
+        paymentTransactionId: undefined,
+        payoutTransactionId: undefined,
+    };
+
+    const res6 = serializeBookingDetails(detailsWithUndefineds);
+    assert.equal(res6.merchantOrderId, null);
+    assert.equal(res6.paymentMode, null);
+    assert.equal(res6.paidAt, null);
+    assert.equal(res6.barberUtr, null);
+    assert.equal(res6.payoutCompletedAt, null);
+    assert.equal(res6.paymentTransactionId, null);
+    assert.equal(res6.payoutTransactionId, null);
 });
