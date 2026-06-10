@@ -39,7 +39,7 @@ const customerRepository = (await import('../../repositories/customer.repository
 const barberRepository = (await import('../../repositories/barber.repository.js')).default;
 const mediaRepository = (await import('../../repositories/media.repository.js')).default;
 const shopRepository = (await import('../../repositories/shop.repository.js')).default;
-const notificationEvents = (await import('../notification-events.service.js')).default;
+const notificationEvents = (await import('../notifications/notification-events.service.js')).default;
 const shopService = await import('../shop.service.js');
 
 test('getFavoriteShops returns a paginated customer favorite shop list', async (t) => {

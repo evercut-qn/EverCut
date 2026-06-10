@@ -8,6 +8,8 @@ import { startAutoCancelJob, stopAutoCancelJob } from './jobs/auto-cancel-bookin
 import { startSlotCleanupJob, stopSlotCleanupJob } from './jobs/slot-cleanup.cron.js';
 import { startMediaCleanupJob, stopMediaCleanupJob } from './jobs/media-cleanup.cron.js';
 import { startSubscriptionJobs, stopSubscriptionJobs } from './jobs/subscription.cron.js';
+import { runStartupRecoveryScan } from './jobs/startup-recovery.job.js';
+import { startCleanupStaleTokensJob, stopCleanupStaleTokensJob } from './jobs/cleanup-stale-tokens.cron.js';
 import logger from './utils/logger.js';
 
 /**
@@ -17,6 +19,7 @@ const start = async () => {
     try {
         // Connect to MongoDB
         await connectDB();
+        await runStartupRecoveryScan();
 
         // Create Express app
         const app = createApp();
@@ -27,6 +30,7 @@ const start = async () => {
         startSlotCleanupJob();
         startMediaCleanupJob();
         startSubscriptionJobs();
+        startCleanupStaleTokensJob();
 
         // Start HTTP server
         const server = app.listen(config.port, () => {
@@ -47,6 +51,7 @@ const start = async () => {
             stopSlotCleanupJob();
             stopMediaCleanupJob();
             stopSubscriptionJobs();
+            stopCleanupStaleTokensJob();
 
             server.close(async () => {
                 await disconnectDB();

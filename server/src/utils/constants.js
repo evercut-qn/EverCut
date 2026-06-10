@@ -273,15 +273,48 @@ export const NOTIFICATION_TYPE = Object.freeze({
 
 export const ALL_NOTIFICATION_TYPES = Object.values(NOTIFICATION_TYPE);
 
+
+export const NOTIFICATION_CATEGORY = Object.freeze({
+    TRANSACTIONAL: 'transactional',
+    ADMIN_BROADCAST: 'admin_broadcast',
+    SILENT_SYNC: 'silent_sync',
+    SYSTEM_ALERT: 'system_alert',
+    PROMOTIONAL: 'promotional',
+});
+
+export const ALL_NOTIFICATION_CATEGORIES = Object.values(NOTIFICATION_CATEGORY);
+
 export const NOTIFICATION_STATUS = Object.freeze({
-    QUEUED: 'queued',
+    SENDING: 'sending',
     SENT: 'sent',
-    PARTIAL: 'partial',
     FAILED: 'failed',
-    SKIPPED: 'skipped',
 });
 
 export const ALL_NOTIFICATION_STATUSES = Object.values(NOTIFICATION_STATUS);
+
+export const FCM_TOKEN_STATUS = Object.freeze({
+    ACTIVE: 'active',
+    REVOKED: 'revoked',
+    INVALID: 'invalid',
+});
+
+export const ALL_FCM_TOKEN_STATUSES = Object.values(FCM_TOKEN_STATUS);
+
+export const NOTIFICATION_AUDIENCE_MODE = Object.freeze({
+    CUSTOMERS: 'customers',
+    BARBERS: 'barbers',
+    CUSTOMERS_AND_BARBERS: 'customers_and_barbers',
+});
+
+export const ALL_NOTIFICATION_AUDIENCE_MODES = Object.values(NOTIFICATION_AUDIENCE_MODE);
+
+export const NOTIFICATION_AUDIT_ACTION = Object.freeze({
+    NOTIFICATION_CREATED: 'notification.created',
+    NOTIFICATION_SENT: 'notification.sent',
+    DELIVERY_COMPLETED: 'delivery.completed',
+});
+
+export const ALL_NOTIFICATION_AUDIT_ACTIONS = Object.values(NOTIFICATION_AUDIT_ACTION);
 
 export const FCM_PLATFORM = Object.freeze({
     ANDROID: 'android',
@@ -311,7 +344,6 @@ export const NOTIFICATION_EVENT = Object.freeze({
     PAYOUT_COMPLETED: 'payout.completed',
     PAYOUT_FAILED: 'payout.failed',
     SYSTEM_ALERT: 'system.alert',
-    CHAT_MESSAGE: 'chat.message',
 });
 
 export const ALL_NOTIFICATION_EVENTS = Object.values(NOTIFICATION_EVENT);

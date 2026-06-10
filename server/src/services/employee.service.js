@@ -9,7 +9,7 @@ import { normalizeShopSchedule } from '../utils/shop-schedule.utils.js';
 import { serializeEmployee, serializeEmployees } from '../serializers/employee.serializer.js';
 import { toIdString } from '../serializers/core.serializer.js';
 import { toDateOnlyString } from '../utils/slot-lock.utils.js';
-import notificationEvents from './notification-events.service.js';
+import notificationEvents from './notifications/notification-events.service.js';
 import * as mediaService from './media/media.service.js';
 import storageProvider from './media/storage-provider.service.js';
 import { MEDIA_ENTITY_TYPE, MEDIA_PURPOSE } from '../utils/constants.js';

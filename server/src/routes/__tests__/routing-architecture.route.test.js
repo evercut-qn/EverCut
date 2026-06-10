@@ -419,8 +419,17 @@ test('changed resource routes require the expected authentication and role guard
     assert.match(employeeRoutes, /router\.get\(\s*'\/:id\/availability',\s*authorize\(ROLES\.CUSTOMER, ROLES\.BARBER\)/);
     assert.match(employeeRoutes, /router\.use\(authorize\(ROLES\.BARBER\)\)/);
 
+    const notificationController = await readSource('controllers/notification.controller.js');
     assert.match(notificationRoutes, /router\.use\(authenticate\)/);
-    assert.doesNotMatch(notificationRoutes, /authorize\(ROLES\./);
+    assert.match(notificationRoutes, /\/inbox/);
+    assert.match(notificationRoutes, /\/broadcasts/);
+    assert.match(notificationRoutes, /\/inbox.*authorize\(ROLES\.CUSTOMER, ROLES\.BARBER\)/);
+    assert.match(notificationRoutes, /\/broadcasts.*authorize\(ROLES\.ADMIN\)/);
+    assert.doesNotMatch(notificationController, /roleType === ROLES\.ADMIN/);
+    assert.doesNotMatch(notificationController, /req\.user\.roleType/);
+    assert.match(notificationRoutes, /\/broadcasts\/:id\/recipients/);
+    assert.match(notificationRoutes, /\/broadcasts\/:id\/audits/);
+    assert.doesNotMatch(notificationRoutes, /\/:id\/notifications/);
 
     assert.match(paymentRoutes, /router\.post\('\/webhook', paymentController\.handleWebhook\)/);
     assert.match(paymentRoutes, /router\.get\(\s*'\/summary'[\s\S]*authorize\(ROLES\.ADMIN\)/);

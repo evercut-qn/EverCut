@@ -113,7 +113,7 @@ test('upsertReplyToRating creates a first reply and notifies the customer', asyn
         };
     });
 
-    const notificationEvents = await import('../notification-events.service.js');
+    const notificationEvents = await import('../notifications/notification-events.service.js');
     let notifyArgs = null;
     t.mock.method(notificationEvents.default, 'notifyRatingReply', async (payload) => {
         notifyArgs = payload;
@@ -167,7 +167,7 @@ test('upsertReplyToRating updates an existing reply without sending a duplicate 
         };
     });
 
-    const notificationEvents = await import('../notification-events.service.js');
+    const notificationEvents = await import('../notifications/notification-events.service.js');
     let notified = false;
     t.mock.method(notificationEvents.default, 'notifyRatingReply', async () => {
         notified = true;

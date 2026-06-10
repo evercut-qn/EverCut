@@ -1,6 +1,11 @@
 import mongoose from 'mongoose';
 
-import { ALL_FCM_PLATFORMS, FCM_PLATFORM } from '../utils/constants.js';
+import {
+    ALL_FCM_PLATFORMS,
+    ALL_FCM_TOKEN_STATUSES,
+    FCM_PLATFORM,
+    FCM_TOKEN_STATUS,
+} from '../utils/constants.js';
 
 const fcmTokenSchema = new mongoose.Schema(
     {
@@ -15,7 +20,6 @@ const fcmTokenSchema = new mongoose.Schema(
             required: true,
             trim: true,
             unique: true,
-            index: true,
         },
         platform: {
             type: String,
@@ -23,10 +27,16 @@ const fcmTokenSchema = new mongoose.Schema(
             default: FCM_PLATFORM.UNKNOWN,
             index: true,
         },
+        status: {
+            type: String,
+            enum: ALL_FCM_TOKEN_STATUSES,
+            default: FCM_TOKEN_STATUS.ACTIVE,
+            index: true,
+        },
         deviceId: {
             type: String,
+            required: true,
             trim: true,
-            default: null,
             maxlength: 128,
         },
         appVersion: {
@@ -35,15 +45,23 @@ const fcmTokenSchema = new mongoose.Schema(
             default: null,
             maxlength: 64,
         },
-        locale: {
-            type: String,
-            trim: true,
-            default: null,
-            maxlength: 32,
+        registeredAt: {
+            type: Date,
+            default: Date.now,
+        },
+        refreshedAt: {
+            type: Date,
+            default: Date.now,
+            index: true,
         },
         lastSeenAt: {
             type: Date,
             default: Date.now,
+            index: true,
+        },
+        lastSuccessfulDeliveryAt: {
+            type: Date,
+            default: null,
             index: true,
         },
         revokedAt: {
@@ -70,6 +88,8 @@ const fcmTokenSchema = new mongoose.Schema(
 );
 
 fcmTokenSchema.index({ userId: 1, platform: 1, revokedAt: 1 });
+fcmTokenSchema.index({ userId: 1, status: 1, lastSeenAt: -1 });
+fcmTokenSchema.index({ status: 1, lastSeenAt: 1 });
 fcmTokenSchema.index(
     { userId: 1, deviceId: 1 },
     {
@@ -80,5 +100,5 @@ fcmTokenSchema.index(
     },
 );
 
-const FcmToken = mongoose.model('FcmToken', fcmTokenSchema);
+const FcmToken = mongoose.models.FcmToken || mongoose.model('FcmToken', fcmTokenSchema);
 export default FcmToken;

@@ -24,7 +24,10 @@ export const validate = (schema, source = 'body') => {
         });
 
         if (error) {
-            const errors = error.details.map((d) => d.message);
+            const errors = error.details.map((d) => ({
+                field: d.path.join('.'),
+                message: d.message,
+            }));
             return next(new BadRequestError('Validation failed', errors));
         }
 

@@ -19,7 +19,7 @@ import { buildPagination } from '../utils/pagination.utils.js';
 import { normalizeServicePricing } from '../utils/service-pricing.utils.js';
 import { normalizeShopSchedule } from '../utils/shop-schedule.utils.js';
 import { isValidUpiId, normalizePayoutString } from '../utils/payout-details.utils.js';
-import notificationEvents from './notification-events.service.js';
+import notificationEvents from './notifications/notification-events.service.js';
 import entitlementService from './subscription/entitlement.service.js';
 import * as mediaService from './media/media.service.js';
 import * as serviceCatalogService from './service-catalog.service.js';

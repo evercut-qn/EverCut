@@ -3,7 +3,7 @@ import userRepository from '../repositories/user.repository.js';
 import bookingRepository from '../repositories/booking.repository.js';
 import paymentRepository from '../repositories/payment.repository.js';
 import { NotFoundError, BadRequestError } from '../utils/api-error.js';
-import notificationEvents from './notification-events.service.js';
+import notificationEvents from './notifications/notification-events.service.js';
 import { serializeCustomerDirectoryItem, serializeCustomerProfile } from '../serializers/customer.serializer.js';
 import { serializeBooking } from '../serializers/booking.serializer.js';
 import { serializePayment } from '../serializers/payment.serializer.js';

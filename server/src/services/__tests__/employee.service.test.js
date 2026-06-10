@@ -32,7 +32,7 @@ const employeeRepository = (await import('../../repositories/employee.repository
 const mediaRepository = (await import('../../repositories/media.repository.js')).default;
 const shopRepository = (await import('../../repositories/shop.repository.js')).default;
 const storageProvider = (await import('../media/storage-provider.service.js')).default;
-const notificationEvents = (await import('../notification-events.service.js')).default;
+const notificationEvents = (await import('../notifications/notification-events.service.js')).default;
 const employeeService = await import('../employee.service.js');
 
 test('deleteEmployee blocks unresolved bookings for that employee', async (t) => {

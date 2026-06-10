@@ -8,7 +8,7 @@ import paymentRepository from '../repositories/payment.repository.js';
 import serviceRepository from '../repositories/service.repository.js';
 import shopRepository from '../repositories/shop.repository.js';
 import phonePeAdapter from '../adapters/phonepe/phonepe.adapter.js';
-import notificationEvents from './notification-events.service.js';
+import notificationEvents from './notifications/notification-events.service.js';
 import logger from '../utils/logger.js';
 import {
     BadRequestError,

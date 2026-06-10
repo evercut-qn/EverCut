@@ -44,7 +44,7 @@ import {
     sumMonthlyStatistics,
 } from '../utils/month-analytics.utils.js';
 import logger from '../utils/logger.js';
-import notificationEvents from './notification-events.service.js';
+import notificationEvents from './notifications/notification-events.service.js';
 import {
     serializeBooking,
     serializeBookingCreation,
