@@ -277,7 +277,7 @@ const authenticationCollection = {
           "  if (data.refreshToken) pm.environment.set('customer_refresh_token', data.refreshToken);",
           "  pm.test('tokenType is Bearer', function () { pm.expect(data.tokenType).to.equal('Bearer'); });",
           "  pm.test('expiresIn is a positive number', function () { pm.expect(data.expiresIn).to.be.a('number').and.to.be.above(0); });",
-          "  pm.test('refreshExpiresIn is a positive number', function () { pm.expect(data.refreshExpiresIn).to.be.a('number').and.to.be.above(0); });",
+          "  if (data.refreshToken) { pm.test('refreshExpiresIn is a positive number', function () { pm.expect(data.refreshExpiresIn).to.be.a('number').and.to.be.above(0); }); }",
           "}",
           "pm.collectionVariables.set('last_session_role', 'CUSTOMER');",
           "pm.collectionVariables.set('last_session_is_new_user', String(Boolean(data.isNewUser)));"
@@ -320,7 +320,7 @@ const authenticationCollection = {
           "  if (data.refreshToken) pm.environment.set('barber_refresh_token', data.refreshToken);",
           "  pm.test('tokenType is Bearer', function () { pm.expect(data.tokenType).to.equal('Bearer'); });",
           "  pm.test('expiresIn is a positive number', function () { pm.expect(data.expiresIn).to.be.a('number').and.to.be.above(0); });",
-          "  pm.test('refreshExpiresIn is a positive number', function () { pm.expect(data.refreshExpiresIn).to.be.a('number').and.to.be.above(0); });",
+          "  if (data.refreshToken) { pm.test('refreshExpiresIn is a positive number', function () { pm.expect(data.refreshExpiresIn).to.be.a('number').and.to.be.above(0); }); }",
           "}",
           "pm.collectionVariables.set('last_session_role', 'BARBER');",
           "pm.collectionVariables.set('last_session_is_new_user', String(Boolean(data.isNewUser)));"
@@ -378,7 +378,7 @@ const authenticationCollection = {
           "if (data.refreshToken) pm.environment.set('customer_refresh_token', data.refreshToken);",
           "pm.test('tokenType is Bearer', function () { pm.expect(data.tokenType).to.equal('Bearer'); });",
           "pm.test('expiresIn is a positive number', function () { pm.expect(data.expiresIn).to.be.a('number').and.to.be.above(0); });",
-          "pm.test('refreshExpiresIn is a positive number', function () { pm.expect(data.refreshExpiresIn).to.be.a('number').and.to.be.above(0); });"
+          "if (data.refreshToken) { pm.test('refreshExpiresIn is a positive number', function () { pm.expect(data.refreshExpiresIn).to.be.a('number').and.to.be.above(0); }); }"
         ),
       }),
     },
@@ -399,7 +399,7 @@ const authenticationCollection = {
           "if (data.refreshToken) pm.environment.set('barber_refresh_token', data.refreshToken);",
           "pm.test('tokenType is Bearer', function () { pm.expect(data.tokenType).to.equal('Bearer'); });",
           "pm.test('expiresIn is a positive number', function () { pm.expect(data.expiresIn).to.be.a('number').and.to.be.above(0); });",
-          "pm.test('refreshExpiresIn is a positive number', function () { pm.expect(data.refreshExpiresIn).to.be.a('number').and.to.be.above(0); });"
+          "if (data.refreshToken) { pm.test('refreshExpiresIn is a positive number', function () { pm.expect(data.refreshExpiresIn).to.be.a('number').and.to.be.above(0); }); }"
         ),
       }),
     },
@@ -535,7 +535,7 @@ const onboardingCollection = {
           "  pm.environment.unset('customer_onboarding_token');",
           "  pm.test('tokenType is Bearer', function () { pm.expect(data.tokenType).to.equal('Bearer'); });",
           "  pm.test('expiresIn is a positive number', function () { pm.expect(data.expiresIn).to.be.a('number').and.to.be.above(0); });",
-          "  pm.test('refreshExpiresIn is a positive number', function () { pm.expect(data.refreshExpiresIn).to.be.a('number').and.to.be.above(0); });",
+          "  if (data.refreshToken) { pm.test('refreshExpiresIn is a positive number', function () { pm.expect(data.refreshExpiresIn).to.be.a('number').and.to.be.above(0); }); }",
           "}"
         ),
       }),
@@ -559,7 +559,7 @@ const onboardingCollection = {
           "  pm.globals.set('shared_barber_pin', '1234');",
           "  pm.test('tokenType is Bearer', function () { pm.expect(data.tokenType).to.equal('Bearer'); });",
           "  pm.test('expiresIn is a positive number', function () { pm.expect(data.expiresIn).to.be.a('number').and.to.be.above(0); });",
-          "  pm.test('refreshExpiresIn is a positive number', function () { pm.expect(data.refreshExpiresIn).to.be.a('number').and.to.be.above(0); });",
+          "  if (data.refreshToken) { pm.test('refreshExpiresIn is a positive number', function () { pm.expect(data.refreshExpiresIn).to.be.a('number').and.to.be.above(0); }); }",
           "}"
         ),
       }),
@@ -2914,6 +2914,230 @@ const subscriptionsCollection = {
   ],
 };
 
+const adminResourceReadsCollection = {
+  info: {
+    name: 'EverCut - Admin Resource Reads',
+    description: 'Admin-only read collection for domain resource summaries and operational lookup views. These requests intentionally use resource endpoints instead of dashboard-oriented URLs.',
+    schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
+  },
+  auth: bearerAuth('admin_access_token'),
+  event: collectionPreRequest({
+    syncPairs: [
+      ['booking_id', 'admin_booking_id'],
+      ['customer_id', 'admin_customer_id'],
+      ['barber_id', 'admin_barber_id'],
+    ],
+  }),
+  variable: [
+    ...baseVariables(
+      textVariable('admin_search', '', 'Optional search term for admin directory and booking lookup requests.'),
+      textVariable('admin_customer_id', '', 'Customer ID used by admin customer detail lookup.'),
+      textVariable('admin_barber_id', '', 'Barber ID used by admin barber detail lookup.'),
+      textVariable('admin_booking_id', '', 'Booking ID used by admin booking detail lookup.'),
+      textVariable('admin_subscription_status', 'ACTIVE', 'Subscription status filter.'),
+    ),
+  ],
+  item: [
+    {
+      name: '1. Get Customer Detail',
+      ...request({
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/customers/{{admin_customer_id}}',
+        description: {
+          text: 'Admin-only customer detail lookup. Exposes full profile info, recent bookings, and payments.',
+          role: 'Admin',
+          prereqs: ['admin_access_token', 'admin_customer_id'],
+          captured: []
+        },
+        event: testEvent("pm.test('status is 200 or 404', function () { pm.expect(pm.response.code).to.be.oneOf([200, 404]); });"),
+      }),
+    },
+    {
+      name: '2. Get Barber Detail',
+      ...request({
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/barbers/{{admin_barber_id}}',
+        description: {
+          text: 'Admin-only barber detail lookup. Exposes performance metrics, bank info, and consolidated shop venue details.',
+          role: 'Admin',
+          prereqs: ['admin_access_token', 'admin_barber_id'],
+          captured: []
+        },
+        event: testEvent("pm.test('status is 200 or 404', function () { pm.expect(pm.response.code).to.be.oneOf([200, 404]); });"),
+      }),
+    },
+    {
+      name: '3. Shops Summary',
+      ...request({
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/shops/summary',
+        description: {
+          text: 'Admin-only shop resource summary with active/inactive and open/closed counts.',
+          role: 'Admin',
+          prereqs: ['admin_access_token'],
+          captured: []
+        },
+        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
+      }),
+    },
+    {
+      name: '4. Bookings Summary',
+      ...request({
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/bookings/summary',
+        description: {
+          text: 'Admin-only booking resource summary with all-time/month/week totals, status distribution, trends, and top shops.',
+          role: 'Admin',
+          prereqs: ['admin_access_token'],
+          captured: []
+        },
+        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
+      }),
+    },
+    {
+      name: '5. Payments Summary',
+      ...request({
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/payments/summary',
+        description: {
+          text: 'Admin-only payment summary with success rate, customer payments collected, platform fees collected, and monthly trends.',
+          role: 'Admin',
+          prereqs: ['admin_access_token'],
+          captured: []
+        },
+        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
+      }),
+    },
+    {
+      name: '6. Payouts Summary',
+      ...request({
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/payouts/summary',
+        description: {
+          text: 'Admin-only payout summary grouped by payout transaction status.',
+          role: 'Admin',
+          prereqs: ['admin_access_token'],
+          captured: []
+        },
+        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
+      }),
+    },
+    {
+      name: '7. Subscriptions Summary',
+      ...request({
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/subscriptions/summary',
+        description: {
+          text: 'Admin-only subscription summary grouped by plan and status with monthly recurring revenue.',
+          role: 'Admin',
+          prereqs: ['admin_access_token'],
+          captured: []
+        },
+        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
+      }),
+    },
+    {
+      name: '8. Customer Directory',
+      ...request({
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/customers?page=1&limit=20&search={{admin_search}}',
+        description: {
+          text: 'Admin-only customer directory with full contact fields, account state, registration date, and booking count.',
+          role: 'Admin',
+          prereqs: ['admin_access_token'],
+          captured: ['admin_customer_id']
+        },
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          "const response = pm.response.json();",
+          "const first = Array.isArray(response.data) ? response.data[0] : null;",
+          "if (first?.id) { pm.collectionVariables.set('admin_customer_id', first.id); }"
+        ),
+      }),
+    },
+    {
+      name: '9. Barber And Shop Directory',
+      ...request({
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/barbers?page=1&limit=20&search={{admin_search}}',
+        description: {
+          text: 'Admin-only barber/shop directory with full payout identifier, operating state, and rating summary.',
+          role: 'Admin',
+          prereqs: ['admin_access_token'],
+          captured: ['admin_barber_id']
+        },
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          "const response = pm.response.json();",
+          "const first = Array.isArray(response.data) ? response.data[0] : null;",
+          "if (first?.id) { pm.collectionVariables.set('admin_barber_id', first.id); }"
+        ),
+      }),
+    },
+    {
+      name: '10. Booking Lookup',
+      ...request({
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/bookings?page=1&limit=20&search={{admin_search}}',
+        description: {
+          text: 'Admin-only booking lookup by booking ID, customer phone/email/name, or shop name. View-only.',
+          role: 'Admin',
+          prereqs: ['admin_access_token'],
+          captured: ['admin_booking_id']
+        },
+        event: testEvent(
+          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+          "const response = pm.response.json();",
+          "const first = Array.isArray(response.data) ? response.data[0] : null;",
+          "if (first?.id) { pm.collectionVariables.set('admin_booking_id', first.id); }"
+        ),
+      }),
+    },
+    {
+      name: '11. Booking Detail',
+      ...request({
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/bookings/{{admin_booking_id}}',
+        description: {
+          text: 'Admin-only read-only booking detail lookup.',
+          role: 'Admin',
+          prereqs: ['admin_access_token', 'admin_booking_id'],
+          captured: []
+        },
+        event: testEvent("pm.test('status is 200 or not found when no id is set', function () { pm.expect(pm.response.code).to.be.oneOf([200, 400, 404]); });"),
+      }),
+    },
+    {
+      name: '12. Refund View',
+      ...request({
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/payments/refunds?page=1&limit=20',
+        description: {
+          text: 'Admin-only read-only refund list. This endpoint does not initiate refunds.',
+          role: 'Admin',
+          prereqs: ['admin_access_token'],
+          captured: []
+        },
+        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
+      }),
+    },
+    {
+      name: '13. Subscription View',
+      ...request({
+        method: 'GET',
+        url: '{{base_url}}/{{api_prefix}}/subscriptions?page=1&limit=20&status={{admin_subscription_status}}',
+        description: {
+          text: 'Admin-only read-only subscription list by plan/status. This endpoint does not override or cancel subscriptions.',
+          role: 'Admin',
+          prereqs: ['admin_access_token'],
+          captured: []
+        },
+        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
+      }),
+    },
+  ],
+};
+
 const environmentTemplate = {
   id: 'evercut-local-environment',
   name: 'EverCut Local',
@@ -2958,4 +3182,5 @@ writeCollection('15-payments.json', paymentsCollection);
 writeCollection('16-payouts.json', payoutsCollection);
 writeCollection('17-notifications.json', notificationsCollection);
 writeCollection('18-subscriptions.json', subscriptionsCollection);
+writeCollection('19-admin-resource-reads.json', adminResourceReadsCollection);
 writeFileSync(resolve(COLLECTIONS_DIR, 'EverCut.postman_environment.json'), `${JSON.stringify(environmentTemplate, null, 2)}\n`);

@@ -11,6 +11,30 @@ export const getMe = async (req, res, next) => {
     }
 };
 
+export const listCustomers = async (req, res, next) => {
+    try {
+        const query = getValidatedRequestData(req, 'query');
+        const result = await userService.listCustomersForAdmin(query);
+        return res.status(200).json(ApiResponse.paginated(
+            result.items,
+            result.pagination,
+            'Customers fetched',
+        ));
+    } catch (err) {
+        next(err);
+    }
+};
+
+export const getCustomerById = async (req, res, next) => {
+    try {
+        const { id } = getValidatedRequestData(req, 'params');
+        const profile = await userService.getCustomerProfileForAdmin(id);
+        return res.status(200).json(ApiResponse.success(profile, 'Customer profile fetched'));
+    } catch (err) {
+        next(err);
+    }
+};
+
 export const updateMe = async (req, res, next) => {
     try {
         const body = getValidatedRequestData(req, 'body');

@@ -31,6 +31,21 @@ const serializeBookingRef = (value, serializer) => (
     isPopulatedRef(value) ? serializer(value) : undefined
 );
 
+const serializeBarberSummary = (barber) => {
+    const plain = sanitizeForResponse(toPlainObject(barber));
+    if (!plain || typeof plain !== 'object') return null;
+    const fullName = `${plain.firstName || ''} ${plain.lastName || ''}`.trim();
+
+    return compact({
+        id: plain.id,
+        firstName: plain.firstName ?? null,
+        lastName: plain.lastName ?? null,
+        fullName: fullName || null,
+        upiId: plain.upiId ?? null,
+        accountHolderName: plain.accountHolderName ?? null,
+    });
+};
+
 const toNumberOrUndefined = (value) => {
     const numericValue = Number(value);
     return Number.isFinite(numericValue) ? numericValue : undefined;
@@ -118,21 +133,31 @@ export const serializeBooking = (booking, options = {}) => {
     const services = serializeServices(rawServices);
     const amountSummary = resolveAmountSummary({ raw, plain, services });
 
-    const customer = serializeBookingRef(raw.customerId || raw.customer, serializeCustomerSummary);
+    const rawCustomer = raw.customer && raw.customerUser
+        ? { ...raw.customer, userId: raw.customerUser }
+        : (raw.customer || raw.customerId);
+    const customer = serializeBookingRef(
+        rawCustomer,
+        (value) => serializeCustomerSummary(value, { includeContact: options.includeCustomerContact }),
+    );
     const employee = serializeBookingRef(
-        withEmployeeBookingAvailability(raw.employeeId || raw.employee, raw.date ?? plain.date),
+        withEmployeeBookingAvailability(raw.employee || raw.employeeId, raw.date ?? plain.date),
         (value) => serializeEmployee(value, { publicView: true }),
     );
-    const shop = serializeBookingRef(raw.shopId || raw.shop, serializeShopSummary);
+    const shop = serializeBookingRef(raw.shop || raw.shopId, serializeShopSummary);
+    const barber = options.includeBarber
+        ? serializeBookingRef(raw.barber || raw.shop?.barberId || raw.shopId?.barberId, serializeBarberSummary)
+        : undefined;
 
     return compact({
         id: plain.id,
-        customerId: customer ? undefined : resolveId(plain.customerId || plain.customer),
+        customerId: customer ? undefined : resolveId(plain.customer || plain.customerId),
         customer,
-        shopId: shop ? undefined : resolveId(plain.shopId || plain.shop),
+        shopId: shop ? undefined : resolveId(plain.shop || plain.shopId),
         shop,
-        employeeId: employee ? undefined : resolveId(plain.employeeId || plain.employee),
+        employeeId: employee ? undefined : resolveId(plain.employee || plain.employeeId),
         employee,
+        barber,
         serviceIds: services.length > 0 ? undefined : (Array.isArray(plain.serviceIds)
             ? plain.serviceIds.map(resolveId).filter(Boolean)
             : undefined),
@@ -215,20 +240,33 @@ export const serializeBookingCreation = (booking) => {
     });
 };
 
-export const serializeBookingDetails = (details) => {
+export const serializeBookingDetails = (details, options = {}) => {
     const raw = toPlainObject(details);
     const plain = sanitizeForResponse(raw);
     if (!plain) return null;
     const services = serializeServices(raw.services || []);
     const amountSummary = resolveAmountSummary({ raw, plain, services });
 
+    const paymentTx = isPopulatedRef(raw.paymentTransactionId) ? raw.paymentTransactionId : null;
+    const payoutTx = isPopulatedRef(raw.payoutTransactionId) ? raw.payoutTransactionId : null;
+
+    const merchantOrderId = plain.merchantOrderId || paymentTx?.merchantOrderId || null;
+    const paymentMode = plain.paymentMode || paymentTx?.paymentMode || null;
+    const paidAt = plain.paidAt || (paymentTx?.status === 'completed' || paymentTx?.status === 'refunded' ? paymentTx?.createdAt : null) || null;
+
+    const barberUtr = plain.barberUtr || payoutTx?.utr || null;
+    const payoutCompletedAt = plain.payoutCompletedAt || payoutTx?.processedAt || null;
+
     return compact({
         id: plain.id || toIdString(plain.bookingId),
-        customer: raw.customer ? serializeCustomerSummary(raw.customer) : null,
+        customer: raw.customer
+            ? serializeCustomerSummary(raw.customer, { includeContact: options.includeCustomerContact })
+            : null,
         employee: raw.employee
             ? serializeEmployee(withEmployeeBookingAvailability(raw.employee, raw.date ?? plain.date), { publicView: true })
             : null,
         shop: raw.shop ? serializeShopSummary(raw.shop) : null,
+        barber: options.includeBarber ? serializeBarberSummary(raw.barber || raw.shop?.barberId) : undefined,
         date: plain.date,
         time: plain.time,
         endTime: plain.endTime,
@@ -244,7 +282,19 @@ export const serializeBookingDetails = (details) => {
         startMinute: plain.startMinute,
         endMinute: plain.endMinute,
         slotLockTimes: plain.slotLockTimes ?? [],
-        paymentTransactionId: toIdString(plain.paymentTransactionId),
-        merchantOrderId: plain.merchantOrderId ?? null,
+        paymentTransactionId: toIdString(raw.paymentTransactionId),
+        merchantOrderId,
+        payoutTransactionId: toIdString(raw.payoutTransactionId),
+        barberUtr,
+        paymentMode,
+        paidAt,
+        payoutCompletedAt,
+        rescheduleCount: plain.rescheduleCount ?? 0,
+        cancelledAt: plain.cancelledAt ?? null,
+        barberCancelledAt: plain.barberCancelledAt ?? null,
+        autoCancelledAt: plain.autoCancelledAt ?? null,
+        noShowAt: plain.noShowAt ?? null,
+        completedAt: plain.completedAt ?? null,
+        cancellationNote: plain.cancellationNote ?? null,
     });
 };

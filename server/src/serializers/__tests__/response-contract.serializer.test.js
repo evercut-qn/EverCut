@@ -5,8 +5,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import config from '../../config/index.js';
-import { serializeBooking } from '../booking.serializer.js';
-import { serializeCustomerProfile, serializeCustomerSummary } from '../customer.serializer.js';
+import { serializeBooking, serializeBookingDetails } from '../booking.serializer.js';
+import { serializeCustomerDirectoryItem, serializeCustomerProfile, serializeCustomerSummary } from '../customer.serializer.js';
 import { serializeEmployee } from '../employee.serializer.js';
 import { serializeNotification, serializeFcmTokenRegistration } from '../notification.serializer.js';
 import { serializePayment, serializePaymentInitiation, serializePaymentStatus } from '../payment.serializer.js';
@@ -14,7 +14,7 @@ import { serializePayout } from '../payout.serializer.js';
 import { serializeMedia } from '../media.serializer.js';
 import { serializeRating } from '../rating.serializer.js';
 import { serializeService } from '../service.serializer.js';
-import { serializeBarberProfile, serializeShopProfile, serializeShopSummary } from '../shop.serializer.js';
+import { serializeBarberDirectoryItem, serializeBarberProfile, serializeShopProfile, serializeShopSummary } from '../shop.serializer.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const srcDir = path.resolve(__dirname, '..', '..');
@@ -255,6 +255,108 @@ test('booking serializer keeps bare ObjectId refs as ids instead of empty relati
     assert.equal('employee' in booking, false);
 });
 
+test('admin directory and payout serializers expose complete admin-visible contact and payout fields', () => {
+    const customer = serializeCustomerDirectoryItem({
+        _id: '507f1f77bcf86cd799439011',
+        firstName: 'Mina',
+        lastName: 'Shah',
+        totalBookings: 3,
+        user: {
+            _id: '507f1f77bcf86cd799439012',
+            email: 'mina@example.com',
+            phoneNumber: '+919876543210',
+            isActive: true,
+            createdAt: '2026-01-01T00:00:00.000Z',
+        },
+    });
+    const barber = serializeBarberDirectoryItem({
+        _id: '507f1f77bcf86cd799439013',
+        firstName: 'Asha',
+        lastName: 'Rao',
+        upiId: 'asha.rao@upi',
+        payoutConfig: { beneficiaryId: 'BARBER_123', verificationStatus: 'verified' },
+        user: { _id: '507f1f77bcf86cd799439014', isActive: true },
+        shop: {
+            _id: '507f1f77bcf86cd799439015',
+            shopName: 'Trim Studio',
+            isOpen: true,
+        },
+    });
+    const payout = serializePayout({
+        _id: '507f1f77bcf86cd799439016',
+        barberId: {
+            _id: '507f1f77bcf86cd799439017',
+            firstName: 'Asha',
+            upiId: 'asha.rao@upi',
+        },
+    });
+
+    assert.equal(customer.contact.phoneNumber, '+919876543210');
+    assert.equal(customer.contact.email, 'mina@example.com');
+    assert.equal(barber.payout.upiId, 'asha.rao@upi');
+    assert.equal(payout.barber.upiId, 'asha.rao@upi');
+});
+
+test('admin booking serializer prefers business display relations over raw ids', () => {
+    const booking = serializeBooking({
+        _id: '507f1f77bcf86cd799439011',
+        customerId: {
+            _bsontype: 'ObjectId',
+            toHexString: () => '507f1f77bcf86cd799439012',
+        },
+        shopId: {
+            _bsontype: 'ObjectId',
+            toHexString: () => '507f1f77bcf86cd799439013',
+        },
+        employeeId: {
+            _bsontype: 'ObjectId',
+            toHexString: () => '507f1f77bcf86cd799439014',
+        },
+        customer: {
+            _id: '507f1f77bcf86cd799439012',
+            firstName: 'Mina',
+            lastName: 'Shah',
+        },
+        customerUser: {
+            _id: '507f1f77bcf86cd799439020',
+            phoneNumber: '+919876543210',
+            email: 'mina@example.com',
+        },
+        shop: {
+            _id: '507f1f77bcf86cd799439013',
+            shopName: 'EverCut Studio',
+        },
+        employee: {
+            _id: '507f1f77bcf86cd799439014',
+            firstName: 'Dev',
+            lastName: 'Patel',
+        },
+        barber: {
+            _id: '507f1f77bcf86cd799439015',
+            firstName: 'Asha',
+            lastName: 'Rao',
+        },
+        services: [
+            {
+                _id: '507f1f77bcf86cd799439016',
+                serviceName: 'Haircut',
+                serviceType: 'single',
+                duration: 30,
+                finalPrice: 450,
+            },
+        ],
+    }, { includeCustomerContact: true, includeBarber: true });
+
+    assert.equal(booking.customer.firstName, 'Mina');
+    assert.equal(booking.customer.contact.phoneNumber, '+919876543210');
+    assert.equal(booking.shop.shopName, 'EverCut Studio');
+    assert.equal(booking.employee.firstName, 'Dev');
+    assert.equal(booking.barber.fullName, 'Asha Rao');
+    assert.equal(booking.services[0].serviceName, 'Haircut');
+    assert.equal('customerId' in booking, false);
+    assert.equal('shopId' in booking, false);
+});
+
 test('booking serializer exposes service amount and payable total when payment is populated', () => {
     const serviceAmount = 199;
     const platformFee = config.payment.platformFeeSingle;
@@ -289,4 +391,151 @@ test('serializers no longer export deprecated API aliases', async () => {
     assert.doesNotMatch(barberProfileUtils, /serializeUpiDetails/);
     assert.doesNotMatch(barberProfileUtils, /serializePayoutConfig/);
     assert.doesNotMatch(coreSerializer, /serializeList/);
+});
+
+test('booking details serializer fallback and nullish logic', () => {
+    const bookingId = '507f1f77bcf86cd799439011';
+    const paymentTxId = '507f1f77bcf86cd799439022';
+    const payoutTxId = '507f1f77bcf86cd799439033';
+
+    // 1. booking value present (preferred root values over transactions)
+    const detailsWithRootValues = {
+        _id: bookingId,
+        merchantOrderId: 'root-merchant-order-id',
+        paymentMode: 'root-payment-mode',
+        paidAt: '2026-06-01T10:00:00Z',
+        barberUtr: 'root-barber-utr',
+        payoutCompletedAt: '2026-06-02T10:00:00Z',
+        paymentTransactionId: {
+            _id: paymentTxId,
+            merchantOrderId: 'tx-merchant-order-id',
+            paymentMode: 'tx-payment-mode',
+            status: 'completed',
+            createdAt: '2026-06-01T11:00:00Z',
+        },
+        payoutTransactionId: {
+            _id: payoutTxId,
+            utr: 'tx-utr',
+            processedAt: '2026-06-02T11:00:00Z',
+        },
+    };
+
+    const res1 = serializeBookingDetails(detailsWithRootValues);
+    assert.equal(res1.merchantOrderId, 'root-merchant-order-id');
+    assert.equal(res1.paymentMode, 'root-payment-mode');
+    assert.equal(res1.paidAt, '2026-06-01T10:00:00Z');
+    assert.equal(res1.barberUtr, 'root-barber-utr');
+    assert.equal(res1.payoutCompletedAt, '2026-06-02T10:00:00Z');
+
+    // 2. booking value missing + transaction fallback
+    const detailsWithFallback = {
+        _id: bookingId,
+        paymentTransactionId: {
+            _id: paymentTxId,
+            merchantOrderId: 'tx-merchant-order-id',
+            paymentMode: 'tx-payment-mode',
+            status: 'completed',
+            createdAt: '2026-06-01T11:00:00Z',
+        },
+        payoutTransactionId: {
+            _id: payoutTxId,
+            utr: 'tx-utr',
+            processedAt: '2026-06-02T11:00:00Z',
+        },
+    };
+
+    const res2 = serializeBookingDetails(detailsWithFallback);
+    assert.equal(res2.merchantOrderId, 'tx-merchant-order-id');
+    assert.equal(res2.paymentMode, 'tx-payment-mode');
+    assert.equal(res2.paidAt, '2026-06-01T11:00:00Z');
+    assert.equal(res2.barberUtr, 'tx-utr');
+    assert.equal(res2.payoutCompletedAt, '2026-06-02T11:00:00Z');
+
+    // 3. payment transaction fallback only for 'completed' or 'refunded'
+    const detailsWithPendingPayment = {
+        _id: bookingId,
+        paymentTransactionId: {
+            _id: paymentTxId,
+            merchantOrderId: 'tx-merchant-order-id',
+            paymentMode: 'tx-payment-mode',
+            status: 'pending',
+            createdAt: '2026-06-01T11:00:00Z',
+        },
+    };
+
+    const res3 = serializeBookingDetails(detailsWithPendingPayment);
+    assert.equal(res3.merchantOrderId, 'tx-merchant-order-id');
+    assert.equal(res3.paymentMode, 'tx-payment-mode');
+    assert.equal(res3.paidAt, null, 'paidAt must be null when status is not completed/refunded');
+
+    const detailsWithRefundedPayment = {
+        _id: bookingId,
+        paymentTransactionId: {
+            _id: paymentTxId,
+            merchantOrderId: 'tx-merchant-order-id',
+            paymentMode: 'tx-payment-mode',
+            status: 'refunded',
+            createdAt: '2026-06-01T11:00:00Z',
+        },
+    };
+    const res3b = serializeBookingDetails(detailsWithRefundedPayment);
+    assert.equal(res3b.paidAt, '2026-06-01T11:00:00Z', 'paidAt must populate for refunded status');
+
+    // 4. missing transaction references (just IDs/strings)
+    const detailsWithPlainIds = {
+        _id: bookingId,
+        paymentTransactionId: paymentTxId,
+        payoutTransactionId: payoutTxId,
+    };
+
+    const res4 = serializeBookingDetails(detailsWithPlainIds);
+    assert.equal(res4.paymentTransactionId, paymentTxId);
+    assert.equal(res4.payoutTransactionId, payoutTxId);
+    assert.equal(res4.merchantOrderId, null);
+    assert.equal(res4.paymentMode, null);
+    assert.equal(res4.paidAt, null);
+    assert.equal(res4.barberUtr, null);
+    assert.equal(res4.payoutCompletedAt, null);
+
+    // 5. null values handled correctly
+    const detailsWithNulls = {
+        _id: bookingId,
+        merchantOrderId: null,
+        paymentMode: null,
+        paidAt: null,
+        barberUtr: null,
+        payoutCompletedAt: null,
+        paymentTransactionId: null,
+        payoutTransactionId: null,
+    };
+
+    const res5 = serializeBookingDetails(detailsWithNulls);
+    assert.equal(res5.merchantOrderId, null);
+    assert.equal(res5.paymentMode, null);
+    assert.equal(res5.paidAt, null);
+    assert.equal(res5.barberUtr, null);
+    assert.equal(res5.payoutCompletedAt, null);
+    assert.equal(res5.paymentTransactionId, null);
+    assert.equal(res5.payoutTransactionId, null);
+
+    // 6. undefined values handled correctly
+    const detailsWithUndefineds = {
+        _id: bookingId,
+        merchantOrderId: undefined,
+        paymentMode: undefined,
+        paidAt: undefined,
+        barberUtr: undefined,
+        payoutCompletedAt: undefined,
+        paymentTransactionId: undefined,
+        payoutTransactionId: undefined,
+    };
+
+    const res6 = serializeBookingDetails(detailsWithUndefineds);
+    assert.equal(res6.merchantOrderId, null);
+    assert.equal(res6.paymentMode, null);
+    assert.equal(res6.paidAt, null);
+    assert.equal(res6.barberUtr, null);
+    assert.equal(res6.payoutCompletedAt, null);
+    assert.equal(res6.paymentTransactionId, null);
+    assert.equal(res6.payoutTransactionId, null);
 });

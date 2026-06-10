@@ -114,7 +114,7 @@ This document defines a **minimal, high-impact** admin dashboard for the EverCut
 
 ---
 
-### 3. User & Shop Management (SEPARATE DIRECTORY PAGES - READ-ONLY)
+### 3. User & Shop Management (READ-ONLY DIRECTORIES)
 
 **Purpose:** Provide dedicated directory views for searching and viewing user accounts and business profiles.
 
@@ -139,6 +139,7 @@ This document defines a **minimal, high-impact** admin dashboard for the EverCut
   - Search bar to filter by shop name, barber name, or UPI/payout identifier.
   - Operating state filters.
 - **Status Indicator:** Visual status pills (Open/Closed/Active/Inactive). No operational toggle actions from the dashboard.
+- **Shop Venue Details Route:** Rather than a separate shop detail view, physical shop profiles, specifications, operating timings, coordinates, and subscription plans are consolidated directly into the dynamic Barber profile detail view `/barbers/[id]`.
 
 **Why:** Verify payout settings and review business details.
 
@@ -194,15 +195,15 @@ This document defines a **minimal, high-impact** admin dashboard for the EverCut
 
 | Feature | Impact | Complexity | Status | Justification |
 |---------|--------|------------|--------|---------------|
-| Platform Overview | High | Low | [ ] Pending | Essential business metrics |
-| Booking Analytics | High | Low | [ ] Pending | Core business KPI |
-| Financial Analytics | High | Medium | [/] In Progress | Revenue and payment health (payout metrics completed) |
-| Recent Payouts Feed | High | Low | [x] Completed | Real-time payout visibility |
-| Payout Monitoring | High | Low | [x] Completed | Critical for operations |
-| User/Shop Lookup | Medium | Low | [ ] Pending | Support and information retrieval |
-| Refund View | Medium | Low | [ ] Pending | Read-only view of refund states |
-| Payout Retry & Settlement | High | Low | [x] Completed | Retry API integrated; manual UTR recording and QR code modal added |
-| Subscription View | Medium | Low | [ ] Pending | Read-only tracking of subscription tiers |
+| Platform Overview | High | Low | [x] Completed | Deployed with all KPI cards on the dashboard. |
+| Booking Analytics | High | Low | [x] Completed | Booking status distribution and top shops tables built on `/overview`. |
+| Financial Analytics | High | Medium | [x] Completed | Payment success, platform fees, and payouts integrated. |
+| Recent Payouts Feed | High | Low | [x] Completed | Real-time payout visibility implemented under payouts history tabs. |
+| Payout Monitoring | High | Low | [x] Completed | Deployed on `/payouts` and `/payouts/[payoutId]`. |
+| User/Shop Lookup | Medium | Low | [x] Completed | Consolidated directories built at `/customers` and `/barbers` (incorporating shops). |
+| Refund View | Medium | Low | [x] Completed | Read-only listing of refunds built at `/refunds`. |
+| Payout Retry & Settlement | High | Low | [x] Completed | UTR manual recording and QR code modal integrated on payout details. |
+| Subscription View | Medium | Low | [x] Completed | Deployed at `/subscriptions`. |
 
 ---
 
@@ -236,15 +237,9 @@ This document defines a **minimal, high-impact** admin dashboard for the EverCut
 
 ## Prioritized Future Implementation (Important Next Steps)
 
-These are the core operational capabilities identified in this spec that are not yet built, but are highly critical for platform management:
-
-### 1. User & Shop Directory Views
-- **Description:** Searchable list views of customers and barbers/shops to retrieve metadata and current statuses.
-- **Layout:** Dedicated paginated tables at `/customers` and `/barbers`.
-
-### 2. Business Metrics on Operations Overview
-- **Description:** Fetch and display high-level platform health metrics (Active Users, Active Shops, Platform Revenue) on the `/overview` dashboard.
-- **Aggregations:** Construct simple repositories/aggregators on the backend to avoid database strain on overview load.
+All core operational capabilities identified in this specification have been successfully built and released:
+1. **User & Shop Directory Views**: Searchable directories deployed at `/customers` and `/barbers`.
+2. **Business Metrics on Operations Overview**: Integrated on `/overview`.
 
 ---
 

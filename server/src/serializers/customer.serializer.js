@@ -13,16 +13,22 @@ const serializeIdList = (values = []) => (
         : []
 );
 
-export const serializeCustomerSummary = (customer) => {
+export const serializeCustomerSummary = (customer, options = {}) => {
     const raw = toPlainObject(customer);
     const plain = sanitizeForResponse(raw);
     if (!plain) return null;
+    const user = sanitizeForResponse(toPlainObject(raw.userId || raw.user)) || {};
 
     return compact({
         id: plain.id,
         firstName: plain.firstName ?? null,
         lastName: plain.lastName ?? null,
+        fullName: `${plain.firstName || ''} ${plain.lastName || ''}`.trim() || null,
         photoUrl: buildMediaUrl(raw.photoR2Key),
+        contact: options.includeContact ? {
+            phoneNumber: user.phoneNumber ?? null,
+            email: user.email ?? null,
+        } : undefined,
     });
 };
 
@@ -51,5 +57,29 @@ export const serializeCustomerProfile = (customer) => {
         feeWaiverExhausted: feeWaiverBookingsUsed >= feeWaiverQuota,
         createdAt: plain.createdAt,
         updatedAt: plain.updatedAt,
+    });
+};
+
+export const serializeCustomerDirectoryItem = (customer) => {
+    const raw = toPlainObject(customer);
+    const plain = sanitizeForResponse(raw);
+    if (!plain) return null;
+    const user = sanitizeForResponse(toPlainObject(raw.user || plain.user)) || {};
+
+    return compact({
+        id: plain.id,
+        userId: user.id || toIdString(plain.userId),
+        fullName: `${plain.firstName || ''} ${plain.lastName || ''}`.trim() || null,
+        firstName: plain.firstName ?? null,
+        lastName: plain.lastName ?? null,
+        address: plain.address ?? null,
+        contact: {
+            phoneNumber: user.phoneNumber ?? null,
+            email: user.email ?? null,
+        },
+        totalBookings: plain.totalBookings || 0,
+        isActive: user.isActive ?? false,
+        registeredAt: user.createdAt ?? plain.createdAt,
+        lastLoginAt: user.lastLoginAt ?? null,
     });
 };

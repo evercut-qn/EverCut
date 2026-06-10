@@ -82,12 +82,9 @@ export const verifyOnboardingToken = (token) => {
     }
 };
 
-/** Generate a pair of access + refresh tokens with full metadata. */
-export const generateTokenPair = (userId, roleType) => {
-    const expiresIn = parseExpiryToSeconds(config.jwt.accessExpiry);
-    const refreshExpiresIn = parseExpiryToSeconds(config.jwt.refreshExpiry);
-
-    const accessToken = jwt.sign(
+/** Generate a signed access token. */
+export const generateAccessToken = (userId, roleType) => {
+    return jwt.sign(
         {
             sub: userId.toString(),
             role: roleType,
@@ -99,6 +96,14 @@ export const generateTokenPair = (userId, roleType) => {
         config.jwt.accessSecret,
         { expiresIn: config.jwt.accessExpiry },
     );
+};
+
+/** Generate a pair of access + refresh tokens with full metadata. */
+export const generateTokenPair = (userId, roleType) => {
+    const expiresIn = parseExpiryToSeconds(config.jwt.accessExpiry);
+    const refreshExpiresIn = parseExpiryToSeconds(config.jwt.refreshExpiry);
+
+    const accessToken = generateAccessToken(userId, roleType);
 
     const refreshToken = jwt.sign(
         {
@@ -225,21 +230,75 @@ export const refreshAccessToken = async (refreshToken) => {
     assertAccountIsActive(user);
 
     const incomingHash = hashToken(refreshToken);
-    if (!user.refreshTokenHash || user.refreshTokenHash !== incomingHash) {
-        logger.warn('Refresh token mismatch - possible token theft', { userId });
-        await userRepository.updateById(userId, { refreshTokenHash: null });
-        throw new UnauthorizedError('Session invalidated. Please sign in again.');
+
+    // 1. Check if the incoming token matches the current active refresh token
+    if (user.refreshTokenHash && user.refreshTokenHash === incomingHash) {
+        const tokens = generateTokenPair(user._id, user.roleType);
+        const newRefreshHash = hashToken(tokens.refreshToken);
+
+        const updatedUser = await userRepository.rotateRefreshToken(userId, incomingHash, newRefreshHash);
+
+        if (!updatedUser) {
+            // We lost the rotation concurrency race!
+            // But since the token was valid, treat it as a grace period refresh
+            logger.info('Rotation race lost: returning new access token only', { userId });
+
+            const expiresIn = parseExpiryToSeconds(config.jwt.accessExpiry);
+            const accessToken = generateAccessToken(userId, user.roleType);
+
+            return {
+                tokenType: 'Bearer',
+                accessToken,
+                expiresIn,
+                refreshToken: undefined,
+                refreshExpiresIn: undefined,
+            };
+        }
+
+        return tokens;
     }
 
-    const tokens = generateTokenPair(user._id, user.roleType);
-    const newRefreshHash = hashToken(tokens.refreshToken);
-    await userRepository.updateById(userId, { refreshTokenHash: newRefreshHash });
+    // 2. Check if the incoming token matches the previous refresh token within the grace period
+    if (user.previousRefreshTokenHash && user.previousRefreshTokenHash === incomingHash) {
+        const gracePeriodSeconds = config.jwt.refreshRotationGracePeriodSeconds;
+        const rotatedAtTime = user.rotatedAt ? new Date(user.rotatedAt).getTime() : 0;
+        const isWithinGracePeriod = rotatedAtTime > 0 && (Date.now() - rotatedAtTime) <= gracePeriodSeconds * 1000;
 
-    // tokens already includes tokenType, expiresIn, refreshExpiresIn from generateTokenPair
-    return tokens;
+        if (isWithinGracePeriod) {
+            logger.info('Refresh token matched previous token within grace period', { userId });
+
+            // Generate access token ONLY
+            const expiresIn = parseExpiryToSeconds(config.jwt.accessExpiry);
+            const accessToken = generateAccessToken(userId, user.roleType);
+
+            // Omit refreshToken and refreshExpiresIn (return them as undefined)
+            return {
+                tokenType: 'Bearer',
+                accessToken,
+                expiresIn,
+                refreshToken: undefined,
+                refreshExpiresIn: undefined,
+            };
+        } else {
+            logger.warn('Previous refresh token reused outside of grace period - possible token theft', { userId });
+        }
+    }
+
+    // 3. Mismatch (neither current, nor previous within grace window) -> treat as theft and revoke session
+    logger.warn('Refresh token mismatch - possible token theft', { userId });
+    await userRepository.updateById(userId, {
+        refreshTokenHash: null,
+        previousRefreshTokenHash: null,
+        rotatedAt: null,
+    });
+    throw new UnauthorizedError('Session invalidated. Please sign in again.');
 };
 
 /** Invalidate refresh token (logout). */
 export const revokeRefreshToken = async (userId) => {
-    await userRepository.updateById(userId, { refreshTokenHash: null });
+    await userRepository.updateById(userId, {
+        refreshTokenHash: null,
+        previousRefreshTokenHash: null,
+        rotatedAt: null,
+    });
 };

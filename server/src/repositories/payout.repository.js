@@ -53,9 +53,30 @@ class PayoutRepository {
         return PayoutTransaction.countDocuments(trustQueryOperators(filter));
     }
 
+    async aggregateAdminSummary() {
+        return PayoutTransaction.aggregate([
+            {
+                $group: {
+                    _id: '$status',
+                    count: { $sum: 1 },
+                    totalAmountInPaisa: { $sum: '$amount' },
+                },
+            },
+            {
+                $project: {
+                    _id: 0,
+                    status: '$_id',
+                    count: 1,
+                    totalAmountInRupees: { $divide: ['$totalAmountInPaisa', 100] },
+                },
+            },
+            { $sort: { status: 1 } },
+        ]);
+    }
+
     async findByIdPopulated(id) {
         return PayoutTransaction.findById(id)
-            .populate('barberId', 'firstName lastName upiId accountHolderName')
+            .populate('barberId', 'firstName lastName upiId accountHolderName bankAccount ifsc')
             .populate('shopId', 'shopName')
             .populate('bookingIds', 'date time status paymentStatus payoutStatus totalAmount barberUtr payoutCompletedAt')
             .populate('paymentTransactionIds', 'bookingId customerId shopId merchantOrderId amount amountInRupees status settlement')

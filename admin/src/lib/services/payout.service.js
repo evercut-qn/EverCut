@@ -45,6 +45,13 @@ export async function getPayouts({
   });
 }
 
+export async function getPayoutSummary(token) {
+  return apiFetch('/payouts/summary', {
+    method: 'GET',
+    token,
+  });
+}
+
 /**
  * Retrieves aggregated pending payouts by barber.
  *

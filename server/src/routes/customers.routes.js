@@ -5,18 +5,32 @@ import authenticate from '../middleware/authenticate.middleware.js';
 import { authorize } from '../middleware/authorize.middleware.js';
 import { validate } from '../middleware/validate.middleware.js';
 import { ROLES } from '../utils/constants.js';
-import { updateCustomerSchema } from '../validators/customer.validator.js';
+import { updateCustomerSchema, customerIdParamSchema } from '../validators/customer.validator.js';
 import { mediaIdBodySchema } from '../validators/media.validator.js';
+import { customerDirectoryQuerySchema } from '../validators/user.validator.js';
 
 const router = Router();
 
-// All customer routes require authentication and CUSTOMER role
-router.use(authenticate, authorize(ROLES.CUSTOMER));
+router.use(authenticate);
 
-router.get('/me', customerController.getMe);
-router.patch('/me', validate(updateCustomerSchema, 'body'), customerController.updateMe);
+router.get(
+    '/',
+    authorize(ROLES.ADMIN),
+    validate(customerDirectoryQuerySchema, 'query'),
+    customerController.listCustomers,
+);
 
-router.patch('/me/media/picture', validate(mediaIdBodySchema, 'body'), customerController.updateMyPicture);
-router.delete('/me/media/picture', customerController.removeMyPicture);
+router.get(
+    '/:id',
+    authorize(ROLES.ADMIN),
+    validate(customerIdParamSchema, 'params'),
+    customerController.getCustomerById,
+);
+
+router.get('/me', authorize(ROLES.CUSTOMER), customerController.getMe);
+router.patch('/me', authorize(ROLES.CUSTOMER), validate(updateCustomerSchema, 'body'), customerController.updateMe);
+
+router.patch('/me/media/picture', authorize(ROLES.CUSTOMER), validate(mediaIdBodySchema, 'body'), customerController.updateMyPicture);
+router.delete('/me/media/picture', authorize(ROLES.CUSTOMER), customerController.removeMyPicture);
 
 export default router;

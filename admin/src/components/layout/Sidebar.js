@@ -5,7 +5,17 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useSidebarStore } from '@/hooks/useSidebarStore';
 import { cn } from '@/lib/utils/cn';
-import { LayoutDashboard, CreditCard, X, Settings } from 'lucide-react';
+import {
+  BadgeIndianRupee,
+  CalendarSearch,
+  CreditCard,
+  LayoutDashboard,
+  ReceiptText,
+  Scissors,
+  Settings,
+  Users,
+  X,
+} from 'lucide-react';
 import { Logo } from '@/components/ui/Logo';
 
 /**
@@ -44,7 +54,12 @@ export function Sidebar({ className, forceExpanded = false, onClose }) {
 
   const links = [
     { href: '/overview', label: 'Overview', icon: LayoutDashboard },
+    { href: '/customers', label: 'Customers', icon: Users },
+    { href: '/barbers', label: 'Barbers', icon: Scissors },
+    { href: '/bookings', label: 'Bookings', icon: CalendarSearch },
     { href: '/payouts', label: 'Payouts', icon: CreditCard },
+    { href: '/subscriptions', label: 'Subscriptions', icon: BadgeIndianRupee },
+    { href: '/refunds', label: 'Refunds', icon: ReceiptText },
   ];
 
   const sidebarContent = (

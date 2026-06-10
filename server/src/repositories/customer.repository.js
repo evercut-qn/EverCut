@@ -1,5 +1,7 @@
 import Customer from '../models/customer.model.js';
 import config from '../config/index.js';
+import { ROLES } from '../utils/constants.js';
+import { escapeRegex } from '../utils/regex.utils.js';
 
 class CustomerRepository {
     async create(data) {
@@ -112,6 +114,95 @@ class CustomerRepository {
             path: 'favoriteShops',
             select: 'shopName address coverR2Key category targetCustomers facilities isOpen location',
         }).lean();
+    }
+
+    buildAdminDirectoryPipeline(query = {}) {
+        const pipeline = [
+            {
+                $lookup: {
+                    from: 'users',
+                    localField: 'userId',
+                    foreignField: '_id',
+                    as: 'user',
+                },
+            },
+            { $unwind: '$user' },
+            {
+                $match: {
+                    'user.deletedAt': null,
+                    'user.roleType': ROLES.CUSTOMER,
+                },
+            },
+        ];
+
+        if (query.isActive !== undefined) {
+            pipeline.push({ $match: { 'user.isActive': query.isActive } });
+        }
+
+        if (query.search) {
+            const escaped = escapeRegex(query.search.trim());
+            const searchPattern = escaped.replace(/\s+/g, '\\s+');
+            const regex = new RegExp(searchPattern, 'i');
+            pipeline.push(
+                {
+                    $addFields: {
+                        fullName: {
+                            $concat: ['$firstName', ' ', '$lastName'],
+                        },
+                    },
+                },
+                {
+                    $match: {
+                        $or: [
+                            { firstName: regex },
+                            { lastName: regex },
+                            { fullName: regex },
+                            { 'user.phoneNumber': regex },
+                            { 'user.email': regex },
+                        ],
+                    },
+                },
+            );
+        }
+
+        pipeline.push(
+            {
+                $lookup: {
+                    from: 'bookings',
+                    localField: '_id',
+                    foreignField: 'customerId',
+                    as: 'bookings',
+                },
+            },
+            {
+                $addFields: {
+                    totalBookings: { $size: '$bookings' },
+                },
+            },
+            { $project: { bookings: 0 } },
+        );
+
+        return pipeline;
+    }
+
+    async countAdminDirectory(query = {}) {
+        const [result] = await Customer.aggregate([
+            ...this.buildAdminDirectoryPipeline(query),
+            { $count: 'total' },
+        ]);
+        return result?.total || 0;
+    }
+
+    async findAdminDirectory(query = {}, options = {}) {
+        const pipeline = [
+            ...this.buildAdminDirectoryPipeline(query),
+            { $sort: { 'user.createdAt': -1, createdAt: -1 } },
+        ];
+
+        if (options.skip !== undefined) pipeline.push({ $skip: options.skip });
+        if (options.limit !== undefined) pipeline.push({ $limit: options.limit });
+
+        return Customer.aggregate(pipeline);
     }
 }
 

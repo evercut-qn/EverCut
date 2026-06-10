@@ -63,6 +63,15 @@ export const listPayouts = async (req, res, next) => {
     }
 };
 
+export const getPayoutSummary = async (_req, res, next) => {
+    try {
+        const result = await payoutService.getPayoutSummary();
+        return res.status(200).json(ApiResponse.success(result, 'Payout summary fetched'));
+    } catch (error) {
+        next(error);
+    }
+};
+
 export const getPayoutDetail = async (req, res, next) => {
     try {
         const { payoutId } = getValidatedRequestData(req, 'params');

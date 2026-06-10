@@ -26,6 +26,11 @@ export const paymentListQuerySchema = paginationSchema.keys({
     bookingId: objectId,
 });
 
+export const refundListQuerySchema = paginationSchema.keys({
+    status: Joi.string().valid(...ALL_PAYMENT_TRANSACTION_STATUSES),
+    refundStatus: Joi.string().valid('pending', 'completed', 'failed'),
+});
+
 export const refundSchema = Joi.object({
     reason: Joi.string().trim().min(3).max(500).required().messages({
         'string.min': 'Refund reason must be at least 3 characters',

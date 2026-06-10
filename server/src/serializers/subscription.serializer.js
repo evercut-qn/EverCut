@@ -45,6 +45,40 @@ export const serializeSubscriptionBasic = (subscription) => {
     });
 };
 
+export const serializeAdminSubscription = ({ subscription, shop } = {}) => {
+    const raw = toPlainObject(subscription);
+    const plain = sanitizeForResponse(raw);
+    if (!plain) return null;
+    const barber = sanitizeForResponse(toPlainObject(raw.barberId || plain.barberId)) || {};
+    const user = sanitizeForResponse(toPlainObject(barber.userId)) || {};
+    const shopPlain = sanitizeForResponse(toPlainObject(shop)) || {};
+
+    return compact({
+        id: plain.id,
+        barberId: barber.id || toIdString(plain.barberId),
+        barberName: `${barber.firstName || ''} ${barber.lastName || ''}`.trim() || null,
+        shopId: shopPlain.id,
+        shopName: shopPlain.shopName ?? null,
+        contact: {
+            email: user.email ?? null,
+            phoneNumber: user.phoneNumber ?? null,
+        },
+        planId: plain.planId,
+        status: plain.status,
+        currentPeriodStart: plain.currentPeriodStart ?? null,
+        currentPeriodEnd: plain.currentPeriodEnd ?? null,
+        cancelAtPeriodEnd: plain.cancelAtPeriodEnd ?? false,
+        pendingPlanId: plain.pendingPlanId ?? null,
+        usage: {
+            photos: plain.totalPhotosUploaded || 0,
+            videos: plain.totalVideosUploaded || 0,
+            statements: plain.statementsDownloadedThisPeriod || 0,
+        },
+        createdAt: plain.createdAt,
+        updatedAt: plain.updatedAt,
+    });
+};
+
 export const serializeSubscription = ({ subscription, entitlements, plan }) => {
     const basic = serializeSubscriptionBasic(subscription);
     if (!basic) return null;
@@ -108,6 +142,7 @@ export default {
     serializePlan,
     serializeSubscription,
     serializeBasic: serializeSubscriptionBasic,
+    serializeAdminSubscription,
     serializeCheckout,
     serializeTransaction,
 };

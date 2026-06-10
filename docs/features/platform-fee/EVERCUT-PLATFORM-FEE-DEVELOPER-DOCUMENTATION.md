@@ -541,4 +541,27 @@ The following item is not yet resolved and must be confirmed before or during th
 
 ---
 
+## 8. Dashboard Financial Metrics Reconciliation
+
+To prevent future discrepancies and confusion when working with admin dashboard metrics, developers must adhere to the following definitions and equations:
+
+### 8.1 Metric Definitions & Equations
+* **Customer Payments Collected**: The sum of `amount` on successful `PaymentTransaction` records (gross payments, inclusive of service value and platform fees).
+* **Platform Fees Collected**: The sum of `settlement.platformFee` on successful `PaymentTransaction` records.
+* **Paid Service Value** (Shop Revenue): The sum of `totalAmount` on successful `Booking` records (service-only price, exclusive of platform fees).
+
+For any set of successful bookings, these three metrics must mathematically balance:
+$$\text{Customer Payments Collected} = \text{Paid Service Value (Shop Revenue)} + \text{Platform Fees Collected}$$
+
+### 8.2 Database Integrity Rules
+* `Booking.totalAmount` must consistently represent the service-only price (exclusive of platform fees).
+* `PaymentTransaction.settlement` must store the exact split in paisa:
+  * `settlement.serviceAmount` = `Booking.totalAmount * 100`
+  * `settlement.platformFee` = charged platform fee (or `0` if waiver applied)
+  * `settlement.barberPayout` = `settlement.serviceAmount`
+* To ensure resiliency against subsequent service price updates or service deactivations, payment initiation via `payment.service.js` uses the booking's `totalAmount` as the authoritative frozen pricing snapshot from the time of booking creation, preventing payments from being blocked by subsequent shop changes.
+
+---
+
 *This document covers the Evercut customer platform fee system exclusively. It is based on the Evercut Professional Report (Storage, Subscription & Platform Cost Analysis) and the Gap Solutions document. Intended for internal development use by Quantneural. All confirmed rules reflect finalised business decisions as of the current revision.*
+

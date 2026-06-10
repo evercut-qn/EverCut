@@ -111,6 +111,24 @@ class SubscriptionRepository {
         return Subscription.find({}).limit(limit);
     }
 
+    async findAllFiltered(filter = {}, options = {}) {
+        const query = Subscription.find(trustQueryOperators(filter))
+            .sort({ updatedAt: -1, createdAt: -1 })
+            .populate({
+                path: 'barberId',
+                select: 'firstName lastName userId',
+                populate: { path: 'userId', select: 'email phoneNumber isActive' },
+            });
+
+        if (options.skip !== undefined) query.skip(options.skip);
+        if (options.limit !== undefined) query.limit(options.limit);
+        return query.lean();
+    }
+
+    async countAll(filter = {}) {
+        return Subscription.countDocuments(trustQueryOperators(filter));
+    }
+
     async countByPlanAndStatus() {
         return Subscription.aggregate([
             {
@@ -119,6 +137,26 @@ class SubscriptionRepository {
                     count: { $sum: 1 },
                 },
             },
+        ]);
+    }
+
+    async aggregateAdminSummary() {
+        return Subscription.aggregate([
+            {
+                $group: {
+                    _id: { planId: '$planId', status: '$status' },
+                    count: { $sum: 1 },
+                },
+            },
+            {
+                $project: {
+                    _id: 0,
+                    planId: '$_id.planId',
+                    status: '$_id.status',
+                    count: 1,
+                },
+            },
+            { $sort: { planId: 1, status: 1 } },
         ]);
     }
 

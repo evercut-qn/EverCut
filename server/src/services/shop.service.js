@@ -3,6 +3,13 @@ import barberRepository from '../repositories/barber.repository.js';
 import customerRepository from '../repositories/customer.repository.js';
 import serviceRepository from '../repositories/service.repository.js';
 import ratingRepository from '../repositories/rating.repository.js';
+import userRepository from '../repositories/user.repository.js';
+import bookingRepository from '../repositories/booking.repository.js';
+import payoutRepository from '../repositories/payout.repository.js';
+import paymentRepository from '../repositories/payment.repository.js';
+import { serializeBooking } from '../serializers/booking.serializer.js';
+import { serializePayout } from '../serializers/payout.serializer.js';
+import { serializePayment } from '../serializers/payment.serializer.js';
 import config from '../config/index.js';
 import { BadRequestError, NotFoundError } from '../utils/api-error.js';
 import { serializeBarberProfile, serializeBankDetails } from '../utils/barber-profile.utils.js';
@@ -18,7 +25,7 @@ import * as mediaService from './media/media.service.js';
 import * as serviceCatalogService from './service-catalog.service.js';
 import { serializeEmployee } from '../serializers/employee.serializer.js';
 import { serializeServices } from '../serializers/service.serializer.js';
-import { serializeShopProfile, serializeShopSummary } from '../serializers/shop.serializer.js';
+import { serializeBarberDirectoryItem, serializeShopProfile, serializeShopSummary } from '../serializers/shop.serializer.js';
 import {
     ALL_SERVICE_FOR,
     ALL_GENDERS,
@@ -532,6 +539,28 @@ export const getShops = async (query = {}) => {
     return [];
 };
 
+export const getShopSummary = async () => {
+    const [summary = {}] = await shopRepository.aggregateSummary();
+    return {
+        totalShops: summary.totalShops || 0,
+        activeShops: summary.activeShops || 0,
+        inactiveShops: summary.inactiveShops || 0,
+        openShops: summary.openShops || 0,
+        closedShops: summary.closedShops || 0,
+    };
+};
+
+export const listBarbersForAdmin = async (query = {}) => {
+    const total = await barberRepository.countAdminDirectory(query);
+    const { skip, limit, pagination } = buildPagination(query, total);
+    const barbers = await barberRepository.findAdminDirectory(query, { skip, limit });
+
+    return {
+        items: barbers.map(serializeBarberDirectoryItem).filter(Boolean),
+        pagination,
+    };
+};
+
 export const getNearbyShops = async (coordinates) => {
     return enrichAndSortShopSummaries(await shopRepository.findNearby(
         coordinates,
@@ -581,3 +610,115 @@ async function enrichAndSortShopSummaries(shops = []) {
         .filter(Boolean)
         .sort((a, b) => (b.priorityListingBoost || 0) - (a.priorityListingBoost || 0));
 }
+
+export const getBarberProfileForAdmin = async (barberId) => {
+    const barber = await barberRepository.findById(barberId);
+    if (!barber) throw new NotFoundError('Barber profile');
+
+    const user = await userRepository.findById(barber.userId);
+    if (!user) throw new NotFoundError('User');
+
+    const shop = await shopRepository.findByBarberId(barber._id);
+
+    // Fetch bookings to calculate metrics
+    let bookings = [];
+    if (shop) {
+        bookings = await bookingRepository.findByShopId(shop._id);
+    }
+    const totalBookingsCount = bookings.length;
+
+    // Paid Service Value = sum of totalAmount for paid/completed bookings
+    const paidBookings = bookings.filter(
+        (b) => b.paymentStatus === 'success' || b.paymentStatus === 'refunded' || b.status === 'completed',
+    );
+    const paidServiceValue = paidBookings.reduce((sum, b) => sum + (b.totalAmount || 0), 0);
+
+    // Fetch payouts to calculate total payouts (status is SUCCESS)
+    const payouts = await payoutRepository.findAllFiltered({ barberId: barber._id });
+    const successPayouts = payouts.filter((p) => p.status === 'SUCCESS');
+    const totalPayouts = successPayouts.reduce((sum, p) => sum + (p.amountInRupees || 0), 0);
+
+    // Fetch rating average
+    let averageRating = 0;
+    if (shop) {
+        const ratingSummary = await ratingRepository.getShopSummary(shop._id);
+        averageRating = ratingSummary.averageRating || 0;
+    }
+
+    // Recent bookings (limit to 10)
+    const sortedBookings = [...bookings].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    const recentBookings = sortedBookings.slice(0, 10);
+
+    // Recent payouts (limit to 10)
+    const sortedPayouts = [...payouts].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    const recentPayouts = sortedPayouts.slice(0, 10);
+
+    // Fetch subscription details if shop exists
+    let serializedSub = null;
+    if (shop) {
+        const subscriptionService = (await import('./subscription/subscription.service.js')).default;
+        const subscription = await subscriptionService.ensureDefaultSubscription(barber._id);
+        const { serializeAdminSubscription } = await import('../serializers/subscription.serializer.js');
+        serializedSub = subscription ? serializeAdminSubscription({ subscription, shop }) : null;
+    }
+
+    // Fetch recent payments if shop exists
+    let recentPayments = [];
+    if (shop) {
+        const payments = await paymentRepository.findAll({ shopId: shop._id });
+        const sortedPayments = [...payments].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        recentPayments = sortedPayments.slice(0, 10);
+    }
+
+    // Calculate shop metrics if shop exists
+    let shopMetrics = null;
+    if (shop) {
+        const completedBookingsCount = bookings.filter((b) => b.status === 'completed').length;
+        const cancelledBookingsCount = bookings.filter((b) => b.status === 'cancelled').length;
+        const successRate = totalBookingsCount > 0 ? (completedBookingsCount / totalBookingsCount) * 100 : 0;
+        const averageRevenue = completedBookingsCount > 0 ? paidServiceValue / completedBookingsCount : 0;
+
+        shopMetrics = {
+            totalBookings: totalBookingsCount,
+            completedBookings: completedBookingsCount,
+            cancelledBookings: cancelledBookingsCount,
+            bookingSuccessRate: parseFloat(successRate.toFixed(2)),
+            totalRevenue: parseFloat(paidServiceValue.toFixed(2)),
+            averageRevenuePerBooking: parseFloat(averageRevenue.toFixed(2)),
+        };
+    }
+
+    const bankDetails = serializeBankDetails(barber);
+    const serializedShop = shop ? {
+        ...serializeShopProfile(shop, { privateView: false }),
+        subscription: serializedSub,
+        metrics: shopMetrics,
+        recentPayments: recentPayments.map((p) => serializePayment(p)).filter(Boolean),
+    } : null;
+
+    return {
+        id: barber._id.toString(),
+        barberName: `${barber.firstName || ''} ${barber.lastName || ''}`.trim(),
+        yearsOfExperience: barber.yearsOfExperience,
+        gender: barber.gender,
+        dateOfBirth: barber.dateOfBirth,
+        payout: bankDetails,
+        shop: serializedShop,
+        isActive: user.isActive,
+        createdAt: user.createdAt,
+        user: {
+            email: user.email,
+            phoneNumber: user.phoneNumber,
+            isActive: user.isActive,
+            lastLoginAt: user.lastLoginAt,
+        },
+        metrics: {
+            totalBookings: totalBookingsCount,
+            paidServiceValue: parseFloat(paidServiceValue.toFixed(2)),
+            totalPayouts: parseFloat(totalPayouts.toFixed(2)),
+            averageRating: parseFloat(averageRating.toFixed(1)),
+        },
+        recentBookings: recentBookings.map((b) => serializeBooking(b)).filter(Boolean),
+        recentPayouts: recentPayouts.map((p) => serializePayout(p)).filter(Boolean),
+    };
+};
