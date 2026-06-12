@@ -18,6 +18,8 @@ const requestLogger = (req, res, next) => {
         };
 
         if (res.statusCode >= 400) {
+            logData.body = req.body;
+            logData.query = req.query;
             logger.warn('Request completed with error', logData);
         } else {
             logger.info('Request completed', logData);

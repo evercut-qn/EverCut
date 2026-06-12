@@ -10,7 +10,7 @@ import {
 } from '../utils/api-error.js';
 import { buildPagination } from '../utils/pagination.utils.js';
 import { serializeRating } from '../utils/rating-response.utils.js';
-import notificationEvents from './notification-events.service.js';
+import notificationEvents from './notifications/notification-events.service.js';
 import { sanitizeForResponse } from '../serializers/core.serializer.js';
 
 /**

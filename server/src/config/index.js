@@ -259,6 +259,12 @@ const config = Object.freeze({
   slotCleanup: Object.freeze({
     intervalMs: 6 * 60 * 60 * 1000,              // 6 hours
   }),
+
+  /** Notification business rules */
+  notification: Object.freeze({
+    staleTokenThresholdDays: 90,
+    staleTokenCleanupCron: '0 3 * * 0',
+  }),
 });
 
 export default config;

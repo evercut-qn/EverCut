@@ -16,8 +16,6 @@ const SENSITIVE_KEYS = new Set([
     'rotatedAt',
     'r2Key',
     'r2Bucket',
-    'coverR2Key',
-    'photoR2Key',
     'sdkOrderToken',
     'gatewayResponse',
     'webhookEventId',

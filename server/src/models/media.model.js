@@ -1,6 +1,5 @@
 import mongoose from 'mongoose';
 import {
-    ALL_MEDIA_ENTITY_TYPES,
     ALL_MEDIA_PURPOSES,
     ALL_MEDIA_STATUSES,
     ALL_MEDIA_TYPES,
@@ -57,16 +56,6 @@ const mediaSchema = new mongoose.Schema(
             type: Number,
             default: null,
         },
-        entityId: {
-            type: mongoose.Schema.Types.ObjectId,
-            default: null,
-            index: true,
-        },
-        entityType: {
-            type: String,
-            enum: ALL_MEDIA_ENTITY_TYPES,
-            default: null,
-        },
         durationSeconds: { type: Number, default: null },
         multipartUploadId: { type: String, default: null },
         hlsR2Prefix: { type: String, default: null },
@@ -83,13 +72,8 @@ const mediaSchema = new mongoose.Schema(
     { timestamps: true },
 );
 
-mediaSchema.index({ entityId: 1, entityType: 1, status: 1 });
 mediaSchema.index({ userId: 1, status: 1 });
 mediaSchema.index({ status: 1, createdAt: 1 });
-mediaSchema.index(
-    { entityId: 1, purpose: 1, status: 1, type: 1, createdAt: -1 },
-    { name: 'idx_media_entity_purpose_status_type_created' },
-);
 mediaSchema.index(
     { uploadExpiresAt: 1 },
     {
@@ -97,15 +81,6 @@ mediaSchema.index(
         partialFilterExpression: { status: MEDIA_STATUS.PENDING },
     },
 );
-
-mediaSchema.statics.countByEntity = function (entityId, entityType, extraFilter = {}) {
-    return this.countDocuments({
-        entityId,
-        entityType,
-        status: MEDIA_STATUS.READY,
-        ...extraFilter,
-    });
-};
 
 const Media = mongoose.model('Media', mediaSchema);
 export default Media;

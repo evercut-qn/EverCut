@@ -43,7 +43,6 @@ Future<void> registerFcmToken(String accessToken) async {
       'platform': Platform.isIOS ? 'ios' : 'android',
       'deviceId': await deviceId(),
       'appVersion': await appVersion(),
-      'locale': Platform.localeName,
     },
   );
 
@@ -56,7 +55,6 @@ Future<void> registerFcmToken(String accessToken) async {
         'platform': Platform.isIOS ? 'ios' : 'android',
         'deviceId': await deviceId(),
         'appVersion': await appVersion(),
-        'locale': Platform.localeName,
       },
     );
   });
@@ -67,9 +65,8 @@ On logout:
 
 ```dart
 await api.delete(
-  '/notifications/tokens',
+  '/notifications/tokens/$token',
   bearerToken: accessToken,
-  body: {'token': token},
 );
 ```
 
@@ -168,17 +165,18 @@ Every FCM data payload includes string values:
 }
 ```
 
-Use `id` to correlate with `/notifications`. Use `entityType/entityId` to fetch domain state.
+Use `id` to correlate with `/notifications/inbox`. Use `entityType/entityId` to fetch domain state.
 
 ## REST APIs
 
 ```text
 POST   /api/v1/notifications/tokens
-DELETE /api/v1/notifications/tokens
-GET    /api/v1/notifications
-GET    /api/v1/notifications/unread-count
-PATCH  /api/v1/notifications/:id
-PATCH  /api/v1/notifications
+DELETE /api/v1/notifications/tokens/:token
+GET    /api/v1/notifications/inbox
+GET    /api/v1/notifications/inbox/unread-count
+GET    /api/v1/notifications/inbox/:id
+PATCH  /api/v1/notifications/inbox/:id
+PATCH  /api/v1/notifications/inbox
 ```
 
 ## Client Rules

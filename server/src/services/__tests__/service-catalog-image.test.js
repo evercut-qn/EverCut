@@ -2,12 +2,9 @@ import assert from 'node:assert/strict';
 import test, { describe, it } from 'node:test';
 import serviceDefaultImageRepository from '../../repositories/service-default-image.repository.js';
 import * as serviceCatalog from '../service-catalog.service.js';
-
-// Access the private function via the exported ones or by re-exporting it for test
-// For this test, I'll mock the repository and verify if it's called correctly by addService
-
 import shopRepository from '../../repositories/shop.repository.js';
 import serviceRepository from '../../repositories/service.repository.js';
+import mediaRepository from '../../repositories/media.repository.js';
 
 describe('ServiceCatalog Image Resolution', () => {
     it('addService: should resolve default image when no imageMediaId provided', async (t) => {
@@ -22,7 +19,22 @@ describe('ServiceCatalog Image Resolution', () => {
 
         t.mock.method(shopRepository, 'findByBarberUserId', () => ({ _id: shopId }));
         t.mock.method(serviceRepository, 'findByShopIdAndName', () => null);
-        t.mock.method(serviceRepository, 'create', (data) => data);
+        t.mock.method(mediaRepository, 'findByR2Key', async (r2Key) => ({
+            _id: `system-${r2Key}`,
+            r2Key,
+        }));
+        t.mock.method(serviceRepository, 'create', (data) => {
+            return {
+                ...data,
+                populate: async function() {
+                    this.imageMediaId = {
+                        _id: this.imageMediaId,
+                        r2Key: this.imageMediaId.replace('system-', '')
+                    };
+                    return this;
+                }
+            };
+        });
         
         t.mock.method(serviceDefaultImageRepository, 'findBestMatch', (name, type, gender) => {
             assert.equal(name, 'Premium Fade');
@@ -48,7 +60,22 @@ describe('ServiceCatalog Image Resolution', () => {
 
         t.mock.method(shopRepository, 'findByBarberUserId', () => ({ _id: shopId }));
         t.mock.method(serviceRepository, 'findByShopIdAndName', () => null);
-        t.mock.method(serviceRepository, 'create', (data) => data);
+        t.mock.method(mediaRepository, 'findByR2Key', async (r2Key) => ({
+            _id: `system-${r2Key}`,
+            r2Key,
+        }));
+        t.mock.method(serviceRepository, 'create', (data) => {
+            return {
+                ...data,
+                populate: async function() {
+                    this.imageMediaId = {
+                        _id: this.imageMediaId,
+                        r2Key: this.imageMediaId.replace('system-', '')
+                    };
+                    return this;
+                }
+            };
+        });
         
         t.mock.method(serviceDefaultImageRepository, 'findBestMatch', () => null);
         t.mock.method(serviceDefaultImageRepository, 'findByName', (name) => {
@@ -72,7 +99,10 @@ describe('ServiceCatalog Image Resolution', () => {
                     serviceName: 'Premium Fade',
                     serviceType: 'single',
                     serviceFor: 'men',
-                    imageR2Key: 'images/services/premium-fade.jpg',
+                    imageMediaId: {
+                        _id: 'media-1',
+                        r2Key: 'images/services/premium-fade.jpg',
+                    },
                     duration: 45,
                     actualPrice: 500,
                     offerPrice: 100,
@@ -80,7 +110,10 @@ describe('ServiceCatalog Image Resolution', () => {
                     shopId: {
                         _id: 'shop-1',
                         shopName: 'EverCut Studio',
-                        coverR2Key: 'shops/cover.jpg',
+                        coverMediaId: {
+                            _id: 'media-shop-cover',
+                            r2Key: 'shops/cover.jpg',
+                        },
                     },
                 },
             ];
@@ -92,7 +125,7 @@ describe('ServiceCatalog Image Resolution', () => {
             'serviceName',
             'serviceFor',
             'serviceType',
-            'imageR2Key',
+            'imageMediaId',
             'duration',
             'actualPrice',
             'offerPrice',

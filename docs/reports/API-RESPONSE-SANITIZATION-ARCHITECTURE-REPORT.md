@@ -143,8 +143,8 @@ Notification:
 
 FCM Token Registration:
 
-- Required: `id`, `userId`, `platform`.
-- Optional: `deviceId`, `appVersion`, `locale`, `lastSeenAt`, `revokedAt`, `createdAt`, `updatedAt`.
+- Required: `id`, `userId`, `platform`, `deviceId`.
+- Optional: `appVersion`, `lastSeenAt`, `revokedAt`, `createdAt`, `updatedAt`.
 - Never returned: raw FCM token value.
 
 ## 6. Transformation Boundary

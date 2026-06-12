@@ -1,5 +1,5 @@
 import userRepository from '../repositories/user.repository.js';
-import notificationEvents from './notification-events.service.js';
+import notificationEvents from './notifications/notification-events.service.js';
 import { BadRequestError, ConflictError } from '../utils/api-error.js';
 import logger, { maskPhoneNumber } from '../utils/logger.js';
 

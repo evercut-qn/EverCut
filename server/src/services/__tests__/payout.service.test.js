@@ -36,7 +36,7 @@ const ensureRequiredEnv = () => {
 ensureRequiredEnv();
 
 const payoutService = await import('../payout.service.js');
-const notificationEvents = (await import('../notification-events.service.js')).default;
+const notificationEvents = (await import('../notifications/notification-events.service.js')).default;
 const bookingRepository = (await import('../../repositories/booking.repository.js')).default;
 const paymentRepository = (await import('../../repositories/payment.repository.js')).default;
 const payoutRepository = (await import('../../repositories/payout.repository.js')).default;

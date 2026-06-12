@@ -59,9 +59,14 @@ test('employeeRepository.claimSlots atomically rejects any occupied slot marker'
     let capturedUpdate = null;
     let capturedOptions = null;
     let capturedSelect = null;
+    let capturedPopulate = null;
     const query = {
         select(fields) {
             capturedSelect = fields;
+            return this;
+        },
+        populate(arg) {
+            capturedPopulate = arg;
             return this;
         },
     };
@@ -89,7 +94,8 @@ test('employeeRepository.claimSlots atomically rejects any occupied slot marker'
     ]);
     assert.equal(capturedFilter.shopId, 'shop-1');
     assert.deepEqual(capturedOptions, { returnDocument: 'after' });
-    assert.equal(capturedSelect, 'firstName lastName photoR2Key');
+    assert.equal(capturedSelect, 'firstName lastName photoMediaId');
+    assert.deepEqual(capturedPopulate, { path: 'photoMediaId', select: 'r2Key' });
 });
 
 test('employeeRepository.claimTimeRange atomically rejects overlapping exact ranges', async (t) => {
@@ -97,9 +103,14 @@ test('employeeRepository.claimTimeRange atomically rejects overlapping exact ran
     let capturedUpdate = null;
     let capturedOptions = null;
     let capturedSelect = null;
+    let capturedPopulate = null;
     const query = {
         select(fields) {
             capturedSelect = fields;
+            return this;
+        },
+        populate(arg) {
+            capturedPopulate = arg;
             return this;
         },
     };
@@ -145,7 +156,8 @@ test('employeeRepository.claimTimeRange atomically rejects overlapping exact ran
     ]);
     assert.equal(capturedFilter.shopId, 'shop-1');
     assert.deepEqual(capturedOptions, { returnDocument: 'after', runValidators: true });
-    assert.equal(capturedSelect, 'firstName lastName photoR2Key workingHours');
+    assert.equal(capturedSelect, 'firstName lastName photoMediaId workingHours');
+    assert.deepEqual(capturedPopulate, { path: 'photoMediaId', select: 'r2Key' });
 });
 
 test('paymentRepository.findPendingByBookingId preserves its internal $in operator under sanitizeFilter', async (t) => {

@@ -36,8 +36,9 @@ const employeeSchema = new mongoose.Schema(
             type: Date,
             required: true,
         },
-        photoR2Key: {
+        photoMediaId: {
             type: String,
+            ref: 'Media',
             default: null,
         },
         workingHours: {

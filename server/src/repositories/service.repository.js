@@ -8,7 +8,7 @@ class ServiceRepository {
     }
 
     async findById(id) {
-        return Service.findById(id);
+        return Service.findById(id).populate({ path: 'imageMediaId', select: 'r2Key' });
     }
 
     async findByIds(ids, selectFields, options = {}) {
@@ -21,7 +21,7 @@ class ServiceRepository {
 
     async findByShopId(shopId, filters = {}, options = {}) {
         const query = trustQueryOperators({ shopId, isActive: true, ...filters });
-        const mongoQuery = Service.find(query);
+        const mongoQuery = Service.find(query).populate({ path: 'imageMediaId', select: 'r2Key' });
         
         if (options.skip !== undefined) mongoQuery.skip(options.skip);
         if (options.limit !== undefined) mongoQuery.limit(options.limit);
@@ -54,7 +54,7 @@ class ServiceRepository {
             trustQueryOperators({ shopId: { $in: shopIds }, isActive: true, ...filters }),
         );
         if (selectFields) query.select(selectFields);
-        return query.lean();
+        return query.populate({ path: 'imageMediaId', select: 'r2Key' }).lean();
     }
 
     async searchByName(nameQuery, filters = {}, selectFields) {
@@ -64,7 +64,11 @@ class ServiceRepository {
             ...filters,
         }));
         if (selectFields) query.select(selectFields);
-        return query.populate('shopId', 'shopName address location category coverR2Key').lean();
+        return query.populate({
+            path: 'shopId',
+            select: 'shopName address location category coverMediaId',
+            populate: { path: 'coverMediaId', select: 'r2Key' }
+        }).lean();
     }
 
     async findByGender(gender, selectFields) {

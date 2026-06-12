@@ -7,6 +7,7 @@ import { useSidebarStore } from '@/hooks/useSidebarStore';
 import { cn } from '@/lib/utils/cn';
 import {
   BadgeIndianRupee,
+  Bell,
   CalendarSearch,
   CreditCard,
   LayoutDashboard,
@@ -59,6 +60,7 @@ export function Sidebar({ className, forceExpanded = false, onClose }) {
     { href: '/bookings', label: 'Bookings', icon: CalendarSearch },
     { href: '/payouts', label: 'Payouts', icon: CreditCard },
     { href: '/subscriptions', label: 'Subscriptions', icon: BadgeIndianRupee },
+    { href: '/notifications', label: 'Notifications', icon: Bell },
     { href: '/refunds', label: 'Refunds', icon: ReceiptText },
   ];
 

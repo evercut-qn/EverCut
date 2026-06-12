@@ -1,10 +1,15 @@
 # EverCut — Backend Migration & Implementation Guide
 ## Cloudinary → Cloudflare R2 Unified Media Architecture
 
-**Document Version:** 2.0  
-**Date:** May 2026  
+**Document Version:** 2.1 (Finalized)  
+**Date:** June 2026  
 **Stack:** Node.js + Express.js · Mongoose · MongoDB  
 **Classification:** Production Migration Blueprint
+
+> [!NOTE]
+> **Architecture Update:** The target design was finalized and updated to the **Media ID Reference Architecture**. 
+> Instead of embedding direct R2 keys (e.g. `photoR2Key`, `coverR2Key`) inside entity models, all models reference `Media` records via `photoMediaId`, `coverMediaId`, and `imageMediaId` (pointing to String UUIDs). 
+> The `Media` model has no back-references (`entityId`/`entityType` were removed), and the `Shop` model directly owns shop galleries via `galleryMediaIds: [{ type: String, ref: 'Media' }]`.
 
 ---
 

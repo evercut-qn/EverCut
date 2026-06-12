@@ -6,16 +6,14 @@ import { buildPagination } from '../utils/pagination.utils.js';
 import { calculateDiscountedPrice, normalizeServicePricing } from '../utils/service-pricing.utils.js';
 import { serializeService, serializeServices } from '../serializers/service.serializer.js';
 import { serializeShopSummary } from '../serializers/shop.serializer.js';
-import { MEDIA_ENTITY_TYPE, MEDIA_PURPOSE } from '../utils/constants.js';
 import * as mediaService from './media/media.service.js';
-import storageProvider from './media/storage-provider.service.js';
 import serviceDefaultImageRepository from '../repositories/service-default-image.repository.js';
 
 const SERVICE_CARD_FIELDS = [
     'serviceName',
     'serviceFor',
     'serviceType',
-    'imageR2Key',
+    'imageMediaId',
     'duration',
     'actualPrice',
     'offerPrice',
@@ -141,40 +139,34 @@ export const addService = async (ownerId, data) => {
     const serviceData = buildServicePayload(data);
     await ensureUniqueActiveService(shop._id, serviceData);
 
-    let imageR2Key;
     let imageMediaId = null;
 
     if (data.imageMediaId) {
-        const media = await mediaService.resolveReadyMediaById(data.imageMediaId);
-        imageR2Key = media.r2Key;
-        imageMediaId = data.imageMediaId;
+        const media = await mediaService.resolveMediaForEntity(ownerId, data.imageMediaId);
+        imageMediaId = media._id;
     } else {
-        imageR2Key = await resolveDefaultServiceImageR2Key(
+        const defaultKey = await resolveDefaultServiceImageR2Key(
             serviceData.serviceName,
             serviceData.serviceType,
             serviceData.serviceFor,
             serviceData.bundledServices,
         );
+        imageMediaId = await mediaService.getOrCreateSystemMedia(defaultKey);
     }
 
     let createdService;
     try {
         createdService = await serviceRepository.create({
             shopId: shop._id,
-            imageR2Key,
+            imageMediaId,
             ...serviceData,
         });
     } catch (error) {
         rethrowDuplicateServiceWrite(error);
     }
 
-    if (imageMediaId) {
-        await mediaService.linkMediaToEntity(
-            imageMediaId,
-            createdService._id,
-            MEDIA_ENTITY_TYPE.SERVICE,
-            MEDIA_PURPOSE.SERVICE,
-        );
+    if (createdService.imageMediaId) {
+        await createdService.populate({ path: 'imageMediaId', select: 'r2Key' });
     }
 
     return serializeService(createdService);
@@ -204,24 +196,39 @@ export const updateService = async (ownerId, serviceId, data) => {
     const updateData = buildServicePayload(data, existingService);
     await ensureUniqueActiveService(shop._id, updateData, existingService._id);
 
-    let imageMediaId = data.imageMediaId;
-    let oldR2KeyToDelete = null;
+    let oldMediaIdToDelete = null;
+    const existingImageMediaId = existingService.imageMediaId?._id || existingService.imageMediaId;
 
-    if (imageMediaId) {
-        const media = await mediaService.resolveReadyMediaById(imageMediaId);
-        oldR2KeyToDelete = existingService.imageR2Key;
-        updateData.imageR2Key = media.r2Key;
-    } else if (
-        updateData.serviceName !== existingService.serviceName
-        || updateData.serviceFor !== existingService.serviceFor
-    ) {
-        // Only resolve new default if name or gender changed and no manual image provided
-        updateData.imageR2Key = await resolveDefaultServiceImageR2Key(
-            updateData.serviceName,
-            updateData.serviceType,
-            updateData.serviceFor,
-            updateData.bundledServices,
+    if (data.imageMediaId !== undefined) {
+        if (data.imageMediaId) {
+            const media = await mediaService.resolveMediaForEntity(ownerId, data.imageMediaId);
+            updateData.imageMediaId = media._id;
+            if (existingImageMediaId && existingImageMediaId.toString() !== media._id.toString()) {
+                oldMediaIdToDelete = existingImageMediaId;
+            }
+        } else {
+            const defaultKey = await resolveDefaultServiceImageR2Key(
+                updateData.serviceName || existingService.serviceName,
+                updateData.serviceType || existingService.serviceType,
+                updateData.serviceFor || existingService.serviceFor,
+                updateData.bundledServices || existingService.bundledServices,
+            );
+            updateData.imageMediaId = await mediaService.getOrCreateSystemMedia(defaultKey);
+            if (existingImageMediaId && existingImageMediaId.toString() !== updateData.imageMediaId.toString()) {
+                oldMediaIdToDelete = existingImageMediaId;
+            }
+        }
+    } else if (existingImageMediaId && String(existingImageMediaId).startsWith('system-')) {
+        const defaultKey = await resolveDefaultServiceImageR2Key(
+            updateData.serviceName || existingService.serviceName,
+            updateData.serviceType || existingService.serviceType,
+            updateData.serviceFor || existingService.serviceFor,
+            updateData.bundledServices || existingService.bundledServices,
         );
+        const newDefaultMediaId = await mediaService.getOrCreateSystemMedia(defaultKey);
+        if (existingImageMediaId.toString() !== newDefaultMediaId.toString()) {
+            updateData.imageMediaId = newDefaultMediaId;
+        }
     }
 
     let updated;
@@ -232,17 +239,12 @@ export const updateService = async (ownerId, serviceId, data) => {
     }
     if (!updated) throw new NotFoundError('Service');
 
-    if (imageMediaId) {
-        await mediaService.linkMediaToEntity(
-            imageMediaId,
-            updated._id,
-            MEDIA_ENTITY_TYPE.SERVICE,
-            MEDIA_PURPOSE.SERVICE,
-        );
+    if (oldMediaIdToDelete) {
+        await mediaService.cleanupMediaById(oldMediaIdToDelete);
+    }
 
-        if (oldR2KeyToDelete && oldR2KeyToDelete !== updated.imageR2Key) {
-            storageProvider.deleteObject(oldR2KeyToDelete).catch(() => {});
-        }
+    if (updated.imageMediaId) {
+        await updated.populate({ path: 'imageMediaId', select: 'r2Key' });
     }
 
     return serializeService(updated);
@@ -254,6 +256,11 @@ export const deleteService = async (ownerId, serviceId) => {
 
     const deleted = await serviceRepository.softDelete(serviceId, shop._id);
     if (!deleted) throw new NotFoundError('Service');
+
+    if (deleted.imageMediaId) {
+        await mediaService.cleanupMediaById(deleted.imageMediaId);
+    }
+
     return { message: 'Service deleted successfully' };
 };
 
@@ -267,7 +274,7 @@ export const searchServices = async (query, gender) => {
 };
 
 export const searchShops = async (query) => {
-    return (await shopRepository.searchByName(query, 'shopName address location category coverR2Key'))
+    return (await shopRepository.searchByName(query, 'shopName address location category coverMediaId'))
         .map(serializeShopSummary)
         .filter(Boolean);
 };

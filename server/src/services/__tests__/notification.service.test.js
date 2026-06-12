@@ -35,8 +35,8 @@ const ensureRequiredEnv = () => {
 
 ensureRequiredEnv();
 
-const notificationService = (await import('../notification.service.js')).default;
-const fcmService = (await import('../fcm.service.js')).default;
+const notificationService = (await import('../notifications/notification.service.js')).default;
+const fcmService = (await import('../notifications/fcm.service.js')).default;
 const notificationRepository = (await import('../../repositories/notification.repository.js')).default;
 const fcmTokenRepository = (await import('../../repositories/fcm-token.repository.js')).default;
 
@@ -57,7 +57,6 @@ test('registerFcmToken upserts a token for the authenticated user and device', a
         platform: 'android',
         deviceId: 'pixel-8',
         appVersion: '2.4.1',
-        locale: 'en-IN',
     });
 
     assert.deepEqual(upsertArgs, {
@@ -67,7 +66,6 @@ test('registerFcmToken upserts a token for the authenticated user and device', a
             platform: 'android',
             deviceId: 'pixel-8',
             appVersion: '2.4.1',
-            locale: 'en-IN',
         },
     });
     assert.equal(result.id, 'token-doc-1');
@@ -79,7 +77,7 @@ test('registerFcmToken upserts a token for the authenticated user and device', a
 });
 
 test('getNotificationUnreadCount returns normalized unread metrics', async (t) => {
-    t.mock.method(notificationRepository, 'countUnread', async (userId) => {
+    t.mock.method(notificationRepository, 'countUnreadInboxNotifications', async (userId) => {
         assert.equal(userId, 'user-1');
         return 7;
     });
@@ -93,7 +91,7 @@ test('getNotificationUnreadCount returns normalized unread metrics', async (t) =
 
 test('patchNotification marks one notification read for the authenticated recipient', async (t) => {
     const readAt = new Date('2026-05-07T08:00:00.000Z');
-    t.mock.method(notificationRepository, 'markRead', async (userId, notificationId) => {
+    t.mock.method(notificationRepository, 'markInboxNotificationRead', async (userId, notificationId) => {
         assert.equal(userId, 'user-1');
         assert.equal(notificationId, 'notification-1');
         return {
@@ -116,7 +114,7 @@ test('patchNotification marks one notification read for the authenticated recipi
 });
 
 test('patchNotifications marks all unread notifications for the authenticated recipient', async (t) => {
-    t.mock.method(notificationRepository, 'markAllRead', async (userId) => {
+    t.mock.method(notificationRepository, 'markAllInboxNotificationsRead', async (userId) => {
         assert.equal(userId, 'user-1');
         return { modifiedCount: 3 };
     });
@@ -136,14 +134,14 @@ test('notification service does not expose deprecated read-action method names',
 
 test('notifyUser persists once, sends a hybrid payload to every active device, and marks delivery', async (t) => {
     let createdPayload = null;
-    t.mock.method(notificationRepository, 'createIfNotExists', async (payload) => {
+    t.mock.method(notificationRepository, 'createInboxNotificationIfNotExists', async (payload) => {
         createdPayload = payload;
         return {
             created: true,
             notification: {
                 _id: 'notification-1',
                 ...payload,
-                status: 'queued',
+                status: 'sent',
             },
         };
     });
@@ -161,7 +159,15 @@ test('notifyUser persists once, sends a hybrid payload to every active device, a
             failureCount: 0,
             invalidTokens: [],
             failures: [],
+            successes: [
+                { token: 'fcm-token-a', messageId: 'msg-id-1' },
+                { token: 'fcm-token-b', messageId: 'msg-id-2' },
+            ],
         };
+    });
+
+    t.mock.method(fcmTokenRepository, 'updateLastSuccessfulDelivery', async (tokens) => {
+        return { modifiedCount: tokens.length };
     });
 
     let deliveryUpdate = null;
@@ -211,7 +217,7 @@ test('notifyUser persists once, sends a hybrid payload to every active device, a
 });
 
 test('notifyUser does not resend an already persisted dedupe key', async (t) => {
-    t.mock.method(notificationRepository, 'createIfNotExists', async (payload) => ({
+    t.mock.method(notificationRepository, 'createInboxNotificationIfNotExists', async (payload) => ({
         created: false,
         notification: {
             _id: 'notification-1',
@@ -240,12 +246,12 @@ test('notifyUser does not resend an already persisted dedupe key', async (t) => 
 });
 
 test('notifyUser revokes invalid FCM tokens and records partial delivery', async (t) => {
-    t.mock.method(notificationRepository, 'createIfNotExists', async (payload) => ({
+    t.mock.method(notificationRepository, 'createInboxNotificationIfNotExists', async (payload) => ({
         created: true,
         notification: {
             _id: 'notification-1',
             ...payload,
-            status: 'queued',
+            status: 'sent',
         },
     }));
 
@@ -258,6 +264,7 @@ test('notifyUser revokes invalid FCM tokens and records partial delivery', async
         successCount: 1,
         failureCount: 1,
         invalidTokens: ['stale-token'],
+        successes: [{ token: 'valid-token', messageId: 'msg-id-1' }],
         failures: [
             {
                 token: 'stale-token',
@@ -271,6 +278,10 @@ test('notifyUser revokes invalid FCM tokens and records partial delivery', async
     t.mock.method(fcmTokenRepository, 'markInvalidTokens', async (tokens, reason) => {
         invalidTokenUpdate = { tokens, reason };
         return { modifiedCount: 1 };
+    });
+
+    t.mock.method(fcmTokenRepository, 'updateLastSuccessfulDelivery', async (tokens) => {
+        return { modifiedCount: tokens.length };
     });
 
     let deliveryUpdate = null;
@@ -292,7 +303,7 @@ test('notifyUser revokes invalid FCM tokens and records partial delivery', async
         tokens: ['stale-token'],
         reason: 'FCM reported token invalid or unregistered',
     });
-    assert.equal(deliveryUpdate.updates.status, 'partial');
+    assert.equal(deliveryUpdate.updates.status, 'sent');
     assert.deepEqual(deliveryUpdate.updates.delivery, {
         successCount: 1,
         failureCount: 1,

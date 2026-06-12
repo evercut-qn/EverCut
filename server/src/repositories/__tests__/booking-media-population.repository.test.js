@@ -10,7 +10,7 @@ test('booking list population includes employee media keys for booking serialize
 
     assert.match(
         source,
-        /const EMPLOYEE_NAME_POPULATE = \{[\s\S]*select: 'firstName lastName photoR2Key blockedDates'/,
+        /const EMPLOYEE_NAME_POPULATE = \{[\s\S]*select: 'firstName lastName photoMediaId blockedDates'/,
     );
 });
 
@@ -26,6 +26,6 @@ test('booking status population includes employee media keys for confirmed booki
 test('booking customer population includes customer media keys for summaries', async () => {
     const source = await readFile(repositoryPath, 'utf8');
 
-    assert.match(source, /const CUSTOMER_SUMMARY_FIELDS = 'firstName lastName photoR2Key userId feeWaiverBookingsUsed'/);
-    assert.match(source, /const CUSTOMER_NAME_FIELDS = 'firstName lastName photoR2Key'/);
+    assert.match(source, /const CUSTOMER_SUMMARY_FIELDS = 'firstName lastName photoMediaId userId feeWaiverBookingsUsed'/);
+    assert.match(source, /const CUSTOMER_NAME_FIELDS = 'firstName lastName photoMediaId'/);
 });

@@ -73,7 +73,7 @@ Stores one row per device token:
 - `userId`
 - `token` unique
 - `platform`: `android`, `ios`, `web`, `unknown`
-- `deviceId`, `appVersion`, `locale`
+- `deviceId`, `appVersion`
 - `lastSeenAt`
 - `revokedAt`
 - `failureCount`, `lastFailureAt`, `failureReason`
@@ -92,7 +92,7 @@ Stores one row per event notification:
 - `data`
 - `entityType`, `entityId`
 - `dedupeKey` unique when present
-- `status`: `queued`, `sent`, `partial`, `failed`, `skipped`
+- `status`: `queued`, `sent`, `failed`
 - `delivery.successCount`, `delivery.failureCount`
 - `deliveredAt`, `readAt`, `failureReason`
 - `expiresAt` optional TTL
@@ -129,7 +129,7 @@ PATCH  /api/v1/notifications
 
 ## Trade-Offs
 
-- Delivery retry queues are represented by persisted `failed` and `partial` states, but no background retry worker was added yet. This avoids introducing queue infrastructure before the project has one.
+- Delivery retry queues are represented by persisted `failed` states, but no background retry worker was added yet. This avoids introducing queue infrastructure before the project has one.
 - FCM delivery is awaited after domain commits so failures are observable in the same request/job, while domain success remains protected by notification event error handling.
 - Chat notifications are documented as a future integration because there is no server-side chat persistence layer.
 
@@ -140,3 +140,22 @@ PATCH  /api/v1/notifications
 - Firebase Admin credentials are supplied through `.env` or runtime environment variables.
 - Local `server/.env` and `server/firebase-admin-sdk.json` are treated as secrets and were not used as implementation input.
 - The codebase scope reviewed was `docs/` and `server/`, excluding generated dependencies such as `server/node_modules` and local secret material.
+
+---
+
+## Addendum: RESTful API Migration & Reliability Refactoring (June 2026)
+
+In June 2026, the notification platform underwent a major RESTful API refactoring and reliability expansion to align with Option A (Full Resource Separation) and introduce enterprise-grade reliability patterns:
+
+### 1. API Surface Separation
+The unified `/notifications` route was split into distinct collections to eliminate role-dependent controller logic and enforce RESTful boundaries:
+- **Inbox Notifications**: Managed under `/api/v1/notifications/inbox` (GET list, GET detail, GET unread-count, PATCH mark read, PATCH mark all read).
+- **Admin Broadcasts**: Managed under `/api/v1/notifications/broadcasts` (GET templates, POST create, GET details, GET recipients, GET inbox-items, GET audits).
+- **Tokens**: Managed under `/api/v1/notifications/tokens` (POST register, DELETE /tokens/:token).
+
+### 2. Reliability & Resilience Upgrades
+- **FCM Retry with Exponential Backoff**: Transient FCM delivery errors (such as `server-unavailable` or `internal-error`) are retried up to 2 times with exponential backoff ($2^{\text{attempt}} \times 1000$ ms) and jitter.
+- **Asynchronous Broadcast Dispatch**: Broadcast creation (`POST /broadcasts`) responds with `201 Created` immediately, executing the dispatch task asynchronously in the background via `setImmediate` to prevent HTTP timeouts.
+- **Parallel Dispatch Processing**: Recipients are processed in parallel batches of 50 to optimize database load and memory usage.
+- **Weekly Stale Token Cleanup**: A background cron job automatically deletes FCM tokens that have been inactive (no successful registrations or deliveries) for over 90 days.
+- **Startup Recovery Scan**: On server restart, a recovery task scans for broadcasts stuck in the transient `sending` state. It marks them as `failed` and records progress context (e.g., processed vs remaining recipients) in `failureReason`.

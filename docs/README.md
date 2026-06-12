@@ -28,10 +28,11 @@ Detailed, implementation-ready guides for Flutter developers and backend testing
 | Document | Description | Status |
 |----------|-------------|--------|
 | [FLUTTER-BOOKING-PAYMENT-FLOW.md](./flows/FLUTTER-BOOKING-PAYMENT-FLOW.md) | Complete Flutter implementation guide for booking + native PhonePe SDK payment flow | ✅ Production Ready |
-| [flutter-notification-integration-guide.md](./flows/flutter-notification-integration-guide.md) | Flutter integration guide for FCM token handling and foreground/background/terminated notification handling | ✅ Production Ready |
+| [FLUTTER-NOTIFICATION-INTEGRATION-GUIDE.md](./flows/FLUTTER-NOTIFICATION-INTEGRATION-GUIDE.md) | Flutter integration guide for FCM token handling and foreground/background/terminated notification handling | ✅ Production Ready |
+| [FLUTTER-NOTIFICATION-MIGRATION-GUIDE.md](./flows/FLUTTER-NOTIFICATION-MIGRATION-GUIDE.md) | Flutter developer migration checklist and code refactoring guide for Option A endpoints | ✅ Production Ready |
 | [POSTMAN-BOOKING-PAYMENT-GUIDE.md](./testing/POSTMAN-BOOKING-PAYMENT-GUIDE.md) | Postman testing guide for booking & payment flow (auth → payment → barber approval) | ✅ Production Ready |
 | [MANUAL-PAYOUT-POSTMAN-TESTING-GUIDE.md](./testing/MANUAL-PAYOUT-POSTMAN-TESTING-GUIDE.md) | Complete Postman testing guide for admin manual payouts and Cashfree compatibility | ✅ Production Ready |
-| [notification-system-postman-guide.md](./testing/notification-system-postman-guide.md) | Postman-only notification backend testing guide | ✅ Production Ready |
+| [NOTIFICATION-SYSTEM-POSTMAN-GUIDE.md](./testing/NOTIFICATION-SYSTEM-POSTMAN-GUIDE.md) | Postman-only notification backend testing guide | ✅ Production Ready |
 
 > **Note:** The `docs/flows/` directory contains detailed, step-by-step implementation guides for developers. The `docs/testing/` directory contains Postman API testing documentation.
 
@@ -112,11 +113,18 @@ Detailed guides for implementing specific features.
 
 ### Notifications
 
+Guides for the enterprise FCM notification platform and RESTful API:
+
 | Document | Description | Status |
 |----------|-------------|--------|
-| [notification-system-overview.md](./features/notifications/notification-system-overview.md) | Functional overview of hybrid FCM + REST notification behavior | ✅ Production Ready |
-| [flutter-notification-integration-guide.md](./flows/flutter-notification-integration-guide.md) | Flutter client integration guide for FCM and REST notification APIs | ✅ Production Ready |
-| [notification-system-postman-guide.md](./testing/notification-system-postman-guide.md) | Postman-only backend notification testing guide | ✅ Production Ready |
+| [README.md](./features/notifications/README.md) | Functional overview of hybrid FCM + REST notification behavior and resilience jobs | ✅ Reference |
+| [BACKEND-DEVELOPER-GUIDE.md](./features/notifications/BACKEND-DEVELOPER-GUIDE.md) | Backend architecture, MongoDB schemas, and reliable event integration guide | ✅ Production Ready |
+| [CLIENT-INTEGRATION-GUIDE.md](./features/notifications/CLIENT-INTEGRATION-GUIDE.md) | Frontend integration procedures for Next.js admin and Flutter clients | ✅ Production Ready |
+| [OPERATIONS-AND-TROUBLESHOOTING-GUIDE.md](./features/notifications/OPERATIONS-AND-TROUBLESHOOTING-GUIDE.md) | Operational playbooks, failure metrics, cleanup jobs, and troubleshooting recipes | ✅ Production Ready |
+| [NOTIFICATION-CHANGELOG.md](./features/notifications/NOTIFICATION-CHANGELOG.md) | Changelog of the notification system refactoring and route separation | ✅ Completed |
+| [FLUTTER-NOTIFICATION-INTEGRATION-GUIDE.md](./flows/FLUTTER-NOTIFICATION-INTEGRATION-GUIDE.md) | Flutter client integration guide for FCM and REST notification APIs | ✅ Production Ready |
+| [FLUTTER-NOTIFICATION-MIGRATION-GUIDE.md](./flows/FLUTTER-NOTIFICATION-MIGRATION-GUIDE.md) | Flutter developer migration checklist and code refactoring guide | ✅ Production Ready |
+| [NOTIFICATION-SYSTEM-POSTMAN-GUIDE.md](./testing/NOTIFICATION-SYSTEM-POSTMAN-GUIDE.md) | Postman-only backend notification testing guide and collections | ✅ Production Ready |
 
 ### Subscription System
 
@@ -171,11 +179,12 @@ docs/
 ├── README.md                          # This file
 ├── flows/                             # Developer implementation guides
 │   ├── FLUTTER-BOOKING-PAYMENT-FLOW.md
-│   └── flutter-notification-integration-guide.md
+│   ├── FLUTTER-NOTIFICATION-INTEGRATION-GUIDE.md
+│   └── FLUTTER-NOTIFICATION-MIGRATION-GUIDE.md
 ├── testing/                           # Postman API testing guides
 │   ├── POSTMAN-BOOKING-PAYMENT-GUIDE.md
 │   ├── MANUAL-PAYOUT-POSTMAN-TESTING-GUIDE.md
-│   └── notification-system-postman-guide.md
+│   └── NOTIFICATION-SYSTEM-POSTMAN-GUIDE.md
 ├── architecture/                      # Architecture & planning docs
 │   └── IMPLEMENTATION-PLAN.md
 ├── security/                          # Security audits & reports
@@ -201,7 +210,11 @@ docs/
 │   ├── webhooks/
 │   │   └── HOOKDECK-DAILY-WORKFLOW.md  # PhonePe + Cashfree + Razorpay
 │   ├── notifications/
-│   │   └── notification-system-overview.md
+│   │   ├── README.md                  # Notification system overview
+│   │   ├── BACKEND-DEVELOPER-GUIDE.md # Backend developer integration
+│   │   ├── CLIENT-INTEGRATION-GUIDE.md # Frontend integration guide
+│   │   ├── OPERATIONS-AND-TROUBLESHOOTING-GUIDE.md # Troubleshooting playbooks
+│   │   └── NOTIFICATION-CHANGELOG.md  # Version changelog
 │   └── msg91/
 │       ├── MSG91-COMPLETE-GUIDE.md
 │       ├── MSG91-INTEGRATION-GUIDE.md
@@ -215,15 +228,13 @@ docs/
 │   ├── REQUEST-VALIDATION-QUERY-FIX-REPORT.md
 │   ├── notification-system-report.md
 │   └── SERVICE-CATALOG-FIXES-REPORT.md
-├── research/                          # Research & analysis docs
-│   ├── OBJECT-STORAGE-RESEARCH.MD
-│   ├── OTP-AUTH-RESEARCH.md
-│   ├── PAYOUT-API-RESEARCH.md
-│   ├── UPI-API-RESEARCH.md
-│   ├── ZOHO-VS-PHONEPE-PG-COMPARISON.md
-│   └── PHONEPE-PG-FLUTTER-NODEJS.md   # Native SDK integration research
-└── testing/                           # Postman API testing guides
-    └── POSTMAN-BOOKING-PAYMENT-GUIDE.md
+└── research/                          # Research & analysis docs
+    ├── OBJECT-STORAGE-RESEARCH.MD
+    ├── OTP-AUTH-RESEARCH.md
+    ├── PAYOUT-API-RESEARCH.md
+    ├── UPI-API-RESEARCH.md
+    ├── ZOHO-VS-PHONEPE-PG-COMPARISON.md
+    └── PHONEPE-PG-FLUTTER-NODEJS.md   # Native SDK integration research
 ```
 
 ---
@@ -239,15 +250,16 @@ docs/
 ### For Flutter Developers
 
 1. **Booking + Payment Flow:** [FLUTTER-BOOKING-PAYMENT-FLOW.md](./flows/FLUTTER-BOOKING-PAYMENT-FLOW.md) — Complete implementation guide with native PhonePe SDK
-2. **Notifications:** [flutter-notification-integration-guide.md](./flows/flutter-notification-integration-guide.md) — FCM setup, token handling, and foreground/background/terminated handling
-3. **Backend Contract:** [BOOKING-SYSTEM-GUIDE.md](./features/bookings/BOOKING-SYSTEM-GUIDE.md) — API contracts and flow details
-4. **Native SDK Source:** [PHONEPE-PG-FLUTTER-NODEJS.md](./research/PHONEPE-PG-FLUTTER-NODEJS.md) — PhonePe integration reference
+2. **Notifications:** [FLUTTER-NOTIFICATION-INTEGRATION-GUIDE.md](./flows/FLUTTER-NOTIFICATION-INTEGRATION-GUIDE.md) — FCM setup, token handling, and foreground/background/terminated handling
+3. **Notification Migration:** [FLUTTER-NOTIFICATION-MIGRATION-GUIDE.md](./flows/FLUTTER-NOTIFICATION-MIGRATION-GUIDE.md) — Flutter client migration checklist for Option A API endpoints
+4. **Backend Contract:** [BOOKING-SYSTEM-GUIDE.md](./features/bookings/BOOKING-SYSTEM-GUIDE.md) — API contracts and flow details
+5. **Native SDK Source:** [PHONEPE-PG-FLUTTER-NODEJS.md](./research/PHONEPE-PG-FLUTTER-NODEJS.md) — PhonePe integration reference
 
 ### For Backend Testing
 
 1. **Booking & Payment Testing:** [POSTMAN-BOOKING-PAYMENT-GUIDE.md](./testing/POSTMAN-BOOKING-PAYMENT-GUIDE.md) — Test booking & payment flow from auth to barber approval
 2. **Manual Payout Testing:** [MANUAL-PAYOUT-POSTMAN-TESTING-GUIDE.md](./testing/MANUAL-PAYOUT-POSTMAN-TESTING-GUIDE.md) — Test admin auth, manual payout lifecycle, concurrency, and Cashfree compatibility
-3. **Notification Testing:** [notification-system-postman-guide.md](./testing/notification-system-postman-guide.md) — Test FCM token management, notification history, unread count, and read tracking
+3. **Notification Testing:** [NOTIFICATION-SYSTEM-POSTMAN-GUIDE.md](./testing/NOTIFICATION-SYSTEM-POSTMAN-GUIDE.md) — Test FCM token management, notification history, unread count, and read tracking
 4. **Postman Collections:** `server/postman-collections/` — Ready-to-use API test collections with auto-generated signatures
 
 ### For Security Review

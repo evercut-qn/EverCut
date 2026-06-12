@@ -2665,7 +2665,7 @@ const analyticsCollection = {
 const notificationsCollection = {
   info: {
     name: 'EverCut - Notifications',
-    description: 'Hybrid FCM + REST notification APIs for device token registration, notification history, unread counts, and read tracking. Use this with either a customer or barber access token.',
+    description: 'Resource-separated FCM + REST notification APIs for token management, user inbox, and admin broadcasts. Use correct credentials for each group.',
     schema: 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
   },
   auth: bearerAuth('customer_access_token'),
@@ -2676,117 +2676,233 @@ const notificationsCollection = {
   }),
   variable: [
     ...baseVariables(
-      textVariable('notification_id', '', 'Notification ID captured from the list endpoint.'),
+      textVariable('notification_id', '', 'Notification ID captured from the list or create endpoints.'),
     ),
   ],
   item: [
     {
-      name: '1. Register FCM Token',
-      ...request({
-        method: 'POST',
-        url: '{{base_url}}/{{api_prefix}}/notifications/tokens',
-        headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody(`{\n  "token": "{{fcm_token}}",\n  "platform": "android",\n  "deviceId": "postman-device-1",\n  "appVersion": "1.0.0",\n  "locale": "en-IN"\n}`),
-        description: 'Registers or refreshes an FCM token for the authenticated user. Multiple devices are supported by registering different tokens. Reusing a token reassigns ownership to the current authenticated user.',
-        event: testEvent(
-          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
-          "pm.test('token document returned', function () {",
-          "  const response = pm.response.json();",
-          "  pm.expect(response.success).to.equal(true);",
-          "  pm.expect(response.data).to.have.property('id');",
-          "  pm.expect(response.data).to.have.property('platform');",
-          "  pm.expect(response.data).to.not.have.property('token');",
-          "});"
-        ),
-      }),
-    },
-    {
-      name: '2. List Notifications And Capture ID',
-      ...request({
-        method: 'GET',
-        url: {
-          raw: '{{base_url}}/{{api_prefix}}/notifications?page=1&limit=20',
-          host: ['{{base_url}}'],
-          path: ['{{api_prefix}}', 'notifications'],
-          query: [
-            { key: 'page', value: '1', description: 'Page number' },
-            { key: 'limit', value: '20', description: 'Page size' },
-            { key: 'read', value: 'false', description: 'Optional read filter', disabled: true },
-            { key: 'type', value: 'hybrid', description: 'Optional notification type filter', disabled: true },
-            { key: 'eventType', value: 'booking.confirmed', description: 'Optional event filter', disabled: true },
-          ],
+      name: 'Token Management',
+      item: [
+        {
+          name: '1. Register FCM Token',
+          ...request({
+            method: 'POST',
+            url: '{{base_url}}/{{api_prefix}}/notifications/tokens',
+            headers: [{ key: 'Content-Type', value: 'application/json' }],
+            body: jsonBody(`{\n  "token": "{{fcm_token}}",\n  "platform": "android",\n  "deviceId": "postman-device-1",\n  "appVersion": "1.0.0"\n}`),
+            description: 'Registers or refreshes an FCM token for the authenticated user. Multiple devices are supported by registering different tokens. Reusing a token reassigns ownership to the current authenticated user.',
+            event: testEvent(
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "pm.test('token document returned', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response.success).to.equal(true);",
+              "  pm.expect(response.data).to.have.property('id');",
+              "  pm.expect(response.data).to.have.property('platform');",
+              "  pm.expect(response.data).to.not.have.property('token');",
+              "});"
+            ),
+          }),
         },
-        description: 'Returns notification history from MongoDB. FCM is only the real-time trigger; clients should use this REST endpoint as source of truth.',
-        event: testEvent(
-          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
-          "const response = pm.response.json();",
-          "pm.test('response uses paginated envelope', function () {",
-          "  pm.expect(response.data).to.be.an('array');",
-          "  pm.expect(response).to.have.nested.property('meta.pagination');",
-          "});",
-          "const notifications = Array.isArray(response.data) ? response.data : [];",
-          "const first = notifications[0];",
-          "if (first && first.id) {",
-          "  const notificationId = first.id;",
-          "  pm.collectionVariables.set('notification_id', notificationId);",
-          "  pm.globals.set('shared_notification_id', notificationId);",
-          "}"
-        ),
-      }),
+        {
+          name: '2. Unregister FCM Token',
+          ...request({
+            method: 'DELETE',
+            url: '{{base_url}}/{{api_prefix}}/notifications/tokens/{{fcm_token}}',
+            description: 'Revokes the current user device token. The token must belong to the authenticated user; otherwise the operation is a no-op.',
+            event: testEvent(
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "pm.test('revoked flag is present', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response.data).to.have.property('revoked');",
+              "});"
+            ),
+          }),
+        },
+      ],
     },
     {
-      name: '3. Get Notification Unread Count',
-      ...request({
-        method: 'GET',
-        url: '{{base_url}}/{{api_prefix}}/notifications/unread-count',
-        description: 'Returns the unread notification count for the authenticated user.',
-        event: testEvent(
-          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
-          "pm.test('unreadCount is present', function () {",
-          "  const response = pm.response.json();",
-          "  pm.expect(response.data).to.have.property('unreadCount');",
-          "});"
-        ),
-      }),
+      name: 'User Inbox',
+      item: [
+        {
+          name: '1. List Notifications And Capture ID',
+          ...request({
+            method: 'GET',
+            url: {
+              raw: '{{base_url}}/{{api_prefix}}/notifications/inbox?page=1&limit=20',
+              host: ['{{base_url}}'],
+              path: ['{{api_prefix}}', 'notifications', 'inbox'],
+              query: [
+                { key: 'page', value: '1', description: 'Page number' },
+                { key: 'limit', value: '20', description: 'Page size' },
+                { key: 'read', value: 'false', description: 'Optional read filter', disabled: true },
+                { key: 'type', value: 'hybrid', description: 'Optional notification type filter', disabled: true },
+                { key: 'eventType', value: 'booking.confirmed', description: 'Optional event filter', disabled: true },
+              ],
+            },
+            description: 'Returns notification history from MongoDB. FCM is only the real-time trigger; clients should use this REST endpoint as source of truth.',
+            event: testEvent(
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "const response = pm.response.json();",
+              "pm.test('response uses paginated envelope', function () {",
+              "  pm.expect(response.data).to.be.an('array');",
+              "  pm.expect(response).to.have.nested.property('meta.pagination');",
+              "});",
+              "const notifications = Array.isArray(response.data) ? response.data : [];",
+              "const first = notifications[0];",
+              "if (first && first.id) {",
+              "  const notificationId = first.id;",
+              "  pm.collectionVariables.set('notification_id', notificationId);",
+              "  pm.globals.set('shared_notification_id', notificationId);",
+              "}"
+            ),
+          }),
+        },
+        {
+          name: '2. Get Notification Unread Count',
+          ...request({
+            method: 'GET',
+            url: '{{base_url}}/{{api_prefix}}/notifications/inbox/unread-count',
+            description: 'Returns the unread notification count for the authenticated user.',
+            event: testEvent(
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "pm.test('unreadCount is present', function () {",
+              "  const response = pm.response.json();",
+              "  pm.expect(response.data).to.have.property('unreadCount');",
+              "});"
+            ),
+          }),
+        },
+        {
+          name: '3. Mark Notification Read',
+          ...request({
+            method: 'PATCH',
+            url: '{{base_url}}/{{api_prefix}}/notifications/inbox/{{notification_id}}',
+            headers: [{ key: 'Content-Type', value: 'application/json' }],
+            body: jsonBody(`{\n  "read": true\n}`),
+            description: 'Marks one notification as read. Run the list inbox request first to capture notification_id, or set it manually.',
+            event: testEvent("pm.test('status is 200 or 404', function () { pm.expect(pm.response.code).to.be.oneOf([200, 404]); });"),
+          }),
+        },
+        {
+          name: '4. Mark All Notifications Read',
+          ...request({
+            method: 'PATCH',
+            url: '{{base_url}}/{{api_prefix}}/notifications/inbox',
+            headers: [{ key: 'Content-Type', value: 'application/json' }],
+            body: jsonBody(`{\n  "read": true\n}`),
+            description: 'Marks all unread notifications for the authenticated user as read.',
+            event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
+          }),
+        },
+      ],
     },
     {
-      name: '4. Mark Notification Read',
-      ...request({
-        method: 'PATCH',
-        url: '{{base_url}}/{{api_prefix}}/notifications/{{notification_id}}',
-        headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody(`{\n  "read": true\n}`),
-        description: 'Marks one notification as read. Run the list request first to capture notification_id, or set it manually.',
-        event: testEvent("pm.test('status is 200 or 404', function () { pm.expect(pm.response.code).to.be.oneOf([200, 404]); });"),
-      }),
-    },
-    {
-      name: '5. Mark All Notifications Read',
-      ...request({
-        method: 'PATCH',
-        url: '{{base_url}}/{{api_prefix}}/notifications',
-        headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody(`{\n  "read": true\n}`),
-        description: 'Marks all unread notifications for the authenticated user as read.',
-        event: testEvent("pm.test('status is 200', function () { pm.response.to.have.status(200); });"),
-      }),
-    },
-    {
-      name: '6. Unregister FCM Token',
-      ...request({
-        method: 'DELETE',
-        url: '{{base_url}}/{{api_prefix}}/notifications/tokens',
-        headers: [{ key: 'Content-Type', value: 'application/json' }],
-        body: jsonBody(`{\n  "token": "{{fcm_token}}"\n}`),
-        description: 'Revokes the current user device token. The token must belong to the authenticated user; otherwise the operation is a no-op.',
-        event: testEvent(
-          "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
-          "pm.test('revoked flag is present', function () {",
-          "  const response = pm.response.json();",
-          "  pm.expect(response.data).to.have.property('revoked');",
-          "});"
-        ),
-      }),
+      name: 'Admin Broadcasts',
+      item: [
+        {
+          name: '1. Admin Create Broadcast',
+          ...request({
+            method: 'POST',
+            url: '{{base_url}}/{{api_prefix}}/notifications/broadcasts',
+            auth: bearerAuth('admin_access_token'),
+            headers: [{ key: 'Content-Type', value: 'application/json' }],
+            body: jsonBody(`{\n  "title": "Postman notification smoke test",\n  "body": "This notification broadcast was sent from Postman.",\n  "type": "hybrid",\n  "category": "admin_broadcast",\n  "audience": {\n    "mode": "customers"\n  },\n  "data": {\n    "route": "/notifications",\n    "source": "postman"\n  }\n}`),
+            description: 'Admin-only endpoint that creates and dispatches a broadcast notification.',
+            event: testEvent(
+              "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
+              "const response = pm.response.json();",
+              "pm.test('notification broadcast returned', function () {",
+              "  pm.expect(response.data).to.have.property('id');",
+              "  pm.expect(response.data.status).to.be.oneOf(['sending', 'sent', 'failed']);",
+              "});",
+              "if (response.data && response.data.id) {",
+              "  pm.collectionVariables.set('notification_id', response.data.id);",
+              "  pm.globals.set('shared_notification_id', response.data.id);",
+              "}"
+            ),
+          }),
+        },
+        {
+          name: '2. Admin List Broadcasts',
+          ...request({
+            method: 'GET',
+            url: {
+              raw: '{{base_url}}/{{api_prefix}}/notifications/broadcasts?page=1&limit=20',
+              host: ['{{base_url}}'],
+              path: ['{{api_prefix}}', 'notifications', 'broadcasts'],
+              query: [
+                { key: 'page', value: '1' },
+                { key: 'limit', value: '20' },
+                { key: 'status', value: 'sent', disabled: true },
+                { key: 'category', value: 'admin_broadcast', disabled: true },
+                { key: 'search', value: 'Postman', disabled: true },
+              ],
+            },
+            auth: bearerAuth('admin_access_token'),
+            description: 'Admin-only endpoint to list all notification broadcasts.',
+            event: testEvent(
+              "pm.test('status is 200', function () { pm.response.to.have.status(200); });",
+              "const response = pm.response.json();",
+              "pm.test('response uses paginated broadcast list', function () {",
+              "  pm.expect(response.data).to.be.an('array');",
+              "  pm.expect(response).to.have.nested.property('meta.pagination');",
+              "});",
+              "const first = Array.isArray(response.data) ? response.data[0] : null;",
+              "if (first && first.id) pm.collectionVariables.set('notification_id', first.id);"
+            ),
+          }),
+        },
+        {
+          name: '3. Admin Get Broadcast',
+          ...request({
+            method: 'GET',
+            url: '{{base_url}}/{{api_prefix}}/notifications/broadcasts/{{notification_id}}',
+            auth: bearerAuth('admin_access_token'),
+            description: 'Fetches one notification broadcast details with audience, metrics, and lifecycle metadata.',
+            event: testEvent(
+              "pm.test('status is 200 or 404', function () { pm.expect(pm.response.code).to.be.oneOf([200, 404]); });"
+            ),
+          }),
+        },
+        {
+          name: '4. Admin List Recipients',
+          ...request({
+            method: 'GET',
+            url: '{{base_url}}/{{api_prefix}}/notifications/broadcasts/{{notification_id}}/recipients?page=1&limit=25',
+            auth: bearerAuth('admin_access_token'),
+            description: 'Lists resolved broadcast recipients and per-recipient delivery counters.',
+            event: testEvent("pm.test('status is 200 or 404', function () { pm.expect(pm.response.code).to.be.oneOf([200, 404]); });"),
+          }),
+        },
+        {
+          name: '5. Admin List Inbox Items',
+          ...request({
+            method: 'GET',
+            url: {
+              raw: '{{base_url}}/{{api_prefix}}/notifications/broadcasts/{{notification_id}}/inbox-items?page=1&limit=20',
+              host: ['{{base_url}}'],
+              path: ['{{api_prefix}}', 'notifications', 'broadcasts', '{{notification_id}}', 'inbox-items'],
+              query: [
+                { key: 'page', value: '1' },
+                { key: 'limit', value: '20' },
+              ],
+            },
+            auth: bearerAuth('admin_access_token'),
+            description: 'Lists personal inbox notification copies created for this broadcast.',
+            event: testEvent("pm.test('status is 200 or 404', function () { pm.expect(pm.response.code).to.be.oneOf([200, 404]); });"),
+          }),
+        },
+        {
+          name: '6. Admin List Audit Logs',
+          ...request({
+            method: 'GET',
+            url: '{{base_url}}/{{api_prefix}}/notifications/broadcasts/{{notification_id}}/audits?limit=25',
+            auth: bearerAuth('admin_access_token'),
+            description: 'Lists broadcast audit events for create and delivery completed operations.',
+            event: testEvent("pm.test('status is 200 or 404', function () { pm.expect(pm.response.code).to.be.oneOf([200, 404]); });"),
+          }),
+        },
+      ],
     },
   ],
 };

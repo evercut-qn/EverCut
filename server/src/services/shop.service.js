@@ -19,7 +19,7 @@ import { buildPagination } from '../utils/pagination.utils.js';
 import { normalizeServicePricing } from '../utils/service-pricing.utils.js';
 import { normalizeShopSchedule } from '../utils/shop-schedule.utils.js';
 import { isValidUpiId, normalizePayoutString } from '../utils/payout-details.utils.js';
-import notificationEvents from './notification-events.service.js';
+import notificationEvents from './notifications/notification-events.service.js';
 import entitlementService from './subscription/entitlement.service.js';
 import * as mediaService from './media/media.service.js';
 import * as serviceCatalogService from './service-catalog.service.js';
@@ -528,7 +528,7 @@ export const getShops = async (query = {}) => {
     if (query.category) {
         return enrichAndSortShopSummaries(await shopRepository.findByCategory(
             query.category,
-            'shopName location coverR2Key address barberId',
+            'shopName location coverMediaId address barberId',
         ));
     }
 
@@ -565,7 +565,7 @@ export const getNearbyShops = async (coordinates) => {
     return enrichAndSortShopSummaries(await shopRepository.findNearby(
         coordinates,
         config.shop.nearbyDistanceMeters,
-        'shopName address coverR2Key facilities barberId',
+        'shopName address coverMediaId facilities barberId',
     ));
 };
 
@@ -573,7 +573,7 @@ export const getNearbyServicesByGender = async (coordinates, gender, searchTerm)
     const nearbyShops = await shopRepository.findNearby(
         coordinates,
         config.shop.nearbyDistanceMeters,
-        'shopName address coverR2Key barberId',
+        'shopName address coverMediaId barberId',
     );
 
     if (!nearbyShops.length) return { shops: [], services: [] };
@@ -585,7 +585,7 @@ export const getNearbyServicesByGender = async (coordinates, gender, searchTerm)
     const services = await serviceRepository.findByShopIds(
         shopIds,
         serviceFilter,
-        'serviceName shopId serviceFor imageR2Key serviceType',
+        'serviceName shopId serviceFor imageMediaId serviceType',
     );
 
     return {

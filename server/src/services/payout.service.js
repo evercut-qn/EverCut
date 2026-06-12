@@ -5,7 +5,7 @@ import barberRepository from '../repositories/barber.repository.js';
 import shopRepository from '../repositories/shop.repository.js';
 import userRepository from '../repositories/user.repository.js';
 import cashfreePayoutAdapter from '../adapters/cashfree/cashfree-payout.adapter.js';
-import notificationEvents from './notification-events.service.js';
+import notificationEvents from './notifications/notification-events.service.js';
 import logger from '../utils/logger.js';
 import config from '../config/index.js';
 import {

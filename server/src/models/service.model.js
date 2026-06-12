@@ -27,8 +27,9 @@ const serviceSchema = new mongoose.Schema(
             enum: ALL_SERVICE_FOR,
             default: 'unisex',
         },
-        imageR2Key: {
+        imageMediaId: {
             type: String,
+            ref: 'Media',
             default: null,
         },
 

@@ -19,8 +19,6 @@ export const serializeMedia = (media) => {
         url,
         contentType: plain.contentType,
         fileSize: plain.actualSize || plain.declaredSize,
-        entityId: toIdString(plain.entityId),
-        entityType: plain.entityType ?? null,
         createdAt: plain.createdAt,
         updatedAt: plain.updatedAt,
     });

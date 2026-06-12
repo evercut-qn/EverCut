@@ -54,7 +54,27 @@ class UserRepository {
         return User.countDocuments(trustQueryOperators(filter));
     }
 
+    async findActiveByRoles(roles = [], filter = {}) {
+        if (!roles.length) return [];
 
+        const { search } = filter;
+        const query = {
+            roleType: { $in: roles },
+            isActive: true,
+        };
+        if (search) {
+            const regex = new RegExp(escapeRegex(search), 'i');
+            query.$or = [
+                { phoneNumber: regex },
+                { email: regex },
+            ];
+        }
+
+        return User.find(trustQueryOperators(query))
+            .sort({ createdAt: -1 })
+            .select('email phoneNumber isActive createdAt lastLoginAt roleType')
+            .lean();
+    }
 
     async searchCustomerUsers(query = {}, options = {}) {
         const filter = { roleType: ROLES.CUSTOMER };

@@ -15,7 +15,7 @@ export const serializeEmployee = (employee, options = {}) => {
         shopId: plain.shopId?.id || toIdString(plain.shopId),
         firstName: plain.firstName ?? null,
         lastName: plain.lastName ?? null,
-        photoUrl: buildMediaUrl(raw.photoR2Key),
+        photoUrl: buildMediaUrl(raw.photoMediaId?.r2Key),
         gender: plain.gender ?? null,
         workingHours: plain.workingHours ?? null,
         isActive: plain.isActive ?? true,

@@ -13,6 +13,12 @@ const router = Router();
 
 router.use(authenticate);
 
+router.get('/me', authorize(ROLES.CUSTOMER), customerController.getMe);
+router.patch('/me', authorize(ROLES.CUSTOMER), validate(updateCustomerSchema, 'body'), customerController.updateMe);
+
+router.patch('/me/media/picture', authorize(ROLES.CUSTOMER), validate(mediaIdBodySchema, 'body'), customerController.updateMyPicture);
+router.delete('/me/media/picture', authorize(ROLES.CUSTOMER), customerController.removeMyPicture);
+
 router.get(
     '/',
     authorize(ROLES.ADMIN),
@@ -26,11 +32,5 @@ router.get(
     validate(customerIdParamSchema, 'params'),
     customerController.getCustomerById,
 );
-
-router.get('/me', authorize(ROLES.CUSTOMER), customerController.getMe);
-router.patch('/me', authorize(ROLES.CUSTOMER), validate(updateCustomerSchema, 'body'), customerController.updateMe);
-
-router.patch('/me/media/picture', authorize(ROLES.CUSTOMER), validate(mediaIdBodySchema, 'body'), customerController.updateMyPicture);
-router.delete('/me/media/picture', authorize(ROLES.CUSTOMER), customerController.removeMyPicture);
 
 export default router;

@@ -7,11 +7,11 @@ class EmployeeRepository {
     }
 
     async findById(id) {
-        return Employee.findById(id);
+        return Employee.findById(id).populate({ path: 'photoMediaId', select: 'r2Key' });
     }
 
     async findByShopId(shopId, options = {}) {
-        const query = Employee.find({ shopId });
+        const query = Employee.find({ shopId }).populate({ path: 'photoMediaId', select: 'r2Key' });
         
         if (options.skip !== undefined) query.skip(options.skip);
         if (options.limit !== undefined) query.limit(options.limit);
@@ -78,7 +78,7 @@ class EmployeeRepository {
                 },
             },
             queryOptions,
-        ).select('firstName lastName photoR2Key');
+        ).select('firstName lastName photoMediaId').populate({ path: 'photoMediaId', select: 'r2Key' });
     }
 
     /**
@@ -143,7 +143,7 @@ class EmployeeRepository {
                 },
             },
             queryOptions,
-        ).select('firstName lastName photoR2Key workingHours');
+        ).select('firstName lastName photoMediaId workingHours').populate({ path: 'photoMediaId', select: 'r2Key' });
     }
 
     async moveTimeRange(employeeId, range, options = {}) {
@@ -196,7 +196,7 @@ class EmployeeRepository {
                 ...queryOptions,
                 arrayFilters: [{ 'bookingRange.bookingId': bookingId }],
             },
-        ).select('firstName lastName photoR2Key workingHours');
+        ).select('firstName lastName photoMediaId workingHours').populate({ path: 'photoMediaId', select: 'r2Key' });
     }
 
     /**
@@ -278,7 +278,7 @@ class EmployeeRepository {
     }
 
     async findByIdLean(id, fields) {
-        return Employee.findById(id).select(fields).lean();
+        return Employee.findById(id).select(fields).populate({ path: 'photoMediaId', select: 'r2Key' }).lean();
     }
 }
 

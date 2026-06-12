@@ -218,11 +218,11 @@ All media is served through `media.evercut.in`, handled by a **Cloudflare Worker
 
 | Old System | New System |
 |---|---|
-| Full Cloudinary URL (vendor-tied) | Short R2 key — `images/gallery/{uuid}.jpg` |
+| Full Cloudinary URL (vendor-tied) | String UUID reference to `Media` document — e.g. `photoMediaId` |
 | Cloudinary public ID | Not needed |
-| Spread across `photoUrl`, `coverUrl`, etc. | Unified `r2Key` field per media record |
+| Spread across `photoUrl`, `coverUrl`, etc. | Unified `Media` collection containing R2 metadata (`r2Key`, etc.) |
 
-The full delivery URL is constructed at response time from the R2 key. The database no longer has any dependency on an external vendor's URL format.
+The database now uses normalized references (`photoMediaId`, `coverMediaId`, `imageMediaId`, and `galleryMediaIds` arrays) to represent attachments. The full delivery URL is resolved at serialization time by traversing the populated `Media` record's `r2Key`. No back-references (`entityId`/`entityType`) exist in the `Media` collection.
 
 ---
 
@@ -233,11 +233,12 @@ Cloudflare R2 bucket (private)
 ├── images/
 │   ├── avatars/        → Customer + barber profile photos
 │   ├── covers/         → Shop cover images
-│   ├── gallery/        → Work sample photos
+│   ├── gallery/        → Gallery photos only
 │   ├── employees/      → Staff photos
 │   └── thumbnails/     → Video preview frames
 └── videos/
     ├── raw/            → Original uploads (deleted after transcoding)
+    ├── gallery/        → Gallery videos only
     └── hls/{videoId}/  → Processed stream segments + playlist files
 ```
 
@@ -354,9 +355,10 @@ For large video files, the app uses **multipart upload**:
 - `cloudinaryId` and legacy URL fields across `Shop`, `Employee`, `Customer` models
 
 **Added:**
-- AWS S3-compatible SDK (Cloudflare R2 implements the S3 API — no custom client needed)
+- AWS S3-compatible SDK (Cloudflare R2 implements the S3 API)
 - Unified `Media` module with its own model, service, controller, and routes
-- `r2Key` fields across entity models
+- Normalized media reference fields (`photoMediaId`, `coverMediaId`, `imageMediaId`) pointing to `Media` collection
+- Explicit `galleryMediaIds` reference array directly on the `Shop` model
 - Cloudflare Worker for edge delivery and token verification
 
 ---
