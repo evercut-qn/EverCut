@@ -36,7 +36,7 @@ const serializeOwner = (barber = {}, userContext = null, privateView = false) =>
         dateOfBirth: privateView ? (plain.dateOfBirth ?? null) : undefined,
         email: privateView ? (user?.email ?? null) : undefined,
         phoneNumber: privateView ? (user?.phoneNumber ?? null) : undefined,
-        photoUrl: buildMediaUrl(rawBarber.photoR2Key),
+        photoUrl: buildMediaUrl(rawBarber.photoMediaId?.r2Key),
     });
 };
 
@@ -76,7 +76,7 @@ export const serializeShopSummary = (shop) => {
         location: plain.location ?? null,
         category: plain.category ?? null,
         targetCustomers: plain.targetCustomers ?? null,
-        coverUrl: buildMediaUrl(raw.coverR2Key),
+        coverUrl: buildMediaUrl(raw.coverMediaId?.r2Key),
         amenities: plain.facilities ?? [],
         isOpen: plain.isOpen,
         workingDays: plain.availableDays,
@@ -110,7 +110,7 @@ export const serializeShopProfile = (shop, options = {}) => {
         workingDays: plain.availableDays ?? [],
         workingHours: toWorkingHours(plain),
         breakTimes: toBreakTimes(plain.breakTimes),
-        coverUrl: buildMediaUrl(raw.coverR2Key),
+        coverUrl: buildMediaUrl(raw.coverMediaId?.r2Key),
         isOpen: plain.isOpen ?? true,
         missedConfirmations: {
             count: plain.missedConfirmationCount || 0,

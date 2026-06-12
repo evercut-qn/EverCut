@@ -229,15 +229,6 @@ export const MEDIA_PURPOSE = Object.freeze({
 
 export const ALL_MEDIA_PURPOSES = Object.values(MEDIA_PURPOSE);
 
-export const MEDIA_ENTITY_TYPE = Object.freeze({
-    BARBER: 'Barber',
-    SHOP: 'Shop',
-    EMPLOYEE: 'Employee',
-    CUSTOMER: 'Customer',
-    SERVICE: 'Service',
-});
-
-export const ALL_MEDIA_ENTITY_TYPES = [...Object.values(MEDIA_ENTITY_TYPE), null];
 
 export const MIME_TO_EXTENSION = Object.freeze({
     'image/jpeg': 'jpg',

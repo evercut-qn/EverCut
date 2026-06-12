@@ -1,16 +1,18 @@
 import crypto from 'crypto';
+import mongoose from 'mongoose';
 import mediaRepository from '../../repositories/media.repository.js';
 import barberRepository from '../../repositories/barber.repository.js';
 import shopRepository from '../../repositories/shop.repository.js';
 import subscriptionRepository from '../../repositories/subscription.repository.js';
+import userRepository from '../../repositories/user.repository.js';
 import config from '../../config/index.js';
-import { BadRequestError, NotFoundError } from '../../utils/api-error.js';
+import { BadRequestError, NotFoundError, ForbiddenError } from '../../utils/api-error.js';
 import {
-    MEDIA_ENTITY_TYPE,
     MEDIA_PURPOSE,
     MEDIA_STATUS,
     MEDIA_TYPE,
     MIME_TO_EXTENSION,
+    ROLES,
 } from '../../utils/constants.js';
 import { getPlanCapabilities, PLAN_IDS } from '../../config/subscription.config.js';
 import { serializeMedia, serializeMediaList } from '../../serializers/media.serializer.js';
@@ -25,8 +27,16 @@ const resolveMediaType = (contentType) => {
     throw new BadRequestError('Unsupported media content type');
 };
 
-const buildR2Key = (purpose, contextId, mediaId, extension) => {
+const buildR2Key = (purpose, contextId, mediaId, extension, mediaType) => {
     const safeContext = String(contextId || 'unassigned').replace(/[^a-zA-Z0-9-_]/g, '-');
+    if (mediaType === MEDIA_TYPE.VIDEO) {
+        const videoKeyMap = {
+            [MEDIA_PURPOSE.GALLERY]: `videos/gallery/${safeContext}/${mediaId}.${extension}`,
+            [MEDIA_PURPOSE.VIDEO_RAW]: `videos/raw/${mediaId}.${extension}`,
+            [MEDIA_PURPOSE.VIDEO_THUMBNAIL]: `thumbnails/videos/${mediaId}.${extension}`,
+        };
+        return videoKeyMap[purpose] || `videos/misc/${safeContext}/${mediaId}.${extension}`;
+    }
     const keyMap = {
         [MEDIA_PURPOSE.AVATAR]: `images/avatars/${safeContext}/${mediaId}.${extension}`,
         [MEDIA_PURPOSE.PROFILE]: `images/profiles/${safeContext}/${mediaId}.${extension}`,
@@ -91,6 +101,23 @@ const incrementGalleryUploadCounter = async (userId, media) => {
 export const requestUploadUrl = async (userId, { contentType, sizeBytes, purpose }) => {
     const ownerKey = userId.toString();
     const mediaType = resolveMediaType(contentType);
+
+    if (mediaType === MEDIA_TYPE.VIDEO) {
+        let isBarber = false;
+        if (mongoose.Types.ObjectId.isValid(userId)) {
+            const user = await userRepository.findById(userId);
+            if (user?.roleType === ROLES.BARBER) {
+                isBarber = true;
+            }
+        }
+        if (!isBarber) {
+            throw new ForbiddenError('Only barbers may upload videos');
+        }
+        if (purpose !== MEDIA_PURPOSE.GALLERY) {
+            throw new BadRequestError('Video uploads are only allowed for gallery purpose');
+        }
+    }
+
     if (!validateContentType(contentType, mediaType)) {
         throw new BadRequestError('Unsupported media content type');
     }
@@ -102,7 +129,7 @@ export const requestUploadUrl = async (userId, { contentType, sizeBytes, purpose
     const mediaId = crypto.randomUUID();
     const extension = MIME_TO_EXTENSION[contentType] || 'bin';
     const contextId = ownerKey;
-    const r2Key = buildR2Key(purpose, contextId, mediaId, extension);
+    const r2Key = buildR2Key(purpose, contextId, mediaId, extension, mediaType);
     const uploadUrl = await storageProvider.generateUploadUrl({
         key: r2Key,
         contentType,
@@ -206,19 +233,26 @@ export const deleteMedia = async (userId, mediaId) => {
         logger.warn('Deferred R2 delete failed', { mediaId, error: err.message });
     });
 
-    if (existing.status === MEDIA_STATUS.HIDDEN && existing.purpose === MEDIA_PURPOSE.GALLERY) {
-        const barber = await resolveBarberForMediaOwner(userId);
-        const subscription = barber
-            ? await subscriptionRepository.findByBarberId(barber._id)
-            : null;
-        if (barber && subscription && existing.entityId) {
-            const lifecycle = await import('../subscription/subscription-lifecycle.service.js');
-            await lifecycle.default.maybeReactivateOneAfterDelete(
-                barber._id,
-                existing.entityId,
-                existing.type,
-                subscription.planId,
-            );
+    if (existing.purpose === MEDIA_PURPOSE.GALLERY) {
+        const shop = await shopRepository.findByBarberUserId(userId);
+        if (shop) {
+            await shopRepository.pullGalleryMedia(shop._id, mediaId);
+            
+            if (existing.status === MEDIA_STATUS.HIDDEN) {
+                const barber = await resolveBarberForMediaOwner(userId);
+                const subscription = barber
+                    ? await subscriptionRepository.findByBarberId(barber._id)
+                    : null;
+                if (barber && subscription) {
+                    const lifecycle = await import('../subscription/subscription-lifecycle.service.js');
+                    await lifecycle.default.maybeReactivateOneAfterDelete(
+                        barber._id,
+                        shop._id,
+                        existing.type,
+                        subscription.planId,
+                    );
+                }
+            }
         }
     }
 
@@ -247,8 +281,8 @@ export const attachGalleryMedia = async (ownerId, mediaIds) => {
         const newPhotos = candidateMedia.filter((media) => media.type === MEDIA_TYPE.IMAGE).length;
         const newVideos = candidateMedia.filter((media) => media.type === MEDIA_TYPE.VIDEO).length;
         const [activePhotos, activeVideos] = await Promise.all([
-            mediaRepository.countActiveGalleryMedia(shop._id, MEDIA_TYPE.IMAGE),
-            mediaRepository.countActiveGalleryMedia(shop._id, MEDIA_TYPE.VIDEO),
+            mediaRepository.countActiveGalleryMedia(shop.galleryMediaIds, MEDIA_TYPE.IMAGE),
+            mediaRepository.countActiveGalleryMedia(shop.galleryMediaIds, MEDIA_TYPE.VIDEO),
         ]);
 
         if (activePhotos + newPhotos > capabilities.maxPhotos) {
@@ -261,12 +295,11 @@ export const attachGalleryMedia = async (ownerId, mediaIds) => {
 
     const attached = [];
     for (const media of candidateMedia) {
-        const attachedMedia = await mediaRepository.attachReadyMedia(media._id, ownerId, {
-            entityId: shop._id,
-            entityType: MEDIA_ENTITY_TYPE.SHOP,
+        const attachedMedia = await mediaRepository.updateById(media._id, {
             purpose: MEDIA_PURPOSE.GALLERY,
         });
-        if (!attachedMedia) throw new BadRequestError(`Media ${media._id} not found, unconfirmed, or already attached`);
+        if (!attachedMedia) throw new BadRequestError(`Media ${media._id} failed to attach`);
+        await shopRepository.addGalleryMedia(shop._id, media._id);
         attached.push(attachedMedia);
     }
 
@@ -277,18 +310,27 @@ export const getShopGallery = async (ownerId) => {
     const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop profile');
 
-    const items = await mediaRepository.findByEntity(shop._id, MEDIA_ENTITY_TYPE.SHOP, { purpose: MEDIA_PURPOSE.GALLERY });
-    return serializeMediaList(items);
+    const populatedShop = await shop.populate({
+        path: 'galleryMediaIds',
+        match: { status: MEDIA_STATUS.READY }
+    });
+    return serializeMediaList(populatedShop.galleryMediaIds);
 };
 
-export const getGalleryByShopId = async (shopId) => (
-    mediaRepository.findByEntity(shopId, MEDIA_ENTITY_TYPE.SHOP, { purpose: MEDIA_PURPOSE.GALLERY })
-);
+export const getGalleryByShopId = async (shopId) => {
+    const shop = await shopRepository.findById(shopId);
+    if (!shop) return [];
+    const populatedShop = await shop.populate({
+        path: 'galleryMediaIds',
+        match: { status: MEDIA_STATUS.READY }
+    });
+    return populatedShop.galleryMediaIds;
+};
 
 export const getGalleryUsage = async (ownerId) => {
     const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop profile');
-    return mediaRepository.getStatsByEntity(shop._id, MEDIA_ENTITY_TYPE.SHOP);
+    return mediaRepository.getStatsForGallery(shop.galleryMediaIds);
 };
 
 export const updateShopCover = async (ownerId, mediaId) => {
@@ -298,18 +340,20 @@ export const updateShopCover = async (ownerId, mediaId) => {
 
     const media = await mediaRepository.findReadyByIdAndUser(mediaId, ownerId);
     if (!media) throw new BadRequestError('Invalid or unconfirmed cover image');
+    if (media.type !== MEDIA_TYPE.IMAGE) {
+        throw new BadRequestError('Cover photo must be an image');
+    }
 
-    const oldR2Key = shop.coverR2Key;
-    const updated = await shopRepository.updateByBarberUserId(ownerId, { coverR2Key: media.r2Key });
+    const oldMediaId = shop.coverMediaId;
+    const updated = await shopRepository.updateByBarberUserId(ownerId, { coverMediaId: media._id });
     await mediaRepository.updateById(mediaId, {
-        entityId: shop._id,
-        entityType: MEDIA_ENTITY_TYPE.SHOP,
         purpose: MEDIA_PURPOSE.COVER,
     });
-    if (oldR2Key && oldR2Key !== media.r2Key) {
-        storageProvider.deleteObject(oldR2Key).catch(() => {});
+    if (oldMediaId && oldMediaId !== media._id) {
+        await cleanupMediaById(oldMediaId);
     }
-    return { coverUrl: buildMediaUrl(updated.coverR2Key) };
+    const populatedShop = await updated.populate({ path: 'coverMediaId', select: 'r2Key' });
+    return { coverUrl: buildMediaUrl(populatedShop.coverMediaId?.r2Key) };
 };
 
 export const updateBarberProfilePicture = async (ownerId, mediaId) => {
@@ -319,19 +363,21 @@ export const updateBarberProfilePicture = async (ownerId, mediaId) => {
 
     const media = await mediaRepository.findReadyByIdAndUser(mediaId, ownerId);
     if (!media) throw new BadRequestError('Invalid or unconfirmed photo');
-
-    const oldR2Key = barber.photoR2Key;
-    const updated = await barberRepository.updateByUserId(ownerId, { photoR2Key: media.r2Key });
-    await mediaRepository.updateById(mediaId, {
-        entityId: barber._id,
-        entityType: MEDIA_ENTITY_TYPE.BARBER,
-        purpose: MEDIA_PURPOSE.PROFILE,
-    });
-    if (oldR2Key && oldR2Key !== media.r2Key) {
-        storageProvider.deleteObject(oldR2Key).catch(() => {});
+    if (media.type !== MEDIA_TYPE.IMAGE) {
+        throw new BadRequestError('Profile picture must be an image');
     }
 
-    const photoUrl = buildMediaUrl(updated.photoR2Key);
+    const oldMediaId = barber.photoMediaId;
+    const updated = await barberRepository.updateByUserId(ownerId, { photoMediaId: media._id });
+    await mediaRepository.updateById(mediaId, {
+        purpose: MEDIA_PURPOSE.PROFILE,
+    });
+    if (oldMediaId && oldMediaId !== media._id) {
+        await cleanupMediaById(oldMediaId);
+    }
+
+    const populatedBarber = await updated.populate({ path: 'photoMediaId', select: 'r2Key' });
+    const photoUrl = buildMediaUrl(populatedBarber.photoMediaId?.r2Key);
     return { photoUrl, profilePhotoUrl: photoUrl, ownerPhotoUrl: photoUrl };
 };
 
@@ -343,35 +389,32 @@ export const updateCustomerProfilePicture = async (ownerId, mediaId) => {
 
     const media = await mediaRepository.findReadyByIdAndUser(mediaId, ownerId);
     if (!media) throw new BadRequestError('Invalid or unconfirmed photo');
-
-    const oldR2Key = customer.photoR2Key;
-    const updated = await customerRepository.updateByUserId(ownerId, { photoR2Key: media.r2Key });
-    await mediaRepository.updateById(mediaId, {
-        entityId: customer._id,
-        entityType: MEDIA_ENTITY_TYPE.CUSTOMER,
-        purpose: MEDIA_PURPOSE.PROFILE,
-    });
-    if (oldR2Key && oldR2Key !== media.r2Key) {
-        storageProvider.deleteObject(oldR2Key).catch(() => {});
-        const oldMedia = await mediaRepository.findByR2Key(oldR2Key);
-        if (oldMedia) await mediaRepository.softDeleteById(oldMedia._id);
+    if (media.type !== MEDIA_TYPE.IMAGE) {
+        throw new BadRequestError('Profile picture must be an image');
     }
 
-    return { photoUrl: buildMediaUrl(updated.photoR2Key) };
+    const oldMediaId = customer.photoMediaId;
+    const updated = await customerRepository.updateByUserId(ownerId, { photoMediaId: media._id });
+    await mediaRepository.updateById(mediaId, {
+        purpose: MEDIA_PURPOSE.PROFILE,
+    });
+    if (oldMediaId && oldMediaId !== media._id) {
+        await cleanupMediaById(oldMediaId);
+    }
+
+    const populatedCustomer = await updated.populate({ path: 'photoMediaId', select: 'r2Key' });
+    return { photoUrl: buildMediaUrl(populatedCustomer.photoMediaId?.r2Key) };
 };
 
 export const removeShopCover = async (ownerId) => {
     const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop profile');
 
-    const oldR2Key = shop.coverR2Key;
-    if (!oldR2Key) return { message: 'No cover photo to remove' };
+    const oldMediaId = shop.coverMediaId;
+    if (!oldMediaId) return { message: 'No cover photo to remove' };
 
-    await shopRepository.updateByBarberUserId(ownerId, { coverR2Key: null });
-
-    storageProvider.deleteObject(oldR2Key).catch(() => {});
-    const oldMedia = await mediaRepository.findByR2Key(oldR2Key);
-    if (oldMedia) await mediaRepository.softDeleteById(oldMedia._id);
+    await shopRepository.updateByBarberUserId(ownerId, { coverMediaId: null });
+    await cleanupMediaById(oldMediaId);
 
     return { message: 'Cover photo removed successfully' };
 };
@@ -380,14 +423,11 @@ export const removeBarberProfilePicture = async (ownerId) => {
     const barber = await barberRepository.findByUserId(ownerId);
     if (!barber) throw new NotFoundError('Barber profile');
 
-    const oldR2Key = barber.photoR2Key;
-    if (!oldR2Key) return { message: 'No profile picture to remove' };
+    const oldMediaId = barber.photoMediaId;
+    if (!oldMediaId) return { message: 'No profile picture to remove' };
 
-    await barberRepository.updateByUserId(ownerId, { photoR2Key: null });
-
-    storageProvider.deleteObject(oldR2Key).catch(() => {});
-    const oldMedia = await mediaRepository.findByR2Key(oldR2Key);
-    if (oldMedia) await mediaRepository.softDeleteById(oldMedia._id);
+    await barberRepository.updateByUserId(ownerId, { photoMediaId: null });
+    await cleanupMediaById(oldMediaId);
 
     return { message: 'Profile picture removed successfully' };
 };
@@ -397,14 +437,11 @@ export const removeCustomerProfilePicture = async (ownerId) => {
     const customer = await customerRepository.findByUserId(ownerId);
     if (!customer) throw new NotFoundError('Customer profile');
 
-    const oldR2Key = customer.photoR2Key;
-    if (!oldR2Key) return { message: 'No profile picture to remove' };
+    const oldMediaId = customer.photoMediaId;
+    if (!oldMediaId) return { message: 'No profile picture to remove' };
 
-    await customerRepository.updateByUserId(ownerId, { photoR2Key: null });
-
-    storageProvider.deleteObject(oldR2Key).catch(() => {});
-    const oldMedia = await mediaRepository.findByR2Key(oldR2Key);
-    if (oldMedia) await mediaRepository.softDeleteById(oldMedia._id);
+    await customerRepository.updateByUserId(ownerId, { photoMediaId: null });
+    await cleanupMediaById(oldMediaId);
 
     return { message: 'Profile picture removed successfully' };
 };
@@ -413,6 +450,9 @@ export const resolveMediaForEntity = async (userId, mediaId) => {
     if (!mediaId) return null;
     const media = await mediaRepository.findReadyByIdAndUser(mediaId, userId);
     if (!media) throw new BadRequestError('Invalid or unconfirmed media');
+    if (media.type !== MEDIA_TYPE.IMAGE) {
+        throw new BadRequestError('Media must be an image');
+    }
     return media;
 };
 
@@ -422,12 +462,53 @@ export const resolveReadyMediaById = async (mediaId) => {
     if (!media || media.status !== MEDIA_STATUS.READY) {
         throw new BadRequestError('Invalid or unconfirmed media');
     }
+    if (media.type !== MEDIA_TYPE.IMAGE) {
+        throw new BadRequestError('Media must be an image');
+    }
     return media;
 };
 
-export const linkMediaToEntity = async (mediaId, entityId, entityType, purpose) => {
-    if (!mediaId) return null;
-    return mediaRepository.updateById(mediaId, { entityId, entityType, purpose });
+export const deleteObjectByKey = async (r2Key) => storageProvider.deleteObject(r2Key);
+
+export const cleanupMediaById = async (mediaId) => {
+    if (!mediaId) return;
+    const media = await mediaRepository.findById(mediaId);
+    if (media && media.status !== MEDIA_STATUS.DELETED && media.userId !== 'system') {
+        storageProvider.deleteObject(media.r2Key).catch((err) => {
+            logger.warn('Cleanup R2 delete failed', { r2Key: media.r2Key, error: err.message });
+        });
+        await mediaRepository.softDeleteById(media._id);
+    }
 };
 
-export const deleteObjectByKey = async (r2Key) => storageProvider.deleteObject(r2Key);
+export const cleanupCustomMedia = async (r2Key) => {
+    if (!r2Key) return;
+    const media = await mediaRepository.findByR2Key(r2Key);
+    if (media && media.status !== MEDIA_STATUS.DELETED && media.userId !== 'system') {
+        storageProvider.deleteObject(media.r2Key).catch((err) => {
+            logger.warn('Cleanup R2 delete failed', { r2Key: media.r2Key, error: err.message });
+        });
+        await mediaRepository.softDeleteById(media._id);
+    }
+};
+
+export const getOrCreateSystemMedia = async (r2Key) => {
+    if (!r2Key) return null;
+    let media = await mediaRepository.findByR2Key(r2Key);
+    if (!media) {
+        media = await mediaRepository.create({
+            _id: `system-${r2Key.replace(/[^a-zA-Z0-9]/g, '-')}`,
+            userId: 'system',
+            type: 'image',
+            status: MEDIA_STATUS.READY,
+            purpose: 'service',
+            r2Key,
+            r2Bucket: config.r2.bucket,
+            contentType: 'image/jpeg',
+            declaredSize: 1,
+            uploadExpiresAt: new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000),
+            confirmedAt: new Date(),
+        });
+    }
+    return media._id;
+};

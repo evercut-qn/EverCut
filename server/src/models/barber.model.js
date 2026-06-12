@@ -60,8 +60,9 @@ const barberSchema = new mongoose.Schema(
             min: 0,
             default: 0,
         },
-        photoR2Key: {
+        photoMediaId: {
             type: String,
+            ref: 'Media',
             default: null,
         },
         upiId: {

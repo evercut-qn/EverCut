@@ -19,53 +19,27 @@ class MediaRepository {
         return Media.findOne({ _id: id, userId, status: MEDIA_STATUS.READY });
     }
 
-    async findByEntity(entityId, entityType, extraFilter = {}, options = {}) {
-        const filter = trustQueryOperators({
-            entityId,
-            entityType,
-            status: MEDIA_STATUS.READY,
-            ...extraFilter,
-        });
-        const query = Media.find(filter).sort({ createdAt: -1 });
-
-        if (options.skip !== undefined) query.skip(options.skip);
-        if (options.limit !== undefined) query.limit(options.limit);
-        return query.lean();
-    }
-
-    async countByEntity(entityId, entityType, extraFilter = {}) {
-        return Media.countDocuments(trustQueryOperators({
-            entityId,
-            entityType,
-            status: MEDIA_STATUS.READY,
-            ...extraFilter,
-        }));
-    }
-
-    async countActiveGalleryMedia(shopId, mediaType) {
+    async countActiveGalleryMedia(galleryMediaIds, mediaType) {
         return Media.countDocuments({
-            entityId: shopId,
-            entityType: 'Shop',
+            _id: { $in: galleryMediaIds || [] },
             purpose: 'gallery',
             type: mediaType,
             status: MEDIA_STATUS.READY,
         });
     }
 
-    async countHiddenGalleryMedia(shopId, mediaType) {
+    async countHiddenGalleryMedia(galleryMediaIds, mediaType) {
         return Media.countDocuments({
-            entityId: shopId,
-            entityType: 'Shop',
+            _id: { $in: galleryMediaIds || [] },
             purpose: 'gallery',
             type: mediaType,
             status: MEDIA_STATUS.HIDDEN,
         });
     }
 
-    async findActiveGalleryMedia(shopId, mediaType, { sort, limit } = {}) {
+    async findActiveGalleryMedia(galleryMediaIds, mediaType, { sort, limit } = {}) {
         let query = Media.find({
-            entityId: shopId,
-            entityType: 'Shop',
+            _id: { $in: galleryMediaIds || [] },
             purpose: 'gallery',
             type: mediaType,
             status: MEDIA_STATUS.READY,
@@ -75,10 +49,9 @@ class MediaRepository {
         return query.lean();
     }
 
-    async findHiddenGalleryMedia(shopId, mediaType, { sort, limit } = {}) {
+    async findHiddenGalleryMedia(galleryMediaIds, mediaType, { sort, limit } = {}) {
         let query = Media.find({
-            entityId: shopId,
-            entityType: 'Shop',
+            _id: { $in: galleryMediaIds || [] },
             purpose: 'gallery',
             type: mediaType,
             status: MEDIA_STATUS.HIDDEN,
@@ -119,24 +92,30 @@ class MediaRepository {
         );
     }
 
-    async softDeleteByIdAndEntity(id, entityId) {
-        return Media.findOneAndUpdate(
-            { _id: id, entityId, status: MEDIA_STATUS.READY },
-            { $set: { status: MEDIA_STATUS.DELETED } },
-            { returnDocument: 'after' },
-        );
-    }
-
-    async getStatsByEntity(entityId, entityType) {
+    async getStatsForGallery(galleryMediaIds) {
         const sizeResult = await Media.aggregate([
-            { $match: { entityId, entityType, status: MEDIA_STATUS.READY, purpose: 'gallery' } },
+            { $match: { _id: { $in: galleryMediaIds || [] }, status: MEDIA_STATUS.READY, purpose: 'gallery' } },
             { $group: { _id: null, totalSize: { $sum: '$actualSize' } } },
         ]);
 
-        const totalItems = await this.countByEntity(entityId, entityType, { purpose: 'gallery' });
+        const totalPhotos = await Media.countDocuments({
+            _id: { $in: galleryMediaIds || [] },
+            purpose: 'gallery',
+            type: 'image',
+            status: MEDIA_STATUS.READY,
+        });
+
+        const totalVideos = await Media.countDocuments({
+            _id: { $in: galleryMediaIds || [] },
+            purpose: 'gallery',
+            type: 'video',
+            status: MEDIA_STATUS.READY,
+        });
+
         return {
-            totalItems,
-            totalPhotos: totalItems,
+            totalItems: totalPhotos + totalVideos,
+            totalPhotos,
+            totalVideos,
             totalSize: sizeResult[0]?.totalSize || 0,
         };
     }

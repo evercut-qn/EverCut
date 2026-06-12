@@ -1,5 +1,6 @@
 import { BadRequestError } from '../utils/api-error.js';
 import { storeValidatedRequestData } from '../utils/request-validation.utils.js';
+import logger from '../utils/logger.js';
 
 /**
  * Generic validation middleware factory.
@@ -24,6 +25,11 @@ export const validate = (schema, source = 'body') => {
         });
 
         if (error) {
+            logger.error('Joi validation failed details', {
+                error: error.message,
+                details: error.details,
+                body: req[source],
+            });
             const errors = error.details.map((d) => ({
                 field: d.path.join('.'),
                 message: d.message,

@@ -7,8 +7,6 @@ import {
     ALL_SERVICE_FOR,
     ALL_SHOP_AMENITIES,
     DAYS_OF_WEEK,
-    MEDIA_ENTITY_TYPE,
-    MEDIA_PURPOSE,
     ROLES,
 } from '../utils/constants.js';
 import { BadRequestError, ConflictError } from '../utils/api-error.js';
@@ -260,7 +258,7 @@ export const createCustomerOnboarding = async (phoneNumber, profileData) => {
     if (!verifiedPhoneNumber) {
         throw new BadRequestError('Verified phone number is required');
     }
-    const media = await mediaService.resolveReadyMediaById(profileData.photoMediaId);
+    const media = await mediaService.resolveMediaForEntity(verifiedPhoneNumber, profileData.photoMediaId);
 
     await ensureUniqueUserIdentity({
         email: profileData.email,
@@ -282,10 +280,8 @@ export const createCustomerOnboarding = async (phoneNumber, profileData) => {
         dateOfBirth: profileData.dateOfBirth,
         address: profileData.address,
         location,
-        photoR2Key: media.r2Key,
+        photoMediaId: media._id,
     });
-
-    await mediaService.linkMediaToEntity(profileData.photoMediaId, profile._id, MEDIA_ENTITY_TYPE.CUSTOMER, MEDIA_PURPOSE.AVATAR);
 
     const tokens = await issueAuthenticationTokens(user);
 
@@ -309,7 +305,7 @@ export const createBarberOnboarding = async (phoneNumber, shopData) => {
         phoneNumber: normalized.phoneNumber,
     });
 
-    const media = await mediaService.resolveReadyMediaById(shopData.photoMediaId);
+    const media = await mediaService.resolveMediaForEntity(verifiedPhoneNumber, shopData.photoMediaId);
 
     const pinResult = validatePinCreation(normalized.pin, normalized.confirmPin);
     if (!pinResult.isValid) {
@@ -354,11 +350,10 @@ export const createBarberOnboarding = async (phoneNumber, shopData) => {
         openTime: normalized.openTime,
         closeTime: normalized.closeTime,
         breakTimes: normalized.breakTimes,
-        coverR2Key: media.r2Key,
+        coverMediaId: media._id,
     };
 
     const createdShop = await shopRepository.create(shopCreateData);
-    await mediaService.linkMediaToEntity(shopData.photoMediaId, createdShop._id, MEDIA_ENTITY_TYPE.SHOP, MEDIA_PURPOSE.COVER);
     await subscriptionRepository.upsertDefaultForBarber(barber._id, 'ONBOARDING');
 
     const tokens = await issueAuthenticationTokens(user);

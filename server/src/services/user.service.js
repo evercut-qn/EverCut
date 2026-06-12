@@ -2,13 +2,14 @@ import customerRepository from '../repositories/customer.repository.js';
 import userRepository from '../repositories/user.repository.js';
 import bookingRepository from '../repositories/booking.repository.js';
 import paymentRepository from '../repositories/payment.repository.js';
+import mediaRepository from '../repositories/media.repository.js';
 import { NotFoundError, BadRequestError } from '../utils/api-error.js';
 import notificationEvents from './notifications/notification-events.service.js';
 import { serializeCustomerDirectoryItem, serializeCustomerProfile } from '../serializers/customer.serializer.js';
 import { serializeBooking } from '../serializers/booking.serializer.js';
 import { serializePayment } from '../serializers/payment.serializer.js';
 import * as mediaService from './media/media.service.js';
-import { MEDIA_ENTITY_TYPE, MEDIA_PURPOSE, ROLES, PAYMENT_TRANSACTION_STATUS } from '../utils/constants.js';
+import { MEDIA_PURPOSE, PAYMENT_TRANSACTION_STATUS } from '../utils/constants.js';
 import { buildPagination } from '../utils/pagination.utils.js';
 
 /**
@@ -41,19 +42,21 @@ export const updateProfile = async (userId, data) => {
     const photoMediaId = data.photoMediaId;
     delete data.photoMediaId;
 
-    let nextPhotoR2Key = null;
+    const oldMediaId = profile.photoMediaId;
+
     if (photoMediaId) {
         const media = await mediaService.resolveMediaForEntity(userId, photoMediaId);
-        nextPhotoR2Key = media.r2Key;
-        data.photoR2Key = nextPhotoR2Key;
+        data.photoMediaId = media._id;
     }
 
     const updated = await customerRepository.updateByUserId(userId, data);
 
     if (photoMediaId) {
-        await mediaService.linkMediaToEntity(photoMediaId, profile._id, MEDIA_ENTITY_TYPE.CUSTOMER, MEDIA_PURPOSE.AVATAR);
-        if (profile.photoR2Key && profile.photoR2Key !== nextPhotoR2Key) {
-            mediaService.deleteObjectByKey(profile.photoR2Key).catch(() => {});
+        await mediaRepository.updateById(photoMediaId, {
+            purpose: MEDIA_PURPOSE.PROFILE,
+        });
+        if (oldMediaId && oldMediaId.toString() !== photoMediaId.toString()) {
+            await mediaService.cleanupMediaById(oldMediaId);
         }
     }
 
@@ -62,7 +65,8 @@ export const updateProfile = async (userId, data) => {
         updateType: 'customer_profile',
     });
 
-    return serializeCustomerProfile(updated);
+    const populatedCustomer = await updated.populate({ path: 'photoMediaId', select: 'r2Key' });
+    return serializeCustomerProfile(populatedCustomer);
 };
 
 

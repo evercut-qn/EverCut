@@ -104,7 +104,10 @@ test('upsertReplyToRating creates a first reply and notifies the customer', asyn
             customerId: {
                 firstName: 'Ava',
                 lastName: 'Customer',
-                photoR2Key: 'images/avatars/customer-1/profile.jpg',
+                photoMediaId: {
+                    _id: 'media-customer-1',
+                    r2Key: 'images/avatars/customer-1/profile.jpg',
+                },
             },
             reply: {
                 text: replyText,
@@ -155,7 +158,10 @@ test('upsertReplyToRating updates an existing reply without sending a duplicate 
             customerId: {
                 firstName: 'Ava',
                 lastName: 'Customer',
-                photoR2Key: 'images/avatars/customer-1/profile.jpg',
+                photoMediaId: {
+                    _id: 'media-customer-1',
+                    r2Key: 'images/avatars/customer-1/profile.jpg',
+                },
                 userId: { email: 'should-not-leak@example.com' },
             },
             reply: {

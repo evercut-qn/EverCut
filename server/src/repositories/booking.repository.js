@@ -13,13 +13,15 @@ const ACTIVE_BOOKING_STATUSES = [
 
 const EMPLOYEE_POPULATE = {
     path: 'employeeId',
-    select: 'firstName lastName photoR2Key blockedDates',
+    select: 'firstName lastName photoMediaId blockedDates',
+    populate: { path: 'photoMediaId', select: 'r2Key' },
     options: { includeDeleted: true },
 };
 
 const EMPLOYEE_NAME_POPULATE = {
     path: 'employeeId',
-    select: 'firstName lastName photoR2Key blockedDates',
+    select: 'firstName lastName photoMediaId blockedDates',
+    populate: { path: 'photoMediaId', select: 'r2Key' },
     options: { includeDeleted: true },
 };
 
@@ -27,7 +29,7 @@ const BOOKING_SERVICE_CARD_FIELDS = [
     'serviceName',
     'serviceFor',
     'serviceType',
-    'imageR2Key',
+    'imageMediaId',
     'duration',
     'actualPrice',
     'offerPrice',
@@ -37,8 +39,14 @@ const BOOKING_SERVICE_CARD_FIELDS = [
     'bundledServices',
 ].join(' ');
 
-const CUSTOMER_SUMMARY_FIELDS = 'firstName lastName photoR2Key userId feeWaiverBookingsUsed';
-const CUSTOMER_NAME_FIELDS = 'firstName lastName photoR2Key';
+const CUSTOMER_SUMMARY_FIELDS = 'firstName lastName photoMediaId userId feeWaiverBookingsUsed';
+const CUSTOMER_NAME_FIELDS = 'firstName lastName photoMediaId';
+
+const SHOP_SUMMARY_POPULATE = {
+    path: 'shopId',
+    select: 'shopName address coverMediaId barberId',
+    populate: { path: 'coverMediaId', select: 'r2Key' },
+};
 const PAYMENT_SUMMARY_POPULATE = {
     path: 'paymentTransactionId',
     select: 'amount amountInRupees waiverApplied settlement merchantOrderId paymentMode status createdAt',
@@ -76,15 +84,21 @@ class BookingRepository {
         return Booking.findById(id)
             .populate({
                 path: 'shopId',
-                select: 'shopName coverR2Key address openTime closeTime barberId',
-                populate: { path: 'barberId', select: 'firstName lastName upiId accountHolderName' },
+                select: 'shopName coverMediaId address openTime closeTime barberId',
+                populate: [
+                    { path: 'barberId', select: 'firstName lastName upiId accountHolderName' },
+                    { path: 'coverMediaId', select: 'r2Key' }
+                ],
             })
             .populate(EMPLOYEE_POPULATE)
             .populate(PAYMENT_SUMMARY_POPULATE)
             .populate({
                 path: 'customerId',
                 select: CUSTOMER_SUMMARY_FIELDS,
-                populate: { path: 'userId', select: 'email phoneNumber' },
+                populate: [
+                    { path: 'userId', select: 'email phoneNumber' },
+                    { path: 'photoMediaId', select: 'r2Key' }
+                ],
             })
             .populate({
                 path: 'payoutTransactionId',
@@ -178,7 +192,7 @@ class BookingRepository {
         const query = Booking.find(trustQueryOperators({ customerId, ...filters }))
             .populate('serviceIds')
             .populate(EMPLOYEE_POPULATE)
-            .populate('shopId', 'shopName address coverR2Key barberId')
+            .populate(SHOP_SUMMARY_POPULATE)
             .populate(PAYMENT_SUMMARY_POPULATE)
             .sort({ date: -1 });
 
@@ -194,7 +208,7 @@ class BookingRepository {
         }))
             .populate('serviceIds')
             .populate(EMPLOYEE_POPULATE)
-            .populate('shopId', 'shopName address coverR2Key barberId')
+            .populate(SHOP_SUMMARY_POPULATE)
             .populate(PAYMENT_SUMMARY_POPULATE)
             .sort({ date: 1 });
 
@@ -214,7 +228,7 @@ class BookingRepository {
         }))
             .populate('serviceIds')
             .populate(EMPLOYEE_POPULATE)
-            .populate('shopId', 'shopName address coverR2Key barberId')
+            .populate(SHOP_SUMMARY_POPULATE)
             .populate(PAYMENT_SUMMARY_POPULATE)
             .sort({ date: -1 });
 
@@ -232,7 +246,10 @@ class BookingRepository {
             .populate({
                 path: 'customerId',
                 select: CUSTOMER_SUMMARY_FIELDS,
-                populate: { path: 'userId', select: 'phoneNumber' },
+                populate: [
+                    { path: 'userId', select: 'phoneNumber' },
+                    { path: 'photoMediaId', select: 'r2Key' }
+                ],
             })
             .populate(EMPLOYEE_NAME_POPULATE)
             .populate('serviceIds', BOOKING_SERVICE_CARD_FIELDS)
@@ -248,7 +265,10 @@ class BookingRepository {
             .populate({
                 path: 'customerId',
                 select: CUSTOMER_SUMMARY_FIELDS,
-                populate: { path: 'userId', select: 'phoneNumber' },
+                populate: [
+                    { path: 'userId', select: 'phoneNumber' },
+                    { path: 'photoMediaId', select: 'r2Key' }
+                ],
             })
             .populate(EMPLOYEE_NAME_POPULATE)
             .populate('serviceIds', BOOKING_SERVICE_CARD_FIELDS)
@@ -620,7 +640,10 @@ class BookingRepository {
             .populate({
                 path: 'customerId',
                 select: CUSTOMER_SUMMARY_FIELDS,
-                populate: { path: 'userId', select: 'phoneNumber email' },
+                populate: [
+                    { path: 'userId', select: 'phoneNumber email' },
+                    { path: 'photoMediaId', select: 'r2Key' }
+                ],
             })
             .populate('shopId', 'shopName barberId')
             .lean();
@@ -783,7 +806,7 @@ class BookingRepository {
         }))
             .populate('serviceIds', BOOKING_SERVICE_CARD_FIELDS)
             .populate(EMPLOYEE_NAME_POPULATE)
-            .populate('shopId', 'shopName address coverR2Key barberId')
+            .populate(SHOP_SUMMARY_POPULATE)
             .populate(PAYMENT_SUMMARY_POPULATE)
             .lean();
     }

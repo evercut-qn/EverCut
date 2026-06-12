@@ -76,8 +76,28 @@ test('addEmployee cleans up uploaded photo when a duplicate write slips past the
 
     t.mock.method(mediaRepository, 'findReadyByIdAndUser', async () => ({
         _id: 'media-1',
+        type: 'image',
         r2Key: 'images/employees/shop-1/employee-photo-1.jpg',
     }));
+    t.mock.method(mediaRepository, 'findById', async (id) => {
+        if (id === 'media-1') {
+            return {
+                _id: 'media-1',
+                r2Key: 'images/employees/shop-1/employee-photo-1.jpg',
+            };
+        }
+        return null;
+    });
+    t.mock.method(mediaRepository, 'findByR2Key', async (r2Key) => {
+        if (r2Key === 'images/employees/shop-1/employee-photo-1.jpg') {
+            return {
+                _id: 'media-1',
+                r2Key: 'images/employees/shop-1/employee-photo-1.jpg',
+            };
+        }
+        return null;
+    });
+    t.mock.method(mediaRepository, 'softDeleteById', async () => ({}));
 
     let deletedR2Key = null;
     t.mock.method(storageProvider, 'deleteObject', async (r2Key) => {

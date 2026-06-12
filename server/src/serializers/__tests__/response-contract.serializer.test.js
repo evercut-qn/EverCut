@@ -196,19 +196,28 @@ test('booking serializer preserves nested media keys long enough to build public
         customerId: {
             _id: '507f1f77bcf86cd799439012',
             firstName: 'Mina',
-            photoR2Key: 'images/customers/customer-1.png',
+            photoMediaId: {
+                _id: 'media-customer-1',
+                r2Key: 'images/customers/customer-1.png',
+            },
         },
         employeeId: {
             _id: '507f1f77bcf86cd799439014',
             firstName: 'Dev',
             lastName: 'Patel',
-            photoR2Key: 'images/employees/employee-1.png',
+            photoMediaId: {
+                _id: 'media-employee-1',
+                r2Key: 'images/employees/employee-1.png',
+            },
             blockedDates: [],
         },
         shopId: {
             _id: '507f1f77bcf86cd799439013',
             shopName: 'EverCut Studio',
-            coverR2Key: 'images/shops/shop-1.png',
+            coverMediaId: {
+                _id: 'media-shop-1',
+                r2Key: 'images/shops/shop-1.png',
+            },
         },
         serviceIds: [
             {
@@ -216,7 +225,10 @@ test('booking serializer preserves nested media keys long enough to build public
                 serviceName: 'Haircut',
                 serviceType: 'single',
                 serviceFor: 'men',
-                imageR2Key: 'images/services/haircut.png',
+                imageMediaId: {
+                    _id: 'media-service-1',
+                    r2Key: 'images/services/haircut.png',
+                },
                 duration: 30,
                 actualPrice: 500,
                 offerPrice: 50,
@@ -229,9 +241,9 @@ test('booking serializer preserves nested media keys long enough to build public
     assert.match(booking.employee.photoUrl, /images\/employees\/employee-1\.png/);
     assert.match(booking.shop.coverUrl, /images\/shops\/shop-1\.png/);
     assert.match(booking.services[0].imageUrl, /images\/services\/haircut\.png/);
-    assert.equal('photoR2Key' in booking.employee, false);
-    assert.equal('coverR2Key' in booking.shop, false);
-    assert.equal('imageR2Key' in booking.services[0], false);
+    assert.equal('photoMediaId' in booking.employee, false);
+    assert.equal('coverMediaId' in booking.shop, false);
+    assert.equal('imageMediaId' in booking.services[0], false);
 });
 
 test('booking serializer keeps bare ObjectId refs as ids instead of empty relation objects', () => {

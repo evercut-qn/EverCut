@@ -41,8 +41,9 @@ const customerSchema = new mongoose.Schema(
             required: true,
             trim: true,
         },
-        photoR2Key: {
+        photoMediaId: {
             type: String,
+            ref: 'Media',
             default: null,
         },
         location: {

@@ -1,4 +1,5 @@
 import * as userService from '../services/user.service.js';
+import * as mediaService from '../services/media/media.service.js';
 import { ApiResponse } from '../utils/api-response.js';
 import { getValidatedRequestData } from '../utils/request-validation.utils.js';
 
@@ -48,7 +49,6 @@ export const updateMe = async (req, res, next) => {
 export const updateMyPicture = async (req, res, next) => {
     try {
         const { mediaId } = getValidatedRequestData(req, 'body');
-        const { default: mediaService } = await import('../services/media/media.service.js');
         const result = await mediaService.updateCustomerProfilePicture(req.user._id, mediaId);
         return res.status(200).json(ApiResponse.success(result, 'Profile picture updated'));
     } catch (err) {
@@ -58,7 +58,6 @@ export const updateMyPicture = async (req, res, next) => {
 
 export const removeMyPicture = async (req, res, next) => {
     try {
-        const { default: mediaService } = await import('../services/media/media.service.js');
         const result = await mediaService.removeCustomerProfilePicture(req.user._id);
         return res.status(200).json(ApiResponse.success(result, 'Profile picture removed'));
     } catch (err) {

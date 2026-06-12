@@ -29,7 +29,7 @@ export const serializeService = (service, options = {}) => {
         serviceName: plain.serviceName ?? null,
         serviceType: plain.serviceType ?? null,
         serviceFor: plain.serviceFor ?? null,
-        imageUrl: buildMediaUrl(normalized.imageR2Key) ?? null,
+        imageUrl: buildMediaUrl(normalized.imageMediaId?.r2Key) ?? null,
         duration: plain.duration,
         actualPrice: plain.actualPrice,
         offerPrice: plain.offerPrice ?? 0,

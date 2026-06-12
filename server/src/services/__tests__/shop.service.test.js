@@ -124,7 +124,13 @@ test('updateBusinessInfo persists desired open state and emits a shop-status not
         closeTime: '18:00',
         breakTimes: [],
     }));
-    t.mock.method(mediaRepository, 'findByEntity', async () => []);
+    t.mock.method(shopRepository, 'findById', async () => ({
+        _id: 'shop-1',
+        galleryMediaIds: [],
+        populate: async function() {
+            return this;
+        }
+    }));
 
     let updateArgs = null;
     t.mock.method(shopRepository, 'updateByBarberId', async (barberId, updateData) => {

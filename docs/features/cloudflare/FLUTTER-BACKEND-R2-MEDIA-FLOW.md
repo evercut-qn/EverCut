@@ -11,10 +11,10 @@
 | Image | `image/jpeg` | `.jpg`, `.jpeg` | Magic bytes |
 | Image | `image/png` | `.png` | Magic bytes |
 | Image | `image/webp` | `.webp` | Magic bytes (RIFF + WEBP) |
-| Video | `video/mp4` | `.mp4` | Magic bytes (`ftyp` at offset 4) |
+| Video | `video/mp4` | `.mp4` | Content-Type only *(Note: Magic bytes check bypassed)* |
 | Video | `video/quicktime` | `.mov` | Content-Type only |
 | Video | `video/x-msvideo` | `.avi` | Content-Type only |
-| Video | `video/webm` | `.webm` | Magic bytes |
+| Video | `video/webm` | `.webm` | Content-Type only *(Note: Magic bytes check bypassed)* |
 
 | Unsupported | Reason |
 |:-:|:-:|
@@ -26,7 +26,7 @@
 
 ## 2. Backend-Enforced Limits
 
-| Rule | Value | Config |
+| Rule | Value | Config / Logic |
 |:-:|:-:|:--|
 | Max image size | **10 MB** | `config.media.maxImageSize` |
 | Max video size | **500 MB** | `config.media.maxVideoSize` |
@@ -35,6 +35,8 @@
 | Presigned upload URL TTL | **15 minutes** | `config.media.presignedUrlTtl` |
 | Pending upload record TTL | **24 hours** | `config.media.pendingUploadTtlHours` |
 | Signed CDN URL TTL | **1 hour** | `config.media.signedUrlTtl` |
+| Video Upload Role Check | **BARBER only** | Enforced by backend auth check |
+| Video Upload Purpose Check | **gallery only** | Enforced by backend purpose validation |
 
 ---
 
@@ -533,7 +535,7 @@ Future<void> attachToGallery(List<String> mediaIds) async {
 | `Pending upload` not found | `404` | Wrong `mediaId` or expired | Regenerate URL (Step 1) |
 | `Upload not found in storage...` | `400` | Step 2 not done or failed | Re-upload to R2, then confirm |
 | `Content-Type mismatch. Upload rejected.` | `400` | R2 `Content-Type` header ≠ declared type | Ensure `Content-Type` header matches Step 1 |
-| `File content does not match declared type.` | `400` | Magic bytes don't match extension | User file is not what it claims to be; reject/ask for reselection |
+| `File content does not match declared type.` | `400` | Magic bytes don't match extension (images only) | User file is not what it claims to be; reject/ask for reselection |
 | `Access denied. Required role(s): BARBER` | `403` | Non-barber user attempting gallery | Check user role before calling |
 | `Gallery limit exceeded. Maximum 10 items allowed.` | `400` | `currentCount + mediaIds.length > 10` | Delete old gallery items first |
 | `Media {id} not found, unconfirmed, or already attached` | `400` | Unconfirmed media in `/gallery` | Call `/confirm` first |

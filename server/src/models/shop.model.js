@@ -89,10 +89,16 @@ const shopSchema = new mongoose.Schema(
                 _id: false,
             },
         ],
-        coverR2Key: {
+        coverMediaId: {
             type: String,
+            ref: 'Media',
             default: null,
         },
+        galleryMediaIds: [{
+            type: String,
+            ref: 'Media',
+            default: [],
+        }],
         isOpen: {
             type: Boolean,
             default: true,

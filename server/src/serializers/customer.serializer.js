@@ -24,7 +24,7 @@ export const serializeCustomerSummary = (customer, options = {}) => {
         firstName: plain.firstName ?? null,
         lastName: plain.lastName ?? null,
         fullName: `${plain.firstName || ''} ${plain.lastName || ''}`.trim() || null,
-        photoUrl: buildMediaUrl(raw.photoR2Key),
+        photoUrl: buildMediaUrl(raw.photoMediaId?.r2Key),
         contact: options.includeContact ? {
             phoneNumber: user.phoneNumber ?? null,
             email: user.email ?? null,
@@ -48,7 +48,7 @@ export const serializeCustomerProfile = (customer) => {
         gender: plain.gender ?? null,
         dateOfBirth: plain.dateOfBirth ?? null,
         address: plain.address ?? null,
-        photoUrl: buildMediaUrl(raw.photoR2Key),
+        photoUrl: buildMediaUrl(raw.photoMediaId?.r2Key),
         location: plain.location ?? null,
         favoriteBookingIds: serializeIdList(plain.favoriteBookings),
         favoriteShopIds: serializeIdList(plain.favoriteShops),

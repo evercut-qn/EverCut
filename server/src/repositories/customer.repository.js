@@ -84,11 +84,20 @@ class CustomerRepository {
                 { path: 'serviceIds' },
                 {
                     path: 'employeeId',
-                    select: 'firstName lastName photoR2Key',
+                    select: 'firstName lastName photoMediaId',
+                    populate: { path: 'photoMediaId', select: 'r2Key' },
                     options: { includeDeleted: true },
                 },
-                { path: 'customerId', select: 'firstName lastName photoR2Key' },
-                { path: 'shopId', select: 'shopName address coverR2Key' },
+                {
+                    path: 'customerId',
+                    select: 'firstName lastName photoMediaId',
+                    populate: { path: 'photoMediaId', select: 'r2Key' },
+                },
+                {
+                    path: 'shopId',
+                    select: 'shopName address coverMediaId',
+                    populate: { path: 'coverMediaId', select: 'r2Key' },
+                },
             ],
         }).lean();
     }
@@ -100,11 +109,20 @@ class CustomerRepository {
                 { path: 'serviceIds' },
                 {
                     path: 'employeeId',
-                    select: 'firstName lastName photoR2Key',
+                    select: 'firstName lastName photoMediaId',
+                    populate: { path: 'photoMediaId', select: 'r2Key' },
                     options: { includeDeleted: true },
                 },
-                { path: 'customerId', select: 'firstName lastName photoR2Key' },
-                { path: 'shopId', select: 'shopName address coverR2Key' },
+                {
+                    path: 'customerId',
+                    select: 'firstName lastName photoMediaId',
+                    populate: { path: 'photoMediaId', select: 'r2Key' },
+                },
+                {
+                    path: 'shopId',
+                    select: 'shopName address coverMediaId',
+                    populate: { path: 'coverMediaId', select: 'r2Key' },
+                },
             ],
         }).lean();
     }
@@ -112,7 +130,8 @@ class CustomerRepository {
     async findFavoriteShopsByUserId(userId) {
         return Customer.findOne({ userId }).populate({
             path: 'favoriteShops',
-            select: 'shopName address coverR2Key category targetCustomers facilities isOpen location',
+            select: 'shopName address coverMediaId category targetCustomers facilities isOpen location',
+            populate: { path: 'coverMediaId', select: 'r2Key' },
         }).lean();
     }
 

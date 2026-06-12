@@ -51,13 +51,13 @@ class ShopRepository {
             },
         }));
         if (selectFields) query.select(selectFields);
-        return query.lean();
+        return query.populate({ path: 'coverMediaId', select: 'r2Key' }).lean();
     }
 
     async findByCategory(category, selectFields) {
         const query = Shop.find({ category });
         if (selectFields) query.select(selectFields);
-        return query.lean();
+        return query.populate({ path: 'coverMediaId', select: 'r2Key' }).lean();
     }
 
     async searchByName(nameQuery, selectFields) {
@@ -65,7 +65,7 @@ class ShopRepository {
             trustQueryOperators({ shopName: { $regex: new RegExp(escapeRegex(nameQuery), 'i') } }),
         );
         if (selectFields) query.select(selectFields);
-        return query.lean();
+        return query.populate({ path: 'coverMediaId', select: 'r2Key' }).lean();
     }
 
     async findByIdWithFields(id, fields) {
@@ -98,6 +98,14 @@ class ShopRepository {
                 },
             },
         ]);
+    }
+
+    async addGalleryMedia(shopId, mediaId) {
+        return Shop.findByIdAndUpdate(shopId, { $addToSet: { galleryMediaIds: mediaId } }, { returnDocument: 'after' });
+    }
+
+    async pullGalleryMedia(shopId, mediaId) {
+        return Shop.findByIdAndUpdate(shopId, { $pull: { galleryMediaIds: mediaId } }, { returnDocument: 'after' });
     }
 }
 

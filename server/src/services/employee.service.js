@@ -11,8 +11,6 @@ import { toIdString } from '../serializers/core.serializer.js';
 import { toDateOnlyString } from '../utils/slot-lock.utils.js';
 import notificationEvents from './notifications/notification-events.service.js';
 import * as mediaService from './media/media.service.js';
-import storageProvider from './media/storage-provider.service.js';
-import { MEDIA_ENTITY_TYPE, MEDIA_PURPOSE } from '../utils/constants.js';
 
 /**
  * Employee service â€” CRUD operations for shop employees.
@@ -193,18 +191,18 @@ const normalizeEmployeePayload = (data = {}, shop = null) => {
     return normalized;
 };
 
-const cleanupR2Key = async (r2Key, context) => {
-    if (!r2Key) return;
+const cleanupMediaId = async (mediaId, context) => {
+    if (!mediaId) return;
     try {
-        await storageProvider.deleteObject(r2Key);
+        await mediaService.cleanupMediaById(mediaId);
     } catch (err) {
-        logger.warn('Employee media cleanup failed', { r2Key, context, error: err.message });
+        logger.warn('Employee media cleanup failed', { mediaId, context, error: err.message });
     }
 };
 
-const rethrowDuplicateEmployeeWrite = async (error, uploadedR2Key) => {
+const rethrowDuplicateEmployeeWrite = async (error, photoMediaId) => {
     if (error?.code === 11000) {
-        await cleanupR2Key(uploadedR2Key, 'duplicate-write');
+        await cleanupMediaId(photoMediaId, 'duplicate-write');
         throw new ConflictError('Employee with this phone number already exists');
     }
 
@@ -240,17 +238,17 @@ export const addEmployee = async (ownerId, data) => {
     };
 
     if (media) {
-        employeeData.photoR2Key = media.r2Key;
+        employeeData.photoMediaId = media._id;
     }
 
     try {
         const created = await employeeRepository.create(employeeData);
         if (photoMediaId) {
-            await mediaService.linkMediaToEntity(photoMediaId, created._id, MEDIA_ENTITY_TYPE.EMPLOYEE, MEDIA_PURPOSE.EMPLOYEE);
+            await created.populate({ path: 'photoMediaId', select: 'r2Key' });
         }
         return serializeEmployee(created);
     } catch (error) {
-        await rethrowDuplicateEmployeeWrite(error, employeeData.photoR2Key);
+        await rethrowDuplicateEmployeeWrite(error, photoMediaId);
     }
 };
 
@@ -386,10 +384,21 @@ export const updateEmployee = async (ownerId, employeeId, data) => {
         }
     }
 
-    const photoMediaId = normalizedData.photoMediaId;
-    if (photoMediaId) {
-        const media = await mediaService.resolveMediaForEntity(ownerId, photoMediaId);
-        updateData.photoR2Key = media.r2Key;
+    let oldMediaIdToDelete = null;
+
+    if (data.photoMediaId !== undefined) {
+        if (data.photoMediaId) {
+            const media = await mediaService.resolveMediaForEntity(ownerId, data.photoMediaId);
+            updateData.photoMediaId = media._id;
+            if (employee.photoMediaId && employee.photoMediaId.toString() !== media._id.toString()) {
+                oldMediaIdToDelete = employee.photoMediaId;
+            }
+        } else {
+            updateData.photoMediaId = null;
+            if (employee.photoMediaId) {
+                oldMediaIdToDelete = employee.photoMediaId;
+            }
+        }
     }
 
     if (Object.keys(updateData).length === 0) {
@@ -399,7 +408,7 @@ export const updateEmployee = async (ownerId, employeeId, data) => {
     if (updateData.phoneNumber && updateData.phoneNumber !== employee.phoneNumber) {
         const existing = await employeeRepository.findByShopIdAndPhone(shop._id, updateData.phoneNumber);
         if (existing && String(existing._id) !== String(employeeId)) {
-            await cleanupR2Key(updateData.photoR2Key, 'duplicate-phone');
+            await cleanupMediaId(updateData.photoMediaId, 'duplicate-phone');
             throw new ConflictError('Employee with this phone number already exists');
         }
     }
@@ -408,17 +417,17 @@ export const updateEmployee = async (ownerId, employeeId, data) => {
     try {
         updated = await employeeRepository.updateById(employeeId, shop._id, updateData);
     } catch (err) {
-        await rethrowDuplicateEmployeeWrite(err, updateData.photoR2Key);
+        await rethrowDuplicateEmployeeWrite(err, updateData.photoMediaId);
     }
 
     if (!updated) throw new NotFoundError('Employee');
 
-    if (photoMediaId) {
-        await mediaService.linkMediaToEntity(photoMediaId, employee._id, MEDIA_ENTITY_TYPE.EMPLOYEE, MEDIA_PURPOSE.EMPLOYEE);
+    if (oldMediaIdToDelete) {
+        await cleanupMediaId(oldMediaIdToDelete, 'replace-photo');
     }
 
-    if (updateData.photoR2Key && employee.photoR2Key && employee.photoR2Key !== updateData.photoR2Key) {
-        await cleanupR2Key(employee.photoR2Key, 'replace-photo');
+    if (updated.photoMediaId) {
+        await updated.populate({ path: 'photoMediaId', select: 'r2Key' });
     }
 
     return serializeEmployee(updated);
@@ -518,8 +527,8 @@ export const deleteEmployee = async (ownerId, employeeId) => {
     );
     if (!deleted) throw new NotFoundError('Employee');
 
-    if (employee.photoR2Key) {
-        await cleanupR2Key(employee.photoR2Key, 'delete-employee');
+    if (employee.photoMediaId) {
+        await cleanupMediaId(employee.photoMediaId, 'delete-employee');
     }
 
     return { message: 'Employee deleted successfully' };

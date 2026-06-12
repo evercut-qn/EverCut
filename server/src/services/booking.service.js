@@ -213,7 +213,7 @@ const assertShopAcceptsDate = (shop, date) => {
 const loadEmployeeForScheduling = async (employeeId, shopId) => {
     const employee = await employeeRepository.findByIdLean(
         employeeId,
-        'firstName lastName photoR2Key shopId workingHours blockedDates isActive deletedAt',
+        'firstName lastName photoMediaId shopId workingHours blockedDates isActive deletedAt',
     );
     if (!employee) throw new NotFoundError('Employee');
     if (!employee.isActive || employee.deletedAt) throw new BadRequestError('Employee is not active');
@@ -1328,7 +1328,7 @@ export const getShopAvailability = async (shopId, date, serviceId) => {
             employeeAvailability.push({
                 employeeId: employee._id,
                 employeeName: `${employee.firstName} ${employee.lastName}`,
-                photoUrl: buildMediaUrl(employee.photoR2Key),
+                photoUrl: buildMediaUrl(employee.photoMediaId?.r2Key),
                 availableSlots,
                 totalAvailable: availableSlots.length,
             });
