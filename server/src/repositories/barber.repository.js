@@ -8,15 +8,15 @@ class BarberRepository {
     }
 
     async findById(id) {
-        return Barber.findById(id);
+        return Barber.findById(id).populate({ path: 'photoMediaId', select: 'r2Key' });
     }
 
     async findByUserId(userId) {
-        return Barber.findOne({ userId });
+        return Barber.findOne({ userId }).populate({ path: 'photoMediaId', select: 'r2Key' });
     }
 
     async findByUserIdWithDeleted(userId) {
-        return Barber.findOne({ userId }).setOptions({ includeDeleted: true });
+        return Barber.findOne({ userId }).setOptions({ includeDeleted: true }).populate({ path: 'photoMediaId', select: 'r2Key' });
     }
 
     async updateById(id, data) {
@@ -102,6 +102,17 @@ class BarberRepository {
             });
         }
 
+        pipeline.push(
+            {
+                $lookup: {
+                    from: 'media',
+                    localField: 'photoMediaId',
+                    foreignField: '_id',
+                    as: 'photoMediaId',
+                },
+            },
+            { $unwind: { path: '$photoMediaId', preserveNullAndEmptyArrays: true } },
+        );
         pipeline.push({ $project: { ratings: 0, pinHash: 0 } });
         return pipeline;
     }

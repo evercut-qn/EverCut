@@ -51,6 +51,11 @@ const PAYMENT_SUMMARY_POPULATE = {
     path: 'paymentTransactionId',
     select: 'amount amountInRupees waiverApplied settlement merchantOrderId paymentMode status createdAt',
 };
+const SERVICE_POPULATE = {
+    path: 'serviceIds',
+    select: BOOKING_SERVICE_CARD_FIELDS,
+    populate: { path: 'imageMediaId', select: 'r2Key' },
+};
 
 class BookingRepository {
     async create(data, options = {}) {
@@ -104,6 +109,7 @@ class BookingRepository {
                 path: 'payoutTransactionId',
                 select: 'utr status processedAt',
             })
+            .populate(SERVICE_POPULATE)
             .lean();
     }
 
@@ -190,7 +196,7 @@ class BookingRepository {
 
     async findByCustomer(customerId, filters = {}, options = {}) {
         const query = Booking.find(trustQueryOperators({ customerId, ...filters }))
-            .populate('serviceIds')
+            .populate(SERVICE_POPULATE)
             .populate(EMPLOYEE_POPULATE)
             .populate(SHOP_SUMMARY_POPULATE)
             .populate(PAYMENT_SUMMARY_POPULATE)
@@ -206,7 +212,7 @@ class BookingRepository {
             customerId,
             date: { $gte: today },
         }))
-            .populate('serviceIds')
+            .populate(SERVICE_POPULATE)
             .populate(EMPLOYEE_POPULATE)
             .populate(SHOP_SUMMARY_POPULATE)
             .populate(PAYMENT_SUMMARY_POPULATE)
@@ -226,7 +232,7 @@ class BookingRepository {
             customerId,
             date: { $lt: today },
         }))
-            .populate('serviceIds')
+            .populate(SERVICE_POPULATE)
             .populate(EMPLOYEE_POPULATE)
             .populate(SHOP_SUMMARY_POPULATE)
             .populate(PAYMENT_SUMMARY_POPULATE)
@@ -252,7 +258,7 @@ class BookingRepository {
                 ],
             })
             .populate(EMPLOYEE_NAME_POPULATE)
-            .populate('serviceIds', BOOKING_SERVICE_CARD_FIELDS)
+            .populate(SERVICE_POPULATE)
             .populate(PAYMENT_SUMMARY_POPULATE);
 
         if (options.skip !== undefined) query.skip(options.skip);
@@ -271,7 +277,7 @@ class BookingRepository {
                 ],
             })
             .populate(EMPLOYEE_NAME_POPULATE)
-            .populate('serviceIds', BOOKING_SERVICE_CARD_FIELDS)
+            .populate(SERVICE_POPULATE)
             .populate(PAYMENT_SUMMARY_POPULATE)
             .sort({ date: -1, createdAt: -1 });
 
@@ -590,7 +596,11 @@ class BookingRepository {
 
     async findByStatusPopulated(status, employeeIds, options = {}) {
         const query = Booking.find(trustQueryOperators({ status, employeeId: { $in: employeeIds } }))
-            .populate('customerId', CUSTOMER_NAME_FIELDS)
+            .populate({
+                path: 'customerId',
+                select: CUSTOMER_NAME_FIELDS,
+                populate: { path: 'photoMediaId', select: 'r2Key' },
+            })
             .populate(EMPLOYEE_NAME_POPULATE)
             .lean();
 
@@ -601,7 +611,11 @@ class BookingRepository {
 
     async findByStatusForShop(shopId, status, options = {}) {
         const query = Booking.find(trustQueryOperators({ shopId, status }))
-            .populate('customerId', CUSTOMER_NAME_FIELDS)
+            .populate({
+                path: 'customerId',
+                select: CUSTOMER_NAME_FIELDS,
+                populate: { path: 'photoMediaId', select: 'r2Key' },
+            })
             .populate(EMPLOYEE_NAME_POPULATE)
             .sort({ date: -1, createdAt: -1 })
             .lean();
@@ -804,7 +818,7 @@ class BookingRepository {
             customerId,
             date: { $gte: startDate, $lte: endDate },
         }))
-            .populate('serviceIds', BOOKING_SERVICE_CARD_FIELDS)
+            .populate(SERVICE_POPULATE)
             .populate(EMPLOYEE_NAME_POPULATE)
             .populate(SHOP_SUMMARY_POPULATE)
             .populate(PAYMENT_SUMMARY_POPULATE)

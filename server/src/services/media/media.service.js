@@ -345,12 +345,13 @@ export const updateShopCover = async (ownerId, mediaId) => {
     }
 
     const oldMediaId = shop.coverMediaId;
+    const oldMediaIdStr = oldMediaId ? (oldMediaId._id ? oldMediaId._id.toString() : oldMediaId.toString()) : null;
     const updated = await shopRepository.updateByBarberUserId(ownerId, { coverMediaId: media._id });
     await mediaRepository.updateById(mediaId, {
         purpose: MEDIA_PURPOSE.COVER,
     });
-    if (oldMediaId && oldMediaId !== media._id) {
-        await cleanupMediaById(oldMediaId);
+    if (oldMediaIdStr && oldMediaIdStr !== media._id.toString()) {
+        await cleanupMediaById(oldMediaIdStr);
     }
     const populatedShop = await updated.populate({ path: 'coverMediaId', select: 'r2Key' });
     return { coverUrl: buildMediaUrl(populatedShop.coverMediaId?.r2Key) };
@@ -368,12 +369,13 @@ export const updateBarberProfilePicture = async (ownerId, mediaId) => {
     }
 
     const oldMediaId = barber.photoMediaId;
+    const oldMediaIdStr = oldMediaId ? (oldMediaId._id ? oldMediaId._id.toString() : oldMediaId.toString()) : null;
     const updated = await barberRepository.updateByUserId(ownerId, { photoMediaId: media._id });
     await mediaRepository.updateById(mediaId, {
         purpose: MEDIA_PURPOSE.PROFILE,
     });
-    if (oldMediaId && oldMediaId !== media._id) {
-        await cleanupMediaById(oldMediaId);
+    if (oldMediaIdStr && oldMediaIdStr !== media._id.toString()) {
+        await cleanupMediaById(oldMediaIdStr);
     }
 
     const populatedBarber = await updated.populate({ path: 'photoMediaId', select: 'r2Key' });
@@ -394,12 +396,13 @@ export const updateCustomerProfilePicture = async (ownerId, mediaId) => {
     }
 
     const oldMediaId = customer.photoMediaId;
+    const oldMediaIdStr = oldMediaId ? (oldMediaId._id ? oldMediaId._id.toString() : oldMediaId.toString()) : null;
     const updated = await customerRepository.updateByUserId(ownerId, { photoMediaId: media._id });
     await mediaRepository.updateById(mediaId, {
         purpose: MEDIA_PURPOSE.PROFILE,
     });
-    if (oldMediaId && oldMediaId !== media._id) {
-        await cleanupMediaById(oldMediaId);
+    if (oldMediaIdStr && oldMediaIdStr !== media._id.toString()) {
+        await cleanupMediaById(oldMediaIdStr);
     }
 
     const populatedCustomer = await updated.populate({ path: 'photoMediaId', select: 'r2Key' });
@@ -411,10 +414,11 @@ export const removeShopCover = async (ownerId) => {
     if (!shop) throw new NotFoundError('Shop profile');
 
     const oldMediaId = shop.coverMediaId;
-    if (!oldMediaId) return { message: 'No cover photo to remove' };
+    const oldMediaIdStr = oldMediaId ? (oldMediaId._id ? oldMediaId._id.toString() : oldMediaId.toString()) : null;
+    if (!oldMediaIdStr) return { message: 'No cover photo to remove' };
 
     await shopRepository.updateByBarberUserId(ownerId, { coverMediaId: null });
-    await cleanupMediaById(oldMediaId);
+    await cleanupMediaById(oldMediaIdStr);
 
     return { message: 'Cover photo removed successfully' };
 };
@@ -424,10 +428,11 @@ export const removeBarberProfilePicture = async (ownerId) => {
     if (!barber) throw new NotFoundError('Barber profile');
 
     const oldMediaId = barber.photoMediaId;
-    if (!oldMediaId) return { message: 'No profile picture to remove' };
+    const oldMediaIdStr = oldMediaId ? (oldMediaId._id ? oldMediaId._id.toString() : oldMediaId.toString()) : null;
+    if (!oldMediaIdStr) return { message: 'No profile picture to remove' };
 
     await barberRepository.updateByUserId(ownerId, { photoMediaId: null });
-    await cleanupMediaById(oldMediaId);
+    await cleanupMediaById(oldMediaIdStr);
 
     return { message: 'Profile picture removed successfully' };
 };
@@ -438,10 +443,11 @@ export const removeCustomerProfilePicture = async (ownerId) => {
     if (!customer) throw new NotFoundError('Customer profile');
 
     const oldMediaId = customer.photoMediaId;
-    if (!oldMediaId) return { message: 'No profile picture to remove' };
+    const oldMediaIdStr = oldMediaId ? (oldMediaId._id ? oldMediaId._id.toString() : oldMediaId.toString()) : null;
+    if (!oldMediaIdStr) return { message: 'No profile picture to remove' };
 
     await customerRepository.updateByUserId(ownerId, { photoMediaId: null });
-    await cleanupMediaById(oldMediaId);
+    await cleanupMediaById(oldMediaIdStr);
 
     return { message: 'Profile picture removed successfully' };
 };

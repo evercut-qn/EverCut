@@ -73,6 +73,7 @@ export const serializeCustomerDirectoryItem = (customer) => {
         firstName: plain.firstName ?? null,
         lastName: plain.lastName ?? null,
         address: plain.address ?? null,
+        photoUrl: buildMediaUrl(raw.photoMediaId?.r2Key),
         contact: {
             phoneNumber: user.phoneNumber ?? null,
             email: user.email ?? null,

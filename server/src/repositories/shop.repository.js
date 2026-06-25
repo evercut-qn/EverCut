@@ -10,17 +10,17 @@ class ShopRepository {
     }
 
     async findById(id) {
-        return Shop.findById(id);
+        return Shop.findById(id).populate({ path: 'coverMediaId', select: 'r2Key' });
     }
 
     async findByBarberId(barberId) {
-        return Shop.findOne({ barberId });
+        return Shop.findOne({ barberId }).populate({ path: 'coverMediaId', select: 'r2Key' });
     }
 
     async findByBarberUserId(userId) {
         const barber = await Barber.findOne({ userId });
         if (!barber) return null;
-        return Shop.findOne({ barberId: barber._id });
+        return Shop.findOne({ barberId: barber._id }).populate({ path: 'coverMediaId', select: 'r2Key' });
     }
 
     async updateByBarberId(barberId, data) {

@@ -9,11 +9,11 @@ class CustomerRepository {
     }
 
     async findByUserId(userId) {
-        return Customer.findOne({ userId });
+        return Customer.findOne({ userId }).populate({ path: 'photoMediaId', select: 'r2Key' });
     }
 
     async findById(id) {
-        return Customer.findById(id);
+        return Customer.findById(id).populate({ path: 'photoMediaId', select: 'r2Key' });
     }
 
     async consumeFeeWaiverSlot(customerId) {
@@ -199,6 +199,15 @@ class CustomerRepository {
                 },
             },
             { $project: { bookings: 0 } },
+            {
+                $lookup: {
+                    from: 'media',
+                    localField: 'photoMediaId',
+                    foreignField: '_id',
+                    as: 'photoMediaId',
+                },
+            },
+            { $unwind: { path: '$photoMediaId', preserveNullAndEmptyArrays: true } },
         );
 
         return pipeline;

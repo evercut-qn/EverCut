@@ -22,6 +22,7 @@ import { isValidUpiId, normalizePayoutString } from '../utils/payout-details.uti
 import notificationEvents from './notifications/notification-events.service.js';
 import entitlementService from './subscription/entitlement.service.js';
 import * as mediaService from './media/media.service.js';
+import { buildMediaUrl } from './media/media-url.service.js';
 import * as serviceCatalogService from './service-catalog.service.js';
 import { serializeEmployee } from '../serializers/employee.serializer.js';
 import { serializeServices } from '../serializers/service.serializer.js';
@@ -420,12 +421,12 @@ export const getShopInfoForCustomer = async (shopId) => {
         serviceRepository.findByShopIdAndType(
             shopId,
             'single',
-            'serviceName duration finalPrice actualPrice offerPrice imageR2Key serviceFor serviceType',
+            'serviceName duration finalPrice actualPrice offerPrice imageMediaId serviceFor serviceType',
         ),
         serviceRepository.findByShopIdAndType(
             shopId,
             'bundled',
-            'serviceName bundledServices totalDuration totalPrice finalPrice actualPrice offerPrice imageR2Key serviceFor serviceType',
+            'serviceName bundledServices totalDuration totalPrice finalPrice actualPrice offerPrice imageMediaId serviceFor serviceType',
         ),
         mediaService.getGalleryByShopId(shopId),
         ratingRepository.getShopSummary(shopId),
@@ -699,6 +700,7 @@ export const getBarberProfileForAdmin = async (barberId) => {
     return {
         id: barber._id.toString(),
         barberName: `${barber.firstName || ''} ${barber.lastName || ''}`.trim(),
+        photoUrl: buildMediaUrl(barber.photoMediaId?.r2Key),
         yearsOfExperience: barber.yearsOfExperience,
         gender: barber.gender,
         dateOfBirth: barber.dateOfBirth,

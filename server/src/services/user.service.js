@@ -43,6 +43,7 @@ export const updateProfile = async (userId, data) => {
     delete data.photoMediaId;
 
     const oldMediaId = profile.photoMediaId;
+    const oldMediaIdStr = oldMediaId ? (oldMediaId._id ? oldMediaId._id.toString() : oldMediaId.toString()) : null;
 
     if (photoMediaId) {
         const media = await mediaService.resolveMediaForEntity(userId, photoMediaId);
@@ -55,8 +56,8 @@ export const updateProfile = async (userId, data) => {
         await mediaRepository.updateById(photoMediaId, {
             purpose: MEDIA_PURPOSE.PROFILE,
         });
-        if (oldMediaId && oldMediaId.toString() !== photoMediaId.toString()) {
-            await mediaService.cleanupMediaById(oldMediaId);
+        if (oldMediaIdStr && oldMediaIdStr !== photoMediaId.toString()) {
+            await mediaService.cleanupMediaById(oldMediaIdStr);
         }
     }
 

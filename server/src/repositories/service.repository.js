@@ -16,7 +16,7 @@ class ServiceRepository {
             trustQueryOperators({ _id: { $in: ids }, isActive: true }),
         ).session(options.session || null);
         if (selectFields) query.select(selectFields);
-        return query.lean();
+        return query.populate({ path: 'imageMediaId', select: 'r2Key' }).lean();
     }
 
     async findByShopId(shopId, filters = {}, options = {}) {
@@ -37,7 +37,7 @@ class ServiceRepository {
     async findByShopIdAndType(shopId, serviceType, selectFields) {
         const query = Service.find({ shopId, serviceType, isActive: true });
         if (selectFields) query.select(selectFields);
-        return query.sort({ createdAt: -1 }).lean();
+        return query.sort({ createdAt: -1 }).populate({ path: 'imageMediaId', select: 'r2Key' }).lean();
     }
 
     async findByShopIdAndName(shopId, serviceName, filters = {}) {
@@ -68,7 +68,7 @@ class ServiceRepository {
             path: 'shopId',
             select: 'shopName address location category coverMediaId',
             populate: { path: 'coverMediaId', select: 'r2Key' }
-        }).lean();
+        }).populate({ path: 'imageMediaId', select: 'r2Key' }).lean();
     }
 
     async findByGender(gender, selectFields) {

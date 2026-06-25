@@ -150,6 +150,7 @@ export const serializeBarberDirectoryItem = (entry) => {
         id: plain.id,
         barberUserId: user.id || toPlainObject(raw.user)?._id?.toString?.() || null,
         barberName: `${plain.firstName || ''} ${plain.lastName || ''}`.trim() || null,
+        photoUrl: buildMediaUrl(raw.photoMediaId?.r2Key),
         shopId: shop.id || toPlainObject(raw.shop)?._id?.toString?.() || null,
         shopName: shop.shopName ?? null,
         payout: {

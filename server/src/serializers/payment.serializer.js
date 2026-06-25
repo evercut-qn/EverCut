@@ -51,7 +51,8 @@ export const serializeSettlement = (settlement) => {
 };
 
 export const serializePayment = (payment) => {
-    const plain = sanitizeForResponse(toPlainObject(payment));
+    const raw = toPlainObject(payment);
+    const plain = sanitizeForResponse(raw);
     if (!plain) return null;
 
     return compact({
@@ -60,19 +61,19 @@ export const serializePayment = (payment) => {
             ? undefined
             : (plain.bookingId?.id || toIdString(plain.bookingId)),
         booking: plain.bookingId && typeof plain.bookingId === 'object'
-            ? serializeBooking(plain.bookingId)
+            ? serializeBooking(raw.bookingId)
             : undefined,
         customerId: plain.customerId && typeof plain.customerId === 'object'
             ? undefined
             : (plain.customerId?.id || toIdString(plain.customerId)),
         customer: plain.customerId && typeof plain.customerId === 'object'
-            ? serializeCustomerSummary(plain.customerId)
+            ? serializeCustomerSummary(raw.customerId)
             : undefined,
         shopId: plain.shopId && typeof plain.shopId === 'object'
             ? undefined
             : (plain.shopId?.id || toIdString(plain.shopId)),
         shop: plain.shopId && typeof plain.shopId === 'object'
-            ? serializeShopSummary(plain.shopId)
+            ? serializeShopSummary(raw.shopId)
             : undefined,
         merchantOrderId: plain.merchantOrderId ?? null,
         orderId: plain.gatewayOrderId ?? null,

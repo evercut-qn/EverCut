@@ -19,12 +19,16 @@ class PaymentRepository {
                 populate: [
                     {
                         path: 'customerId',
-                        select: 'firstName lastName userId',
-                        populate: { path: 'userId', select: 'phoneNumber' },
+                        select: 'firstName lastName userId photoMediaId',
+                        populate: [
+                            { path: 'userId', select: 'phoneNumber' },
+                            { path: 'photoMediaId', select: 'r2Key' }
+                        ],
                     },
                     {
                         path: 'employeeId',
-                        select: 'firstName lastName',
+                        select: 'firstName lastName photoMediaId',
+                        populate: { path: 'photoMediaId', select: 'r2Key' },
                         options: { includeDeleted: true },
                     },
                     {
@@ -43,7 +47,11 @@ class PaymentRepository {
         const query = PaymentTransaction.find(trustQueryOperators(filter))
             .sort({ createdAt: -1 })
             .populate('bookingId', 'date time status paymentStatus totalAmount')
-            .populate('customerId', 'firstName lastName userId')
+            .populate({
+                path: 'customerId',
+                select: 'firstName lastName userId photoMediaId',
+                populate: { path: 'photoMediaId', select: 'r2Key' }
+            })
             .populate('shopId', 'shopName barberId');
 
         if (options.skip !== undefined) query.skip(options.skip);
@@ -60,12 +68,16 @@ class PaymentRepository {
                 populate: [
                     {
                         path: 'customerId',
-                        select: 'firstName lastName userId',
-                        populate: { path: 'userId', select: 'phoneNumber' },
+                        select: 'firstName lastName userId photoMediaId',
+                        populate: [
+                            { path: 'userId', select: 'phoneNumber' },
+                            { path: 'photoMediaId', select: 'r2Key' }
+                        ],
                     },
                     {
                         path: 'employeeId',
-                        select: 'firstName lastName',
+                        select: 'firstName lastName photoMediaId',
+                        populate: { path: 'photoMediaId', select: 'r2Key' },
                         options: { includeDeleted: true },
                     },
                     {
@@ -74,7 +86,11 @@ class PaymentRepository {
                     },
                 ],
             })
-            .populate('customerId', 'firstName lastName userId')
+            .populate({
+                path: 'customerId',
+                select: 'firstName lastName userId photoMediaId',
+                populate: { path: 'photoMediaId', select: 'r2Key' }
+            })
             .populate('shopId', 'shopName barberId');
 
         if (options.skip !== undefined) query.skip(options.skip);
@@ -165,7 +181,11 @@ class PaymentRepository {
         }))
             .sort({ 'refund.initiatedAt': -1, createdAt: -1 })
             .populate('bookingId', 'date time status paymentStatus payoutStatus totalAmount')
-            .populate('customerId', 'firstName lastName userId')
+            .populate({
+                path: 'customerId',
+                select: 'firstName lastName userId photoMediaId',
+                populate: { path: 'photoMediaId', select: 'r2Key' }
+            })
             .populate('shopId', 'shopName barberId');
 
         if (options.skip !== undefined) query.skip(options.skip);

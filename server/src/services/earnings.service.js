@@ -4,6 +4,7 @@ import barberRepository from '../repositories/barber.repository.js';
 import paymentRepository from '../repositories/payment.repository.js';
 import subscriptionRepository from '../repositories/subscription.repository.js';
 import { NotFoundError, ForbiddenError } from '../utils/api-error.js';
+import { buildMediaUrl } from './media/media-url.service.js';
 import { buildPagination } from '../utils/pagination.utils.js';
 import { PAYMENT_TRANSACTION_STATUS } from '../utils/constants.js';
 import {
@@ -152,6 +153,7 @@ const buildTransactionListItem = (payment, booking) => {
         customer: {
             name: formatCustomerName(customer),
             upiId: customerUser?.phoneNumber ? `${customerUser.phoneNumber.slice(-10)}@upi` : null,
+            photoUrl: buildMediaUrl(customer?.photoMediaId?.r2Key),
         },
         amount: (payment.settlement?.barberPayout || payment.amount) / 100,
         currency: payment.currency || 'INR',
@@ -199,9 +201,11 @@ const buildTransactionDetail = async (payment, booking) => {
         transactionId: payment.gatewayTransactionId || `TXN${payment._id.toString().slice(-8).toUpperCase()}`,
         customer: {
             name: formatCustomerName(customer),
+            photoUrl: buildMediaUrl(customer?.photoMediaId?.r2Key),
         },
         barber: {
             name: formatEmployeeName(employee),
+            photoUrl: buildMediaUrl(employee?.photoMediaId?.r2Key),
         },
         booking: {
             date: formatBookingDate(booking?.date),
