@@ -529,7 +529,7 @@ export const getShops = async (query = {}) => {
     if (query.category) {
         return enrichAndSortShopSummaries(await shopRepository.findByCategory(
             query.category,
-            'shopName location coverMediaId address barberId',
+            'shopName address location category targetCustomers coverMediaId facilities barberId openTime closeTime availableDays isOpen',
         ));
     }
 
@@ -566,7 +566,7 @@ export const getNearbyShops = async (coordinates) => {
     return enrichAndSortShopSummaries(await shopRepository.findNearby(
         coordinates,
         config.shop.nearbyDistanceMeters,
-        'shopName address coverMediaId facilities barberId',
+        'shopName address location category targetCustomers coverMediaId facilities barberId openTime closeTime availableDays isOpen',
     ));
 };
 
@@ -574,7 +574,7 @@ export const getNearbyServicesByGender = async (coordinates, gender, searchTerm)
     const nearbyShops = await shopRepository.findNearby(
         coordinates,
         config.shop.nearbyDistanceMeters,
-        'shopName address coverMediaId barberId',
+        'shopName address location category targetCustomers coverMediaId facilities barberId openTime closeTime availableDays isOpen',
     );
 
     if (!nearbyShops.length) return { shops: [], services: [] };

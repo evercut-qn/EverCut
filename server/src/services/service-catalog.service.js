@@ -274,7 +274,7 @@ export const searchServices = async (query, gender) => {
 };
 
 export const searchShops = async (query) => {
-    return (await shopRepository.searchByName(query, 'shopName address location category coverMediaId'))
+    return (await shopRepository.searchByName(query, 'shopName address location category targetCustomers coverMediaId facilities barberId openTime closeTime availableDays isOpen'))
         .map(serializeShopSummary)
         .filter(Boolean);
 };
