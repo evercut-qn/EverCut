@@ -13,14 +13,14 @@ const ACTIVE_BOOKING_STATUSES = [
 
 const EMPLOYEE_POPULATE = {
     path: 'employeeId',
-    select: 'firstName lastName photoMediaId blockedDates',
+    select: 'firstName lastName photoMediaId blockedDates shopId gender workingHours isActive',
     populate: { path: 'photoMediaId', select: 'r2Key' },
     options: { includeDeleted: true },
 };
 
 const EMPLOYEE_NAME_POPULATE = {
     path: 'employeeId',
-    select: 'firstName lastName photoMediaId blockedDates',
+    select: 'firstName lastName photoMediaId blockedDates shopId gender workingHours isActive',
     populate: { path: 'photoMediaId', select: 'r2Key' },
     options: { includeDeleted: true },
 };
@@ -37,6 +37,7 @@ const BOOKING_SERVICE_CARD_FIELDS = [
     'totalDuration',
     'totalPrice',
     'bundledServices',
+    'shopId',
 ].join(' ');
 
 const CUSTOMER_SUMMARY_FIELDS = 'firstName lastName photoMediaId userId feeWaiverBookingsUsed';
