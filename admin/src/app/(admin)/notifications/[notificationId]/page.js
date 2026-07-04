@@ -1,5 +1,7 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { notFound, redirect } from 'next/navigation';
+import { Fragment } from 'react';
 import { ArrowLeft, Bell, CheckCircle2, Users, XCircle } from 'lucide-react';
 
 import { ErrorNotice, MetricCard, SectionHeader, TableShell } from '@/components/ui/AdminPrimitives';
@@ -121,6 +123,18 @@ export default async function NotificationDetailPage({ params }) {
       <div className="grid gap-4 lg:grid-cols-2">
         <section className="rounded-lg border border-border bg-card p-5 shadow-sm">
           <h2 className="text-sm font-semibold text-foreground">Notification</h2>
+          {notification.imageUrl && (
+            <div className="mt-3 overflow-hidden rounded-md border border-border bg-muted">
+              <Image
+                src={notification.imageUrl}
+                alt=""
+                width={640}
+                height={192}
+                unoptimized
+                className="h-48 w-full object-cover"
+              />
+            </div>
+          )}
           <dl className="mt-2">
             <DetailRow label="Status" value={<StatusBadge value={notification.status} label={notification.displayStatus} />} />
             <DetailRow label="Type" value={labelize(notification.type)} />
@@ -155,7 +169,7 @@ export default async function NotificationDetailPage({ params }) {
             </thead>
             <tbody>
               {recipients.map((recipient) => (
-                <>
+                <Fragment key={recipient.id}>
                   <tr key={recipient.id} className="border-b border-border last:border-0 hover:bg-muted/30">
                     <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{recipient.userId}</td>
                     <td className="px-4 py-3 text-xs text-muted-foreground">{recipient.roleType}</td>
@@ -171,7 +185,7 @@ export default async function NotificationDetailPage({ params }) {
                   {(recipient.tokenAttempts || []).map((attempt, i) => (
                     <TokenAttemptRow key={`${recipient.id}-token-${i}`} attempt={attempt} />
                   ))}
-                </>
+                </Fragment>
               ))}
             </tbody>
           </table>

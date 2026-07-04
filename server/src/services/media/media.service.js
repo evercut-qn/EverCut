@@ -18,7 +18,7 @@ import { getPlanCapabilities, PLAN_IDS } from '../../config/subscription.config.
 import { serializeMedia, serializeMediaList } from '../../serializers/media.serializer.js';
 import logger from '../../utils/logger.js';
 import storageProvider from './storage-provider.service.js';
-import { buildMediaUrl } from './media-url.service.js';
+import { buildMediaUrl, buildStableMediaUrl } from './media-url.service.js';
 import { validateContentType, validateFileSize, validateMagicBytes } from './media-validation.service.js';
 
 const resolveMediaType = (contentType) => {
@@ -45,6 +45,7 @@ const buildR2Key = (purpose, contextId, mediaId, extension, mediaType) => {
         [MEDIA_PURPOSE.EMPLOYEE]: `images/employees/${safeContext}/${mediaId}.${extension}`,
         [MEDIA_PURPOSE.ONBOARDING]: `images/onboarding/${safeContext}/${mediaId}.${extension}`,
         [MEDIA_PURPOSE.SERVICE]: `images/services/${mediaId}.${extension}`,
+        [MEDIA_PURPOSE.NOTIFICATION]: `images/notifications/${safeContext}/${mediaId}.${extension}`,
         [MEDIA_PURPOSE.VIDEO_RAW]: `videos/raw/${mediaId}.${extension}`,
         [MEDIA_PURPOSE.VIDEO_THUMBNAIL]: `thumbnails/videos/${mediaId}.${extension}`,
     };
@@ -98,9 +99,17 @@ const incrementGalleryUploadCounter = async (userId, media) => {
     };
 };
 
-export const requestUploadUrl = async (userId, { contentType, sizeBytes, purpose }) => {
+export const requestUploadUrl = async (
+    userId,
+    { contentType, sizeBytes, purpose },
+    { roleType = null } = {},
+) => {
     const ownerKey = userId.toString();
     const mediaType = resolveMediaType(contentType);
+
+    if (purpose === MEDIA_PURPOSE.NOTIFICATION && roleType !== ROLES.ADMIN) {
+        throw new ForbiddenError('Only administrators may upload notification images');
+    }
 
     if (mediaType === MEDIA_TYPE.VIDEO) {
         let isBarber = false;
@@ -210,7 +219,9 @@ export const confirmUpload = async (userId, mediaId) => {
 
     return {
         mediaId: updated._id.toString(),
-        cdnUrl: buildMediaUrl(updated.r2Key),
+        cdnUrl: updated.purpose === MEDIA_PURPOSE.NOTIFICATION
+            ? buildStableMediaUrl(updated.r2Key)
+            : buildMediaUrl(updated.r2Key),
         r2Key: updated.r2Key,
         contentType: updated.contentType,
         fileSize: updated.actualSize,

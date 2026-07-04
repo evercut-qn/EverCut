@@ -42,4 +42,13 @@ export const buildMediaUrl = (r2Key, options = {}) => {
     return url.toString();
 };
 
+export const buildStableMediaUrl = (r2Key, options = {}) => {
+    if (!r2Key) return null;
+
+    const key = normalizeKey(r2Key);
+    const url = new URL(`${normalizeBaseUrl(config.r2.cdnBaseUrl)}/${key}`);
+    appendTransformParams(url, options);
+    return url.toString();
+};
+
 export const r2KeyToUrl = (r2Key, options = {}) => buildMediaUrl(r2Key, options);

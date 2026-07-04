@@ -53,9 +53,20 @@ The following table lists every notification-related API route and its migrated 
 
 ## 4. Request/Response Contract Changes
 
-> [!IMPORTANT]
-> **There are zero changes to request bodies, query parameters, or response payloads.**
-> All schemas, serializations, and pagination envelopes remain identical. Only URL paths change.
+Inbox notification responses now use the canonical Flutter notification model:
+
+```dart
+class NotificationMessage {
+  final String? id;
+  final String? title;
+  final String? body;
+  final String? imageUrl;
+  final String? datetime;
+  final Map<String, dynamic> data;
+}
+```
+
+`datetime` is sourced from the backend `createdAt` timestamp and returned as an ISO 8601 UTC string. Operational metadata such as status, read timestamps, categories, and delivery counters is not part of the Flutter inbox payload. Routing fields such as `eventType`, `entityType`, and `entityId` live inside `data`.
 
 ---
 
@@ -84,6 +95,7 @@ Updating read status or listing notifications must use the `/notifications/inbox
 For example, to mark all read:
 - OLD: `PATCH /api/v1/notifications`
 - NEW: `PATCH /api/v1/notifications/inbox`
+- Body: `{ "read": true }`
 
 ---
 
@@ -95,7 +107,7 @@ No handler code changes are required. As long as your API client utility base pa
 
 ## 9. Background Notification Handling
 
-No changes are required for `onBackgroundMessage()` or `onMessageOpenedApp()`. Payload structure and parameters (e.g. `entityId`, `entityType`) are identical.
+FCM uses the same delivery message fields except for `datetime`, which is REST-only. `imageUrl` is included when available, and route parameters such as `entityId` and `entityType` are read from `message.data`.
 
 ---
 

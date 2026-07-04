@@ -45,6 +45,7 @@ const assertNoOwnIdAliases = (resourceName, payload) => {
 
 test('resource serializers expose only id for each resource own identity', () => {
     const id = '507f1f77bcf86cd799439011';
+    const notificationCreatedAt = new Date('2026-07-01T10:06:34.000Z');
     const shop = {
         _id: id,
         barberId: '507f1f77bcf86cd799439012',
@@ -74,7 +75,7 @@ test('resource serializers expose only id for each resource own identity', () =>
         customerSummary: serializeCustomerSummary({ _id: id, firstName: 'Mina', lastName: 'Shah' }),
         customerProfile: serializeCustomerProfile({ _id: id, firstName: 'Mina', lastName: 'Shah' }),
         employee: serializeEmployee({ _id: id, firstName: 'Dev', lastName: 'Patel' }),
-        notification: serializeNotification({ _id: id, type: 'booking', eventType: 'booking.created', title: 'Title', body: 'Body' }),
+        notification: serializeNotification({ _id: id, type: 'booking', eventType: 'booking.created', title: 'Title', body: 'Body', createdAt: notificationCreatedAt }),
         fcmToken: serializeFcmTokenRegistration({ _id: id, userId: id, platform: 'android' }),
         payment: serializePayment({ _id: id, status: 'initiated' }),
         paymentInitiation: serializePaymentInitiation({ payment: { _id: id, merchantOrderId: 'EC-1', amount: 100, amountInRupees: 1 }, bookingId: id }),
@@ -106,6 +107,8 @@ test('resource serializers expose only id for each resource own identity', () =>
 
     assert.equal('photoUrl' in samples.media, false);
     assert.match(samples.media.url, /^https:\/\/.+\/images\/gallery\/shop-1\/photo\.jpg\?exp=/);
+    assert.equal(samples.notification.datetime, '2026-07-01T10:06:34.000Z');
+    assert.equal('createdAt' in samples.notification, true);
 
     // Double serialization check
     const doubleSerialized = serializeMedia(samples.media);

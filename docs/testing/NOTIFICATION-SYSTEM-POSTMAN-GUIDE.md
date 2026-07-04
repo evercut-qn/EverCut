@@ -58,6 +58,25 @@ Expected notification payload data includes:
 }
 ```
 
+FCM data values are strings and do not include `datetime`. The REST inbox response includes `datetime` as an ISO 8601 UTC string plus typed `data` values:
+
+```json
+{
+  "id": "<notificationId>",
+  "title": "Booking confirmed",
+  "body": "Your booking is confirmed.",
+  "imageUrl": "https://<cloudflare-media-domain>/images/notifications/system/evercut.png",
+  "datetime": "2026-07-01T10:06:34.000Z",
+  "data": {
+    "eventType": "booking.confirmed",
+    "entityType": "booking",
+    "entityId": "<bookingId>",
+    "bookingId": "<bookingId>",
+    "requiresFetch": true
+  }
+}
+```
+
 ## Flow 3: Read Notification History
 
 Request:
@@ -110,6 +129,11 @@ Request:
 ```http
 PATCH /api/v1/notifications/inbox/{{notification_id}}
 Authorization: Bearer {{customer_access_token}}
+Content-Type: application/json
+
+{
+  "read": true
+}
 ```
 
 Expected:
@@ -124,6 +148,11 @@ Request:
 ```http
 PATCH /api/v1/notifications/inbox
 Authorization: Bearer {{customer_access_token}}
+Content-Type: application/json
+
+{
+  "read": true
+}
 ```
 
 Expected:
@@ -164,6 +193,14 @@ Authorization: Bearer {{admin_access_token}}
 ```
 
 ### Flow 9: Create Broadcast (Async Dispatch)
+
+To attach an image, first use the existing media flow as an admin:
+
+1. `POST /api/v1/media/upload-url` with `purpose: "notification"` and an image MIME type (`image/png`, `image/jpeg`, or `image/webp`).
+2. Upload the image bytes to the returned R2 `uploadUrl`.
+3. `POST /api/v1/media/confirm` with the returned `mediaId`.
+4. Use that `mediaId` as `imageMediaId` in the broadcast request.
+
 Request:
 ```http
 POST /api/v1/notifications/broadcasts
@@ -173,13 +210,20 @@ Content-Type: application/json
 {
   "title": "Promo Alert",
   "body": "Get 20% off your next booking!",
-  "type": "push",
+  "type": "hybrid",
   "category": "promotional",
-  "audienceMode": "customers",
-  "dataJson": "{\"discount\":\"20\"}"
+  "audience": {
+    "mode": "customers",
+    "filters": {}
+  },
+  "imageMediaId": "{{notification_image_media_id}}",
+  "data": {
+    "route": "/offers/weekend",
+    "discount": "20"
+  }
 }
 ```
-Expected: `201 Created` response immediately. Dispatch runs asynchronously in the background.
+Expected: `201 Created` response immediately. Dispatch runs asynchronously in the background. If `imageMediaId` is omitted, the backend uses the default stable Cloudflare notification image.
 
 ### Flow 10: View Broadcast Details & Metrics
 Request:
@@ -221,6 +265,6 @@ Authorization: Bearer {{admin_access_token}}
 1. Register a stale or invalid real FCM token.
 2. Trigger a notification.
 3. Firebase returns an invalid-token error.
-4. Backend marks the token `revokedAt` and records delivery as `partial` or `failed`.
+4. Backend marks the token `revokedAt` and records delivery as `sent` when at least one device succeeds, or `failed` when all targeted devices fail.
 
 Synthetic Postman tokens cannot validate real Firebase delivery. They validate only REST persistence and ownership behavior.

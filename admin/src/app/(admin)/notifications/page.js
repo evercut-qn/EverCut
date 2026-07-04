@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { redirect } from 'next/navigation';
 import { Bell, Eye, Plus } from 'lucide-react';
 
@@ -106,8 +107,22 @@ export default async function NotificationsPage({ searchParams }) {
               {items.map((notification) => (
                 <tr key={notification.id} className="border-b border-border last:border-0 hover:bg-muted/30">
                   <td className="px-4 py-3">
-                    <div className="font-medium text-foreground">{notification.title}</div>
-                    <div className="max-w-md truncate text-xs text-muted-foreground">{notification.body}</div>
+                    <div className="flex items-center gap-3">
+                      {notification.imageUrl && (
+                        <Image
+                          src={notification.imageUrl}
+                          alt=""
+                          width={64}
+                          height={40}
+                          unoptimized
+                          className="h-10 w-16 rounded border border-border object-cover"
+                        />
+                      )}
+                      <div className="min-w-0">
+                        <div className="font-medium text-foreground">{notification.title}</div>
+                        <div className="max-w-md truncate text-xs text-muted-foreground">{notification.body}</div>
+                      </div>
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-xs text-muted-foreground">
                     {String(notification.audience?.mode || 'unknown').replaceAll('_', ' ')}

@@ -29,7 +29,7 @@ const ensureRequiredEnv = () => {
 ensureRequiredEnv();
 
 const mediaUrlModule = await import('../media-url.service.js');
-const { buildMediaUrl } = mediaUrlModule;
+const { buildMediaUrl, buildStableMediaUrl } = mediaUrlModule;
 
 test('buildMediaUrl returns CDN URL with signed token and transform params', () => {
     const url = new URL(buildMediaUrl('images/gallery/shop-1/photo.jpg', {
@@ -60,4 +60,12 @@ test('buildMediaUrl returns CDN URL with signed token and transform params', () 
 test('media URL module exposes only R2 URL builders after migration finalization', () => {
     assert.equal('buildLegacyCompatibleUrl' in mediaUrlModule, false);
     assert.equal(buildMediaUrl(null), null);
+});
+
+test('buildStableMediaUrl returns long-lived CDN URL without signed query params', () => {
+    const url = new URL(buildStableMediaUrl('images/notifications/system/evercut.png'));
+
+    assert.equal(url.origin, 'https://media.evercut.test');
+    assert.equal(url.pathname, '/images/notifications/system/evercut.png');
+    assert.equal(url.search, '');
 });

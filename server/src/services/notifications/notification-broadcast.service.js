@@ -4,6 +4,7 @@ import {
     NOTIFICATION_AUDIT_ACTION,
     NOTIFICATION_STATUS,
     NOTIFICATION_CATEGORY,
+    NOTIFICATION_EVENT,
 } from '../../utils/constants.js';
 import {
     serializeInboxNotification,
@@ -12,24 +13,42 @@ import {
     serializeNotificationRecipient,
 } from '../../serializers/notification.serializer.js';
 import { NotFoundError } from '../../utils/api-error.js';
+import {
+    buildNotificationData,
+    resolveNotificationImageUrl,
+} from './notification-message.service.js';
 
-const toNotificationPayload = (body, actorUserId) => ({
-    title: body.title,
-    body: body.body,
-    type: body.type || 'hybrid',
-    category: body.category || NOTIFICATION_CATEGORY.ADMIN_BROADCAST,
-    status: body.status || NOTIFICATION_STATUS.SENDING,
-    createdByUserId: actorUserId,
-    audience: body.audience,
-    payload: body.data || {},
-    entityType: body.entityType || null,
-    entityId: body.entityId || null,
-    scheduledFor: body.scheduledFor || null,
-    dedupeKey: body.dedupeKey || null,
-});
+const toNotificationPayload = async (body, actorUserId) => {
+    const imageUrl = await resolveNotificationImageUrl({
+        imageUrl: body.imageUrl,
+        imageMediaId: body.imageMediaId,
+    });
+
+    return {
+        title: body.title,
+        body: body.body,
+        imageUrl,
+        imageMediaId: body.imageMediaId || null,
+        type: body.type || 'hybrid',
+        category: body.category || NOTIFICATION_CATEGORY.ADMIN_BROADCAST,
+        status: body.status || NOTIFICATION_STATUS.SENDING,
+        createdByUserId: actorUserId,
+        audience: body.audience,
+        payload: buildNotificationData({
+            data: body.data,
+            eventType: NOTIFICATION_EVENT.SYSTEM_ALERT,
+            entityType: body.entityType,
+            entityId: body.entityId,
+        }),
+        entityType: body.entityType || null,
+        entityId: body.entityId || null,
+        scheduledFor: body.scheduledFor || null,
+        dedupeKey: body.dedupeKey || null,
+    };
+};
 
 export const createNotification = async ({ actorUserId, body, ip = null, userAgent = null }) => {
-    const payload = toNotificationPayload(body, actorUserId);
+    const payload = await toNotificationPayload(body, actorUserId);
     const notification = await notificationRepository.createNotification(payload);
     await notificationRepository.createAuditLog({
         actorUserId,

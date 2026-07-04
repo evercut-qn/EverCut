@@ -99,6 +99,7 @@ test('adminNotificationCreateSchema accepts a customer broadcast notification', 
         audience: {
             mode: NOTIFICATION_AUDIENCE_MODE.CUSTOMERS,
         },
+        imageMediaId: 'notification-image-1',
         data: {
             route: '/offers/weekend',
             requiresFetch: true,
@@ -108,6 +109,7 @@ test('adminNotificationCreateSchema accepts a customer broadcast notification', 
     assert.equal(error, undefined);
     assert.equal(value.status, NOTIFICATION_STATUS.SENDING);
     assert.equal(value.audience.mode, 'customers');
+    assert.equal(value.imageMediaId, 'notification-image-1');
     assert.equal(value.data.requiresFetch, true);
 });
 
@@ -163,6 +165,19 @@ test('adminNotificationCreateSchema validates audience constraints and rejects r
     });
 
     assert.match(reservedKey.error?.message || '', /reserved/i);
+
+    const reservedExactKey = adminNotificationCreateSchema.validate({
+        title: 'Weekend offer',
+        body: 'Book today.',
+        type: 'hybrid',
+        category: NOTIFICATION_CATEGORY.ADMIN_BROADCAST,
+        audience: {
+            mode: NOTIFICATION_AUDIENCE_MODE.CUSTOMERS,
+        },
+        data: { from: 'firebase-reserved' },
+    });
+
+    assert.match(reservedExactKey.error?.message || '', /reserved/i);
 });
 
 test('adminNotificationListQuerySchema normalizes status, category, search, and pagination', () => {

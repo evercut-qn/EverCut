@@ -78,6 +78,7 @@ export const sendNotification = async (notificationId, { actorUserId = null, ip 
                 eventType: 'system.alert',
                 title: notification.title,
                 body: notification.body,
+                imageUrl: notification.imageUrl,
                 data: notification.payload || {},
                 entityType: notification.entityType || null,
                 entityId: notification.entityId || null,
@@ -114,11 +115,9 @@ export const sendNotification = async (notificationId, { actorUserId = null, ip 
                         payload: {
                             id: toIdString(inboxNotification._id),
                             type: notification.type,
-                            eventType: inboxNotification.eventType,
                             title: notification.title,
                             body: notification.body,
-                            entityType: inboxNotification.entityType,
-                            entityId: inboxNotification.entityId ? toIdString(inboxNotification.entityId) : null,
+                            imageUrl: notification.imageUrl,
                             data: notification.payload || {},
                         },
                     });

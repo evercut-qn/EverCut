@@ -2,6 +2,10 @@
 
 import { revalidatePath } from 'next/cache';
 import { createNotification } from '@/lib/services/notification.service';
+import {
+  confirmMediaUpload,
+  requestNotificationImageUpload,
+} from '@/lib/services/media.service';
 import { notificationFormSchema, toNotificationPayload } from '@/lib/schemas/notification.schema';
 import { getValidAccessToken } from '@/lib/auth';
 import { decodeJWTPayload } from '@/lib/jwt';
@@ -77,4 +81,18 @@ export async function handleCreateNotificationAction(formData) {
       message: error.message || 'A server error occurred while sending notification.',
     };
   }
+}
+
+export async function handleRequestNotificationImageUploadAction({ contentType, sizeBytes }) {
+  const { token, error } = await requireAdminToken();
+  if (error) return error;
+
+  return requestNotificationImageUpload({ contentType, sizeBytes }, { token });
+}
+
+export async function handleConfirmNotificationImageUploadAction(mediaId) {
+  const { token, error } = await requireAdminToken();
+  if (error) return error;
+
+  return confirmMediaUpload(mediaId, { token });
 }

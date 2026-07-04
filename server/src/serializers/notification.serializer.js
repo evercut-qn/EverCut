@@ -4,30 +4,23 @@ const compact = (value) => Object.fromEntries(
     Object.entries(value).filter(([, nestedValue]) => nestedValue !== undefined),
 );
 
+const toIsoDateTime = (value) => {
+    if (!value) return null;
+    const date = value instanceof Date ? value : new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date.toISOString();
+};
+
 export const serializeInboxNotification = (notification) => {
     const plain = sanitizeForResponse(toPlainObject(notification));
     if (!plain) return null;
 
     return {
         id: plain.id,
-        notificationId: plain.notificationId ? toIdString(plain.notificationId) : null,
-        recipientId: plain.recipientId ? toIdString(plain.recipientId) : null,
-        recipientUserId: toIdString(plain.recipientUserId),
-        actorUserId: plain.actorUserId ? toIdString(plain.actorUserId) : null,
-        type: plain.type,
-        category: plain.category || null,
-        eventType: plain.eventType,
         title: plain.title,
         body: plain.body,
+        imageUrl: plain.imageUrl || null,
+        datetime: toIsoDateTime(plain.createdAt),
         data: plain.data || {},
-        entityType: plain.entityType || null,
-        entityId: plain.entityId || null,
-        status: plain.status,
-        delivery: plain.delivery || { successCount: 0, failureCount: 0 },
-        readAt: plain.readAt || null,
-        deliveredAt: plain.deliveredAt || null,
-        createdAt: plain.createdAt,
-        updatedAt: plain.updatedAt,
     };
 };
 
@@ -62,6 +55,8 @@ export const serializeNotification = (notification) => {
         id: plain.id,
         title: plain.title,
         body: plain.body,
+        imageUrl: plain.imageUrl || null,
+        datetime: toIsoDateTime(plain.createdAt),
         type: plain.type,
         category: plain.category,
         status: plain.status,

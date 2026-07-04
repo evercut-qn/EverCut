@@ -44,9 +44,11 @@ To ensure a device does not receive notifications after logout, **always revoke 
 For managing user notifications feeds, the Flutter app integrates with the following inbox-specific REST routes:
 - **Fetch Notifications List**: `GET /api/v1/notifications/inbox` (supports `page`, `limit`, and `read` query parameters)
 - **Get Unread Badge Count**: `GET /api/v1/notifications/inbox/unread-count`
-- **Mark Single Notification as Read**: `PATCH /api/v1/notifications/inbox/:id`
-- **Mark All Notifications as Read**: `PATCH /api/v1/notifications/inbox`
+- **Mark Single Notification as Read**: `PATCH /api/v1/notifications/inbox/:id` with `{ "read": true }`
+- **Mark All Notifications as Read**: `PATCH /api/v1/notifications/inbox` with `{ "read": true }`
 - **Fetch Notification Details**: `GET /api/v1/notifications/inbox/:id`
+
+Inbox list and detail responses return `id`, `title`, `body`, `imageUrl`, `datetime`, and `data`. `datetime` is an ISO 8601 UTC string sourced from the backend creation timestamp and should be used for display ordering/date labels. FCM payloads do not include `datetime`; after any push, fetch REST for the authoritative timestamp.
 
 ---
 
@@ -62,9 +64,19 @@ Admin broadcasts are created using a client-side Zod validator [notification.sch
   - `type` (Enum: `push`, `silent`, `hybrid`)
   - `category` (Enum: `transactional`, `admin_broadcast`, `silent_sync`, `system_alert`, `promotional`)
   - `audienceMode` (Enum: `customers`, `barbers`, `customers_and_barbers`)
-  - `dataJson` (Valid JSON string containing custom FCM payload parameters)
+  - `imageMediaId` (Optional media id returned by the notification image upload flow)
+  - `dataJson` (Valid JSON object string containing custom FCM data; reserved Firebase keys are rejected)
 
-### 2.2 Server Action Dispatches
+### 2.2 Notification Image Upload
+The admin form uploads images through the existing media flow before creating the broadcast:
+1. Request a signed R2 upload URL from `POST /api/v1/media/upload-url` with `purpose: "notification"`.
+2. Upload the selected PNG, JPEG, or WebP file directly to R2.
+3. Confirm the upload with `POST /api/v1/media/confirm`.
+4. Submit the returned `mediaId` as `imageMediaId` on `POST /api/v1/notifications/broadcasts`.
+
+The broadcast API stores and returns a stable Cloudflare `imageUrl` without signed expiry parameters. If no image is selected, the backend uses the default system notification image.
+
+### 2.3 Server Action Dispatches
 Because the admin session cookies (`evercut_admin_session`) are protected with `HttpOnly` security, they cannot be read by browser-side JavaScript. To successfully authenticate writes, the frontend form calls a Next.js Server Action [notification.action.js](file:///c:/Users/manis/Projects/EverCut/admin/src/app/(admin)/notifications/_actions/notification.action.js):
 
 ```javascript

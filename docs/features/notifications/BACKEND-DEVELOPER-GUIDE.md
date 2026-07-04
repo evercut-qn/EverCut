@@ -49,8 +49,8 @@ All endpoints require an authenticated `Authorization: Bearer <token>` header.
 | `GET` | `/api/v1/notifications/inbox` | Customer / Barber | Lists personal inbox notifications. |
 | `GET` | `/api/v1/notifications/inbox/unread-count` | Customer / Barber | Gets the unread badge count for the caller. |
 | `GET` | `/api/v1/notifications/inbox/:id` | Owner | Gets details of a personal inbox notification. |
-| `PATCH` | `/api/v1/notifications/inbox/:id` | Owner | Marks a specific inbox notification as read. |
-| `PATCH` | `/api/v1/notifications/inbox` | Customer / Barber | Marks all personal inbox notifications as read. |
+| `PATCH` | `/api/v1/notifications/inbox/:id` | Owner | Marks a specific inbox notification as read. Body: `{ "read": true }`. |
+| `PATCH` | `/api/v1/notifications/inbox` | Customer / Barber | Marks all personal inbox notifications as read. Body: `{ "read": true }`. |
 | `GET` | `/api/v1/notifications/broadcasts` | `ADMIN` Role | Lists bulk broadcasts. |
 | `POST` | `/api/v1/notifications/broadcasts` | `ADMIN` Role | Creates a bulk broadcast notification (async dispatch). |
 | `GET` | `/api/v1/notifications/broadcasts/:id` | `ADMIN` Role | Gets details and delivery metrics of a broadcast. |
@@ -71,6 +71,8 @@ Example response payload for `GET /api/v1/notifications/broadcasts/:id`:
     "id": "60a7c0000000000000000001",
     "title": "Weekend Promotion",
     "body": "Book now and get 10% off!",
+    "imageUrl": "https://media.example.com/images/notifications/system/evercut.png",
+    "datetime": "2026-06-10T11:55:00.000Z",
     "type": "hybrid",
     "category": "admin_broadcast",
     "status": "sent",
@@ -159,27 +161,38 @@ To add a new notification event (e.g., a new booking state or business alert):
    );
    ```
 3. **Trigger Event**: Import and call `notifyNewAwesomeEvent` from your business logic service.
-4. **Validation rules**: Data payloads passed to FCM are validated; any key starting with `google.`, `gcm.`, or `gcm.notification.` will be rejected to prevent FCM reserved namespaces issues.
+4. **Validation rules**: Data payloads passed to FCM are validated; the exact keys `from` and `message_type`, plus any key starting with `google.`, `gcm.`, or `gcm.notification.`, are rejected to prevent FCM reserved namespace issues.
+
+## 6. Notification Images
+
+Notification images are resolved centrally before persistence and dispatch:
+- Admin broadcasts can pass `imageMediaId` referencing a ready media row with `purpose: "notification"`.
+- System-generated notifications use the configured default R2 key (`NOTIFICATION_DEFAULT_IMAGE_R2_KEY`, default `images/notifications/system/evercut.png`) when no explicit image is provided.
+- Notification image URLs are stable Cloudflare URLs built without `exp` or `token` query parameters. Do not use short-lived signed URLs for notification images because FCM delivery and opens can be delayed.
+
+## 7. API Datetime Field
+
+Notifications API message responses include `datetime`, sourced from the document `createdAt` timestamp and serialized as an ISO 8601 UTC string. Inbox responses expose only `id`, `title`, `body`, `imageUrl`, `datetime`, and `data` to Flutter. FCM payloads do not include `datetime`.
 
 ---
 
-## 6. Reliability and Background Jobs
+## 8. Reliability and Background Jobs
 
 The platform includes built-in mechanisms for reliability and background maintenance.
 
-### 6.1 FCM Retry with Exponential Backoff
+### 7.1 FCM Retry with Exponential Backoff
 Transient delivery failures when communicating with the FCM server (e.g., rate limits or network issues) are retried automatically:
 - **Max Retries**: 2 additional attempts.
 - **Backoff Algorithm**: Exponential backoff with a base of 1000ms ($2^{\text{attempt}} \times 1000$ ms) plus a random jitter up to 100ms.
 - **Retryable Errors**: `messaging/internal-error`, `messaging/server-unavailable`.
 - **Permanent Errors**: Stale tokens (`messaging/invalid-registration`, `messaging/registration-token-not-registered`), bad requests, or configuration errors are NOT retried.
 
-### 6.2 Stale Token Cleanup
+### 7.2 Stale Token Cleanup
 A background cron job runs weekly to clean up inactive tokens:
 - **Centralized Configuration**: The staleness threshold (90 days) and weekly schedule (`0 3 * * 0`, Sunday at 03:00 in Asia/Kolkata timezone) are defined under the `notification` block in `server/src/config/index.js` as frozen constants.
 - **Action**: Stale tokens are deactivated/deleted in the database to maintain optimal storage and dispatch speed.
 
-### 6.3 Startup Recovery Scan
+### 7.3 Startup Recovery Scan
 On server startup, a recovery scan runs to check for broadcasts that were left in the transient `sending` status due to a server crash or sudden restart:
 - **Action**: Any broadcast stuck in `sending` state for more than 5 minutes is updated to `failed`.
 - **Context Preservation**: A detailed description is logged into `failureReason` noting how many recipients were processed vs how many were remaining at the time of recovery.

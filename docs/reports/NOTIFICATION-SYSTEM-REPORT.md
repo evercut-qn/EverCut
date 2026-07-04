@@ -25,11 +25,12 @@ Textual flow:
 Business event
   -> domain service updates MongoDB state
   -> notification-events.service builds event-specific payload
-  -> notification.service persists Notification with dedupeKey
+  -> notification-message core builds FCM { id, title, body, imageUrl, data }
+  -> notification.service persists InboxNotification with dedupeKey
   -> notification.service reads active FcmToken records
-  -> fcm.service sends FCM multicast payload
+  -> fcm.service sends the FCM delivery payload
   -> invalid FCM tokens are revoked
-  -> Notification delivery status is updated
+  -> InboxNotification delivery status is updated
   -> Flutter receives trigger and fetches REST source of truth
 ```
 
@@ -80,7 +81,22 @@ Stores one row per device token:
 
 Registering the same token again refreshes metadata. If another authenticated user registers the same token, ownership is reassigned to the current user.
 
-### `Notification`
+### Client Notification Message
+
+REST inbox responses use the client model:
+
+- `id`
+- `title`
+- `body`
+- `imageUrl`
+- `datetime`
+- `data`
+
+`datetime` is sourced from `createdAt` and serialized as an ISO 8601 UTC string. FCM uses the same delivery fields except for `datetime`, which is intentionally REST-only.
+
+`data` contains routing metadata such as `eventType`, `entityType`, and `entityId` plus event-specific fields. Operational metadata remains internal.
+
+### `InboxNotification`
 
 Stores one row per event notification:
 
@@ -89,13 +105,18 @@ Stores one row per event notification:
 - `type`
 - `eventType`
 - `title`, `body`
+- `imageUrl`
 - `data`
 - `entityType`, `entityId`
 - `dedupeKey` unique when present
-- `status`: `queued`, `sent`, `failed`
+- `status`: `sending`, `sent`, `failed`
 - `delivery.successCount`, `delivery.failureCount`
 - `deliveredAt`, `readAt`, `failureReason`
 - `expiresAt` optional TTL
+
+### `Notification`
+
+Admin-created broadcasts are stored as campaign records with internal audience, metrics, audit, and delivery metadata. Broadcasts persist the resolved `imageUrl` and deliver the same `id/title/body/imageUrl/data` model to recipients and FCM.
 
 ## API Surface
 
@@ -103,11 +124,18 @@ All endpoints require authentication.
 
 ```text
 POST   /api/v1/notifications/tokens
-DELETE /api/v1/notifications/tokens
-GET    /api/v1/notifications
-GET    /api/v1/notifications/unread-count
-PATCH  /api/v1/notifications/:id
-PATCH  /api/v1/notifications
+DELETE /api/v1/notifications/tokens/:token
+GET    /api/v1/notifications/inbox
+GET    /api/v1/notifications/inbox/unread-count
+GET    /api/v1/notifications/inbox/:id
+PATCH  /api/v1/notifications/inbox/:id
+PATCH  /api/v1/notifications/inbox
+GET    /api/v1/notifications/broadcasts
+POST   /api/v1/notifications/broadcasts
+GET    /api/v1/notifications/broadcasts/:id
+GET    /api/v1/notifications/broadcasts/:id/recipients
+GET    /api/v1/notifications/broadcasts/:id/inbox-items
+GET    /api/v1/notifications/broadcasts/:id/audits
 ```
 
 ## Reliability Decisions
@@ -136,7 +164,7 @@ PATCH  /api/v1/notifications
 ## Assumptions
 
 - MongoDB remains the authoritative store for notifications.
-- Flutter will fetch `/notifications` and the domain endpoint referenced by `entityType/entityId` after each FCM trigger.
+- Flutter will fetch `/notifications/inbox` and the domain endpoint referenced by `data.entityType/data.entityId` after each FCM trigger.
 - Firebase Admin credentials are supplied through `.env` or runtime environment variables.
 - Local `server/.env` and `server/firebase-admin-sdk.json` are treated as secrets and were not used as implementation input.
 - The codebase scope reviewed was `docs/` and `server/`, excluding generated dependencies such as `server/node_modules` and local secret material.
@@ -159,3 +187,15 @@ The unified `/notifications` route was split into distinct collections to elimin
 - **Parallel Dispatch Processing**: Recipients are processed in parallel batches of 50 to optimize database load and memory usage.
 - **Weekly Stale Token Cleanup**: A background cron job automatically deletes FCM tokens that have been inactive (no successful registrations or deliveries) for over 90 days.
 - **Startup Recovery Scan**: On server restart, a recovery task scans for broadcasts stuck in the transient `sending` state. It marks them as `failed` and records progress context (e.g., processed vs remaining recipients) in `failureReason`.
+
+---
+
+## Addendum: Unified Message Core & Notification Images (June 2026)
+
+The notification payload was simplified around a canonical message model. REST inbox responses expose `id`, `title`, `body`, `imageUrl`, `datetime`, and `data`; FCM payloads expose `id`, `title`, `body`, `imageUrl`, and `data`.
+
+- Admin broadcasts can upload notification images through the existing Cloudflare R2 media flow.
+- Notification image URLs are stable long-lived Cloudflare URLs. They are not short-lived signed media URLs because FCM notifications can be delivered or opened much later.
+- System notifications automatically use the default uploaded EverCut image at `images/notifications/system/evercut.png` when no explicit image is provided.
+- `server/scripts/seed-notification-default-image.mjs` uploads `server/assets/logo/evercut.png` to the configured default R2 key and records the media row.
+- Flutter REST receives only the canonical message fields plus `datetime`; internal delivery/read/audit metadata remains backend-only. FCM intentionally does not include `datetime`.

@@ -151,12 +151,27 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 ## Payload Contract
 
-Every FCM data payload includes string values:
+REST inbox notifications include a canonical `datetime` field sourced from the backend `createdAt` timestamp and returned as an ISO 8601 UTC string:
+
+```dart
+class NotificationMessage {
+  final String? id;
+  final String? title;
+  final String? body;
+  final String? imageUrl;
+  final String? datetime;
+  final Map<String, dynamic> data;
+}
+```
+
+FCM does not include `datetime`. FCM visible notifications include `title`, `body`, and `imageUrl` in the platform notification block, and FCM data includes string values for `id`, `imageUrl`, and every value inside `data`.
+
+Example FCM data:
 
 ```json
 {
   "id": "<notification id>",
-  "type": "hybrid",
+  "imageUrl": "https://<cloudflare-media-domain>/images/notifications/system/evercut.png",
   "eventType": "booking.confirmed",
   "entityType": "booking",
   "entityId": "<bookingId>",
@@ -165,7 +180,7 @@ Every FCM data payload includes string values:
 }
 ```
 
-Use `id` to correlate with `/notifications/inbox`. Use `entityType/entityId` to fetch domain state.
+Use `id` to correlate with `/notifications/inbox`. Use `data.entityType` and `data.entityId` to fetch domain state. Notification images are stable Cloudflare media URLs and should not be treated as expiring signed URLs.
 
 ## REST APIs
 

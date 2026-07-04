@@ -1,14 +1,15 @@
 import Notification, { NotificationRecipient, NotificationAuditLog } from '../models/notification.model.js';
 import { NOTIFICATION_STATUS, NOTIFICATION_AUDIT_ACTION } from '../utils/constants.js';
 import logger from '../utils/logger.js';
+import { trustQueryOperators } from '../utils/mongoose-query.utils.js';
 
 export const runStartupRecoveryScan = async () => {
     try {
         const threshold = new Date(Date.now() - 5 * 60 * 1000); // Stuck for > 5 minutes
-        const stuckBroadcasts = await Notification.find({
+        const stuckBroadcasts = await Notification.find(trustQueryOperators({
             status: NOTIFICATION_STATUS.SENDING,
             sentAt: { $lt: threshold }
-        });
+        }));
 
         if (stuckBroadcasts.length === 0) {
             logger.info('[StartupRecovery] No stuck broadcasts found');
@@ -19,10 +20,10 @@ export const runStartupRecoveryScan = async () => {
 
         for (const broadcast of stuckBroadcasts) {
             const totalRecipients = await NotificationRecipient.countDocuments({ notificationId: broadcast._id });
-            const processedRecipients = await NotificationRecipient.countDocuments({
+            const processedRecipients = await NotificationRecipient.countDocuments(trustQueryOperators({
                 notificationId: broadcast._id,
                 processedAt: { $ne: null }
-            });
+            }));
             const remainingRecipients = totalRecipients - processedRecipients;
 
             let failureReason = '';

@@ -5,7 +5,11 @@ import { getValidatedRequestData } from '../utils/request-validation.utils.js';
 export const requestUploadUrl = async (req, res, next) => {
     try {
         const body = getValidatedRequestData(req, 'body');
-        const result = await mediaService.requestUploadUrl(req.user._id, body);
+        const result = await mediaService.requestUploadUrl(
+            req.user._id,
+            body,
+            { roleType: req.user.roleType },
+        );
         return res.status(201).json(ApiResponse.success(result, 'Upload URL generated'));
     } catch (err) {
         next(err);
