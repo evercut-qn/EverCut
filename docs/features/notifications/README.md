@@ -8,10 +8,10 @@ EverCut uses a hybrid real-time design for user notifications. The system ensure
 
 The system uses **Firebase Cloud Messaging (FCM)** as a real-time wake-up trigger. When a notification event occurs:
 1. The backend persists the state (recipient and inbox feed entry).
-2. The backend sends a minimal multicast FCM payload containing only routing metadata (e.g. `id`, `eventType`, `entityType`, `entityId`).
+2. The backend sends the canonical push message through FCM: `id`, `title`, `body`, `imageUrl`, and `data`.
 3. The client receives the FCM trigger and queries the **EverCut REST API** to fetch the authoritative, up-to-date state.
 
-This approach avoids sending full business objects (e.g. booking details, payment data) over push payloads, keeping payloads under size limits and ensuring sensitive information is never exposed outside the authenticated API boundary.
+This approach avoids sending full business objects (e.g. booking details, payment data) over push payloads, keeping payloads under size limits and ensuring sensitive information is never exposed outside the authenticated API boundary. Notification images use stable long-lived Cloudflare URLs so FCM cards can still render after delayed delivery or delayed opening.
 
 ---
 
@@ -62,6 +62,8 @@ Barber replies to a rating
 To distinguish between personal notifications and bulk templates, the system uses two concepts and enforces full RESTful resource separation at the API layer:
 - **Notification (Broadcast)**: Represents a bulk message template created by admins targeting a specific audience segment (e.g., a promotional offer). Managed via `/api/v1/notifications/broadcasts`.
 - **InboxNotification (Personal Feed)**: Represents a single recipient's inbox feed item (e.g., a booking update or a resolved copy of a broadcast notification). Managed via `/api/v1/notifications/inbox`.
+
+Notifications API message responses serialize client-facing notifications with `id`, `title`, `body`, `imageUrl`, `datetime`, and `data`; `datetime` is an ISO 8601 UTC string sourced from `createdAt`. FCM payloads intentionally omit `datetime` and keep `id`, `title`, `body`, `imageUrl`, and `data`. Delivery state, read timestamps, metrics, audit records, and recipient/token details remain internal operational metadata.
 
 ---
 

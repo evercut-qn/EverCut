@@ -1,6 +1,8 @@
 # EverCut Media Worker
 
-Cloudflare Worker for signed media delivery from private R2 buckets.
+Cloudflare Worker for media delivery from private R2 buckets.
+
+All media paths require signed URLs except `/images/notifications/*`. Notification images are intentionally public and stable because FCM messages may be delivered or opened after a short-lived signature would expire.
 
 ## Environments
 

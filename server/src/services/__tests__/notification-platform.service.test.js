@@ -43,6 +43,7 @@ const notificationRepository = (await import('../../repositories/notification.re
 const fcmTokenRepository = (await import('../../repositories/fcm-token.repository.js')).default;
 const userRepository = (await import('../../repositories/user.repository.js')).default;
 const fcmService = (await import('../notifications/fcm.service.js')).default;
+const mediaRepository = (await import('../../repositories/media.repository.js')).default;
 
 test('notification token service registers expanded device metadata without exposing raw token', async (t) => {
     let upsertArgs = null;
@@ -98,8 +99,51 @@ test('broadcast service creates notifications and writes audit log', async (t) =
     });
 
     assert.equal(result.id, 'notification-1');
+    assert.equal(result.imageUrl.endsWith('/images/notifications/system/evercut.png'), true);
     assert.equal(auditPayload.action, 'notification.created');
     assert.equal(auditPayload.actorUserId, 'admin-1');
+});
+
+test('broadcast service resolves uploaded notification images to stable URLs', async (t) => {
+    let createdPayload = null;
+    t.mock.method(mediaRepository, 'findById', async (id) => ({
+        _id: id,
+        type: 'image',
+        purpose: 'notification',
+        status: 'ready',
+        r2Key: 'images/notifications/admin-1/promo.png',
+    }));
+    t.mock.method(notificationRepository, 'createNotification', async (payload) => {
+        createdPayload = payload;
+        return {
+            _id: 'notification-1',
+            ...payload,
+        };
+    });
+    t.mock.method(notificationRepository, 'createAuditLog', async (payload) => ({ _id: 'audit-1', ...payload }));
+
+    const result = await notificationBroadcastService.createNotification({
+        actorUserId: 'admin-1',
+        body: {
+            title: 'Weekend offer',
+            body: 'Book today.',
+            audience: { mode: 'customers' },
+            imageMediaId: 'media-1',
+            data: { route: '/offers' },
+            entityType: 'campaign',
+            entityId: 'campaign-1',
+        },
+    });
+
+    assert.equal(result.imageUrl, 'https://media.evercut.test/images/notifications/admin-1/promo.png');
+    assert.equal(createdPayload.imageUrl, 'https://media.evercut.test/images/notifications/admin-1/promo.png');
+    assert.equal(createdPayload.imageMediaId, 'media-1');
+    assert.deepEqual(createdPayload.payload, {
+        route: '/offers',
+        eventType: 'system.alert',
+        entityType: 'campaign',
+        entityId: 'campaign-1',
+    });
 });
 
 test('broadcast service returns notification detail and delivery history', async (t) => {
@@ -171,11 +215,37 @@ test('audience service resolves role-wide and combined recipients from active us
     assert.deepEqual(requestedRoles, [['CUSTOMER'], ['CUSTOMER', 'BARBER']]);
 });
 
+test('fcm service maps canonical imageUrl into every visible notification image field', () => {
+    const imageUrl = 'https://media.evercut.test/images/notifications/admin-1/promo.png';
+    const message = fcmService.buildMulticastMessage({
+        tokens: ['token-1'],
+        payload: {
+            id: 'notification-1',
+            type: 'hybrid',
+            title: 'Weekend offer',
+            body: 'Book today.',
+            imageUrl,
+            data: {
+                route: '/offers',
+                requiresFetch: true,
+            },
+        },
+    });
+
+    assert.equal(message.notification.imageUrl, imageUrl);
+    assert.equal(message.android.notification.imageUrl, imageUrl);
+    assert.equal(message.apns.fcmOptions.imageUrl, imageUrl);
+    assert.equal(message.webpush.notification.image, imageUrl);
+    assert.equal(message.data.imageUrl, imageUrl);
+    assert.equal(message.data.requiresFetch, 'true');
+});
+
 test('dispatch service records no-token recipients as skipped', async (t) => {
     t.mock.method(notificationRepository, 'claimNotificationForSending', async (notificationId, actorUserId) => ({
         _id: notificationId,
         title: 'Weekend offer',
         body: 'Book today.',
+        imageUrl: 'https://media.evercut.test/images/notifications/admin-1/promo.png',
         type: 'hybrid',
         category: 'admin_broadcast',
         status: 'sending',
@@ -216,6 +286,7 @@ test('dispatch service marks empty resolved audiences as failed', async (t) => {
         _id: notificationId,
         title: 'Weekend offer',
         body: 'Book today.',
+        imageUrl: 'https://media.evercut.test/images/notifications/admin-1/promo.png',
         type: 'hybrid',
         category: 'admin_broadcast',
         status: 'sending',
@@ -243,6 +314,7 @@ test('dispatch service sends tokens, records attempts, and invalidates stale tok
         _id: notificationId,
         title: 'Weekend offer',
         body: 'Book today.',
+        imageUrl: 'https://media.evercut.test/images/notifications/admin-1/promo.png',
         type: 'hybrid',
         category: 'admin_broadcast',
         status: 'sending',
@@ -257,21 +329,29 @@ test('dispatch service sends tokens, records attempts, and invalidates stale tok
         _id: 'recipient-1',
         ...item,
     })));
-    t.mock.method(notificationRepository, 'bulkCreateInboxNotifications', async (items) => items.map((item) => ({
+    let inboxCreateItems = null;
+    t.mock.method(notificationRepository, 'bulkCreateInboxNotifications', async (items) => {
+        inboxCreateItems = items;
+        return items.map((item) => ({
         _id: 'notification-1',
         ...item,
-    })));
+        }));
+    });
     t.mock.method(fcmTokenRepository, 'findActiveTokensByUserIds', async () => [
         { _id: 'token-1', userId: 'user-1', token: 'valid-token', platform: 'android' },
         { _id: 'token-2', userId: 'user-1', token: 'stale-token', platform: 'android' },
     ]);
-    t.mock.method(fcmService, 'sendMulticast', async () => ({
+    let sentArgs = null;
+    t.mock.method(fcmService, 'sendMulticast', async (args) => {
+        sentArgs = args;
+        return ({
         successCount: 1,
         failureCount: 1,
         invalidTokens: ['stale-token'],
         successes: [{ token: 'valid-token', messageId: 'message-1' }],
         failures: [{ token: 'stale-token', code: 'messaging/registration-token-not-registered', message: 'gone', invalidToken: true }],
-    }));
+        });
+    });
     let recipientUpdate = null;
     let invalidated = null;
     t.mock.method(notificationRepository, 'updateRecipientById', async (id, updates) => {
@@ -294,6 +374,8 @@ test('dispatch service sends tokens, records attempts, and invalidates stale tok
     assert.equal(result.metrics.successCount, 1);
     assert.equal(result.metrics.failureCount, 1);
     assert.equal(result.metrics.invalidTokenCount, 1);
+    assert.equal(inboxCreateItems[0].imageUrl, 'https://media.evercut.test/images/notifications/admin-1/promo.png');
+    assert.equal(sentArgs.payload.imageUrl, 'https://media.evercut.test/images/notifications/admin-1/promo.png');
     assert.equal(recipientUpdate.tokenAttempts.length, 2);
     assert.equal(recipientUpdate.tokenAttempts[0].success, true);
     assert.equal(recipientUpdate.tokenAttempts[1].success, false);

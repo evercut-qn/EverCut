@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import mongoose from 'mongoose';
 
 const ensureRequiredEnv = () => {
     const defaults = {
@@ -38,6 +39,11 @@ ensureRequiredEnv();
 const Notification = (await import('../../models/notification.model.js')).default;
 const { NotificationRecipient, NotificationAuditLog } = await import('../../models/notification.model.js');
 const { runStartupRecoveryScan } = await import('../startup-recovery.job.js');
+
+const sanitize = (filter) => {
+    mongoose.sanitizeFilter(filter);
+    return filter;
+};
 
 test('runStartupRecoveryScan does nothing if no stuck broadcasts exist', async (t) => {
     t.mock.method(Notification, 'find', async () => {
@@ -142,4 +148,42 @@ test('runStartupRecoveryScan recovers stuck broadcasts with no recipients create
         updatedSet.failureReason,
         'Server restarted during dispatch before recipients were created.'
     );
+});
+
+test('runStartupRecoveryScan preserves internal MongoDB operators under sanitizeFilter', async (t) => {
+    const mockBroadcastId = '507f1f77bcf86cd799439092';
+    const mockBroadcast = {
+        _id: mockBroadcastId,
+        status: 'sending',
+        sentAt: new Date(Date.now() - 10 * 60 * 1000)
+    };
+
+    let capturedFindFilter = null;
+    const capturedCountFilters = [];
+
+    t.mock.method(Notification, 'find', async (filter) => {
+        capturedFindFilter = filter;
+        return [mockBroadcast];
+    });
+
+    t.mock.method(NotificationRecipient, 'countDocuments', async (filter) => {
+        capturedCountFilters.push(filter);
+        return 1;
+    });
+
+    t.mock.method(Notification, 'findByIdAndUpdate', async (id, update) => ({
+        _id: id,
+        status: update.$set.status,
+        failureReason: update.$set.failureReason
+    }));
+
+    t.mock.method(NotificationAuditLog, 'create', async () => ({ _id: 'audit-id' }));
+
+    await runStartupRecoveryScan();
+
+    sanitize(capturedFindFilter);
+    sanitize(capturedCountFilters[1]);
+
+    assert.ok(capturedFindFilter.sentAt.$lt instanceof Date);
+    assert.equal(capturedCountFilters[1].processedAt.$ne, null);
 });

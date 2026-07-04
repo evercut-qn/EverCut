@@ -247,11 +247,12 @@ Employee `workingHours.start` and `workingHours.end` remain `HH:MM` 24-hour valu
 | # | Method | Endpoint | Description |
 |---|---|---|---|
 | 1 | POST | `/api/v1/notifications/tokens` | Register or refresh an FCM token for the authenticated user |
-| 2 | GET | `/api/v1/notifications?page=1&limit=20` | List notification history and capture a notification ID |
-| 3 | GET | `/api/v1/notifications/unread-count` | Get notification unread count |
-| 4 | PATCH | `/api/v1/notifications/{{notification_id}}` | Mark one notification read |
-| 5 | PATCH | `/api/v1/notifications` | Mark all notifications read |
-| 6 | DELETE | `/api/v1/notifications/tokens` | Revoke the authenticated user's FCM token |
+| 2 | GET | `/api/v1/notifications/inbox?page=1&limit=20` | List canonical inbox notifications and capture a notification ID |
+| 3 | GET | `/api/v1/notifications/inbox/unread-count` | Get notification unread count |
+| 4 | PATCH | `/api/v1/notifications/inbox/{{notification_id}}` | Mark one notification read |
+| 5 | PATCH | `/api/v1/notifications/inbox` | Mark all notifications read |
+| 6 | DELETE | `/api/v1/notifications/tokens/{{fcm_token}}` | Revoke the authenticated user's FCM token |
+| 7 | POST | `/api/v1/notifications/broadcasts` | Create an admin broadcast; supports `imageMediaId` from the media upload flow |
 
 ### `18-subscriptions.json`
 

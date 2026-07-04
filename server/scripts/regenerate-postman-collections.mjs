@@ -2677,6 +2677,8 @@ const notificationsCollection = {
   variable: [
     ...baseVariables(
       textVariable('notification_id', '', 'Notification ID captured from the list or create endpoints.'),
+      textVariable('notification_image_media_id', '', 'Optional notification image mediaId captured from the admin upload flow.'),
+      textVariable('notification_image_upload_url', '', 'Presigned R2 PUT URL for uploading the optional notification image.'),
     ),
   ],
   item: [
@@ -2747,6 +2749,14 @@ const notificationsCollection = {
               "  pm.expect(response.data).to.be.an('array');",
               "  pm.expect(response).to.have.nested.property('meta.pagination');",
               "});",
+              "pm.test('notification DTOs include API-only datetime', function () {",
+              "  response.data.forEach((notification) => {",
+              "    pm.expect(notification).to.have.all.keys('id', 'title', 'body', 'imageUrl', 'datetime', 'data');",
+              "    pm.expect(notification.datetime).to.be.a('string').and.match(/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$/);",
+              "    pm.expect(notification).to.not.have.property('createdAt');",
+              "    pm.expect(notification).to.not.have.property('readAt');",
+              "  });",
+              "});",
               "const notifications = Array.isArray(response.data) ? response.data : [];",
               "const first = notifications[0];",
               "if (first && first.id) {",
@@ -2800,19 +2810,70 @@ const notificationsCollection = {
       name: 'Admin Broadcasts',
       item: [
         {
-          name: '1. Admin Create Broadcast',
+          name: '1. Admin Request Notification Image Upload URL',
+          ...request({
+            method: 'POST',
+            url: '{{base_url}}/{{api_prefix}}/media/upload-url',
+            auth: bearerAuth('admin_access_token'),
+            headers: [{ key: 'Content-Type', value: 'application/json' }],
+            body: jsonBody(`{\n  "purpose": "notification",\n  "contentType": "image/png",\n  "sizeBytes": 2048\n}`),
+            description: 'Optional helper for admin-created notification images. Upload the image bytes to the returned uploadUrl, then run the confirm request before using notification_image_media_id on a broadcast.',
+            event: testEvent(
+              "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
+              "const response = pm.response.json();",
+              "const data = response.data || {};",
+              "pm.test('notification image upload data returned', function () {",
+              "  pm.expect(data).to.have.property('mediaId');",
+              "  pm.expect(data).to.have.property('uploadUrl');",
+              "});",
+              "if (data.mediaId) pm.collectionVariables.set('notification_image_media_id', data.mediaId);",
+              "if (data.uploadUrl) pm.collectionVariables.set('notification_image_upload_url', data.uploadUrl);"
+            ),
+          }),
+        },
+        {
+          name: '2. Admin Confirm Notification Image Upload',
+          ...request({
+            method: 'POST',
+            url: '{{base_url}}/{{api_prefix}}/media/confirm',
+            auth: bearerAuth('admin_access_token'),
+            headers: [{ key: 'Content-Type', value: 'application/json' }],
+            body: jsonBody(`{\n  "mediaId": "{{notification_image_media_id}}"\n}`),
+            description: 'Confirms an uploaded notification image after the direct R2 PUT succeeds. The response URL is stable and long-lived for FCM rendering.',
+            event: testEvent(
+              "pm.test('status is 200 after upload, otherwise validation/not-found', function () { pm.expect(pm.response.code).to.be.oneOf([200, 400, 404]); });",
+              "if (pm.response.code === 200) {",
+              "  const response = pm.response.json();",
+              "  pm.test('stable notification image URL returned', function () {",
+              "    pm.expect(response.data).to.have.property('cdnUrl');",
+              "    pm.expect(response.data.cdnUrl).to.be.a('string');",
+              "    pm.expect(response.data.cdnUrl).to.not.include('exp=');",
+              "    pm.expect(response.data.cdnUrl).to.not.include('token=');",
+              "  });",
+              "}"
+            ),
+          }),
+        },
+        {
+          name: '3. Admin Create Broadcast',
           ...request({
             method: 'POST',
             url: '{{base_url}}/{{api_prefix}}/notifications/broadcasts',
             auth: bearerAuth('admin_access_token'),
             headers: [{ key: 'Content-Type', value: 'application/json' }],
             body: jsonBody(`{\n  "title": "Postman notification smoke test",\n  "body": "This notification broadcast was sent from Postman.",\n  "type": "hybrid",\n  "category": "admin_broadcast",\n  "audience": {\n    "mode": "customers"\n  },\n  "data": {\n    "route": "/notifications",\n    "source": "postman"\n  }\n}`),
-            description: 'Admin-only endpoint that creates and dispatches a broadcast notification.',
+            description: 'Admin-only endpoint that creates and dispatches a broadcast notification. This default body omits imageMediaId so the backend uses the stable default system notification image. To test a custom image, first run the image upload helper requests, then add "imageMediaId": "{{notification_image_media_id}}" to this JSON body.',
             event: testEvent(
               "pm.test('status is 201', function () { pm.response.to.have.status(201); });",
               "const response = pm.response.json();",
               "pm.test('notification broadcast returned', function () {",
               "  pm.expect(response.data).to.have.property('id');",
+              "  pm.expect(response.data).to.have.property('imageUrl');",
+              "  pm.expect(response.data.imageUrl).to.be.a('string');",
+              "  pm.expect(response.data.imageUrl).to.not.include('exp=');",
+              "  pm.expect(response.data.imageUrl).to.not.include('token=');",
+              "  pm.expect(response.data).to.have.property('datetime');",
+              "  pm.expect(response.data.datetime).to.be.a('string').and.match(/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$/);",
               "  pm.expect(response.data.status).to.be.oneOf(['sending', 'sent', 'failed']);",
               "});",
               "if (response.data && response.data.id) {",
@@ -2823,7 +2884,7 @@ const notificationsCollection = {
           }),
         },
         {
-          name: '2. Admin List Broadcasts',
+          name: '4. Admin List Broadcasts',
           ...request({
             method: 'GET',
             url: {
@@ -2853,7 +2914,7 @@ const notificationsCollection = {
           }),
         },
         {
-          name: '3. Admin Get Broadcast',
+          name: '5. Admin Get Broadcast',
           ...request({
             method: 'GET',
             url: '{{base_url}}/{{api_prefix}}/notifications/broadcasts/{{notification_id}}',
@@ -2865,7 +2926,7 @@ const notificationsCollection = {
           }),
         },
         {
-          name: '4. Admin List Recipients',
+          name: '6. Admin List Recipients',
           ...request({
             method: 'GET',
             url: '{{base_url}}/{{api_prefix}}/notifications/broadcasts/{{notification_id}}/recipients?page=1&limit=25',
@@ -2875,7 +2936,7 @@ const notificationsCollection = {
           }),
         },
         {
-          name: '5. Admin List Inbox Items',
+          name: '7. Admin List Inbox Items',
           ...request({
             method: 'GET',
             url: {
@@ -2893,7 +2954,7 @@ const notificationsCollection = {
           }),
         },
         {
-          name: '6. Admin List Audit Logs',
+          name: '8. Admin List Audit Logs',
           ...request({
             method: 'GET',
             url: '{{base_url}}/{{api_prefix}}/notifications/broadcasts/{{notification_id}}/audits?limit=25',

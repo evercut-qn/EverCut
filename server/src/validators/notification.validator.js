@@ -12,19 +12,16 @@ import {
     NOTIFICATION_CATEGORY,
     NOTIFICATION_STATUS,
 } from '../utils/constants.js';
-
-const RESERVED_FCM_DATA_KEY_PREFIXES = ['google.', 'gcm.', 'gcm.notification.'];
-
-const hasReservedFcmDataKey = (key) => RESERVED_FCM_DATA_KEY_PREFIXES.some((prefix) => key.startsWith(prefix));
+import { normalizeNotificationData } from '../utils/notification-message.utils.js';
 
 const fcmDataSchema = Joi.object()
     .unknown(true)
     .custom((value, helpers) => {
-        const reservedKey = Object.keys(value || {}).find(hasReservedFcmDataKey);
-        if (reservedKey) {
-            return helpers.message(`FCM data key "${reservedKey}" uses a reserved prefix`);
+        try {
+            return normalizeNotificationData(value);
+        } catch (error) {
+            return helpers.message(error.message);
         }
-        return value;
     }, 'FCM data key validation')
     .default({});
 
@@ -68,6 +65,7 @@ export const adminNotificationCreateSchema = Joi.object({
     category: Joi.string().valid(...ALL_NOTIFICATION_CATEGORIES).default(NOTIFICATION_CATEGORY.ADMIN_BROADCAST),
     status: Joi.string().valid(NOTIFICATION_STATUS.SENDING).default(NOTIFICATION_STATUS.SENDING),
     audience: audienceSchema.required(),
+    imageMediaId: Joi.string().trim().max(128),
     data: fcmDataSchema,
     entityType: Joi.string().trim().max(64),
     entityId: Joi.string().trim().max(128),

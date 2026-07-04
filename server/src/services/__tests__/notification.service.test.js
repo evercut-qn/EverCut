@@ -39,6 +39,7 @@ const notificationService = (await import('../notifications/notification.service
 const fcmService = (await import('../notifications/fcm.service.js')).default;
 const notificationRepository = (await import('../../repositories/notification.repository.js')).default;
 const fcmTokenRepository = (await import('../../repositories/fcm-token.repository.js')).default;
+const { serializeInboxNotification } = await import('../../serializers/notification.serializer.js');
 
 test('registerFcmToken upserts a token for the authenticated user and device', async (t) => {
     let upsertArgs = null;
@@ -109,8 +110,8 @@ test('patchNotification marks one notification read for the authenticated recipi
     const result = await notificationService.patchNotification('user-1', 'notification-1');
 
     assert.equal(result.id, 'notification-1');
-    assert.equal(result.recipientUserId, 'user-1');
-    assert.equal(result.readAt, readAt);
+    assert.equal('recipientUserId' in result, false);
+    assert.equal('readAt' in result, false);
 });
 
 test('patchNotifications marks all unread notifications for the authenticated recipient', async (t) => {
@@ -130,6 +131,46 @@ test('notification service does not expose deprecated read-action method names',
     assert.equal('getUnreadCount' in notificationService, false);
     assert.equal('markNotificationRead' in notificationService, false);
     assert.equal('markAllNotificationsRead' in notificationService, false);
+});
+
+test('serializeInboxNotification returns the canonical Flutter API notification message with datetime', () => {
+    const createdAt = new Date('2026-07-01T10:06:34.000Z');
+    const result = serializeInboxNotification({
+        _id: 'notification-1',
+        notificationId: 'broadcast-1',
+        recipientUserId: 'user-1',
+        type: 'hybrid',
+        category: 'admin_broadcast',
+        eventType: 'system.alert',
+        title: 'Title',
+        body: 'Body',
+        imageUrl: 'https://media.evercut.test/images/notifications/system/evercut.png',
+        data: {
+            eventType: 'system.alert',
+        },
+        entityType: 'system',
+        entityId: 'system-1',
+        status: 'sent',
+        delivery: {
+            successCount: 1,
+            failureCount: 0,
+        },
+        createdAt,
+        readAt: new Date('2026-07-01T10:10:00.000Z'),
+    });
+
+    assert.deepEqual(result, {
+        id: 'notification-1',
+        title: 'Title',
+        body: 'Body',
+        imageUrl: 'https://media.evercut.test/images/notifications/system/evercut.png',
+        datetime: '2026-07-01T10:06:34.000Z',
+        data: {
+            eventType: 'system.alert',
+        },
+    });
+    assert.equal('createdAt' in result, false);
+    assert.equal('readAt' in result, false);
 });
 
 test('notifyUser persists once, sends a hybrid payload to every active device, and marks delivery', async (t) => {
@@ -195,11 +236,21 @@ test('notifyUser persists once, sends a hybrid payload to every active device, a
     assert.equal(createdPayload.recipientUserId, 'user-1');
     assert.equal(createdPayload.eventType, 'booking.confirmed');
     assert.equal(createdPayload.dedupeKey, 'booking.confirmed:booking-1');
+    assert.equal(createdPayload.imageUrl.endsWith('/images/notifications/system/evercut.png'), true);
+    assert.deepEqual(createdPayload.data, {
+        bookingId: 'booking-1',
+        requiresFetch: true,
+        eventType: 'booking.confirmed',
+        entityType: 'booking',
+        entityId: 'booking-1',
+    });
     assert.deepEqual(sentArgs.tokens, ['fcm-token-a', 'fcm-token-b']);
     assert.equal(sentArgs.payload.type, 'hybrid');
     assert.equal(sentArgs.payload.id, 'notification-1');
+    assert.equal(sentArgs.payload.imageUrl.endsWith('/images/notifications/system/evercut.png'), true);
     assert.equal(sentArgs.payload.data.bookingId, 'booking-1');
-    assert.equal(sentArgs.payload.data.requiresFetch, 'true');
+    assert.equal(sentArgs.payload.data.requiresFetch, true);
+    assert.equal(sentArgs.payload.data.eventType, 'booking.confirmed');
     assert.deepEqual(deliveryUpdate, {
         id: 'notification-1',
         updates: {

@@ -223,6 +223,7 @@ export const MEDIA_PURPOSE = Object.freeze({
     EMPLOYEE: 'employee',
     ONBOARDING: 'onboarding',
     SERVICE: 'service',
+    NOTIFICATION: 'notification',
     VIDEO_RAW: 'video_raw',
     VIDEO_THUMBNAIL: 'video_thumbnail',
 });

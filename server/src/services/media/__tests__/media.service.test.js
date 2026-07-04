@@ -32,6 +32,7 @@ const mediaRepository = (await import('../../../repositories/media.repository.js
 const userRepository = (await import('../../../repositories/user.repository.js')).default;
 const storageProvider = (await import('../storage-provider.service.js')).default;
 const mediaService = await import('../media.service.js');
+const { MEDIA_PURPOSE } = await import('../../../utils/constants.js');
 
 test('requestUploadUrl creates pending media and returns a presigned R2 PUT URL', async (t) => {
     let createdPayload = null;
@@ -62,6 +63,51 @@ test('requestUploadUrl creates pending media and returns a presigned R2 PUT URL'
         key: createdPayload.r2Key,
         contentType: 'image/jpeg',
     });
+});
+
+test('requestUploadUrl supports notification images with dedicated R2 keys', async (t) => {
+    let createdPayload = null;
+    t.mock.method(mediaRepository, 'create', async (payload) => {
+        createdPayload = payload;
+        return { ...payload };
+    });
+
+    t.mock.method(storageProvider, 'generateUploadUrl', async () => 'https://r2.example/upload');
+
+    const result = await mediaService.requestUploadUrl('admin-1', {
+        contentType: 'image/png',
+        sizeBytes: 2048,
+        purpose: MEDIA_PURPOSE.NOTIFICATION,
+    }, { roleType: 'ADMIN' });
+
+    assert.equal(result.uploadUrl, 'https://r2.example/upload');
+    assert.equal(createdPayload.purpose, 'notification');
+    assert.match(createdPayload.r2Key, /^images\/notifications\/admin-1\/[0-9a-f-]+\.png$/);
+});
+
+test('requestUploadUrl rejects notification images from non-admin users', async (t) => {
+    t.mock.method(userRepository, 'findById', async () => ({ roleType: 'CUSTOMER' }));
+    const createMock = t.mock.method(mediaRepository, 'create', async () => {
+        throw new Error('create should not be called for unauthorized media');
+    });
+    const uploadMock = t.mock.method(storageProvider, 'generateUploadUrl', async () => {
+        throw new Error('upload URL should not be created for unauthorized media');
+    });
+
+    await assert.rejects(
+        () => mediaService.requestUploadUrl('customer-1', {
+            contentType: 'image/png',
+            sizeBytes: 2048,
+            purpose: MEDIA_PURPOSE.NOTIFICATION,
+        }, { roleType: 'CUSTOMER' }),
+        {
+            name: 'ForbiddenError',
+            message: 'Only administrators may upload notification images',
+        },
+    );
+
+    assert.equal(createMock.mock.calls.length, 0);
+    assert.equal(uploadMock.mock.calls.length, 0);
 });
 
 test('requestUploadUrl rejects unsupported MIME types before creating media', async (t) => {
@@ -152,6 +198,42 @@ test('requestUploadUrl rejects video upload for non-gallery purposes', async (t)
             message: 'Video uploads are only allowed for gallery purpose',
         },
     );
+});
+
+test('confirmUpload returns a stable Cloudflare URL for notification images', async (t) => {
+    const media = {
+        _id: 'media-1',
+        userId: 'admin-1',
+        type: 'image',
+        status: 'pending',
+        purpose: MEDIA_PURPOSE.NOTIFICATION,
+        r2Key: 'images/notifications/admin-1/promo.png',
+        contentType: 'image/png',
+        declaredSize: 2048,
+    };
+
+    t.mock.method(mediaRepository, 'findByIdAndUser', async () => media);
+    t.mock.method(storageProvider, 'headObject', async () => ({
+        ContentType: 'image/png',
+        ContentLength: 2048,
+    }));
+    t.mock.method(storageProvider, 'getObjectRange', async () => Buffer.from([
+        0x89, 0x50, 0x4e, 0x47,
+        0x0d, 0x0a, 0x1a, 0x0a,
+        0x00, 0x00, 0x00, 0x0d,
+        0x49, 0x48, 0x44, 0x52,
+    ]));
+    t.mock.method(mediaRepository, 'updateById', async (id, update) => ({
+        ...media,
+        _id: id,
+        ...update,
+    }));
+
+    const result = await mediaService.confirmUpload('admin-1', 'media-1');
+
+    assert.equal(result.cdnUrl, 'https://media.evercut.test/images/notifications/admin-1/promo.png');
+    assert.equal(result.cdnUrl.includes('exp='), false);
+    assert.equal(result.cdnUrl.includes('token='), false);
 });
 
 test('cleanupCustomMedia deletes from storage and soft-deletes DB media if found by key', async (t) => {

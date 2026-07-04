@@ -25,6 +25,7 @@ test('notification validates sending admin broadcast metadata', () => {
         payload: {
             route: '/offers/weekend',
         },
+        imageUrl: 'https://media.evercut.test/images/notifications/system/evercut.png',
     });
 
     assert.equal(notification.validateSync(), undefined);
@@ -80,6 +81,10 @@ test('inbox notification links to notification and recipient while preserving in
         eventType: 'system.alert',
         title: 'Weekend offer',
         body: 'Book today.',
+        imageUrl: 'https://media.evercut.test/images/notifications/system/evercut.png',
+        data: {
+            eventType: 'system.alert',
+        },
     });
 
     assert.equal(inboxNotification.validateSync(), undefined);

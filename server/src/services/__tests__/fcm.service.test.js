@@ -51,14 +51,28 @@ test('buildMulticastMessage builds visible hybrid payloads with platform options
             eventType: 'system.alert',
             title: 'Title',
             body: 'Body',
-            data: { requiresFetch: true },
+            imageUrl: 'https://media.evercut.test/images/notifications/logo.png',
+            data: {
+                eventType: 'system.alert',
+                requiresFetch: true,
+            },
         },
     });
 
     assert.deepEqual(message.tokens, ['token-1']);
-    assert.deepEqual(message.notification, { title: 'Title', body: 'Body' });
+    assert.deepEqual(message.notification, {
+        title: 'Title',
+        body: 'Body',
+        imageUrl: 'https://media.evercut.test/images/notifications/logo.png',
+    });
+    assert.equal(message.data.imageUrl, 'https://media.evercut.test/images/notifications/logo.png');
+    assert.equal(message.data.eventType, 'system.alert');
     assert.equal(message.data.requiresFetch, 'true');
+    assert.equal('type' in message.data, false);
     assert.equal(message.android.notification.channelId, 'evercut_default');
+    assert.equal(message.android.notification.imageUrl, 'https://media.evercut.test/images/notifications/logo.png');
+    assert.equal(message.apns.fcmOptions.imageUrl, 'https://media.evercut.test/images/notifications/logo.png');
+    assert.equal(message.webpush.notification.image, 'https://media.evercut.test/images/notifications/logo.png');
     assert.equal(message.apns.headers['apns-priority'], '10');
 });
 
@@ -69,14 +83,19 @@ test('buildMulticastMessage builds silent data-only payloads without notificatio
             id: 'notification-1',
             type: 'silent',
             eventType: 'account.updated',
-            data: { requiresFetch: true },
+            data: {
+                eventType: 'account.updated',
+                requiresFetch: true,
+            },
         },
     });
 
     assert.equal(message.notification, undefined);
     assert.equal(message.android.notification, undefined);
     assert.equal(message.apns.headers['apns-priority'], '5');
+    assert.equal(message.data.eventType, 'account.updated');
     assert.equal(message.data.requiresFetch, 'true');
+    assert.equal('type' in message.data, false);
 });
 
 test('classifyFirebaseMessagingError identifies invalid token errors', () => {

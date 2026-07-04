@@ -264,6 +264,7 @@ const config = Object.freeze({
   notification: Object.freeze({
     staleTokenThresholdDays: 90,
     staleTokenCleanupCron: '0 3 * * 0',
+    defaultImageR2Key: optionalEnv('NOTIFICATION_DEFAULT_IMAGE_R2_KEY', 'images/notifications/system/evercut.png'),
   }),
 });
 

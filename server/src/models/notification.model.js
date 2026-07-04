@@ -81,6 +81,18 @@ const notificationSchema = new mongoose.Schema(
             required: true,
             maxlength: 500,
         },
+        imageUrl: {
+            type: String,
+            trim: true,
+            maxlength: 2048,
+            default: null,
+        },
+        imageMediaId: {
+            type: String,
+            trim: true,
+            maxlength: 128,
+            default: null,
+        },
         type: {
             type: String,
             enum: ALL_NOTIFICATION_TYPES,
@@ -408,6 +420,12 @@ const inboxNotificationSchema = new mongoose.Schema(
             type: String,
             trim: true,
             maxlength: 500,
+            default: null,
+        },
+        imageUrl: {
+            type: String,
+            trim: true,
+            maxlength: 2048,
             default: null,
         },
         data: {

@@ -8,6 +8,11 @@ import {
     NOTIFICATION_STATUS,
     NOTIFICATION_TYPE,
 } from '../../utils/constants.js';
+import {
+    buildNotificationData,
+    buildNotificationMessage,
+    resolveNotificationImageUrl,
+} from './notification-message.service.js';
 
 const toObjectIdString = (value) => String(value?._id || value || '');
 
@@ -32,21 +37,33 @@ export const notifyUser = async ({
     eventType,
     title = null,
     body = null,
+    imageUrl = null,
+    imageMediaId = null,
     data = {},
     entityType = null,
     entityId = null,
     dedupeKey = null,
     expiresAt = null,
 }) => {
+    const messageData = buildNotificationData({ data, eventType, entityType, entityId });
+    const resolvedImageUrl = await resolveNotificationImageUrl({ imageUrl, imageMediaId });
+    const baseMessage = buildNotificationMessage({
+        title,
+        body,
+        imageUrl: resolvedImageUrl,
+        data: messageData,
+    });
+
     const { created, notification } = await notificationRepository.createInboxNotificationIfNotExists({
         recipientUserId,
         actorUserId,
         type,
         category,
         eventType,
-        title,
-        body,
-        data,
+        title: baseMessage.title,
+        body: baseMessage.body,
+        imageUrl: baseMessage.imageUrl,
+        data: baseMessage.data,
         entityType,
         entityId: entityId ? toObjectIdString(entityId) : null,
         dedupeKey,
@@ -93,12 +110,10 @@ export const notifyUser = async ({
             payload: {
                 id: toObjectIdString(notification._id),
                 type,
-                eventType,
-                title,
-                body,
-                entityType,
-                entityId: entityId ? toObjectIdString(entityId) : null,
-                data: fcmService.normalizeFcmData(data),
+                title: notification.title,
+                body: notification.body,
+                imageUrl: notification.imageUrl,
+                data: notification.data || baseMessage.data,
             },
         });
 

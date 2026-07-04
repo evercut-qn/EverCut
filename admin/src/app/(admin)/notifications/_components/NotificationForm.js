@@ -1,9 +1,10 @@
 'use client';
 
 import { useState, useTransition, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { toast } from 'sonner';
 import {
   Loader2,
@@ -16,13 +17,20 @@ import {
   AlertTriangle,
   X,
   Code,
-  ListPlus
+  ListPlus,
+  ImagePlus
 } from 'lucide-react';
 
 import { FormInput, FormTextarea, FormSelect } from '@/components/forms';
 import { notificationFormSchema } from '@/lib/schemas/notification.schema';
-import { handleCreateNotificationAction } from '../_actions/notification.action';
+import {
+  handleConfirmNotificationImageUploadAction,
+  handleCreateNotificationAction,
+  handleRequestNotificationImageUploadAction,
+} from '../_actions/notification.action';
 import { cn } from '@/lib/utils/cn';
+
+const allowedNotificationImageTypes = new Set(['image/png', 'image/jpeg', 'image/webp']);
 
 const audienceCards = [
   {
@@ -48,6 +56,39 @@ const audienceCards = [
   },
 ];
 
+const uploadNotificationImage = async (file) => {
+  const upload = await handleRequestNotificationImageUploadAction({
+    contentType: file.type,
+    sizeBytes: file.size,
+  });
+
+  if (!upload.success) {
+    throw new Error(upload.message || 'Unable to create image upload.');
+  }
+
+  const response = await fetch(upload.data.uploadUrl, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': file.type,
+    },
+    body: file,
+  });
+
+  if (!response.ok) {
+    throw new Error('Image upload failed.');
+  }
+
+  const confirmed = await handleConfirmNotificationImageUploadAction(upload.data.mediaId);
+  if (!confirmed.success) {
+    throw new Error(confirmed.message || 'Unable to confirm image upload.');
+  }
+
+  return {
+    mediaId: upload.data.mediaId,
+    media: confirmed.data,
+  };
+};
+
 export function NotificationForm() {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -55,13 +96,17 @@ export function NotificationForm() {
   const [kvPairs, setKvPairs] = useState([{ key: '', value: '' }]);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [validatedValues, setValidatedValues] = useState(null);
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState(null);
+  const [imageUploadError, setImageUploadError] = useState(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   const {
     register,
     handleSubmit,
     setError,
     setValue,
-    watch,
+    control,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(notificationFormSchema),
@@ -71,33 +116,52 @@ export function NotificationForm() {
       type: 'hybrid',
       category: 'admin_broadcast',
       audienceMode: 'customers',
+      imageMediaId: null,
       dataJson: '{}',
     },
   });
 
-  const watchTitle = watch('title');
-  const watchBody = watch('body');
-  const watchCategory = watch('category');
-  const watchAudience = watch('audienceMode');
-  const watchDataJson = watch('dataJson');
+  const [watchTitle, watchBody, watchCategory, watchAudience, watchDataJson] = useWatch({
+    control,
+    name: ['title', 'body', 'category', 'audienceMode', 'dataJson'],
+  });
+  const isSubmitting = isPending || isUploadingImage;
 
-  // Synchronise structured inputs on mount
-  useEffect(() => {
-    try {
-      const parsed = JSON.parse(watchDataJson || '{}');
-      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-        const pairs = Object.entries(parsed).map(([key, val]) => ({
-          key,
-          value: typeof val === 'object' ? JSON.stringify(val) : String(val),
-        }));
-        if (pairs.length > 0) {
-          setKvPairs(pairs);
-        }
-      }
-    } catch (e) {
-      // Keep initial default pair
+  useEffect(() => () => {
+    if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
+  }, [imagePreviewUrl]);
+
+  const handleImageChange = (event) => {
+    const file = event.target.files?.[0] || null;
+    setImageUploadError(null);
+
+    if (!file) return;
+
+    if (!allowedNotificationImageTypes.has(file.type)) {
+      setImageUploadError('Select a PNG, JPEG, or WebP image.');
+      event.target.value = '';
+      return;
     }
-  }, []);
+
+    if (file.size > 10 * 1024 * 1024) {
+      setImageUploadError('Image must be 10 MB or smaller.');
+      event.target.value = '';
+      return;
+    }
+
+    if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
+    setImageFile(file);
+    setImagePreviewUrl(URL.createObjectURL(file));
+    setValue('imageMediaId', null, { shouldValidate: true });
+  };
+
+  const clearImage = () => {
+    if (imagePreviewUrl) URL.revokeObjectURL(imagePreviewUrl);
+    setImageFile(null);
+    setImagePreviewUrl(null);
+    setImageUploadError(null);
+    setValue('imageMediaId', null, { shouldValidate: true });
+  };
 
   // Sync structured state back to dataJson hidden form state
   const updatePayloadField = (updatedPairs) => {
@@ -173,7 +237,28 @@ export function NotificationForm() {
     if (!validatedValues) return;
 
     startTransition(async () => {
-      const result = await handleCreateNotificationAction(validatedValues);
+      let imageMediaId = validatedValues.imageMediaId || null;
+
+      if (imageFile && !imageMediaId) {
+        try {
+          setIsUploadingImage(true);
+          const upload = await uploadNotificationImage(imageFile);
+          imageMediaId = upload.mediaId;
+          setValue('imageMediaId', imageMediaId, { shouldValidate: true });
+        } catch (error) {
+          toast.error(error.message || 'Unable to upload notification image.');
+          setImageUploadError(error.message || 'Unable to upload notification image.');
+          setIsUploadingImage(false);
+          return;
+        } finally {
+          setIsUploadingImage(false);
+        }
+      }
+
+      const result = await handleCreateNotificationAction({
+        ...validatedValues,
+        imageMediaId,
+      });
 
       if (!result.success) {
         if (result.errors?.length) {
@@ -259,6 +344,57 @@ export function NotificationForm() {
             error={errors.body?.message}
             {...register('body')}
           />
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-xs font-semibold text-foreground/80">Notification Image</h3>
+              </div>
+              {imagePreviewUrl && (
+                <button
+                  type="button"
+                  onClick={clearImage}
+                  className="inline-flex h-8 items-center gap-1.5 rounded border border-border px-2.5 text-xs font-semibold text-foreground hover:bg-muted"
+                >
+                  <X className="h-3.5 w-3.5" />
+                  Remove
+                </button>
+              )}
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-[160px_1fr]">
+              <div className="flex aspect-[16/9] items-center justify-center overflow-hidden rounded-md border border-border bg-muted">
+                {imagePreviewUrl ? (
+                  <Image
+                    src={imagePreviewUrl}
+                    alt=""
+                    width={320}
+                    height={180}
+                    unoptimized
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <ImagePlus className="h-7 w-7 text-muted-foreground" />
+                )}
+              </div>
+              <label className="flex min-h-24 cursor-pointer flex-col items-center justify-center gap-2 rounded-md border border-dashed border-border bg-background px-4 py-3 text-center hover:bg-muted/50">
+                <ImagePlus className="h-5 w-5 text-muted-foreground" />
+                <span className="text-xs font-semibold text-foreground">Upload Image</span>
+                <span className="text-[11px] text-muted-foreground">PNG, JPEG, or WebP up to 10 MB</span>
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  onChange={handleImageChange}
+                  className="sr-only"
+                />
+              </label>
+            </div>
+            {imageUploadError && (
+              <p className="text-xs font-medium text-destructive" role="alert">
+                {imageUploadError}
+              </p>
+            )}
+          </div>
         </div>
 
         {/* Audience Selector Card */}
@@ -393,10 +529,10 @@ export function NotificationForm() {
         <div className="flex justify-end">
           <button
             type="submit"
-            disabled={isPending}
+            disabled={isSubmitting}
             className="inline-flex h-10 items-center gap-2 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50 select-none cursor-pointer"
           >
-            {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             Send Broadcast
           </button>
         </div>
@@ -433,6 +569,21 @@ export function NotificationForm() {
                 <span className="font-semibold text-muted-foreground">Body message:</span>
                 <p className="text-foreground bg-card px-2.5 py-1.5 rounded border border-border/40 max-h-24 overflow-y-auto leading-relaxed">{watchBody}</p>
               </div>
+              {imagePreviewUrl && (
+                <div className="space-y-1">
+                  <span className="font-semibold text-muted-foreground">Image:</span>
+                  <div className="overflow-hidden rounded border border-border/40 bg-card">
+                    <Image
+                      src={imagePreviewUrl}
+                      alt=""
+                      width={448}
+                      height={112}
+                      unoptimized
+                      className="h-28 w-full object-cover"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="flex items-center gap-2 border-l-2 border-destructive bg-destructive/5 p-3 text-[11px] text-destructive">
@@ -450,9 +601,10 @@ export function NotificationForm() {
               <button
                 type="button"
                 onClick={onFinalSubmit}
-                className="inline-flex h-9 items-center gap-1.5 rounded bg-primary px-3 text-xs font-semibold text-primary-foreground hover:bg-primary/90 cursor-pointer"
+                disabled={isSubmitting}
+                className="inline-flex h-9 items-center gap-1.5 rounded bg-primary px-3 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50 cursor-pointer"
               >
-                <Send className="h-3.5 w-3.5" />
+                {isSubmitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
                 Confirm & Send
               </button>
             </div>

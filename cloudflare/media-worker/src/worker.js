@@ -5,6 +5,8 @@ const CACHE_CONTROL = {
   default: 'public, max-age=3600',
 };
 
+const PUBLIC_MEDIA_PATH_PREFIXES = ['/images/notifications/'];
+
 const textEncoder = new TextEncoder();
 
 const parseAllowedOrigins = (value = '') => (
@@ -14,21 +16,24 @@ const parseAllowedOrigins = (value = '') => (
     .filter(Boolean)
 );
 
-const corsHeaders = (request, env) => {
+export const corsHeaders = (request, env) => {
   const origin = request.headers.get('Origin');
   const allowedOrigins = parseAllowedOrigins(env.ALLOWED_ORIGINS);
-  const allowOrigin = origin && allowedOrigins.includes(origin)
-    ? origin
-    : allowedOrigins[0] || '*';
-
-  return {
-    'Access-Control-Allow-Origin': allowOrigin,
+  const headers = {
     'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
     'Access-Control-Allow-Headers': 'Range, Content-Type',
     'Access-Control-Expose-Headers': 'Accept-Ranges, Content-Length, Content-Range, ETag',
     'Access-Control-Max-Age': '86400',
     Vary: 'Origin',
   };
+
+  if (!origin) {
+    headers['Access-Control-Allow-Origin'] = allowedOrigins[0] || '*';
+  } else if (allowedOrigins.includes(origin)) {
+    headers['Access-Control-Allow-Origin'] = origin;
+  }
+
+  return headers;
 };
 
 const timingSafeEqual = (a, b) => {
@@ -91,7 +96,11 @@ const verifyToken = async (url, env) => {
   return { ok: false, status: 401, message: 'Unauthorized - invalid media token' };
 };
 
-const parseRange = (rangeHeader, objectSize) => {
+export const isPublicMediaPath = (pathname) => (
+  PUBLIC_MEDIA_PATH_PREFIXES.some((prefix) => pathname.startsWith(prefix))
+);
+
+export const parseRange = (rangeHeader, objectSize) => {
   if (!rangeHeader) return undefined;
 
   const match = /^bytes=(\d*)-(\d*)$/.exec(rangeHeader);
@@ -109,8 +118,12 @@ const parseRange = (rangeHeader, objectSize) => {
 
   const start = Number.parseInt(startText, 10);
   const end = endText ? Number.parseInt(endText, 10) : objectSize - 1;
-  if (!Number.isFinite(start) || !Number.isFinite(end) || start > end || start >= objectSize) {
+  if (!Number.isFinite(start) || !Number.isFinite(end)) {
     return undefined;
+  }
+
+  if (start > end || start >= objectSize) {
+    return { unsatisfiable: true };
   }
 
   return {
@@ -149,12 +162,14 @@ export default {
       });
     }
 
-    const tokenResult = await verifyToken(url, env);
-    if (!tokenResult.ok) {
-      return new Response(tokenResult.message, {
-        status: tokenResult.status,
-        headers: baseCors,
-      });
+    if (!isPublicMediaPath(url.pathname)) {
+      const tokenResult = await verifyToken(url, env);
+      if (!tokenResult.ok) {
+        return new Response(tokenResult.message, {
+          status: tokenResult.status,
+          headers: baseCors,
+        });
+      }
     }
 
     const key = decodeURIComponent(url.pathname.replace(/^\/+/, ''));
@@ -178,6 +193,17 @@ export default {
     }
 
     const range = parseRange(rangeHeader, head.size);
+    if (range?.unsatisfiable) {
+      return new Response(null, {
+        status: 416,
+        headers: {
+          ...baseCors,
+          'Accept-Ranges': 'bytes',
+          'Content-Range': `bytes */${head.size}`,
+        },
+      });
+    }
+
     const object = await env.MEDIA_BUCKET.get(key, range ? { range } : undefined);
     if (!object) {
       return new Response('Not Found', { status: 404, headers: baseCors });
