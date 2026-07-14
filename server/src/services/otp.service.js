@@ -1,4 +1,4 @@
-import * as smsProvider from './sms-provider.service.js';
+import * as smsProvider from './sms/sms.service.js';
 import { BadRequestError } from '../utils/api-error.js';
 import logger from '../utils/logger.js';
 

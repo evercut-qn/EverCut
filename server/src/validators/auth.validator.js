@@ -1,7 +1,9 @@
 import Joi from 'joi';
 import config from '../config/index.js';
 
-const OTP_DIGIT_PATTERN = new RegExp(`^\\d{${config.msg91.otpLength}}$`);
+// Provider-agnostic OTP length — works whether MSG91 (remote-verified) or
+// StartMessaging (locally-verified via otp-store.service.js) is active.
+const OTP_DIGIT_PATTERN = new RegExp(`^\\d{${config.otp.length}}$`);
 
 /** Indian mobile number: exactly 10 digits, starting with 6-9. */
 const indianMobile = Joi.string()
@@ -28,7 +30,7 @@ export const verifyOtpSchema = Joi.object({
         .required()
         .messages({
             'string.empty': 'OTP is required',
-            'string.pattern.base': `OTP must be exactly ${config.msg91.otpLength} digits`,
+            'string.pattern.base': `OTP must be exactly ${config.otp.length} digits`,
             'any.required': 'OTP is required',
         }),
 });

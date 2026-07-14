@@ -1,4 +1,4 @@
-import * as smsProvider from './sms-provider.service.js';
+import * as smsProvider from './sms/sms.service.js';
 import userRepository from '../repositories/user.repository.js';
 import notificationEvents from './notifications/notification-events.service.js';
 import { BadRequestError, ConflictError } from '../utils/api-error.js';
@@ -48,7 +48,7 @@ export const sendPhoneUpdateOtp = async (userId, newMobile) => {
         throw new BadRequestError('New phone number is the same as current phone number');
     }
 
-    // Send OTP via MSG91
+    // Send OTP via the currently configured SMS provider (MSG91 or StartMessaging)
     const result = await smsProvider.sendOtp(newMobile);
     if (!result.success) {
         throw new BadRequestError('Failed to send OTP. Please try again.');
@@ -74,7 +74,7 @@ export const verifyAndUpdatePhone = async (userId, newMobile, otp) => {
     // Normalize the new phone number
     const normalizedPhone = normalizePhoneNumber(newMobile);
 
-    // Verify OTP with MSG91
+    // Verify OTP with the currently configured SMS provider (MSG91 or StartMessaging)
     const verificationResult = await smsProvider.verifyOtp(newMobile, otp);
     if (!verificationResult.success) {
         throw new BadRequestError(verificationResult.message || 'Invalid or expired OTP');

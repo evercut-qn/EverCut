@@ -1,12 +1,13 @@
-import msg91 from '../config/msg91.config.js';
-import logger, { maskPhoneNumber } from '../utils/logger.js';
-import { AppError } from '../utils/api-error.js';
+import msg91 from '../../../config/msg91.config.js';
+import logger, { maskPhoneNumber } from '../../../utils/logger.js';
+import { AppError } from '../../../utils/api-error.js';
 
 /**
- * SMS Provider Service - abstracts MSG91 OTP API.
+ * MSG91 Provider — moved verbatim from the old `sms-provider.service.js`.
  *
- * All MSG91 API communication is isolated here. To switch providers
- * (Twilio, 2Factor, etc.), only this file needs to change.
+ * MSG91 owns OTP generation, storage, and verification remotely — this file
+ * only talks to MSG91's OTP API. Behavior is 100% unchanged from before the
+ * StartMessaging migration ("Keep MSG91 intact").
  */
 
 /**
