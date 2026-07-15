@@ -1,4 +1,4 @@
-import admin from 'firebase-admin';
+import admin, { cert } from 'firebase-admin';
 import config from './index.js';
 import logger from '../utils/logger.js';
 
@@ -7,13 +7,18 @@ import logger from '../utils/logger.js';
  * The service-account credentials are read from environment variables.
  */
 const initFirebase = () => {
-  if (admin.apps.length > 0) {
+  const apps = typeof admin.getApps === 'function' ? admin.getApps() : admin.apps;
+  if (apps && apps.length > 0) {
     return admin;
   }
 
   try {
+    const firebaseCredential = admin.credential?.cert
+      ? admin.credential.cert({ ...config.firebase })
+      : cert({ ...config.firebase });
+
     admin.initializeApp({
-      credential: admin.credential.cert({ ...config.firebase }),
+      credential: firebaseCredential,
     });
 
     logger.info('Firebase Admin SDK initialised', {
