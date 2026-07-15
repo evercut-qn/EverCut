@@ -426,8 +426,7 @@ const config = Object.freeze({
     length: parseInt(optionalEnv('OTP_LOCAL_LENGTH', '6'), 10),
     expiryMinutes: parseInt(optionalEnv('OTP_LOCAL_EXPIRY_MINUTES', '10'), 10),
     maxVerifyAttempts: parseInt(optionalEnv('OTP_LOCAL_MAX_VERIFY_ATTEMPTS', '5'), 10),
-    // testMode: process.env.NODE_ENV !== 'production' && true,   // shared dev bypass, provider-agnostic
-    // testOtp: '123456',
+    testOtp: '123456',
 
     //for real otp
     testMode: process.env.OTP_TEST_MODE

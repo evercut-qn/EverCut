@@ -48,6 +48,7 @@ export const ensureRequiredEnv = () => {
         MSG91_AUTH_KEY: 'msg91-auth',
         MSG91_OTP_TEMPLATE_ID: 'msg91-template',
         SMS_PROVIDER: 'msg91',
+        OTP_TEST_MODE: 'true',
         STARTMESSAGING_API_KEY: 'sm_test_key',
         STARTMESSAGING_TEMPLATE_ID: 'sm-template',
         STARTMESSAGING_BASE_URL: 'https://api.startmessaging.test',

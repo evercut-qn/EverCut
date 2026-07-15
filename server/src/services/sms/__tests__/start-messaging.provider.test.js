@@ -10,6 +10,7 @@ ensureRequiredEnv();
 // but not what this file is testing). All other required env vars are
 // already supplied by ensureRequiredEnv(), so this is safe in isolation.
 process.env.NODE_ENV = 'production';
+process.env.OTP_TEST_MODE = 'false';
 
 const otpStore = await import('../otp-store.service.js');
 const provider = await import('../providers/start-messaging.provider.js');
