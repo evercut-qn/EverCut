@@ -7,6 +7,7 @@ import { NotFoundError, ForbiddenError } from '../utils/api-error.js';
 import { buildMediaUrl } from './media/media-url.service.js';
 import { buildPagination } from '../utils/pagination.utils.js';
 import { PAYMENT_TRANSACTION_STATUS } from '../utils/constants.js';
+import { serializeBookingDetails } from '../serializers/booking.serializer.js';
 import {
     buildMonthlyStatistics,
     calculateGrowthPercentage,
@@ -62,6 +63,11 @@ const formatBookingDate = (date) => {
     const day = d.getDate();
     const year = d.getFullYear();
     return `${month} ${day}, ${year}`;
+};
+
+const toRupees = (value) => {
+    const numericValue = Number(value);
+    return Number.isFinite(numericValue) ? numericValue / 100 : undefined;
 };
 
 /**
@@ -188,47 +194,68 @@ const getServicePrice = (service) => {
 };
 
 /**
- * Build detailed transaction response
+ * Build detailed transaction response using the same payload contract as appointment detail fetches.
  */
 const buildTransactionDetail = async (payment, booking) => {
     const customer = booking?.customerId;
     const customerUser = customer?.userId;
     const employee = booking?.employeeId;
     const services = booking?.serviceIds || [];
+    const transactionId = payment.gatewayTransactionId || `TXN${payment._id.toString().slice(-8).toUpperCase()}`;
+    const paymentStatusLabel = payment.status === PAYMENT_TRANSACTION_STATUS.COMPLETED
+        ? 'Successfully Paid'
+        : payment.status === PAYMENT_TRANSACTION_STATUS.REFUNDED
+            ? 'Refunded'
+            : payment.status === PAYMENT_TRANSACTION_STATUS.REFUND_PENDING
+                ? 'Refund Pending'
+                : 'Payment Pending';
+    const totalDuration = booking?.durationMinutes ?? services.reduce((sum, service) => {
+        const duration = Number(service?.totalDuration ?? service?.duration);
+        return sum + (Number.isFinite(duration) ? duration : 0);
+    }, 0);
+
+    const serviceAmount = toRupees(payment.settlement?.serviceAmount) ?? booking?.totalAmount ?? undefined;
+    const platformFee = toRupees(payment.settlement?.platformFee) ?? undefined;
+    const totalAmount = toRupees(payment.settlement?.barberPayout)
+        ?? toRupees(payment.amount)
+        ?? booking?.totalAmount
+        ?? undefined;
+
+    const appointmentPayload = serializeBookingDetails({
+        bookingId: booking?._id,
+        customer,
+        employee,
+        shop: booking?.shopId,
+        date: booking?.date,
+        time: booking?.time,
+        endTime: booking?.endTime,
+        services,
+        serviceAmount,
+        platformFee,
+        totalAmount,
+        totalServices: services.length,
+        status: booking?.status,
+        paymentStatus: booking?.paymentStatus,
+        payoutStatus: booking?.payoutStatus,
+        durationMinutes: booking?.durationMinutes,
+        totalDuration,
+        startMinute: booking?.startMinute,
+        endMinute: booking?.endMinute,
+        slotLockTimes: booking?.slotLockTimes,
+        paymentTransactionId: payment?._id,
+        merchantOrderId: booking?.merchantOrderId,
+    });
 
     return {
-        id: toObjectIdString(payment._id),
-        transactionId: payment.gatewayTransactionId || `TXN${payment._id.toString().slice(-8).toUpperCase()}`,
-        customer: {
-            name: formatCustomerName(customer),
-            photoUrl: buildMediaUrl(customer?.photoMediaId?.r2Key),
-        },
-        barber: {
-            name: formatEmployeeName(employee),
-            photoUrl: buildMediaUrl(employee?.photoMediaId?.r2Key),
-        },
-        booking: {
-            date: formatBookingDate(booking?.date),
-            time: booking?.time || '',
-        },
-        services: services.map((service) => ({
-            id: toObjectIdString(service._id),
-            name: service.serviceName || 'Service',
-            price: getServicePrice(service),
-        })),
-        grandTotal: (payment.settlement?.serviceAmount || payment.amount) / 100,
-        taxInclusive: true,
-        paymentStatus: payment.status === PAYMENT_TRANSACTION_STATUS.COMPLETED
-            ? 'Successfully Paid'
-            : payment.status === PAYMENT_TRANSACTION_STATUS.REFUNDED
-                ? 'Refunded'
-                : payment.status === PAYMENT_TRANSACTION_STATUS.REFUND_PENDING
-                    ? 'Refund Pending'
-                    : 'Payment Pending',
+        ...appointmentPayload,
+        transactionId,
+        paymentStatus: paymentStatusLabel,
         userUpi: customerUser?.phoneNumber ? `${customerUser.phoneNumber.slice(-10)}@upi` : null,
         currency: payment.currency || 'INR',
         timestamp: payment.createdAt,
         paymentMode: payment.paymentMode || 'UPI',
+        grandTotal: appointmentPayload?.totalAmount ?? totalAmount ?? (payment.settlement?.barberPayout || payment.amount) / 100,
+        taxInclusive: true,
     };
 };
 

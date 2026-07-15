@@ -90,3 +90,53 @@ test('getEarnings returns zero-filled income analytics when no monthly income ex
         ],
     });
 });
+
+test('getTransactionDetail returns an appointment-style payload with transaction metadata', async (t) => {
+    t.mock.method(shopRepository, 'findByBarberUserId', async () => ({ _id: 'shop-1' }));
+    t.mock.method(paymentRepository, 'findByIdForEarnings', async () => ({
+        _id: 'payment-1',
+        shopId: 'shop-1',
+        status: 'completed',
+        amount: 5500,
+        currency: 'INR',
+        paymentMode: 'UPI',
+        gatewayTransactionId: 'txn-123',
+        createdAt: new Date('2026-05-10T12:00:00.000Z'),
+        settlement: { serviceAmount: 5500, barberPayout: 5000 },
+        bookingId: {
+            _id: 'booking-1',
+            customerId: { _id: 'customer-1', firstName: 'Jane', lastName: 'Doe' },
+            employeeId: { _id: 'employee-1', firstName: 'Alex', lastName: 'Smith' },
+            shopId: { _id: 'shop-1', shopName: 'EverCut' },
+            date: new Date('2026-05-10T00:00:00.000Z'),
+            time: '10:30 AM',
+            endTime: '11:00 AM',
+            serviceIds: [{ _id: 'service-1', serviceName: 'Haircut', actualPrice: 2500, offerPrice: 0 }],
+            totalAmount: 5500,
+            durationMinutes: 30,
+            startMinute: 630,
+            endMinute: 660,
+            slotLockTimes: [],
+            paymentTransactionId: 'payment-1',
+            merchantOrderId: 'order-123',
+            status: 'completed',
+            paymentStatus: 'paid',
+            payoutStatus: 'not_initiated',
+        },
+    }));
+
+    const result = await earningsService.getTransactionDetail('owner-1', 'payment-1');
+
+    assert.equal(result.id, 'booking-1');
+    assert.equal(result.customer?.firstName, 'Jane');
+    assert.equal(result.customer?.lastName, 'Doe');
+    assert.equal(result.employee?.firstName, 'Alex');
+    assert.equal(result.employee?.lastName, 'Smith');
+    assert.equal(result.shop?.shopName, 'EverCut');
+    assert.equal(result.services?.[0]?.name, 'Haircut');
+    assert.equal(result.serviceAmount, 25);
+    assert.equal(result.totalAmount, 50);
+    assert.equal(result.transactionId, 'txn-123');
+    assert.equal(result.paymentMode, 'UPI');
+    assert.equal(result.paymentStatus, 'Successfully Paid');
+});
