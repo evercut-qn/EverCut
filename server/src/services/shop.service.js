@@ -570,6 +570,18 @@ export const getNearbyShops = async (coordinates) => {
     ));
 };
 
+const attachShopContextToServices = (services = [], shops = []) => {
+    const shopsById = new Map(shops.map((shop) => [String(shop._id), shop]));
+
+    return services.map((service) => {
+        const matchingShop = shopsById.get(String(service.shopId));
+        return {
+            ...service,
+            shopId: matchingShop || service.shopId,
+        };
+    });
+};
+
 export const getNearbyServicesByGender = async (coordinates, gender, searchTerm) => {
     const nearbyShops = await shopRepository.findNearby(
         coordinates,
@@ -589,9 +601,11 @@ export const getNearbyServicesByGender = async (coordinates, gender, searchTerm)
         'serviceName shopId serviceFor imageMediaId serviceType',
     );
 
+    const servicesWithShop = attachShopContextToServices(services, nearbyShops);
+
     return {
         shops: await enrichAndSortShopSummaries(nearbyShops),
-        services: serializeServices(services, { includeShop: true }),
+        services: serializeServices(servicesWithShop, { includeShop: true }),
     };
 };
 
