@@ -36,6 +36,7 @@ const ensureRequiredEnv = () => {
 ensureRequiredEnv();
 
 const config = (await import('../../config/index.js')).default;
+const { BOOKING_STATUS } = (await import('../../utils/constants.js'));
 const bookingRepository = (await import('../../repositories/booking.repository.js')).default;
 const employeeRepository = (await import('../../repositories/employee.repository.js')).default;
 const shopRepository = (await import('../../repositories/shop.repository.js')).default;
@@ -276,13 +277,16 @@ test('getBookingOverview returns summary, milestones, today pulse, and both queu
         },
     ]));
 
-    t.mock.method(bookingRepository, 'countAll', async () => 12);
-    t.mock.method(bookingRepository, 'countByStatusForShop', async (_shopId, status) => ({
-        pending: 2,
-        awaiting_confirmation: 3,
-        completed: 4,
-        cancelled: 1,
-    }[status] || 0));
+    const countAllCalls = [];
+    t.mock.method(bookingRepository, 'countAll', async (filter) => {
+        countAllCalls.push(filter);
+        if (filter.status === BOOKING_STATUS.PENDING) return 2;
+        if (filter.status === BOOKING_STATUS.AWAITING_CONFIRMATION) return 3;
+        if (filter.status === BOOKING_STATUS.COMPLETED) return 4;
+        if (filter.status === BOOKING_STATUS.CANCELLED) return 1;
+        return 12;
+    });
+    t.mock.method(bookingRepository, 'countByStatusForShop', async () => 0);
     t.mock.method(bookingRepository, 'countCompletedForShopInDateRange', async () => 500);
     t.mock.method(bookingRepository, 'aggregateAppointmentAnalyticsByMonth', async () => []);
     t.mock.method(bookingRepository, 'findByShopId', async (_shopId, filters) => {
@@ -328,6 +332,14 @@ test('getBookingOverview returns summary, milestones, today pulse, and both queu
         awaitingConfirmation: 3,
         completed: 4,
         cancelled: 1,
+    });
+    assert.equal(countAllCalls.length, 5);
+    countAllCalls.forEach((filter) => {
+        assert.deepEqual(filter.shopId, 'shop-1');
+        assert.ok(filter.date?.$gte instanceof Date);
+        assert.ok(filter.date?.$lt instanceof Date);
+        assert.equal(filter.date.$gte.toISOString(), '2026-03-15T00:00:00.000Z');
+        assert.equal(filter.date.$lt.toISOString(), '2026-03-16T00:00:00.000Z');
     });
     assert.equal(result.milestones.period.label, 'March 2026');
     assert.equal(result.today.occupancy.unit, 'minutes');

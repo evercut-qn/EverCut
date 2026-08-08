@@ -1474,13 +1474,27 @@ const buildBookingSummaryAnalytics = async (ownerId) => {
     const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop');
 
+    const now = new Date();
+    const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    const tomorrow = new Date(today);
+    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+
+    const filter = {
+        shopId: shop._id,
+        date: {
+            $gte: today,
+            $lt: tomorrow,
+        },
+    };
+
     const [total, pending, awaitingConfirmation, completed, cancelled] = await Promise.all([
-        bookingRepository.countAll({ shopId: shop._id }),
-        bookingRepository.countByStatusForShop(shop._id, 'pending'),
-        bookingRepository.countByStatusForShop(shop._id, 'awaiting_confirmation'),
-        bookingRepository.countByStatusForShop(shop._id, 'completed'),
-        bookingRepository.countByStatusForShop(shop._id, 'cancelled'),
+        bookingRepository.countAll(filter),
+        bookingRepository.countAll({ ...filter, status: BOOKING_STATUS.PENDING }),
+        bookingRepository.countAll({ ...filter, status: BOOKING_STATUS.AWAITING_CONFIRMATION }),
+        bookingRepository.countAll({ ...filter, status: BOOKING_STATUS.COMPLETED }),
+        bookingRepository.countAll({ ...filter, status: BOOKING_STATUS.CANCELLED }),
     ]);
+
     return { total, pending, awaitingConfirmation, completed, cancelled };
 };
 
