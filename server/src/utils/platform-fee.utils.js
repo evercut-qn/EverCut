@@ -83,13 +83,13 @@ export const assertMinimumServiceAmount = (serviceAmount, bookingFeeType) => {
 };
 
 export const resolveCustomerPlatformFee = ({
-    customer,
+    completedWaiverBookings = 0,
     bookingFeeType,
     activeWaiverReservations = 0,
 }) => {
     const feeWaiverQuota = toNonNegativeInteger(config.payment.feeWaiverQuota, 0);
     const feeWaiverBookingsUsed = Math.min(
-        toNonNegativeInteger(customer?.feeWaiverBookingsUsed, 0),
+        toNonNegativeInteger(completedWaiverBookings, 0),
         feeWaiverQuota,
     );
     const reserved = Math.min(toNonNegativeInteger(activeWaiverReservations, 0), feeWaiverQuota);

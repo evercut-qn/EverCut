@@ -87,11 +87,12 @@ export const PAYOUT_GATEWAY = Object.freeze({
 
 export const ALL_PAYOUT_GATEWAYS = Object.values(PAYOUT_GATEWAY);
 
-export const PHONEPE_WEBHOOK_EVENTS = Object.freeze({
-    ORDER_COMPLETED: 'checkout.order.completed',
-    ORDER_FAILED: 'checkout.order.failed',
-    REFUND_COMPLETED: 'pg.refund.completed',
-    REFUND_FAILED: 'pg.refund.failed',
+export const ZOHO_WEBHOOK_EVENTS = Object.freeze({
+    ORDER_COMPLETED: 'payment.succeeded',
+    ORDER_FAILED: 'payment.failed',
+    ORDER_PENDING: 'payment.pending',
+    REFUND_COMPLETED: 'refund.succeeded',
+    REFUND_FAILED: 'refund.failed',
 });
 
 export const CASHFREE_WEBHOOK_EVENTS = Object.freeze({
@@ -101,7 +102,7 @@ export const CASHFREE_WEBHOOK_EVENTS = Object.freeze({
 });
 
 export const PAYMENT_GATEWAYS = Object.freeze({
-    PHONEPE: 'phonepe',
+    ZOHO: 'zoho',
     RAZORPAY: 'razorpay',
     CASHFREE: 'cashfree',
     MANUAL: 'manual',

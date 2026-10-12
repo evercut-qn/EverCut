@@ -4,8 +4,8 @@ import { getValidatedRequestData } from '../utils/request-validation.utils.js';
 
 export const addRating = async (req, res, next) => {
     try {
-        const { shopId, rating, review } = getValidatedRequestData(req, 'body');
-        const result = await ratingService.addRating(req.user._id, shopId, rating, review);
+        const { bookingId, shopId, rating, review } = getValidatedRequestData(req, 'body');
+        const result = await ratingService.addRating(req.user._id, { bookingId, shopId, rating, review });
         return res.status(201).json(ApiResponse.success(result, 'Rating submitted'));
     } catch (err) {
         next(err);

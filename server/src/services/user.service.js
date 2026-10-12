@@ -4,6 +4,7 @@ import bookingRepository from '../repositories/booking.repository.js';
 import paymentRepository from '../repositories/payment.repository.js';
 import mediaRepository from '../repositories/media.repository.js';
 import { NotFoundError, BadRequestError } from '../utils/api-error.js';
+import { revokeRefreshToken } from './auth.service.js';
 import notificationEvents from './notifications/notification-events.service.js';
 import { serializeCustomerDirectoryItem, serializeCustomerProfile } from '../serializers/customer.serializer.js';
 import { serializeBooking } from '../serializers/booking.serializer.js';
@@ -68,6 +69,35 @@ export const updateProfile = async (userId, data) => {
 
     const populatedCustomer = await updated.populate({ path: 'photoMediaId', select: 'r2Key' });
     return serializeCustomerProfile(populatedCustomer);
+};
+
+/**
+ * Soft-deletes a Customer's account. Mirrors the Barber account-deletion
+ * pattern in account.service.js#deleteBarberAccount, minus the shop
+ * cascade (Customer has no shop-equivalent) and the PIN check (Customers
+ * don't use the PIN system — that's Barber-only). Booking/payment history
+ * is left untouched for admin/audit purposes, same as it is for barbers;
+ * the Customer document itself isn't flagged, since authenticate.middleware
+ * only checks User.deletedAt/isActive, and the admin directory pipeline
+ * already excludes customers by that same flag (see
+ * CustomerRepository#buildAdminDirectoryPipeline).
+ */
+export const deleteCustomerAccount = async (userId) => {
+    const profile = await customerRepository.findByUserId(userId);
+    if (!profile) throw new NotFoundError('Customer');
+
+    // Revoke refresh access before the soft delete, matching the barber
+    // flow's ordering — the refresh-token hash lives on the User document,
+    // so this still has a document to update either way, but keeping the
+    // same order avoids a state where a not-yet-revoked refresh token
+    // outlives a user already marked deleted.
+    await revokeRefreshToken(userId);
+    await userRepository.softDelete(userId);
+
+    return {
+        deleted: true,
+        authCleanup: 'revoked',
+    };
 };
 
 

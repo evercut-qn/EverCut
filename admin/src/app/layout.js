@@ -14,10 +14,10 @@ const outfit = Outfit({
 
 /** @type {import('next').Metadata} */
 export const metadata = {
-  title: 'EverCut Admin Panel — Operations Management',
-  description: 'Administrative interface for EverCut hair salons bookings, barber schedules, and financial operations tracking.',
+  title: 'Evercut — Smart Salon & Grooming Booking Platform | evercut.in',
+  description: 'Evercut is now available on Google Play Store! Book appointments at top salons, pick your stylist, book exact 5-minute time slots, and skip the queue.',
   appleWebApp: {
-    title: 'EverCut - Admin Panel',
+    title: 'Evercut',
   },
 };
 

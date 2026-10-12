@@ -93,6 +93,10 @@ export const serializePayment = (payment) => {
     });
 };
 
+// Builds the hosted checkout redirect URL from Zoho's access_key.
+// https://www.zoho.com/in/payments/developerdocs/web-integration/hosted-checkout/#redirect-customer
+const buildCheckoutUrl = (accessKey) => (accessKey ? `${config.zoho.checkoutBaseUrl}/${accessKey}` : null);
+
 export const serializePaymentInitiation = ({
     payment,
     bookingId,
@@ -100,22 +104,31 @@ export const serializePaymentInitiation = ({
     reusable = false,
 }) => {
     const raw = toPlainObject(payment);
-    const sdkOrderToken = raw?.sdkOrderToken || payment?.sdkOrderToken || null;
+    const accessKey = gatewayResponse?.token || raw?.sdkOrderToken || payment?.sdkOrderToken || null;
     const plain = sanitizeForResponse(toPlainObject(payment));
     return compact({
         id: plain.id,
         bookingId: toIdString(bookingId),
         merchantOrderId: plain.merchantOrderId,
         orderId: gatewayResponse?.orderId || plain.gatewayOrderId || null,
-        token: gatewayResponse?.token || sdkOrderToken,
-        merchantId: config.phonepe.merchantId,
+        // Same value as orderId — Zoho's payments_session_id. Named
+        // explicitly for the Flutter SDK's checkout widget, which expects
+        // a `paymentSessionId` to invoke the native payment flow directly
+        // (no browser/WebView redirect needed for this path).
+        paymentSessionId: gatewayResponse?.orderId || plain.gatewayOrderId || null,
+        // The Flutter app should open this URL in an in-app browser /
+        // WebView and watch for a redirect to the configured success_url
+        // or failure_url (or intercept the deep link if those URLs are
+        // set to a custom scheme / universal link).
+        checkoutUrl: buildCheckoutUrl(accessKey),
+        accessKey,
         amountInPaisa: plain.amount,
         amountInRupees: plain.amountInRupees,
         currency: plain.currency || 'INR',
         state: gatewayResponse?.state || plain.gatewayState || 'PENDING',
         expiresAt: dateToEpochMs(gatewayResponse?.expiresAt || plain.expiresAt),
-        gateway: PAYMENT_GATEWAYS.PHONEPE,
-        paymentFlow: 'PHONEPE_SDK',
+        gateway: PAYMENT_GATEWAYS.ZOHO,
+        paymentFlow: 'ZOHO_HOSTED_CHECKOUT',
         reusable,
     });
 };

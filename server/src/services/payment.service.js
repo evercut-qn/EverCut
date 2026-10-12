@@ -7,7 +7,7 @@ import employeeRepository from '../repositories/employee.repository.js';
 import paymentRepository from '../repositories/payment.repository.js';
 import serviceRepository from '../repositories/service.repository.js';
 import shopRepository from '../repositories/shop.repository.js';
-import phonePeAdapter from '../adapters/phonepe/phonepe.adapter.js';
+import zohoAdapter from '../adapters/zoho/zoho.adapter.js';
 import notificationEvents from './notifications/notification-events.service.js';
 import logger from '../utils/logger.js';
 import {
@@ -23,7 +23,7 @@ import {
     REFUND_TYPE,
     PAYMENT_STATUS,
     PAYMENT_TRANSACTION_STATUS,
-    PHONEPE_WEBHOOK_EVENTS,
+    ZOHO_WEBHOOK_EVENTS,
     ROLES,
 } from '../utils/constants.js';
 import {
@@ -281,9 +281,12 @@ const calculateSettlement = async (booking, customer) => {
     const serviceAmountInRupees = Number(booking.totalAmount || sumServiceAmounts(services) || 0);
 
     assertMinimumServiceAmount(serviceAmountInRupees, bookingFeeType);
-    const activeWaiverReservations = await paymentRepository.countActiveWaiverReservations(customer._id);
+    const [activeWaiverReservations, completedWaiverBookings] = await Promise.all([
+        paymentRepository.countActiveWaiverReservations(customer._id),
+        paymentRepository.countCompletedWaiverBookings(customer._id),
+    ]);
     const feeSummary = resolveCustomerPlatformFee({
-        customer,
+        completedWaiverBookings,
         bookingFeeType,
         activeWaiverReservations,
     });
@@ -308,7 +311,16 @@ const verifyOrderFromGateway = async (webhookData) => {
     }
 
     try {
-        const status = await phonePeAdapter.getOrderStatus(webhookData.merchantOrderId);
+        // Zoho's payment.succeeded/failed webhooks do not include the
+        // payments_session_id, only reference_number (our merchantOrderId).
+        // Look up our own record to get the gatewayOrderId Zoho actually
+        // needs for a status lookup.
+        const existingPayment = await paymentRepository.findByMerchantOrderId(webhookData.merchantOrderId);
+        if (!existingPayment?.gatewayOrderId) {
+            return webhookData;
+        }
+
+        const status = await zohoAdapter.getOrderStatus(existingPayment.gatewayOrderId);
         return {
             ...webhookData,
             state: status.state || webhookData.state,
@@ -353,10 +365,10 @@ const rejectPaymentAmountMismatch = async (payment, webhookData) => {
         status: PAYMENT_TRANSACTION_STATUS.FAILED,
         gatewayState: webhookData.state,
         errorCode: 'AMOUNT_MISMATCH',
-        detailedErrorCode: 'PHONEPE_AMOUNT_MISMATCH',
-        errorSource: 'PHONEPE',
+        detailedErrorCode: 'ZOHO_AMOUNT_MISMATCH',
+        errorSource: 'ZOHO',
         errorStage: 'VERIFICATION',
-        errorDescription: `PhonePe amount mismatch: expected ${payment.amount}, received ${webhookData.amount}`,
+        errorDescription: `Zoho amount mismatch: expected ${payment.amount}, received ${webhookData.amount}`,
         webhookReceivedAt: new Date(),
         webhookProcessed: true,
     });
@@ -496,8 +508,8 @@ const buildPaymentStatusResponse = async (payment, gatewayStatus = null, sdkCont
 const syncPaymentWithGateway = async (payment, sdkContext = {}) => {
     let gatewayStatus = null;
 
-    if (MUTABLE_PAYMENT_STATUSES.has(payment.status)) {
-        gatewayStatus = await phonePeAdapter.getOrderStatus(payment.merchantOrderId);
+    if (MUTABLE_PAYMENT_STATUSES.has(payment.status) && payment.gatewayOrderId) {
+        gatewayStatus = await zohoAdapter.getOrderStatus(payment.gatewayOrderId);
 
         if (gatewayStatus.state === 'COMPLETED') {
             await handlePaymentSuccess({
@@ -587,7 +599,7 @@ export const initiatePayment = async (userId, bookingId) => {
     });
 
     try {
-        const gatewayResponse = await phonePeAdapter.createOrder({
+        const gatewayResponse = await zohoAdapter.createOrder({
             merchantOrderId,
             amount: settlement.totalAmountInPaisa,
             metadata: {
@@ -596,10 +608,7 @@ export const initiatePayment = async (userId, bookingId) => {
                 shopId: toObjectIdString(booking.shopId),
             },
             paymentModeConfig: config.payment.paymentModes?.length > 0
-                ? {
-                    version: 'V2',
-                    enabledPaymentModes: config.payment.paymentModes,
-                }
+                ? config.payment.paymentModes.map((mode) => String(mode.type).toLowerCase())
                 : null,
         });
 
@@ -619,15 +628,15 @@ export const initiatePayment = async (userId, bookingId) => {
             paymentTransactionId: paymentTransaction._id,
             merchantOrderId,
             paymentStatus: PAYMENT_STATUS.INITIATED,
-            paymentGateway: PAYMENT_GATEWAYS.PHONEPE,
+            paymentGateway: PAYMENT_GATEWAYS.ZOHO,
         });
 
         logger.info('[PaymentService] Payment initiated', {
             bookingId,
             merchantOrderId,
             amountInRupees: settlement.totalAmountInRupees,
-            gateway: PAYMENT_GATEWAYS.PHONEPE,
-            paymentFlow: 'PHONEPE_SDK',
+            gateway: PAYMENT_GATEWAYS.ZOHO,
+            paymentFlow: 'ZOHO_HOSTED_CHECKOUT',
         });
 
         const paymentResponseBase = paymentTransaction.toObject
@@ -661,13 +670,13 @@ export const initiatePayment = async (userId, bookingId) => {
     }
 };
 
-export const handleWebhook = async (headers, body) => {
-    if (!phonePeAdapter.verifyWebhook(headers, body)) {
+export const handleWebhook = async (headers, body, rawBody) => {
+    if (!zohoAdapter.verifyWebhook(headers, rawBody)) {
         logger.warn('[PaymentService] Invalid webhook authentication');
         throw new BadRequestError('Invalid webhook authentication');
     }
 
-    let webhookData = phonePeAdapter.parseWebhookPayload(body);
+    let webhookData = zohoAdapter.parseWebhookPayload(body);
 
     logger.info('[PaymentService] Webhook received', {
         event: webhookData.event,
@@ -676,23 +685,28 @@ export const handleWebhook = async (headers, body) => {
     });
 
     if (
-        webhookData.event === PHONEPE_WEBHOOK_EVENTS.ORDER_COMPLETED
-        || webhookData.event === PHONEPE_WEBHOOK_EVENTS.ORDER_FAILED
+        webhookData.event === ZOHO_WEBHOOK_EVENTS.ORDER_COMPLETED
+        || webhookData.event === ZOHO_WEBHOOK_EVENTS.ORDER_FAILED
     ) {
         webhookData = await verifyOrderFromGateway(webhookData);
     }
 
     switch (webhookData.event) {
-        case PHONEPE_WEBHOOK_EVENTS.ORDER_COMPLETED:
+        case ZOHO_WEBHOOK_EVENTS.ORDER_COMPLETED:
             return handlePaymentSuccess(webhookData);
-        case PHONEPE_WEBHOOK_EVENTS.ORDER_FAILED:
+        case ZOHO_WEBHOOK_EVENTS.ORDER_FAILED:
             return handlePaymentFailure(webhookData);
-        case PHONEPE_WEBHOOK_EVENTS.REFUND_COMPLETED:
+        case ZOHO_WEBHOOK_EVENTS.ORDER_PENDING:
+            // Relevant for ACH-style delayed methods, not UPI/card/netbanking.
+            // No state transition needed - the session stays PENDING until a
+            // succeeded/failed event or the next status poll arrives.
+            return { processed: true, event: ZOHO_WEBHOOK_EVENTS.ORDER_PENDING };
+        case ZOHO_WEBHOOK_EVENTS.REFUND_COMPLETED:
             return handleRefundSuccess(webhookData);
-        case PHONEPE_WEBHOOK_EVENTS.REFUND_FAILED:
+        case ZOHO_WEBHOOK_EVENTS.REFUND_FAILED:
             return handleRefundFailure(webhookData);
         default:
-            logger.warn('[PaymentService] Unknown PhonePe webhook event', { event: webhookData.event });
+            logger.warn('[PaymentService] Unknown Zoho webhook event', { event: webhookData.event });
             return { processed: false, event: webhookData.event };
     }
 };
@@ -802,11 +816,11 @@ async function handlePaymentSuccess(webhookData) {
         logger.warn('[PaymentService] Payment not found for success webhook', {
             merchantOrderId: webhookData.merchantOrderId,
         });
-        return { processed: false, event: PHONEPE_WEBHOOK_EVENTS.ORDER_COMPLETED };
+        return { processed: false, event: ZOHO_WEBHOOK_EVENTS.ORDER_COMPLETED };
     }
 
     if (payment.status === PAYMENT_TRANSACTION_STATUS.COMPLETED) {
-        return { processed: true, event: PHONEPE_WEBHOOK_EVENTS.ORDER_COMPLETED };
+        return { processed: true, event: ZOHO_WEBHOOK_EVENTS.ORDER_COMPLETED };
     }
 
     if (!MUTABLE_PAYMENT_STATUSES.has(payment.status)) {
@@ -815,10 +829,10 @@ async function handlePaymentSuccess(webhookData) {
             payment,
             PAYMENT_TRANSACTION_STATUS.COMPLETED,
         );
-        return { processed: true, event: PHONEPE_WEBHOOK_EVENTS.ORDER_COMPLETED };
+        return { processed: true, event: ZOHO_WEBHOOK_EVENTS.ORDER_COMPLETED };
     }
 
-    // CRITICAL: Only mark as completed if PhonePe confirms the payment is COMPLETED
+    // CRITICAL: Only mark as completed if Zoho confirms the payment is COMPLETED
     if (webhookData.state !== 'COMPLETED') {
         logger.warn('[PaymentService] Webhook claims success but gatewayState is not COMPLETED', {
             merchantOrderId: webhookData.merchantOrderId,
@@ -832,12 +846,12 @@ async function handlePaymentSuccess(webhookData) {
             webhookReceivedAt: new Date(),
         });
         
-        return { processed: true, event: PHONEPE_WEBHOOK_EVENTS.ORDER_COMPLETED };
+        return { processed: true, event: ZOHO_WEBHOOK_EVENTS.ORDER_COMPLETED };
     }
 
     if (hasPaymentAmountMismatch(payment, webhookData)) {
         await rejectPaymentAmountMismatch(payment, webhookData);
-        return { processed: true, event: PHONEPE_WEBHOOK_EVENTS.ORDER_COMPLETED };
+        return { processed: true, event: ZOHO_WEBHOOK_EVENTS.ORDER_COMPLETED };
     }
 
     const firstPayment = webhookData.paymentDetails?.[0] || null;
@@ -859,16 +873,10 @@ async function handlePaymentSuccess(webhookData) {
         webhookProcessed: true,
     });
 
-    if (payment.waiverApplied) {
-        const waiverUpdate = await customerRepository.consumeFeeWaiverSlot(payment.customerId);
-        if (!waiverUpdate) {
-            logger.error('[PaymentService] Waiver payment completed but no waiver slot could be consumed', {
-                paymentId: payment._id,
-                bookingId: payment.bookingId,
-                customerId: payment.customerId,
-            });
-        }
-    }
+    // Fee-waiver eligibility is derived (counted from completed payments)
+    // rather than tracked via a mutable counter on the Customer document —
+    // see calculateSettlement(). Nothing to write/increment here anymore,
+    // so there's no longer a write path that can fail or drift out of sync.
 
     await bookingRepository.updateById(payment.bookingId, {
         paymentStatus: PAYMENT_STATUS.SUCCESS,
@@ -887,17 +895,17 @@ async function handlePaymentSuccess(webhookData) {
         paymentMode: firstPayment?.paymentMode || webhookData.paymentMode || null,
     });
 
-    return { processed: true, event: PHONEPE_WEBHOOK_EVENTS.ORDER_COMPLETED };
+    return { processed: true, event: ZOHO_WEBHOOK_EVENTS.ORDER_COMPLETED };
 }
 
 async function handlePaymentFailure(webhookData) {
     const payment = await paymentRepository.findByMerchantOrderId(webhookData.merchantOrderId);
     if (!payment) {
-        return { processed: false, event: PHONEPE_WEBHOOK_EVENTS.ORDER_FAILED };
+        return { processed: false, event: ZOHO_WEBHOOK_EVENTS.ORDER_FAILED };
     }
 
     if (payment.status === PAYMENT_TRANSACTION_STATUS.FAILED) {
-        return { processed: true, event: PHONEPE_WEBHOOK_EVENTS.ORDER_FAILED };
+        return { processed: true, event: ZOHO_WEBHOOK_EVENTS.ORDER_FAILED };
     }
 
     if (
@@ -909,7 +917,7 @@ async function handlePaymentFailure(webhookData) {
             payment,
             PAYMENT_TRANSACTION_STATUS.FAILED,
         );
-        return { processed: true, event: PHONEPE_WEBHOOK_EVENTS.ORDER_FAILED };
+        return { processed: true, event: ZOHO_WEBHOOK_EVENTS.ORDER_FAILED };
     }
 
     if (!MUTABLE_PAYMENT_STATUSES.has(payment.status)) {
@@ -918,7 +926,7 @@ async function handlePaymentFailure(webhookData) {
             payment,
             PAYMENT_TRANSACTION_STATUS.FAILED,
         );
-        return { processed: true, event: PHONEPE_WEBHOOK_EVENTS.ORDER_FAILED };
+        return { processed: true, event: ZOHO_WEBHOOK_EVENTS.ORDER_FAILED };
     }
 
     await paymentRepository.updateById(payment._id, {
@@ -950,17 +958,21 @@ async function handlePaymentFailure(webhookData) {
         errorCode: webhookData.errorCode || webhookData.errorContext?.errorCode || null,
     });
 
-    return { processed: true, event: PHONEPE_WEBHOOK_EVENTS.ORDER_FAILED };
+    return { processed: true, event: ZOHO_WEBHOOK_EVENTS.ORDER_FAILED };
 }
 
 async function handleRefundSuccess(webhookData) {
-    const payment = await paymentRepository.findByMerchantOrderId(webhookData.originalMerchantOrderId);
+    // Zoho's refund.succeeded webhook only carries the original payment_id
+    // (gatewayPaymentId here), not our merchantOrderId/reference_number.
+    const payment = webhookData.originalMerchantOrderId
+        ? await paymentRepository.findByMerchantOrderId(webhookData.originalMerchantOrderId)
+        : await paymentRepository.findByGatewayTransactionId(webhookData.gatewayPaymentId);
     if (!payment) {
-        return { processed: false, event: PHONEPE_WEBHOOK_EVENTS.REFUND_COMPLETED };
+        return { processed: false, event: ZOHO_WEBHOOK_EVENTS.REFUND_COMPLETED };
     }
 
     if (payment.status === PAYMENT_TRANSACTION_STATUS.REFUNDED) {
-        return { processed: true, event: PHONEPE_WEBHOOK_EVENTS.REFUND_COMPLETED };
+        return { processed: true, event: ZOHO_WEBHOOK_EVENTS.REFUND_COMPLETED };
     }
 
     if (
@@ -975,7 +987,7 @@ async function handleRefundSuccess(webhookData) {
             payment,
             PAYMENT_TRANSACTION_STATUS.REFUNDED,
         );
-        return { processed: true, event: PHONEPE_WEBHOOK_EVENTS.REFUND_COMPLETED };
+        return { processed: true, event: ZOHO_WEBHOOK_EVENTS.REFUND_COMPLETED };
     }
 
     await paymentRepository.updateById(payment._id, {
@@ -1003,17 +1015,19 @@ async function handleRefundSuccess(webhookData) {
         amountInRupees: Number(webhookData.amount || payment.refund?.amount || 0) / 100 || null,
     });
 
-    return { processed: true, event: PHONEPE_WEBHOOK_EVENTS.REFUND_COMPLETED };
+    return { processed: true, event: ZOHO_WEBHOOK_EVENTS.REFUND_COMPLETED };
 }
 
 async function handleRefundFailure(webhookData) {
-    const payment = await paymentRepository.findByMerchantOrderId(webhookData.originalMerchantOrderId);
+    const payment = webhookData.originalMerchantOrderId
+        ? await paymentRepository.findByMerchantOrderId(webhookData.originalMerchantOrderId)
+        : await paymentRepository.findByGatewayTransactionId(webhookData.gatewayPaymentId);
     if (!payment) {
-        return { processed: false, event: PHONEPE_WEBHOOK_EVENTS.REFUND_FAILED };
+        return { processed: false, event: ZOHO_WEBHOOK_EVENTS.REFUND_FAILED };
     }
 
     if (payment.status === PAYMENT_TRANSACTION_STATUS.REFUND_FAILED) {
-        return { processed: true, event: PHONEPE_WEBHOOK_EVENTS.REFUND_FAILED };
+        return { processed: true, event: ZOHO_WEBHOOK_EVENTS.REFUND_FAILED };
     }
 
     if (payment.status === PAYMENT_TRANSACTION_STATUS.REFUNDED) {
@@ -1022,7 +1036,7 @@ async function handleRefundFailure(webhookData) {
             payment,
             PAYMENT_TRANSACTION_STATUS.REFUND_FAILED,
         );
-        return { processed: true, event: PHONEPE_WEBHOOK_EVENTS.REFUND_FAILED };
+        return { processed: true, event: ZOHO_WEBHOOK_EVENTS.REFUND_FAILED };
     }
 
     if (
@@ -1036,7 +1050,7 @@ async function handleRefundFailure(webhookData) {
             payment,
             PAYMENT_TRANSACTION_STATUS.REFUND_FAILED,
         );
-        return { processed: true, event: PHONEPE_WEBHOOK_EVENTS.REFUND_FAILED };
+        return { processed: true, event: ZOHO_WEBHOOK_EVENTS.REFUND_FAILED };
     }
 
     await paymentRepository.updateById(payment._id, {
@@ -1064,7 +1078,7 @@ async function handleRefundFailure(webhookData) {
         status: PAYMENT_STATUS.REFUND_FAILED,
     });
 
-    return { processed: true, event: PHONEPE_WEBHOOK_EVENTS.REFUND_FAILED };
+    return { processed: true, event: ZOHO_WEBHOOK_EVENTS.REFUND_FAILED };
 }
 
 export const initiateRefund = async (bookingId, reason, actor = null, isBarberCancellation = false) => {
@@ -1121,11 +1135,16 @@ export const initiateRefund = async (bookingId, reason, actor = null, isBarberCa
     });
     let refundResponse;
 
+    if (!payment.gatewayTransactionId) {
+        throw new PaymentError('Cannot refund: no Zoho payment_id recorded for this payment yet. Please retry shortly or contact support.');
+    }
+
     try {
-        refundResponse = await phonePeAdapter.initiateRefund({
+        refundResponse = await zohoAdapter.initiateRefund({
             merchantRefundId,
-            originalMerchantOrderId: payment.merchantOrderId,
+            paymentId: payment.gatewayTransactionId,
             amount: refundAmountInPaisa,
+            reason,
         });
     } catch (error) {
         const failedRefund = createRefundRecord({
@@ -1237,8 +1256,12 @@ export const pollPendingPayments = async () => {
     });
 
     for (const payment of pendingPayments) {
+        if (!payment.gatewayOrderId) {
+            continue;
+        }
+
         try {
-            const status = await phonePeAdapter.getOrderStatus(payment.merchantOrderId);
+            const status = await zohoAdapter.getOrderStatus(payment.gatewayOrderId);
 
             await paymentRepository.updateById(payment._id, {
                 pollAttempts: (payment.pollAttempts || 0) + 1,

@@ -3,10 +3,10 @@ import { refreshTokens } from './lib/refresh';
 import { decodeJWTPayload } from './lib/jwt';
 
 export const config = {
-  matcher: ['/((?!api|_next/static|_next/image|favicon.ico|images).*)'],
+  matcher: ['/((?!api|_next/static|_next/image|favicon.ico|images|screenshots|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)'],
 };
 
-const PUBLIC_PATHS = ['/login'];
+const PUBLIC_PATHS = ['/login', '/adminevercut'];
 
 /**
  * Proxy Middleware to enforce administration authorization
@@ -14,7 +14,7 @@ const PUBLIC_PATHS = ['/login'];
  */
 export async function proxy(request) {
   const { pathname } = request.nextUrl;
-  const isPublicPath = PUBLIC_PATHS.some((path) => pathname.startsWith(path));
+  const isPublicPath = pathname === '/' || pathname.startsWith('/screenshots') || PUBLIC_PATHS.some((path) => pathname.startsWith(path));
 
   const token = request.cookies.get('evercut_admin_session')?.value;
   const refreshTokenVal = request.cookies.get('evercut_admin_refresh_token')?.value;

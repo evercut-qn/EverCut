@@ -65,6 +65,27 @@ test('expired cancellation only grants Basic entitlements with existing usage pr
     });
 });
 
+test('cancelled subscription with no currentPeriodEnd is NOT entitled (safe default, not indefinite access)', async (t) => {
+    // Regression test: a subscription that was never activated by the
+    // subscription.activated webhook has no currentPeriodEnd. If it's
+    // later cancelled, the old fallback logic treated a missing
+    // currentPeriodEnd as "still entitled forever" instead of "we can't
+    // verify continued access, so don't grant it".
+    t.mock.method(subscriptionRepository, 'findByBarberId', async () => ({
+        _id: 'sub-1',
+        planId: PLAN_IDS.POPULAR,
+        status: 'CANCELLED',
+        currentPeriodEnd: null,
+        totalPhotosUploaded: 5,
+        totalVideosUploaded: 1,
+    }));
+
+    const entitlements = await entitlementService.resolveEntitlements('barber-1');
+
+    assert.equal(entitlements.planId, PLAN_IDS.BASIC);
+    assert.equal(entitlements.maxPhotos, 10);
+});
+
 test('canDownloadStatement enforces the per-cycle counter', async (t) => {
     t.mock.method(subscriptionRepository, 'findByBarberId', async () => ({
         _id: 'sub-1',

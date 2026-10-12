@@ -249,11 +249,12 @@ export const notifyBookingStatusChanged = async ({ bookingId, status, actorUserI
         return notifyBookingCancelled({ bookingId, actorUserId, cancelledBy: 'barber' });
     }
 
+    const isCompleted = status === BOOKING_STATUS.COMPLETED;
     const statusEvent = status === BOOKING_STATUS.NO_SHOW
         ? NOTIFICATION_EVENT.BOOKING_NO_SHOW
         : NOTIFICATION_EVENT.BOOKING_COMPLETED;
-    const title = status === BOOKING_STATUS.NO_SHOW ? 'Booking marked no-show' : 'Booking completed';
-    const body = status === BOOKING_STATUS.NO_SHOW
+    const title = status === BOOKING_STATUS.NO_SHOW ? 'Booking marked no-show' : 'Rate your visit';
+    const defaultBody = status === BOOKING_STATUS.NO_SHOW
         ? 'Your barber marked this booking as no-show.'
         : 'Your appointment has been completed.';
 
@@ -265,6 +266,20 @@ export const notifyBookingStatusChanged = async ({ bookingId, status, actorUserI
             const { booking, shop, customer } = context;
             if (!customer.userId) return { skipped: true, reason: 'customer_user_missing' };
 
+            const bookingIdStr = toObjectIdString(booking._id);
+            const reviewExpiresAt = isCompleted
+                ? (booking.reviewExpiresAt
+                    ? new Date(booking.reviewExpiresAt)
+                    : new Date(new Date(booking.completedAt || Date.now()).getTime() + 24 * 60 * 60 * 1000))
+                : null;
+            const reviewUrl = isCompleted
+                ? `https://evercut.in/ratings/new?bookingId=${bookingIdStr}`
+                : null;
+
+            const body = isCompleted && shop?.shopName
+                ? `Your appointment at ${shop.shopName} is complete. Tap to rate and review your service within 24 hours.`
+                : defaultBody;
+
             const result = await notificationService.notifyUser({
                 recipientUserId: customer.userId,
                 actorUserId,
@@ -272,10 +287,17 @@ export const notifyBookingStatusChanged = async ({ bookingId, status, actorUserI
                 eventType: statusEvent,
                 title,
                 body,
-                data: bookingData(booking, shop, customer, { status }),
+                data: bookingData(booking, shop, customer, {
+                    status,
+                    ...(isCompleted ? {
+                        reviewUrl,
+                        reviewExpiresAt: reviewExpiresAt.toISOString(),
+                    } : {}),
+                }),
                 entityType: 'booking',
                 entityId: booking._id,
                 dedupeKey: `${statusEvent}:${bookingId}`,
+                expiresAt: reviewExpiresAt,
             });
 
             return { ...result, skipped: false };

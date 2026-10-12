@@ -1,3 +1,6 @@
+import { ensureRequiredEnv } from '../../__tests__/helpers/env.js';
+ensureRequiredEnv();
+
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -6,47 +9,138 @@ import customerRepository from '../../repositories/customer.repository.js';
 import ratingRepository from '../../repositories/rating.repository.js';
 import shopRepository from '../../repositories/shop.repository.js';
 import * as ratingService from '../rating.service.js';
+import { BOOKING_STATUS } from '../../utils/constants.js';
 
-test('addRating translates duplicate-key writes and normalizes blank reviews', async (t) => {
+test('addRating successfully creates rating for completed booking within 24 hours', async (t) => {
+    const completedAt = new Date();
+    const reviewExpiresAt = new Date(completedAt.getTime() + 24 * 60 * 60 * 1000);
+
     t.mock.method(customerRepository, 'findByUserId', async () => ({ _id: 'customer-1' }));
     t.mock.method(shopRepository, 'findById', async () => ({ _id: 'shop-1' }));
-    t.mock.method(bookingRepository, 'hasCompletedBookingForCustomer', async () => true);
-    t.mock.method(ratingRepository, 'findByCustomerAndShop', async () => null);
+    t.mock.method(bookingRepository, 'findById', async () => ({
+        _id: 'booking-1',
+        customerId: 'customer-1',
+        shopId: 'shop-1',
+        status: BOOKING_STATUS.COMPLETED,
+        completedAt,
+        reviewExpiresAt,
+        hasReviewed: false,
+    }));
+    t.mock.method(ratingRepository, 'findByBookingId', async () => null);
 
     let createPayload = null;
     t.mock.method(ratingRepository, 'create', async (payload) => {
         createPayload = payload;
-        const error = new Error('duplicate key');
-        error.code = 11000;
-        throw error;
+        return {
+            _id: 'rating-1',
+            ...payload,
+            customerId: { firstName: 'Ava', lastName: 'Customer' },
+            createdAt: new Date(),
+        };
     });
 
-    await assert.rejects(
-        () => ratingService.addRating('user-1', 'shop-1', 5, '   '),
-        {
-            name: 'ConflictError',
-            message: 'You have already rated this shop',
-        },
-    );
+    let markedBookingId = null;
+    let markedRatingId = null;
+    t.mock.method(bookingRepository, 'markAsReviewed', async (bookingId, ratingId) => {
+        markedBookingId = bookingId;
+        markedRatingId = ratingId;
+        return { _id: bookingId, hasReviewed: true, ratingId };
+    });
+
+    const result = await ratingService.addRating('user-1', {
+        bookingId: 'booking-1',
+        rating: 5,
+        review: '  Excellent haircut!  ',
+    });
 
     assert.deepEqual(createPayload, {
+        bookingId: 'booking-1',
         customerId: 'customer-1',
         shopId: 'shop-1',
         rating: 5,
-        review: undefined,
+        review: 'Excellent haircut!',
     });
+    assert.equal(markedBookingId, 'booking-1');
+    assert.equal(markedRatingId, 'rating-1');
+    assert.equal(result.rating, 5);
+    assert.equal(result.review, 'Excellent haircut!');
 });
 
-test('addRating rejects customers who have no completed booking for the target shop', async (t) => {
+test('addRating rejects ratings when 24-hour review window has expired', async (t) => {
+    const completedAt = new Date(Date.now() - 25 * 60 * 60 * 1000); // 25 hours ago
+    const reviewExpiresAt = new Date(Date.now() - 1 * 60 * 60 * 1000); // 1 hour ago
+
     t.mock.method(customerRepository, 'findByUserId', async () => ({ _id: 'customer-1' }));
     t.mock.method(shopRepository, 'findById', async () => ({ _id: 'shop-1' }));
-    t.mock.method(bookingRepository, 'hasCompletedBookingForCustomer', async () => false);
+    t.mock.method(bookingRepository, 'findById', async () => ({
+        _id: 'booking-1',
+        customerId: 'customer-1',
+        shopId: 'shop-1',
+        status: BOOKING_STATUS.COMPLETED,
+        completedAt,
+        reviewExpiresAt,
+        hasReviewed: false,
+    }));
+    t.mock.method(ratingRepository, 'findByBookingId', async () => null);
 
     await assert.rejects(
-        () => ratingService.addRating('user-1', 'shop-1', 5, 'Great visit'),
+        () => ratingService.addRating('user-1', {
+            bookingId: 'booking-1',
+            rating: 5,
+            review: 'Great',
+        }),
         {
-            name: 'ForbiddenError',
-            message: 'You can only rate shops where you have a completed booking',
+            name: 'BadRequestError',
+            message: 'Review window has expired (reviews must be submitted within 24 hours of service completion)',
+        },
+    );
+});
+
+test('addRating rejects duplicate reviews for the same booking', async (t) => {
+    const completedAt = new Date();
+
+    t.mock.method(customerRepository, 'findByUserId', async () => ({ _id: 'customer-1' }));
+    t.mock.method(shopRepository, 'findById', async () => ({ _id: 'shop-1' }));
+    t.mock.method(bookingRepository, 'findById', async () => ({
+        _id: 'booking-1',
+        customerId: 'customer-1',
+        shopId: 'shop-1',
+        status: BOOKING_STATUS.COMPLETED,
+        completedAt,
+        hasReviewed: true,
+    }));
+    t.mock.method(ratingRepository, 'findByBookingId', async () => ({ _id: 'existing-rating' }));
+
+    await assert.rejects(
+        () => ratingService.addRating('user-1', {
+            bookingId: 'booking-1',
+            rating: 5,
+        }),
+        {
+            name: 'ConflictError',
+            message: 'You have already submitted a review for this booking',
+        },
+    );
+});
+
+test('addRating rejects non-completed bookings', async (t) => {
+    t.mock.method(customerRepository, 'findByUserId', async () => ({ _id: 'customer-1' }));
+    t.mock.method(shopRepository, 'findById', async () => ({ _id: 'shop-1' }));
+    t.mock.method(bookingRepository, 'findById', async () => ({
+        _id: 'booking-1',
+        customerId: 'customer-1',
+        shopId: 'shop-1',
+        status: BOOKING_STATUS.CONFIRMED,
+    }));
+
+    await assert.rejects(
+        () => ratingService.addRating('user-1', {
+            bookingId: 'booking-1',
+            rating: 5,
+        }),
+        {
+            name: 'BadRequestError',
+            message: 'You can only rate completed appointments',
         },
     );
 });
@@ -190,7 +284,7 @@ test('upsertReplyToRating updates an existing reply without sending a duplicate 
     assert.equal(result.user.lastName, 'Customer');
     assert.match(
         result.user.photoUrl,
-        /^https:\/\/evercut-media-worker-dev\.quantneural-evercut\.workers\.dev\/images\/avatars\/customer-1\/profile\.jpg\?exp=\d+&token=[a-f0-9]{64}$/,
+        /\/images\/avatars\/customer-1\/profile\.jpg\?exp=\d+&token=[a-f0-9]{64}$/,
     );
     assert.equal('email' in result.user, false);
     assert.deepEqual(result.reply, {

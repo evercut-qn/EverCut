@@ -107,6 +107,20 @@ class SubscriptionRepository {
         })).limit(limit);
     }
 
+    // A subscription can sit in PENDING_PAYMENT forever if the
+    // subscription.activated webhook never arrives (misconfigured webhook
+    // URL/secret, delivery failure, etc.) — findAllActivePaid() above
+    // deliberately excludes this status, so without this query nothing
+    // ever re-checks these against Razorpay. `olderThan` avoids reconciling
+    // a subscription the user is still mid-checkout on.
+    async findStalePendingSubscriptions(olderThan, limit = 200) {
+        return Subscription.find(trustQueryOperators({
+            status: SUBSCRIPTION_STATUSES.PENDING_PAYMENT,
+            razorpaySubscriptionId: { $ne: null },
+            updatedAt: { $lte: olderThan },
+        })).limit(limit);
+    }
+
     async findAllForMediaReconciliation(limit = 1000) {
         return Subscription.find({}).limit(limit);
     }

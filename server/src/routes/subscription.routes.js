@@ -18,6 +18,7 @@ router.get('/plans', subscriptionController.getPlans);
 router.get('/', authenticate, authorize(ROLES.ADMIN), validate(adminSubscriptionListQuerySchema, 'query'), subscriptionController.listSubscriptions);
 router.get('/summary', authenticate, authorize(ROLES.ADMIN), subscriptionController.getSubscriptionSummary);
 router.get('/me', authenticate, authorize(ROLES.BARBER), subscriptionController.getMySubscription);
+router.post('/me/sync', authenticate, authorize(ROLES.BARBER), subscriptionController.syncMySubscription);
 router.post('/subscribe', authenticate, authorize(ROLES.BARBER), validate(subscriptionPlanBodySchema, 'body'), subscriptionController.subscribe);
 router.post('/upgrade', authenticate, authorize(ROLES.BARBER), validate(subscriptionPlanBodySchema, 'body'), subscriptionController.upgrade);
 router.post('/downgrade', authenticate, authorize(ROLES.BARBER), validate(subscriptionPlanBodySchema, 'body'), subscriptionController.downgrade);

@@ -17,8 +17,17 @@ function isSubscriptionEntitled(subscription) {
         return false;
     }
 
-    if (subscription.status === SUBSCRIPTION_STATUSES.CANCELLED && subscription.currentPeriodEnd) {
-        return Date.now() < new Date(subscription.currentPeriodEnd).getTime();
+    // A cancelled (cancel-at-cycle-end) subscription keeps access only
+    // until currentPeriodEnd. If that date is missing — e.g. because the
+    // original subscription.activated webhook never landed and
+    // currentPeriodEnd was never populated — the safe default is NOT
+    // entitled, never "still active forever". Previously this fell through
+    // to `return true` unconditionally whenever currentPeriodEnd was
+    // falsy, which is exactly how a cancelled subscription kept showing as
+    // an active paid plan.
+    if (subscription.status === SUBSCRIPTION_STATUSES.CANCELLED) {
+        return Boolean(subscription.currentPeriodEnd)
+            && Date.now() < new Date(subscription.currentPeriodEnd).getTime();
     }
 
     return true;

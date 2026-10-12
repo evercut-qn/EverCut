@@ -64,3 +64,12 @@ export const removeMyPicture = async (req, res, next) => {
         next(err);
     }
 };
+
+export const deleteMe = async (req, res, next) => {
+    try {
+        const result = await userService.deleteCustomerAccount(req.user._id);
+        return res.status(200).json(ApiResponse.success(result, 'Account deleted successfully'));
+    } catch (err) {
+        next(err);
+    }
+};

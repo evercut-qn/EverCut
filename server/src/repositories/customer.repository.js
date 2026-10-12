@@ -1,5 +1,4 @@
 import Customer from '../models/customer.model.js';
-import config from '../config/index.js';
 import { ROLES } from '../utils/constants.js';
 import { escapeRegex } from '../utils/regex.utils.js';
 
@@ -16,26 +15,10 @@ class CustomerRepository {
         return Customer.findById(id).populate({ path: 'photoMediaId', select: 'r2Key' });
     }
 
-    async consumeFeeWaiverSlot(customerId) {
-        const quota = config.payment.feeWaiverQuota;
-        if (quota <= 0) return null;
-
-        const customer = await Customer.findOneAndUpdate(
-            {
-                _id: customerId,
-                $or: [
-                    { feeWaiverBookingsUsed: { $exists: false } },
-                    { feeWaiverBookingsUsed: { $lt: quota } },
-                ],
-            },
-            {
-                $inc: { feeWaiverBookingsUsed: 1 },
-            },
-            { returnDocument: 'after', runValidators: true },
-        );
-
-        return customer || null;
-    }
+    // NOTE: fee-waiver eligibility is now derived by counting completed
+    // payments (see paymentRepository.countCompletedWaiverBookings) instead
+    // of tracking a mutable counter here. consumeFeeWaiverSlot() has been
+    // removed — there's nothing left to write/increment for this feature.
 
     async updateByUserId(userId, data) {
         return Customer.findOneAndUpdate(

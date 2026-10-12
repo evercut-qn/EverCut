@@ -5,6 +5,10 @@ export const ensureRequiredEnv = () => {
         FIREBASE_PROJECT_ID: 'evercut-test',
         FIREBASE_CLIENT_EMAIL: 'firebase@example.com',
         FIREBASE_PRIVATE_KEY: '-----BEGIN PRIVATE KEY-----\\nabc\\n-----END PRIVATE KEY-----',
+        APP_NAME: 'EverCut',
+        STARTMESSAGING_API_KEY: 'sm_live_test_key',
+        STARTMESSAGING_TEMPLATE_ID: 'sm_template_test',
+        STARTMESSAGING_OTP_EXPIRY_MINUTES: '10',
         MSG91_AUTH_KEY: 'msg91-auth',
         MSG91_OTP_TEMPLATE_ID: 'msg91-template',
         JWT_ACCESS_SECRET: 'access-secret',
@@ -36,3 +40,6 @@ export const ensureRequiredEnv = () => {
         process.env[key] ??= value;
     }
 };
+
+ensureRequiredEnv();
+

@@ -43,6 +43,13 @@ class PaymentRepository {
         return PaymentTransaction.findOne({ merchantOrderId });
     }
 
+    // Zoho refund webhooks only carry the Zoho payment_id (stored as
+    // gatewayTransactionId), not our merchantOrderId - this is the
+    // correlation path for refund.succeeded / refund.failed events.
+    async findByGatewayTransactionId(gatewayTransactionId) {
+        return PaymentTransaction.findOne({ gatewayTransactionId }).sort({ createdAt: -1 });
+    }
+
     async findAll(filter = {}, options = {}) {
         const query = PaymentTransaction.find(trustQueryOperators(filter))
             .sort({ createdAt: -1 })
@@ -250,6 +257,18 @@ class PaymentRepository {
                     PAYMENT_TRANSACTION_STATUS.PENDING,
                 ],
             },
+        }));
+    }
+
+    // Source of truth for "how many free bookings has this customer already
+    // used" — counted fresh from completed payments every time, instead of
+    // relying on a mutable counter field that has to be written and kept in
+    // sync separately. Nothing to increment, nothing to drift out of sync.
+    async countCompletedWaiverBookings(customerId) {
+        return PaymentTransaction.countDocuments(trustQueryOperators({
+            customerId,
+            waiverApplied: true,
+            status: PAYMENT_TRANSACTION_STATUS.COMPLETED,
         }));
     }
 

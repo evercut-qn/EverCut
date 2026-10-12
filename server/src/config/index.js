@@ -65,6 +65,8 @@ const config = Object.freeze({
   /** Application */
   env: optionalEnv('NODE_ENV', 'development'),
   port: parseInt(optionalEnv('PORT', '5000'), 10),
+  appName: optionalEnv('APP_NAME', 'EverCut'),
+  smsProvider: optionalEnv('SMS_PROVIDER', 'startmessaging'),
   apiPrefix: '/api/v1',
 
   /** MongoDB */
@@ -128,10 +130,22 @@ const config = Object.freeze({
     }),
   }),
 
+  /** StartMessaging OTP */
+  startmessaging: Object.freeze({
+    apiKey: optionalEnv('STARTMESSAGING_API_KEY', ''),
+    templateId: optionalEnv('STARTMESSAGING_TEMPLATE_ID', ''),
+    baseUrl: optionalEnv('STARTMESSAGING_BASE_URL', 'https://api.startmessaging.com'),
+    appName: optionalEnv('APP_NAME', 'EverCut'),
+    otpLength: 6,
+    otpExpiry: parseInt(optionalEnv('STARTMESSAGING_OTP_EXPIRY_MINUTES', '10'), 10),
+    testMode: process.env.NODE_ENV !== 'production' && process.env.STARTMESSAGING_TEST_MODE !== 'false',
+    testOtp: optionalEnv('STARTMESSAGING_TEST_OTP', '123456'),
+  }),
+
   /** MSG91 OTP */
   msg91: Object.freeze({
-    authKey: requireEnv('MSG91_AUTH_KEY'),
-    otpTemplateId: requireEnv('MSG91_OTP_TEMPLATE_ID'),
+    authKey: optionalEnv('MSG91_AUTH_KEY', 'msg91-auth'),
+    otpTemplateId: optionalEnv('MSG91_OTP_TEMPLATE_ID', 'msg91-template'),
     otpLength: 6,
     otpExpiry: 10,                                              // minutes
     testMode: process.env.NODE_ENV !== 'production' && true,   // flip to true in dev to skip real SMS
@@ -157,22 +171,29 @@ const config = Object.freeze({
     maxLimit: 100,
   }),
 
-  /** PhonePe Payment Gateway */
-  phonepe: Object.freeze({
-    clientId: providerEnv('PHONEPE_CLIENT_ID', 'test-phonepe-client-id'),
-    clientSecret: providerEnv('PHONEPE_CLIENT_SECRET', 'test-phonepe-client-secret'),
-    clientVersion: parseInt(optionalEnv('PHONEPE_CLIENT_VERSION', '1'), 10),
-    merchantId: providerEnv('PHONEPE_MERCHANT_ID', 'test-phonepe-merchant-id'),
-    env: optionalEnv('PHONEPE_ENV', 'SANDBOX'),
-    webhookUsername: providerEnv('PHONEPE_WEBHOOK_USERNAME', 'test-phonepe-webhook-user'),
-    webhookPassword: providerEnv('PHONEPE_WEBHOOK_PASSWORD', 'test-phonepe-webhook-password'),
-    authUrl: optionalEnv('PHONEPE_ENV', 'SANDBOX') === 'PRODUCTION'
-      ? 'https://api.phonepe.com/apis/identity-manager/v1/oauth/token'
-      : 'https://api-preprod.phonepe.com/apis/pg-sandbox/v1/oauth/token',
-    baseUrl: optionalEnv('PHONEPE_ENV', 'SANDBOX') === 'PRODUCTION'
-      ? 'https://api.phonepe.com/apis/pg'
-      : 'https://api-preprod.phonepe.com/apis/pg-sandbox',
+  /** Zoho Payments Gateway (India edition) */
+  zoho: Object.freeze({
+    clientId: providerEnv('ZOHO_CLIENT_ID', 'test-zoho-client-id'),
+    clientSecret: providerEnv('ZOHO_CLIENT_SECRET', 'test-zoho-client-secret'),
+    refreshToken: providerEnv('ZOHO_REFRESH_TOKEN', 'test-zoho-refresh-token'),
+    accountId: providerEnv('ZOHO_ACCOUNT_ID', 'test-zoho-account-id'),
+    env: optionalEnv('ZOHO_ENV', 'SANDBOX'),
+    webhookSigningKey: providerEnv('ZOHO_WEBHOOK_SIGNING_KEY', 'test-zoho-webhook-signing-key'),
+    // Zoho India edition. Sandbox and production are separate hosts, not a
+    // flag on the same host - see https://www.zoho.com/in/payments/developerdocs/sandbox
+    accountsTokenUrl: 'https://accounts.zoho.in/oauth/v2/token',
+    baseUrl: optionalEnv('ZOHO_ENV', 'SANDBOX') === 'PRODUCTION'
+      ? 'https://payments.zoho.in/api/v1'
+      : 'https://paymentssandbox.zoho.in/api/v1',
+    checkoutBaseUrl: optionalEnv('ZOHO_ENV', 'SANDBOX') === 'PRODUCTION'
+      ? 'https://payments.zoho.in/hostedcheckout'
+      : 'https://paymentssandbox.zoho.in/hostedcheckout',
+    // Deep link / universal link URLs the Flutter app intercepts once the
+    // in-app browser redirects here after the customer finishes paying.
+    successUrl: optionalEnv('ZOHO_SUCCESS_URL', 'https://evercut.in/payments/success'),
+    failureUrl: optionalEnv('ZOHO_FAILURE_URL', 'https://evercut.in/payments/failure'),
     tokenRefreshBufferMs: 5 * 60 * 1000,  // 5 minutes before expiry
+    webhookTimestampToleranceSec: 300,    // reject webhooks older than 5 minutes
   }),
 
   /** Cashfree Payouts */
@@ -203,6 +224,12 @@ const config = Object.freeze({
     mediaReconciliationCronSchedule: '0 3 * * *',
     cronTimezone: 'Asia/Kolkata',
     webhookTimestampToleranceSec: 300,
+    // How often to re-check subscriptions stuck in PENDING_PAYMENT against
+    // Razorpay directly (safety net for missed subscription.activated
+    // webhooks) and how old a PENDING_PAYMENT record must be before it's
+    // considered stuck rather than "still mid-checkout".
+    pendingReconciliationIntervalMs: 5 * 60 * 1000,
+    pendingStaleThresholdMs: 10 * 60 * 1000,
   }),
 
   /** Booking business rules */
@@ -240,10 +267,15 @@ const config = Object.freeze({
     pollIntervalMs: 5 * 60 * 1000,               // 5 minutes
     payoutBatchCronTime: '0 23 * * *',
     payoutBatchTimezone: 'Asia/Kolkata',
-    // Payment modes configuration (PhonePe V2 Schema)
-    // Configure which payment methods to enable
-    // Empty array = all payment modes enabled
-    // Examples: [{ type: 'UPI' }], [{ type: 'UPI' }, { type: 'CARD' }]
+    // Payment modes configuration (Zoho Payments allowed_payment_methods).
+    // [{ type: 'UPI' }] restricts the hosted checkout page to UPI only.
+    // Empty array ([]) shows every payment method enabled on the Zoho
+    // account (card/UPI/netbanking/wallet/bank_transfer - a multi-option
+    // page). There is no server-side "try UPI then fall back" within a
+    // single session; if you want customers who can't use UPI to still
+    // pay, leave this array empty so the checkout offers all methods.
+    // Accepted India-edition values: UPI, CARD, NETBANKING, WALLET, BANK_TRANSFER
+    // (the adapter lowercases these before calling Zoho).
     paymentModes: [{ type: 'UPI' }],
   }),
 

@@ -2,6 +2,7 @@ import config from '../config/index.js';
 import subscriptionRepository from '../repositories/subscription.repository.js';
 import subscriptionTransactionRepository from '../repositories/subscription-transaction.repository.js';
 import subscriptionGateway from '../adapters/razorpay/razorpay-subscription.adapter.js';
+import subscriptionService from '../services/subscription/subscription.service.js';
 import lifecycleOrchestrator from '../services/subscription/subscription-lifecycle.service.js';
 import { resolveRazorpayPlanId, PLAN_IDS } from '../config/subscription.config.js';
 import {
@@ -15,6 +16,7 @@ const LOG = '[SubscriptionCron]';
 let expiryIntervalId = null;
 let reconciliationIntervalId = null;
 let mediaReconciliationIntervalId = null;
+let pendingReconciliationIntervalId = null;
 let lastReconciliationRunKey = null;
 let lastMediaRunKey = null;
 
@@ -157,6 +159,60 @@ export const runSubscriptionReconciliationNow = async () => {
     return { checked: subscriptions.length, processed, driftCount };
 };
 
+// Safety net for subscriptions stuck in PENDING_PAYMENT because the
+// subscription.activated webhook never arrived (delivery failure,
+// misconfigured webhook secret/URL, etc.). runSubscriptionReconciliationNow
+// above never sees these — findAllActivePaid() deliberately excludes
+// PENDING_PAYMENT, since re-checking a subscription seconds into checkout
+// would be pointless. This runs more frequently (every few minutes, not
+// daily) and only considers records older than
+// config.subscription.pendingStaleThresholdMs.
+export const runPendingSubscriptionReconciliationNow = async () => {
+    const staleCutoff = new Date(Date.now() - config.subscription.pendingStaleThresholdMs);
+    const pendingSubscriptions = await subscriptionRepository.findStalePendingSubscriptions(staleCutoff);
+
+    let processed = 0;
+    let activated = 0;
+
+    for (const subscription of pendingSubscriptions) {
+        try {
+            const { changed, transitionedToActive } = await subscriptionService.reconcileWithGateway(
+                subscription,
+                { source: 'RECONCILIATION' },
+            );
+            processed += 1;
+            if (transitionedToActive) activated += 1;
+            if (!changed) {
+                // Still genuinely pending on Razorpay's side too — surface
+                // this so a persistently-stuck subscription is visible in
+                // monitoring instead of only when a user complains.
+                logger.warn(`${LOG} Subscription still pending payment on Razorpay`, {
+                    subscriptionId: subscription._id,
+                    barberId: subscription.barberId,
+                    razorpaySubscriptionId: subscription.razorpaySubscriptionId,
+                    stuckSinceMinutes: Math.round((Date.now() - new Date(subscription.updatedAt).getTime()) / 60000),
+                });
+            }
+        } catch (error) {
+            logger.error(`${LOG} Pending subscription reconciliation failed`, {
+                subscriptionId: subscription._id,
+                razorpaySubscriptionId: subscription.razorpaySubscriptionId,
+                error: error.message,
+            });
+        }
+    }
+
+    if (pendingSubscriptions.length > 0) {
+        logger.info(`${LOG} Pending subscription reconciliation complete`, {
+            checked: pendingSubscriptions.length,
+            processed,
+            activated,
+        });
+    }
+
+    return { checked: pendingSubscriptions.length, processed, activated };
+};
+
 export const runSubscriptionMediaReconciliationNow = async () => {
     const subscriptions = await subscriptionRepository.findAllForMediaReconciliation();
     let processed = 0;
@@ -215,6 +271,14 @@ export const startSubscriptionJobs = () => {
         });
     }
 
+    if (!pendingReconciliationIntervalId) {
+        pendingReconciliationIntervalId = setInterval(() => {
+            runPendingSubscriptionReconciliationNow().catch((error) => {
+                logger.error(`${LOG} Pending reconciliation job failed`, { error: error.message });
+            });
+        }, config.subscription.pendingReconciliationIntervalMs);
+    }
+
     if (!mediaReconciliationIntervalId) {
         mediaReconciliationIntervalId = scheduleDaily({
             cronExpression: config.subscription.mediaReconciliationCronSchedule,
@@ -230,11 +294,12 @@ export const startSubscriptionJobs = () => {
 };
 
 export const stopSubscriptionJobs = () => {
-    for (const id of [expiryIntervalId, reconciliationIntervalId, mediaReconciliationIntervalId]) {
+    for (const id of [expiryIntervalId, reconciliationIntervalId, mediaReconciliationIntervalId, pendingReconciliationIntervalId]) {
         if (id) clearInterval(id);
     }
     expiryIntervalId = null;
     reconciliationIntervalId = null;
     mediaReconciliationIntervalId = null;
+    pendingReconciliationIntervalId = null;
     logger.info(`${LOG} Subscription jobs stopped`);
 };

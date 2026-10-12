@@ -106,7 +106,7 @@ const bookingSchema = new mongoose.Schema(
         paymentGateway: {
             type: String,
             enum: Object.values(PAYMENT_GATEWAYS),
-            default: PAYMENT_GATEWAYS.PHONEPE,
+            default: PAYMENT_GATEWAYS.ZOHO,
         },
         paidAt: {
             type: Date,
@@ -137,6 +137,19 @@ const bookingSchema = new mongoose.Schema(
         },
         completedAt: {
             type: Date,
+            default: null,
+        },
+        reviewExpiresAt: {
+            type: Date,
+            default: null,
+        },
+        hasReviewed: {
+            type: Boolean,
+            default: false,
+        },
+        ratingId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Rating',
             default: null,
         },
         cancellationNote: {

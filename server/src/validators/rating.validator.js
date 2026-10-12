@@ -2,9 +2,12 @@ import Joi from 'joi';
 import { objectId } from './common.validator.js';
 
 export const addRatingSchema = Joi.object({
-    shopId: objectId.required().messages({
+    bookingId: objectId.required().messages({
+        'any.invalid': 'Booking ID must be a valid ID',
+        'any.required': 'Booking ID is required',
+    }),
+    shopId: objectId.optional().messages({
         'any.invalid': 'Shop ID must be a valid ID',
-        'any.required': 'Shop ID is required',
     }),
     rating: Joi.number().integer().min(1).max(5).required().messages({
         'number.base': 'Rating must be a number',

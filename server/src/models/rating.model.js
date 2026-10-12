@@ -10,6 +10,12 @@ import mongoose from 'mongoose';
  */
 const ratingSchema = new mongoose.Schema(
     {
+        bookingId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Booking',
+            required: true,
+            index: true,
+        },
         customerId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'Customer',
@@ -49,9 +55,10 @@ const ratingSchema = new mongoose.Schema(
     { timestamps: true },
 );
 
-// One rating per customer per shop (was commented out before)
-ratingSchema.index({ shopId: 1, customerId: 1 }, { unique: true });
-ratingSchema.index({ shopId: 1 });
+// One rating per service booking/appointment
+ratingSchema.index({ bookingId: 1 }, { unique: true });
+ratingSchema.index({ shopId: 1, createdAt: -1 });
+ratingSchema.index({ customerId: 1 });
 
 const Rating = mongoose.model('Rating', ratingSchema);
 export default Rating;

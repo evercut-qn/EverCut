@@ -19,6 +19,8 @@ router.patch('/me', authorize(ROLES.CUSTOMER), validate(updateCustomerSchema, 'b
 router.patch('/me/media/picture', authorize(ROLES.CUSTOMER), validate(mediaIdBodySchema, 'body'), customerController.updateMyPicture);
 router.delete('/me/media/picture', authorize(ROLES.CUSTOMER), customerController.removeMyPicture);
 
+router.delete('/me', authorize(ROLES.CUSTOMER), customerController.deleteMe);
+
 router.get(
     '/',
     authorize(ROLES.ADMIN),

@@ -141,6 +141,7 @@ export const notifyUser = async ({
             recipientUserId,
             eventType,
             error: error.message,
+            stack: error.stack,
         });
 
         await updateDelivery(notification._id, {

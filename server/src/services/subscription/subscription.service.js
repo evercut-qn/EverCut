@@ -9,6 +9,7 @@ import {
     getAllPlans,
     getPlan,
     validatePlanTransition,
+    resolveRazorpayPlanId,
     PLAN_IDS,
     assertPaidPlanConfigured,
 } from '../../config/subscription.config.js';
@@ -28,6 +29,20 @@ import logger from '../../utils/logger.js';
 import { serializeAdminSubscription } from '../../serializers/subscription.serializer.js';
 
 const LOG = '[SubscriptionService]';
+
+const toDateFromSeconds = (value) => (
+    Number.isFinite(Number(value)) ? new Date(Number(value) * 1000) : null
+);
+
+const mapRazorpayStatus = (status) => {
+    const normalized = String(status || '').toLowerCase();
+    if (['active', 'authenticated'].includes(normalized)) return SUBSCRIPTION_STATUSES.ACTIVE;
+    if (['pending', 'created'].includes(normalized)) return SUBSCRIPTION_STATUSES.PENDING_PAYMENT;
+    if (['halted', 'expired', 'completed'].includes(normalized)) return SUBSCRIPTION_STATUSES.EXPIRED;
+    if (normalized === 'cancelled') return SUBSCRIPTION_STATUSES.CANCELLED;
+    if (normalized === 'paused') return SUBSCRIPTION_STATUSES.PAUSED;
+    return null;
+};
 
 const isPaid = (subscription) => (
     typeof subscription?.isPaid === 'function'
@@ -73,6 +88,134 @@ class SubscriptionService {
         return this.getSubscription(barber._id);
     }
 
+    // Fetches this subscription's live state directly from Razorpay and
+    // reconciles the local record. This is the single source of truth both
+    // the on-demand sync endpoint (syncSubscription) and the cron
+    // reconciliation jobs use — previously the cron had its own inline copy
+    // of this logic and nothing else could trigger it, which is exactly why
+    // a subscription stuck in PENDING_PAYMENT (webhook never arrived) had
+    // no path back to ACTIVE short of a full day's wait for the reconciler
+    // to even consider it (findAllActivePaid excluded PENDING_PAYMENT
+    // entirely — see subscription.repository.js).
+    //
+    // Returns { subscription, changed, transitionedToActive } — the caller
+    // decides what side effects (lifecycle hooks, transaction records) to
+    // run for its own context (webhook-style vs cron-style vs sync-style),
+    // since the audit trail (`source`) needs to reflect which one.
+    async reconcileWithGateway(subscription, { source = 'RECONCILIATION' } = {}) {
+        if (!subscription.razorpaySubscriptionId) {
+            return { subscription, changed: false, transitionedToActive: false };
+        }
+
+        const gatewaySubscription = await subscriptionGateway.fetchSubscription(
+            subscription.razorpaySubscriptionId,
+        );
+        const mappedStatus = mapRazorpayStatus(gatewaySubscription.status);
+        const gatewayPlanId = resolveRazorpayPlanId(gatewaySubscription.plan_id);
+        const wasActive = subscription.status === SUBSCRIPTION_STATUSES.ACTIVE;
+
+        if (mappedStatus === SUBSCRIPTION_STATUSES.EXPIRED) {
+            await subscriptionTransactionRepository.create({
+                subscriptionId: subscription._id,
+                barberId: subscription.barberId,
+                type: SUBSCRIPTION_TRANSACTION_TYPES.EXPIRY,
+                source,
+                fromPlan: subscription.planId,
+                toPlan: PLAN_IDS.BASIC,
+                metadata: { gatewayStatus: gatewaySubscription.status },
+            });
+            await lifecycleOrchestrator.onSubscriptionExpired(subscription.barberId);
+            const updated = await subscriptionRepository.findById(subscription._id);
+            return { subscription: updated, changed: true, transitionedToActive: false };
+        }
+
+        const updates = {};
+        if (mappedStatus && mappedStatus !== subscription.status) updates.status = mappedStatus;
+        if (gatewayPlanId && gatewayPlanId !== subscription.planId) updates.planId = gatewayPlanId;
+        const currentStart = toDateFromSeconds(gatewaySubscription.current_start);
+        const currentEnd = toDateFromSeconds(gatewaySubscription.current_end);
+        if (currentStart) updates.currentPeriodStart = currentStart;
+        if (currentEnd) updates.currentPeriodEnd = currentEnd;
+
+        if (Object.keys(updates).length === 0) {
+            return { subscription, changed: false, transitionedToActive: false };
+        }
+
+        const updated = await subscriptionRepository.updateById(subscription._id, updates);
+        const transitionedToActive = !wasActive && mappedStatus === SUBSCRIPTION_STATUSES.ACTIVE;
+
+        if (transitionedToActive) {
+            await subscriptionTransactionRepository.create({
+                subscriptionId: subscription._id,
+                barberId: subscription.barberId,
+                type: SUBSCRIPTION_TRANSACTION_TYPES.ACTIVATION,
+                source,
+                fromPlan: subscription.planId,
+                toPlan: updated.planId,
+                metadata: { gatewayStatus: gatewaySubscription.status, reason: 'Missed subscription.activated webhook' },
+            });
+            await lifecycleOrchestrator.onSubscriptionActivated(subscription.barberId, updated.planId);
+        }
+
+        await lifecycleOrchestrator.reconcileMediaForSubscription(updated);
+
+        return { subscription: updated, changed: true, transitionedToActive };
+    }
+
+    // Called by every billing-affecting action (subscribe/upgrade/downgrade/
+    // cancel) before it evaluates any guard condition against local state.
+    // Fixes the class of bug where a manual Razorpay-dashboard change (or a
+    // missed webhook) leaves the local record stale until the next daily
+    // cron pass — e.g. cancelling directly in Razorpay while the local
+    // record still said ACTIVE, which blocked re-subscribing with a 409
+    // for up to 24h. Best-effort: a sync failure here logs and falls back
+    // to local state rather than blocking the user's action entirely.
+    async _syncBeforeGuard(subscription, context) {
+        if (!subscription?.razorpaySubscriptionId) {
+            return subscription;
+        }
+
+        try {
+            const { subscription: synced } = await this.reconcileWithGateway(subscription, {
+                source: 'PRE_ACTION_SYNC',
+            });
+            return synced;
+        } catch (error) {
+            logger.warn(`${LOG} Pre-action sync failed, proceeding with local state`, {
+                barberId: subscription.barberId,
+                subscriptionId: subscription._id,
+                context,
+                error: error.message,
+            });
+            return subscription;
+        }
+    }
+
+    async syncSubscriptionForUser(userId) {
+        const barber = await this.resolveBarberForUser(userId);
+        return this.syncSubscription(barber._id);
+    }
+
+    // On-demand version of the reconciliation cron — call right after the
+    // user returns from Razorpay's hosted checkout, same principle as the
+    // booking-payment flow's POST /payments/:id/verify. Never trusts
+    // client-reported outcome; always re-checks Razorpay directly.
+    async syncSubscription(barberId) {
+        const subscription = await this.ensureDefaultSubscription(barberId);
+
+        try {
+            await this.reconcileWithGateway(subscription, { source: 'SYNC' });
+        } catch (error) {
+            logger.warn(`${LOG} Subscription sync failed`, {
+                barberId,
+                subscriptionId: subscription._id,
+                error: error.message,
+            });
+        }
+
+        return this.getSubscription(barberId);
+    }
+
     async subscribeUser(user, planId) {
         const barber = await this.resolveBarberForUser(user._id);
         const barberDetails = {
@@ -92,7 +235,9 @@ class SubscriptionService {
         }
         assertPaidPlanConfigured(planId);
 
-        const existing = await this.ensureDefaultSubscription(barberId);
+        let existing = await this.ensureDefaultSubscription(barberId);
+        existing = await this._syncBeforeGuard(existing, 'createSubscription');
+
         if (
             isPaid(existing)
             && isEntitled(existing)
@@ -166,7 +311,9 @@ class SubscriptionService {
     async upgradeSubscription(barberId, newPlanId) {
         logger.info(`${LOG} Upgrading subscription`, { barberId, newPlanId });
 
-        const subscription = await this.ensureDefaultSubscription(barberId);
+        let subscription = await this.ensureDefaultSubscription(barberId);
+        subscription = await this._syncBeforeGuard(subscription, 'upgradeSubscription');
+
         const transition = validatePlanTransition(subscription.planId, newPlanId);
         if (!transition.valid) throw new BadRequestError(transition.reason);
         if (transition.type !== 'UPGRADE') {
@@ -211,7 +358,9 @@ class SubscriptionService {
     async downgradeSubscription(barberId, newPlanId) {
         logger.info(`${LOG} Downgrading subscription`, { barberId, newPlanId });
 
-        const subscription = await this.ensureDefaultSubscription(barberId);
+        let subscription = await this.ensureDefaultSubscription(barberId);
+        subscription = await this._syncBeforeGuard(subscription, 'downgradeSubscription');
+
         const transition = validatePlanTransition(subscription.planId, newPlanId);
         if (!transition.valid) throw new BadRequestError(transition.reason);
         if (transition.type !== 'DOWNGRADE') {
@@ -250,11 +399,20 @@ class SubscriptionService {
     async cancelSubscription(barberId) {
         logger.info(`${LOG} Cancelling subscription`, { barberId });
 
-        const subscription = await this.ensureDefaultSubscription(barberId);
+        let subscription = await this.ensureDefaultSubscription(barberId);
+        subscription = await this._syncBeforeGuard(subscription, 'cancelSubscription');
+
+        // The sync above may have discovered the subscription had already
+        // expired on Razorpay's side (onSubscriptionExpired already reset
+        // it to Basic) — nothing left to cancel.
+        if (subscription.status === SUBSCRIPTION_STATUSES.EXPIRED) {
+            return subscription;
+        }
+
         if (!isPaid(subscription)) {
             throw new BadRequestError('No active paid subscription to cancel');
         }
-        if (subscription.cancelAtPeriodEnd) {
+        if (subscription.cancelAtPeriodEnd || subscription.status === SUBSCRIPTION_STATUSES.CANCELLED) {
             throw new ConflictError('Subscription is already set to cancel');
         }
 

@@ -29,6 +29,20 @@ export const getMySubscription = async (req, res, next) => {
     }
 };
 
+// Client-triggered re-check against Razorpay — call this right after
+// returning from Razorpay's hosted checkout page. Safety net for missed
+// subscription.activated webhooks; never trusts client-reported outcome,
+// always re-verifies with Razorpay directly (same principle as the booking
+// payment flow's POST /payments/:id/verify).
+export const syncMySubscription = async (req, res, next) => {
+    try {
+        const result = await subscriptionService.syncSubscriptionForUser(req.user._id);
+        return res.status(200).json(ApiResponse.success(serializeSubscription(result), 'Subscription synced'));
+    } catch (error) {
+        return next(error);
+    }
+};
+
 export const subscribe = async (req, res, next) => {
     try {
         const { planId } = getValidatedRequestData(req, 'body');

@@ -5,7 +5,10 @@ import logger from '../utils/logger.js';
 
 export const handleWebhook = async (req, res) => {
     try {
-        const result = await paymentService.handleWebhook(req.headers, req.body);
+        // req.rawBody is populated by webhook-raw-body.middleware.js for
+        // routes listed in RAW_JSON_WEBHOOK_ROUTES (see config/webhook.config.js).
+        // Zoho's HMAC signature is computed over these exact raw bytes.
+        const result = await paymentService.handleWebhook(req.headers, req.body, req.rawBody);
 
         logger.info('[PaymentController] Webhook processed', {
             event: result.event,

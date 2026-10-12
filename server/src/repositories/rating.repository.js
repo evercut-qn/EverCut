@@ -16,6 +16,10 @@ class RatingRepository {
         return Rating.findOne({ customerId, shopId });
     }
 
+    async findByBookingId(bookingId) {
+        return Rating.findOne({ bookingId });
+    }
+
     async countByShop(shopId) {
         return Rating.countDocuments({ shopId });
     }
