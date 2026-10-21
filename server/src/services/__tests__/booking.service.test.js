@@ -137,6 +137,9 @@ test('getBookingOverview returns the monthly completed-booking target state for 
     t.mock.method(employeeRepository, 'findByShopId', async () => []);
     t.mock.method(bookingRepository, 'countAll', async () => 0);
     t.mock.method(bookingRepository, 'countByStatusForShop', async () => 0);
+    t.mock.method(bookingRepository, 'countByStatusForShopInDateRange', async () => 0);
+    t.mock.method(bookingRepository, 'countByStatusForShopInDateRange', async () => 0);
+    t.mock.method(bookingRepository, 'countByStatusForShopInDateRange', async () => 0);
     t.mock.method(bookingRepository, 'findByShopId', async () => []);
     t.mock.method(bookingRepository, 'aggregateAppointmentAnalyticsByMonth', async () => []);
 
@@ -246,11 +249,16 @@ test('getBookingOverview returns summary, milestones, today pulse, and both queu
     ]));
 
     t.mock.method(bookingRepository, 'countAll', async () => 12);
+    t.mock.method(bookingRepository, 'countByStatusForShopInDateRange', async (_shopId, status) => {
+        if (status === null) return 12;
+        if (Array.isArray(status) && status.includes('confirmed')) return 2;
+        if (status === 'awaiting_confirmation') return 3;
+        if (status === 'completed') return 4;
+        if (Array.isArray(status) && status.includes('cancelled')) return 1;
+        return 0;
+    });
     t.mock.method(bookingRepository, 'countByStatusForShop', async (_shopId, status) => ({
-        pending: 2,
         awaiting_confirmation: 3,
-        completed: 4,
-        cancelled: 1,
     }[status] || 0));
     t.mock.method(bookingRepository, 'countCompletedForShopInDateRange', async () => 500);
     t.mock.method(bookingRepository, 'aggregateAppointmentAnalyticsByMonth', async () => []);

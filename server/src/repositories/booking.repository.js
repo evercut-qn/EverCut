@@ -1499,14 +1499,17 @@ class BookingRepository {
     }
 
     async countByStatusForShopInDateRange(shopId, status, startDate, endDate) {
-        return Booking.countDocuments(trustQueryOperators({
+        const query = {
             shopId,
-            status,
             date: {
                 $gte: startDate,
                 $lt: endDate,
             },
-        }));
+        };
+        if (status !== undefined && status !== null) {
+            query.status = Array.isArray(status) ? { $in: status } : status;
+        }
+        return Booking.countDocuments(trustQueryOperators(query));
     }
 
     async countCompletedForShopInDateRange(shopId, startDate, endDate) {

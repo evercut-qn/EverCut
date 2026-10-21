@@ -81,6 +81,7 @@ export const bookingIdParamSchema = Joi.object({
 export const bookingOverviewQuerySchema = Joi.object({
     month: Joi.number().integer().min(1).max(12),
     year: Joi.number().integer().min(2000).max(9999),
+    date: dateString,
 }).and('month', 'year');
 
 export const favoritePatchSchema = Joi.object({

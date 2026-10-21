@@ -11,6 +11,7 @@ import { toIdString } from '../serializers/core.serializer.js';
 import { toDateOnlyString } from '../utils/slot-lock.utils.js';
 import notificationEvents from './notifications/notification-events.service.js';
 import * as mediaService from './media/media.service.js';
+import { BOOKING_STATUS } from '../utils/constants.js';
 
 /**
  * Employee service â€” CRUD operations for shop employees.
@@ -560,23 +561,31 @@ export const getStaffDailyProgress = async (ownerId) => {
                 [employee._id],
                 {
                     date: { $gte: today, $lt: tomorrow },
-                    status: { $nin: ['cancelled'] },
+                    status: {
+                        $in: [
+                            BOOKING_STATUS.CONFIRMED,
+                            BOOKING_STATUS.COMPLETED,
+                            BOOKING_STATUS.NO_SHOW,
+                        ],
+                    },
                 },
                 {},
             );
 
             const completedCount = employeeBookings.filter(
-                (b) =>
-                    b.status === 'completed' ||
-                    b.status === 'no-show',
+                (b) => b.status === BOOKING_STATUS.COMPLETED,
+            ).length;
+            const noShowCount = employeeBookings.filter(
+                (b) => b.status === BOOKING_STATUS.NO_SHOW,
             ).length;
 
             const totalCount = employeeBookings.length;
-            const remainingCount = totalCount - completedCount;
+            const resolvedCount = completedCount + noShowCount;
+            const remainingCount = totalCount - resolvedCount;
 
-            // Calculate progress percentage
+            // Progress measures resolved accepted appointments; no-shows are reported separately.
             const progressPercentage =
-                totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+                totalCount > 0 ? Math.round((resolvedCount / totalCount) * 100) : 0;
 
             return {
                 id: toIdString(employee._id),
@@ -584,6 +593,8 @@ export const getStaffDailyProgress = async (ownerId) => {
                 photoUrl: serializeEmployee(employee, { publicView: true })?.photoUrl ?? null,
                 progress: {
                     completed: completedCount,
+                    noShow: noShowCount,
+                    resolved: resolvedCount,
                     total: totalCount,
                     remaining: remainingCount,
                     percentage: progressPercentage,

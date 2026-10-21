@@ -56,6 +56,17 @@ test('bookingPatchSchema rejects mixed schedule and status changes', () => {
     assert.match(error?.message || '', /does not match any of the allowed types/);
 });
 
+test('bookingOverviewQuerySchema accepts explicit date query', () => {
+    const { error, value } = bookingOverviewQuerySchema.validate({
+        date: '2026-05-15',
+    });
+
+    assert.equal(error, undefined);
+    assert.deepEqual(value, {
+        date: '2026-05-15',
+    });
+});
+
 test('bookingOverviewQuerySchema accepts a complete explicit month/year period', () => {
     const { error, value } = bookingOverviewQuerySchema.validate({
         month: '3',

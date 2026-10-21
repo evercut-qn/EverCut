@@ -343,3 +343,63 @@ test('updateEmployeeAvailability removes blocked dates without notifying custome
     assert.equal(result.customersNotified, 0);
     assert.deepEqual(result.blockedDates, []);
 });
+
+test('getStaffDailyProgress measures resolved accepted bookings and excludes pending, awaiting confirmation, and cancelled', async (t) => {
+    t.mock.timers.enable({
+        apis: ['Date'],
+        now: new Date('2026-05-15T10:00:00.000Z'),
+    });
+
+    t.mock.method(shopRepository, 'findByBarberUserId', async () => ({
+        _id: 'shop-1',
+    }));
+
+    t.mock.method(employeeRepository, 'findByShopId', async () => [
+        {
+            _id: 'emp-1',
+            firstName: 'John',
+            lastName: 'Doe',
+            isActive: true,
+            deletedAt: null,
+        },
+        {
+            _id: 'emp-inactive',
+            firstName: 'Jane',
+            lastName: 'Smith',
+            isActive: false,
+            deletedAt: null,
+        },
+    ]);
+
+    let capturedFilters = null;
+    t.mock.method(bookingRepository, 'findByEmployeeIds', async (employeeIds, filters) => {
+        capturedFilters = filters;
+        const bookings = [
+            { _id: 'b-1', status: 'completed' },
+            { _id: 'b-2', status: 'no-show' },
+            { _id: 'b-3', status: 'cancelled' },
+            { _id: 'b-4', status: 'confirmed' },
+            { _id: 'b-5', status: 'pending' },
+            { _id: 'b-6', status: 'awaiting_confirmation' },
+        ];
+        return bookings.filter((booking) => filters.status.$in.includes(booking.status));
+    });
+
+    const result = await employeeService.getStaffDailyProgress('owner-1');
+
+    assert.equal(result.totalStaff, 1);
+    assert.equal(result.staff.length, 1);
+    assert.deepEqual(capturedFilters.status.$in, [
+        'confirmed',
+        'completed',
+        'no-show',
+    ]);
+    assert.deepEqual(result.staff[0].progress, {
+        completed: 1,
+        noShow: 1,
+        resolved: 2,
+        total: 3,
+        remaining: 1,
+        percentage: 67,
+    });
+});

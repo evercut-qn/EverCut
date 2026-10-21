@@ -3509,21 +3509,30 @@ export const updateBookingStatus = async (bookingId, user, status) => {
     throw new ForbiddenError('This endpoint is available only to customers and barbers');
 };
 
-const buildBookingSummaryAnalytics = async (ownerId) => {
+const buildBookingSummaryAnalytics = async (ownerId, query = {}) => {
     const shop = await shopRepository.findByBarberUserId(ownerId);
     if (!shop) throw new NotFoundError('Shop');
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    let startDate;
+    let endDate;
+
+    if (query.date && typeof query.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(query.date)) {
+        startDate = toUtcDateBoundary(query.date);
+        endDate = new Date(startDate);
+        endDate.setUTCDate(endDate.getUTCDate() + 1);
+    } else {
+        startDate = new Date();
+        startDate.setHours(0, 0, 0, 0);
+        endDate = new Date(startDate);
+        endDate.setDate(endDate.getDate() + 1);
+    }
 
     const [total, pending, awaitingConfirmation, completed, cancelled] = await Promise.all([
-        bookingRepository.countAll({ shopId: shop._id }),
-        bookingRepository.countByStatusForShopInDateRange(shop._id, 'confirmed', today, tomorrow),
-        bookingRepository.countByStatusForShop(shop._id, 'awaiting_confirmation'),
-        bookingRepository.countByStatusForShop(shop._id, 'completed'),
-        bookingRepository.countByStatusForShop(shop._id, 'cancelled'),
+        bookingRepository.countByStatusForShopInDateRange(shop._id, null, startDate, endDate),
+        bookingRepository.countByStatusForShopInDateRange(shop._id, [BOOKING_STATUS.CONFIRMED, BOOKING_STATUS.PENDING], startDate, endDate),
+        bookingRepository.countByStatusForShopInDateRange(shop._id, BOOKING_STATUS.AWAITING_CONFIRMATION, startDate, endDate),
+        bookingRepository.countByStatusForShopInDateRange(shop._id, BOOKING_STATUS.COMPLETED, startDate, endDate),
+        bookingRepository.countByStatusForShopInDateRange(shop._id, [BOOKING_STATUS.CANCELLED, BOOKING_STATUS.NO_SHOW], startDate, endDate),
     ]);
     return { total, pending, awaitingConfirmation, completed, cancelled };
 };
@@ -3613,7 +3622,7 @@ const buildAppointmentAnalytics = async (ownerId) => {
 
 export const getBookingOverview = async (ownerId, query = {}) => {
     const [summary, milestones, today, queue, appointments] = await Promise.all([
-        buildBookingSummaryAnalytics(ownerId),
+        buildBookingSummaryAnalytics(ownerId, query),
         buildMilestoneAnalytics(ownerId, query),
         buildTodayAnalytics(ownerId),
         buildQueueAnalytics(ownerId),

@@ -6,13 +6,13 @@ The barber dashboard is served through resource-owned API endpoints rather than 
 
 ## Dashboard Data Sources
 
-| Dashboard section | Endpoint | Source resource |
-|---|---|---|
-| Booking summary, milestones, today pulse, queue, appointment trend | `GET /api/v1/bookings/overview` | Bookings |
-| Staff daily progress | `GET /api/v1/employees/daily-progress` | Employees and bookings |
-| Earnings and income trend | `GET /api/v1/earnings` | Earnings and payment transactions |
-| Ratings summary | `GET /api/v1/ratings/summary` | Ratings |
-| Gallery usage | `GET /api/v1/media/gallery/usage` | Media |
+| Dashboard section                                                  | Endpoint                               | Source resource                   |
+| ------------------------------------------------------------------ | -------------------------------------- | --------------------------------- |
+| Booking summary, milestones, today pulse, queue, appointment trend | `GET /api/v1/bookings/overview`        | Bookings                          |
+| Staff daily progress                                               | `GET /api/v1/employees/daily-progress` | Employees and bookings            |
+| Earnings and income trend                                          | `GET /api/v1/earnings`                 | Earnings and payment transactions |
+| Ratings summary                                                    | `GET /api/v1/ratings/summary`          | Ratings                           |
+| Gallery usage                                                      | `GET /api/v1/media/gallery/usage`      | Media                             |
 
 All dashboard-facing endpoints require a valid JWT. Barber-owned dashboard resources require the `BARBER` role and are scoped to the authenticated barber's shop.
 
@@ -81,7 +81,7 @@ It includes:
 
 **Endpoint:** `GET /api/v1/employees/daily-progress`
 
-Returns active, non-deleted employees with today's completed, total, remaining, and percentage progress. Completed progress includes both `completed` and `no-show` bookings. Cancelled bookings are excluded from each employee's daily total.
+Returns active, non-deleted employees with today's accepted appointment progress. The daily total includes `confirmed`, `completed`, and `no-show` bookings; `pending`, `awaiting_confirmation`, and `cancelled` bookings are excluded. `completed` counts only completed services, while `noShow` is reported separately. `resolved` and the percentage count both completed and no-show appointments as resolved outcomes; `remaining` is the accepted appointments not yet resolved.
 
 ## Earnings And Income
 
