@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import Link from 'next/link';
 
 export function LandingFooter({ onSelectDoc }) {
   const handleLegalClick = (e, docId) => {
@@ -140,13 +139,6 @@ export function LandingFooter({ onSelectDoc }) {
               >
                 Merchant agreement
               </a>
-              <Link
-                href="/adminevercut"
-                style={{ opacity: 0.5 }}
-                title="EverCut Administrative Gateway"
-              >
-                Portal
-              </Link>
             </div>
           </div>
         </div>
