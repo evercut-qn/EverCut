@@ -1,112 +1,151 @@
 'use client';
 
-import React from 'react';
-import { Store } from 'lucide-react';
-import { AppPhoneMockup } from './AppPhoneMockup';
+import React, { useRef, useState, useEffect } from 'react';
 
 export function HeroSection() {
+  const stageRef = useRef(null);
+  const tiltRef = useRef(null);
+  const [isLive, setIsLive] = useState(false);
+  const [baseTransform, setBaseTransform] = useState('rotateX(6deg) rotateY(-16deg) rotateZ(1deg)');
+  const [customStyle, setCustomStyle] = useState({});
+
+  useEffect(() => {
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReducedMotion) return;
+
+    let ticking = false;
+    const handleScroll = () => {
+      if (!ticking) {
+        ticking = true;
+        window.requestAnimationFrame(() => {
+          ticking = false;
+          const p = Math.min(Math.max(window.scrollY / 650, 0), 1);
+          const x = 6 * (1 - p);
+          const y = -16 * (1 - p);
+          const z = 1 - p;
+          const transform = `rotateX(${x}deg) rotateY(${y}deg) rotateZ(${z}deg)`;
+          setBaseTransform(transform);
+          if (!isLive) {
+            setCustomStyle({ transform });
+          }
+        });
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [isLive]);
+
+  const handlePointerMove = (e) => {
+    if (e.pointerType === 'touch') return;
+    const host = stageRef.current;
+    if (!host) return;
+
+    const rect = host.getBoundingClientRect();
+    const px = (e.clientX - rect.left) / rect.width - 0.5;
+    const py = (e.clientY - rect.top) / rect.height - 0.5;
+
+    setIsLive(true);
+    setCustomStyle({
+      transform: `rotateX(${6 - py * 10}deg) rotateY(${-16 + px * 14}deg) rotateZ(1deg)`
+    });
+  };
+
+  const handlePointerLeave = () => {
+    setIsLive(false);
+    setCustomStyle({ transform: baseTransform });
+  };
+
   return (
-    <section className="relative pt-12 pb-20 lg:pt-20 lg:pb-28 overflow-hidden">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid lg:grid-cols-12 gap-12 lg:gap-8 items-center">
-          
-          {/* Left Column: Hero Text & Call to Actions */}
-          <div className="lg:col-span-7 text-center lg:text-left">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-evercut-green/10 border border-evercut-green/30 text-evercut-green text-xs font-semibold mb-6">
-              <span className="w-2 h-2 rounded-full bg-evercut-green animate-ping"></span>
-              Live On Google Play &bull; Instant Salon Booking
-            </div>
+    <header className="hero" id="top">
+      <div className="field" style={{ width: 380, height: 380, bottom: -60, right: '18%' }}></div>
+      <div className="wrap">
+        <div>
+          <div className="status raised">
+            <i></i>Live on Google Play. Instant salon booking.
+          </div>
+          <h1>Book nearby salons and stylists in seconds.</h1>
+          <p className="lede">
+            Discover premier salons like Artwood Salon and Men Super Salon. Pick your barber, book an exact 5-minute slot, and unlock instant discounts on every haircut, trim and facial.
+          </p>
+          <div className="cta">
+            <a
+              className="btn solid"
+              href="https://play.google.com/store/apps/details?id=com.quantneural.evercut.customer"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Download for customers
+            </a>
+            <a
+              className="btn soft"
+              href="https://play.google.com/store/apps/details?id=com.quantneural.evercut.merchant"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Download for merchants
+            </a>
+          </div>
+        </div>
 
-            <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold font-heading text-white tracking-tight leading-[1.14] mb-6">
-              Book Nearby Salons & <br className="hidden sm:inline" />
-              Stylists in <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-green-500">Seconds</span>.
-            </h1>
-
-            <p className="text-slate-300 text-sm sm:text-base lg:text-lg max-w-2xl mx-auto lg:mx-0 mb-8 leading-relaxed">
-              Discover premier salons like <strong className="text-white">Artwood Salon</strong> & <strong className="text-white">Men Super Salon</strong>. Pick your barber, book exact 5-minute appointment slots, and unlock instant discounts on every haircut, trim, and facial.
-            </p>
-
-            {/* Google Play CTA Buttons */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center lg:justify-start gap-3 sm:gap-4">
-              
-              {/* Customer App */}
-              <a
-                href="https://play.google.com/store/search?q=evercut&c=apps"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-3.5 px-5 sm:px-6 py-3.5 rounded-2xl bg-black border border-slate-700 hover:border-evercut-green hover:shadow-lg hover:shadow-emerald-900/40 text-white transition-all transform hover:-translate-y-0.5 group w-full sm:w-auto justify-center sm:justify-start"
-              >
-                <svg className="w-8 h-8 shrink-0" viewBox="0 0 512 512">
-                  <path fill="#4285F4" d="M32.5 24.1c-3.1 3.4-4.9 8.6-4.9 15.3v433.2c0 6.7 1.8 11.9 4.9 15.3l1.8 1.8L259 265v-18L34.3 22.3l-1.8 1.8z"/>
-                  <path fill="#FBBC04" d="M334.3 340.3l-75.3-75.3v-18l75.3-75.3 1.7 1 89.2 50.7c25.5 14.5 25.5 38.3 0 52.8l-89.2 50.7-1.7-6.6z"/>
-                  <path fill="#EA4335" d="M336 339.3L259 262.3 32.5 488.7c8.4 8.9 22.3 9.9 38 1l265.5-150.4"/>
-                  <path fill="#34A853" d="M336 172.7L70.5 22.3c-15.7-8.9-29.6-7.9-38 1L259 249.7 336 172.7z"/>
-                </svg>
-                <div className="text-left">
-                  <div className="text-[10px] uppercase font-bold text-slate-400 group-hover:text-slate-300">
-                    Download For Customers
+        <div
+          className="stage"
+          id="heroStage"
+          ref={stageRef}
+          onPointerMove={handlePointerMove}
+          onPointerLeave={handlePointerLeave}
+        >
+          <div
+            className={`tilt ${isLive ? 'live' : ''}`}
+            ref={tiltRef}
+            style={customStyle}
+          >
+            <div className="phone">
+              <div className="screen" id="heroScreen">
+                <div className="scr on">
+                  <small>Nearby salons</small>
+                  <h4>Find your next haircut</h4>
+                  <div className="search">Search salons, styles, treatments</div>
+                  <div className="seg">
+                    <span className="a">Male</span>
+                    <span>Female</span>
                   </div>
-                  <div className="text-sm sm:text-base font-bold text-white leading-tight flex items-center gap-1.5">
-                    Google Play <span className="text-[10px] bg-evercut-green/20 text-evercut-green px-1.5 py-0.5 rounded font-mono font-semibold">User App</span>
+                  <div className="sc">
+                    <div className="row">
+                      <b>Men Super Salon</b>
+                      <span className="tag">Open</span>
+                    </div>
+                    <small>Haircut, beard, facial</small>
+                  </div>
+                  <div className="sc">
+                    <div className="row">
+                      <b>Artwood Salon</b>
+                      <span className="tag">Open</span>
+                    </div>
+                    <small>Styling, color, spa</small>
+                  </div>
+                  <div className="sc">
+                    <small>Suggestions are based on your location.</small>
                   </div>
                 </div>
-              </a>
-
-              {/* Merchant App */}
-              <a
-                href="https://play.google.com/store/search?q=evercut%20partner&c=apps"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-3.5 px-5 sm:px-6 py-3.5 rounded-2xl bg-[#141A24] border border-slate-700/80 hover:border-emerald-400 hover:shadow-lg text-white transition-all transform hover:-translate-y-0.5 group w-full sm:w-auto justify-center sm:justify-start"
-              >
-                <Store className="w-7 h-7 text-evercut-green shrink-0" />
-                <div className="text-left">
-                  <div className="text-[10px] uppercase font-bold text-slate-400">
-                    Download For Merchants
-                  </div>
-                  <div className="text-sm sm:text-base font-bold text-white leading-tight flex items-center gap-1.5">
-                    Google Play <span className="text-[10px] bg-slate-800 text-slate-300 px-1.5 py-0.5 rounded font-mono font-semibold">Salon Partner</span>
-                  </div>
-                </div>
-              </a>
+              </div>
             </div>
 
-            {/* Feature Badges */}
-            <div className="mt-8 sm:mt-10 grid grid-cols-3 gap-2 sm:gap-3 max-w-lg mx-auto lg:mx-0">
-              <div className="p-2.5 sm:p-3.5 rounded-2xl bg-slate-900/60 border border-slate-800 text-center sm:text-left">
-                <div className="text-base sm:text-xl font-extrabold text-evercut-green">Area Rates</div>
-                <div className="text-[10px] sm:text-xs text-slate-400">Local Salon Pricing</div>
-              </div>
-              <div className="p-2.5 sm:p-3.5 rounded-2xl bg-slate-900/60 border border-slate-800 text-center sm:text-left">
-                <div className="text-base sm:text-xl font-extrabold text-white">5 Mins</div>
-                <div className="text-[10px] sm:text-xs text-slate-400">Time-Slot Precision</div>
-              </div>
-              <div className="p-2.5 sm:p-3.5 rounded-2xl bg-slate-900/60 border border-slate-800 text-center sm:text-left">
-                <div className="text-base sm:text-xl font-extrabold text-emerald-400">0 Waiting</div>
-                <div className="text-[10px] sm:text-xs text-slate-400">Reserved Chairs</div>
-              </div>
+            <div className="chip glass c1">
+              <b>Artwood Salon</b>
+              <span>Open now</span>
+            </div>
+            <div className="chip glass c2">
+              <b>10:15 am with Shankya Mali</b>
+              <span>5-minute slot reserved</span>
+            </div>
+            <div className="chip glass c3">
+              <b>Booking confirmed</b>
+              <span>Your chair is waiting</span>
             </div>
           </div>
-
-          {/* Right Column: Phone Showcase with Ambient Glow */}
-          <div className="lg:col-span-5 flex justify-center items-center mt-6 lg:mt-0">
-            <div className="relative w-full max-w-[260px] xs:max-w-[280px] sm:max-w-[310px] lg:max-w-[330px] flex justify-center">
-              {/* Ambient Glow */}
-              <div className="absolute -inset-4 bg-gradient-to-r from-emerald-500/25 to-green-600/20 rounded-full blur-3xl opacity-70"></div>
-              
-              <div className="relative transition-transform duration-500 hover:scale-[1.02] flex justify-center w-full">
-                <AppPhoneMockup
-                  screenType="dashboard"
-                  imageSrc="/screenshots/Screenshot_20261005_222943.png"
-                  alt="Evercut Customer App Dashboard"
-                  priority={true}
-                />
-              </div>
-            </div>
-          </div>
-
         </div>
       </div>
-    </section>
+    </header>
   );
 }

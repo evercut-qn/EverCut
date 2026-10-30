@@ -1,0 +1,1729 @@
+/* EverCut Landing Page Scoped Stylesheet
+   Strictly scoped under .evercut-landing to ensure 0 interference with Admin Overview
+*/
+
+.evercut-landing {
+  --bg: #f8fafb;
+  --ink: #12171a;
+  --muted: #6c767e;
+  --accent: #1f4f5c;
+  --accent-ink: #ffffff;
+  --glass: rgba(255, 255, 255, 0.42);
+  --glass-edge: rgba(255, 255, 255, 0.75);
+  --sh-l: rgba(255, 255, 255, 0.95);
+  --sh-d: rgba(138, 150, 162, 0.5);
+  --blob: #1f4f5c;
+  --blob-o: 0.16;
+  --s-bg: #f3f5f6;
+  --s-card: #ffffff;
+  --s-line: #dfe4e8;
+  --frame: #12171a;
+  --serif: var(--font-newsreader), "Newsreader", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  --sans: var(--font-hanken), "Hanken Grotesk", "Helvetica Neue", Arial, sans-serif;
+  color-scheme: light;
+
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 17px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  position: relative;
+  overflow-x: hidden;
+  width: 100%;
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+
+/* Dark Theme */
+.evercut-landing[data-theme="dark"] {
+  --bg: #15191c;
+  --ink: #e9edf0;
+  --muted: #8f9aa2;
+  --accent: #86b6c4;
+  --accent-ink: #0d1316;
+  --glass: rgba(255, 255, 255, 0.055);
+  --glass-edge: rgba(255, 255, 255, 0.13);
+  --sh-l: rgba(255, 255, 255, 0.045);
+  --sh-d: rgba(0, 0, 0, 0.65);
+  --blob: #86b6c4;
+  --blob-o: 0.12;
+  --s-bg: #1c2125;
+  --s-card: #262d32;
+  --s-line: #333b41;
+  --frame: #0a0d0f;
+  color-scheme: dark;
+}
+
+/* Green Theme */
+.evercut-landing[data-theme="green"] {
+  --bg: #f1f7f3;
+  --ink: #0f241a;
+  --muted: #52695c;
+  --accent: #16703f;
+  --accent-ink: #ffffff;
+  --glass: rgba(255, 255, 255, 0.62);
+  --glass-edge: rgba(255, 255, 255, 0.95);
+  --sh-l: rgba(255, 255, 255, 1);
+  --sh-d: rgba(110, 148, 126, 0.42);
+  --blob: #16703f;
+  --blob-o: 0.14;
+  --s-bg: #f7fbf8;
+  --s-card: #ffffff;
+  --s-line: #d9e8de;
+  --frame: #0f2218;
+  color-scheme: light;
+}
+
+/* System dark fallback when no manual theme override is set */
+@media (prefers-color-scheme: dark) {
+  .evercut-landing:not([data-theme="light"]):not([data-theme="green"]) {
+    --bg: #15191c;
+    --ink: #e9edf0;
+    --muted: #8f9aa2;
+    --accent: #86b6c4;
+    --accent-ink: #0d1316;
+    --glass: rgba(255, 255, 255, 0.055);
+    --glass-edge: rgba(255, 255, 255, 0.13);
+    --sh-l: rgba(255, 255, 255, 0.045);
+    --sh-d: rgba(0, 0, 0, 0.65);
+    --blob: #86b6c4;
+    --blob-o: 0.12;
+    --s-bg: #1c2125;
+    --s-card: #262d32;
+    --s-line: #333b41;
+    --frame: #0a0d0f;
+    color-scheme: dark;
+  }
+}
+
+/* Scoped reset and base elements */
+.evercut-landing *,
+.evercut-landing *::before,
+.evercut-landing *::after {
+  box-sizing: border-box;
+}
+
+.evercut-landing a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.evercut-landing :focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 10px;
+}
+
+.evercut-landing h1,
+.evercut-landing h2,
+.evercut-landing h3 {
+  font-family: var(--serif);
+  font-weight: 400;
+  letter-spacing: -0.015em;
+  line-height: 1.08;
+}
+
+.evercut-landing .wrap {
+  width: min(1180px, 100% - 48px);
+  margin-inline: auto;
+}
+
+/* Ambient background fields */
+.evercut-landing .field {
+  position: absolute;
+  border-radius: 50%;
+  background: var(--blob);
+  opacity: var(--blob-o);
+  filter: blur(90px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Surfaces */
+.evercut-landing .raised {
+  background: var(--bg);
+  box-shadow: 12px 12px 28px var(--sh-d), -12px -12px 28px var(--sh-l);
+  border-radius: 28px;
+}
+
+.evercut-landing .inset {
+  background: var(--bg);
+  box-shadow: inset 7px 7px 16px var(--sh-d), inset -7px -7px 16px var(--sh-l);
+  border-radius: 22px;
+}
+
+.evercut-landing .glass {
+  background: var(--glass);
+  border: 1px solid var(--glass-edge);
+  -webkit-backdrop-filter: blur(22px) saturate(1.15);
+  backdrop-filter: blur(22px) saturate(1.15);
+  box-shadow: 0 24px 60px -20px var(--sh-d);
+}
+
+/* Navigation */
+.evercut-landing nav {
+  position: sticky;
+  top: calc(env(safe-area-inset-top, 0px) + 14px);
+  z-index: 50;
+  margin-top: 14px;
+}
+
+.evercut-landing .nav-in {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 12px 14px 12px 28px;
+  border-radius: 999px;
+}
+
+.evercut-landing .brand {
+  font-family: var(--serif);
+  font-size: 26px;
+  letter-spacing: -0.02em;
+}
+
+.evercut-landing .links {
+  display: flex;
+  gap: 32px;
+  font-size: 15px;
+  color: var(--muted);
+}
+
+.evercut-landing .links a:hover {
+  color: var(--ink);
+}
+
+.evercut-landing .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font: 500 15px/1 var(--sans);
+  padding: 16px 26px;
+  border-radius: 999px;
+  border: 0;
+  cursor: pointer;
+  color: var(--ink);
+  transition: box-shadow 0.25s, transform 0.25s, opacity 0.2s;
+  text-decoration: none;
+}
+
+.evercut-landing .btn.solid {
+  background: var(--accent);
+  color: var(--accent-ink);
+  box-shadow: 0 14px 30px -12px var(--accent);
+}
+
+.evercut-landing .btn.solid:hover {
+  opacity: 0.92;
+  transform: translateY(-1px);
+}
+
+.evercut-landing .btn.soft {
+  background: var(--bg);
+  box-shadow: 8px 8px 18px var(--sh-d), -8px -8px 18px var(--sh-l);
+}
+
+.evercut-landing .btn.soft:hover {
+  box-shadow: inset 5px 5px 12px var(--sh-d), inset -5px -5px 12px var(--sh-l);
+}
+
+.evercut-landing .btn.small {
+  padding: 13px 22px;
+}
+
+/* Hero */
+.evercut-landing .hero {
+  position: relative;
+  padding: 84px 0 56px;
+}
+
+.evercut-landing .hero .wrap {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 1.05fr 0.95fr;
+  gap: 48px;
+  align-items: center;
+}
+
+.evercut-landing .status {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 20px;
+  border-radius: 999px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.evercut-landing .status i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  display: block;
+}
+
+.evercut-landing h1 {
+  font-size: clamp(44px, 6.2vw, 84px);
+  margin: 30px 0 26px;
+  font-weight: 300;
+}
+
+.evercut-landing .lede {
+  max-width: 520px;
+  color: var(--muted);
+  font-size: 18px;
+}
+
+.evercut-landing .cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 40px;
+}
+
+.evercut-landing .stage {
+  perspective: 1500px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 640px;
+  position: relative;
+}
+
+.evercut-landing .tilt {
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform 0.35s cubic-bezier(0.2, 0.7, 0.2, 1);
+  transform: rotateX(6deg) rotateY(-16deg) rotateZ(1deg);
+  will-change: transform;
+}
+
+.evercut-landing .tilt.live {
+  transition: transform 0.08s linear;
+}
+
+/* Phone presentation */
+.evercut-landing .phone {
+  position: relative;
+  width: 292px;
+  height: 596px;
+  border-radius: 46px;
+  background: var(--frame);
+  padding: 9px;
+  transform-style: preserve-3d;
+  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.12), 0 50px 80px -30px rgba(0, 0, 0, 0.45);
+}
+
+.evercut-landing .phone::before {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  border-radius: 44px;
+  background: #05080a;
+  transform: translateZ(-16px);
+}
+
+.evercut-landing .phone::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border-radius: 45px;
+  background: var(--frame);
+  transform: translateZ(-8px);
+}
+
+.evercut-landing .screen {
+  position: relative;
+  height: 100%;
+  border-radius: 38px;
+  background: var(--s-bg);
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.evercut-landing .screen::before {
+  content: "";
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  width: 78px;
+  height: 22px;
+  border-radius: 12px;
+  background: var(--frame);
+  transform: translateX(-50%);
+  z-index: 3;
+}
+
+.evercut-landing .scr {
+  position: absolute;
+  inset: 0;
+  padding: 48px 18px 18px;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.45s ease, visibility 0.45s;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.evercut-landing .scr.on {
+  opacity: 1;
+  visibility: visible;
+}
+
+.evercut-landing .scr h4 {
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: 24px;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+  margin: 0;
+}
+
+.evercut-landing .scr small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.evercut-landing .sc {
+  background: var(--s-card);
+  border-radius: 16px;
+  padding: 13px 14px;
+  border: 1px solid var(--s-line);
+}
+
+.evercut-landing .row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.evercut-landing .search {
+  border-radius: 14px;
+  padding: 12px 14px;
+  color: var(--muted);
+  background: var(--s-card);
+  border: 1px solid var(--s-line);
+}
+
+.evercut-landing .seg {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-radius: 14px;
+  padding: 4px;
+  background: var(--s-line);
+}
+
+.evercut-landing .seg span {
+  text-align: center;
+  padding: 8px;
+  border-radius: 10px;
+  color: var(--muted);
+}
+
+.evercut-landing .seg span.a {
+  background: var(--s-card);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.evercut-landing .tag {
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.evercut-landing .tag.line {
+  background: transparent;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+}
+
+.evercut-landing .slots {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.evercut-landing .slots span {
+  text-align: center;
+  padding: 10px 0;
+  border-radius: 12px;
+  background: var(--s-card);
+  border: 1px solid var(--s-line);
+  font-weight: 500;
+}
+
+.evercut-landing .slots span.x {
+  opacity: 0.4;
+  text-decoration: line-through;
+}
+
+.evercut-landing .slots span.s {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-color: var(--accent);
+}
+
+.evercut-landing .cta-bar {
+  margin-top: auto;
+  text-align: center;
+  padding: 14px;
+  border-radius: 14px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+
+.evercut-landing .total {
+  font-family: var(--serif);
+  font-size: 28px;
+}
+
+.evercut-landing .sep {
+  height: 1px;
+  background: var(--s-line);
+  margin: 4px 0;
+}
+
+/* Floating chips */
+.evercut-landing .chip {
+  position: absolute;
+  padding: 16px 20px;
+  border-radius: 20px;
+  font-size: 14px;
+  line-height: 1.35;
+  transform-style: preserve-3d;
+  white-space: nowrap;
+  z-index: 10;
+}
+
+.evercut-landing .chip b {
+  display: block;
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.evercut-landing .chip span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.evercut-landing .chip.c1 {
+  left: -96px;
+  top: 84px;
+}
+
+.evercut-landing .chip.c2 {
+  right: -84px;
+  bottom: 112px;
+}
+
+.evercut-landing .chip.c3 {
+  left: -52px;
+  bottom: 48px;
+}
+
+/* Facts Section */
+.evercut-landing .facts {
+  position: relative;
+  z-index: 1;
+  padding: 24px 0 96px;
+}
+
+.evercut-landing .facts-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 28px;
+}
+
+.evercut-landing .fact {
+  padding: 36px 34px;
+}
+
+.evercut-landing .fact strong {
+  display: block;
+  font-family: var(--serif);
+  font-size: 52px;
+  font-weight: 300;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  margin-bottom: 10px;
+}
+
+.evercut-landing .fact span {
+  color: var(--muted);
+  font-size: 16px;
+}
+
+/* Band Sections */
+.evercut-landing .band {
+  position: relative;
+  z-index: 1;
+  padding: 64px 0 0;
+}
+
+.evercut-landing .bandbox {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 32px;
+  padding: 46px 54px;
+  border-radius: 36px;
+}
+
+.evercut-landing .bandbox h2 {
+  font-size: clamp(34px, 4.4vw, 56px);
+  font-weight: 300;
+}
+
+.evercut-landing .bandbox p {
+  color: var(--muted);
+  margin-top: 10px;
+  max-width: 560px;
+}
+
+/* Blocks */
+.evercut-landing section.block {
+  position: relative;
+  padding: 96px 0;
+}
+
+.evercut-landing .head {
+  margin-bottom: 48px;
+  max-width: 720px;
+}
+
+.evercut-landing .head h2 {
+  font-size: clamp(36px, 4.8vw, 64px);
+  font-weight: 300;
+  margin-bottom: 14px;
+}
+
+.evercut-landing .head p {
+  font-size: 19px;
+  color: var(--muted);
+}
+
+/* Interactive Showcase */
+.evercut-landing .show {
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: 40px;
+  align-items: center;
+}
+
+.evercut-landing .show-left {
+  padding: 40px;
+  border-radius: 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.evercut-landing .tabs {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.evercut-landing .tab {
+  text-align: left;
+  font: 500 16px/1.3 var(--sans);
+  color: var(--muted);
+  padding: 17px 24px;
+  border-radius: 20px;
+  border: 0;
+  cursor: pointer;
+  background: var(--bg);
+  box-shadow: 7px 7px 16px var(--sh-d), -7px -7px 16px var(--sh-l);
+  transition: box-shadow 0.3s, color 0.3s;
+}
+
+.evercut-landing .tab[aria-selected="true"] {
+  color: var(--accent);
+  box-shadow: inset 6px 6px 14px var(--sh-d), inset -6px -6px 14px var(--sh-l);
+}
+
+.evercut-landing .copy {
+  min-height: 280px;
+}
+
+.evercut-landing .copy h3 {
+  font-size: 32px;
+  font-weight: 300;
+  margin: 8px 0 12px;
+}
+
+.evercut-landing .copy p {
+  color: var(--muted);
+}
+
+.evercut-landing .copy ul {
+  list-style: none;
+  margin: 18px 0 26px;
+  padding: 0;
+  display: grid;
+  gap: 11px;
+}
+
+.evercut-landing .copy li {
+  padding-left: 22px;
+  position: relative;
+  font-size: 16px;
+}
+
+.evercut-landing .copy li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.62em;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.evercut-landing .kicker {
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.evercut-landing .show-stage {
+  perspective: 1500px;
+  padding: 40px 24px 30px;
+  border-radius: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.evercut-landing .show-stage .tilt {
+  transform: none;
+  transition: none;
+}
+
+.evercut-landing .note {
+  margin-top: 18px;
+  font-size: 13px;
+  color: var(--muted);
+  text-align: center;
+}
+
+/* Workflow Flow */
+.evercut-landing .flow {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 26px;
+  position: relative;
+}
+
+.evercut-landing .step {
+  padding: 34px 28px 36px;
+  position: relative;
+}
+
+.evercut-landing .step .n {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--accent);
+}
+
+.evercut-landing .step h3 {
+  font-size: 26px;
+  font-weight: 400;
+  margin: 26px 0 12px;
+}
+
+.evercut-landing .step p {
+  color: var(--muted);
+  font-size: 15.5px;
+}
+
+/* Extras / Nav Elements */
+.evercut-landing .navr {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.evercut-landing .themes {
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 999px;
+}
+
+.evercut-landing .themes button {
+  font: 500 13px/1 var(--sans);
+  padding: 10px 15px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.25s, color 0.25s;
+}
+
+.evercut-landing .themes button[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+/* Booking Simulator */
+.evercut-landing .sim {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  gap: 36px;
+  align-items: stretch;
+}
+
+.evercut-landing .panel {
+  padding: 32px;
+}
+
+.evercut-landing .grp + .grp {
+  margin-top: 22px;
+}
+
+.evercut-landing .grp h4 {
+  font: 600 15px/1.3 var(--sans);
+  margin-bottom: 14px;
+}
+
+.evercut-landing .opts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.evercut-landing .opt {
+  font: 500 15px/1 var(--sans);
+  color: var(--muted);
+  padding: 14px 20px;
+  border-radius: 16px;
+  border: 0;
+  cursor: pointer;
+  background: var(--bg);
+  box-shadow: 5px 5px 12px var(--sh-d), -5px -5px 12px var(--sh-l);
+  transition: box-shadow 0.25s, color 0.25s;
+}
+
+.evercut-landing .opt[aria-pressed="true"] {
+  color: var(--accent);
+  box-shadow: inset 4px 4px 10px var(--sh-d), inset -4px -4px 10px var(--sh-l);
+}
+
+.evercut-landing .opt:disabled {
+  opacity: 0.32;
+  cursor: not-allowed;
+  text-decoration: line-through;
+  box-shadow: none;
+}
+
+.evercut-landing .slotgrid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 10px;
+}
+
+.evercut-landing .slotgrid .opt {
+  padding: 13px 0;
+  text-align: center;
+  border-radius: 14px;
+  font-size: 14px;
+}
+
+.evercut-landing .receipt {
+  padding: 32px;
+  border-radius: 34px;
+  display: flex;
+  flex-direction: column;
+}
+
+.evercut-landing .receipt h3 {
+  font-size: 32px;
+  font-weight: 300;
+  margin-bottom: 14px;
+}
+
+.evercut-landing .rrow {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--glass-edge);
+  font-size: 15.5px;
+}
+
+.evercut-landing .rrow span:first-child {
+  color: var(--muted);
+}
+
+.evercut-landing .rrow span:last-child {
+  text-align: right;
+}
+
+.evercut-landing .rtotal {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 20px 0 24px;
+  margin-top: auto;
+}
+
+.evercut-landing .rtotal strong {
+  font-family: var(--serif);
+  font-weight: 300;
+  font-size: 48px;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.evercut-landing .receipt .btn {
+  width: 100%;
+}
+
+.evercut-landing .receipt .btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.evercut-landing .rmsg {
+  margin-top: 16px;
+  font-size: 14px;
+  color: var(--muted);
+  min-height: 44px;
+}
+
+/* Time Calculator */
+.evercut-landing .calc {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 36px;
+  padding: 44px;
+  align-items: stretch;
+}
+
+.evercut-landing .calc label {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 500;
+  margin-bottom: 14px;
+}
+
+.evercut-landing .calc label b {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.evercut-landing .calc input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+  margin-bottom: 34px;
+  cursor: pointer;
+}
+
+.evercut-landing .res {
+  padding: 40px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.evercut-landing .res strong {
+  font-family: var(--serif);
+  font-weight: 300;
+  font-size: clamp(54px, 6vw, 84px);
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.evercut-landing .res span {
+  display: block;
+  margin-top: 14px;
+  color: var(--muted);
+}
+
+/* Download Cards */
+.evercut-landing .dl {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 34px;
+  position: relative;
+  z-index: 1;
+}
+
+.evercut-landing .dl.one {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.evercut-landing .card {
+  padding: 48px 44px;
+  border-radius: 34px;
+  display: flex;
+  flex-direction: column;
+}
+
+.evercut-landing .dl.one .card {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 64px;
+  align-items: start;
+  padding: 52px 56px;
+}
+
+.evercut-landing .dl.one .card > span,
+.evercut-landing .dl.one .card > h3,
+.evercut-landing .dl.one .card > p {
+  grid-column: 1;
+}
+
+.evercut-landing .dl.one .card > ul {
+  grid-column: 2;
+  grid-row: 1 / 5;
+  align-self: center;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 14px;
+}
+
+.evercut-landing .dl.one .card > .getrow {
+  grid-column: 1;
+  grid-row: 4;
+  margin-top: 30px;
+}
+
+.evercut-landing .card .kicker {
+  margin-bottom: 6px;
+}
+
+.evercut-landing .card h3 {
+  font-size: 38px;
+  font-weight: 300;
+  margin-bottom: 16px;
+}
+
+.evercut-landing .card p {
+  color: var(--muted);
+}
+
+.evercut-landing .card ul {
+  list-style: none;
+  margin: 28px 0 38px;
+  padding: 0;
+  display: grid;
+  gap: 14px;
+}
+
+.evercut-landing .card li {
+  padding-left: 22px;
+  position: relative;
+  font-size: 16px;
+}
+
+.evercut-landing .card li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.62em;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.evercut-landing .getrow {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.evercut-landing .getrow .btn small {
+  font-weight: 400;
+  opacity: 0.75;
+  font-size: 13px;
+  margin-right: 4px;
+}
+
+.evercut-landing .qr {
+  width: 92px;
+  height: 92px;
+  padding: 8px;
+  border-radius: 16px;
+  background: #fff;
+  flex: 0 0 auto;
+  box-shadow: 6px 6px 14px var(--sh-d), -6px -6px 14px var(--sh-l);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.evercut-landing .qr img,
+.evercut-landing .qr canvas,
+.evercut-landing .qr svg {
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+}
+
+/* Salon Owner Board */
+.evercut-landing .board {
+  padding: 40px;
+}
+
+.evercut-landing .legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  margin-bottom: 26px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.evercut-landing .legend i {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+  vertical-align: -4px;
+  margin-right: 8px;
+}
+
+.evercut-landing .sw-b {
+  background: var(--accent);
+}
+
+.evercut-landing .sw-w {
+  border: 2px solid var(--accent);
+}
+
+.evercut-landing .sw-o {
+  background: var(--bg);
+  box-shadow: inset 2px 2px 4px var(--sh-d), inset -2px -2px 4px var(--sh-l);
+}
+
+.evercut-landing .scroll-x {
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+
+.evercut-landing .bgrid {
+  display: grid;
+  grid-template-columns: 84px repeat(8, minmax(56px, 1fr));
+  gap: 8px;
+  align-items: center;
+  min-width: 640px;
+}
+
+.evercut-landing .bgrid .th {
+  font-size: 13px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.evercut-landing .bgrid .rl {
+  font-weight: 500;
+  font-size: 15px;
+}
+
+.evercut-landing .cell {
+  height: 46px;
+  border-radius: 12px;
+  border: 0;
+  cursor: pointer;
+  transition: box-shadow 0.25s, background 0.25s;
+}
+
+.evercut-landing .cell.open {
+  background: var(--bg);
+  box-shadow: inset 3px 3px 7px var(--sh-d), inset -3px -3px 7px var(--sh-l);
+}
+
+.evercut-landing .cell.booked {
+  background: var(--accent);
+  cursor: default;
+}
+
+.evercut-landing .cell.walk {
+  background: transparent;
+  border: 2px solid var(--accent);
+}
+
+.evercut-landing .util {
+  margin-top: 30px;
+  display: flex;
+  align-items: center;
+  gap: 22px;
+}
+
+.evercut-landing .util .bar {
+  flex: 1;
+  height: 12px;
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.evercut-landing .util .bar i {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--accent);
+  border-radius: 99px;
+  transition: width 0.5s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.evercut-landing .util strong {
+  font-family: var(--serif);
+  font-weight: 300;
+  font-size: 34px;
+  min-width: 84px;
+  text-align: right;
+}
+
+/* FAQ */
+.evercut-landing .faq {
+  max-width: 900px;
+}
+
+.evercut-landing .faq details {
+  border-radius: 22px;
+  margin-bottom: 18px;
+}
+
+.evercut-landing .faq summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 24px 30px;
+  font: 500 18px/1.4 var(--sans);
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.evercut-landing .faq summary::-webkit-details-marker {
+  display: none;
+}
+
+.evercut-landing .faq summary::after {
+  content: "+";
+  color: var(--accent);
+  font-size: 26px;
+  line-height: 1;
+  transition: transform 0.3s;
+}
+
+.evercut-landing .faq details[open] summary::after {
+  transform: rotate(45deg);
+}
+
+.evercut-landing .faq details p {
+  padding: 0 30px 26px;
+  color: var(--muted);
+  max-width: 720px;
+  margin: 0;
+}
+
+.evercut-landing .faq details p a {
+  color: var(--accent);
+  font-weight: 500;
+}
+
+/* Legal Documents Reader */
+.evercut-landing .legal-grid {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 36px;
+  align-items: stretch;
+}
+
+.evercut-landing .ltabs {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.evercut-landing .ltabs .tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+
+.evercut-landing .reader {
+  padding: 36px 40px;
+  height: min(72vh, 640px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--sh-d) transparent;
+}
+
+.evercut-landing .reader::-webkit-scrollbar {
+  width: 6px;
+}
+
+.evercut-landing .reader::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.05);
+}
+
+.evercut-landing .reader::-webkit-scrollbar-thumb {
+  background: var(--accent);
+  border-radius: 9999px;
+}
+
+.evercut-landing .doc[hidden] {
+  display: none;
+}
+
+.evercut-landing .doc h3 {
+  font-size: clamp(30px, 3.4vw, 42px);
+  font-weight: 300;
+  margin-bottom: 8px;
+}
+
+.evercut-landing .doc .eff {
+  color: var(--muted);
+  font-size: 14px;
+  margin-bottom: 26px;
+}
+
+.evercut-landing .doc h4 {
+  font: 600 16.5px/1.4 var(--sans);
+  margin: 30px 0 8px;
+}
+
+.evercut-landing .doc p,
+.evercut-landing .doc li {
+  font-size: 16px;
+  line-height: 1.72;
+  color: var(--ink);
+  opacity: 0.86;
+}
+
+.evercut-landing .doc p + p {
+  margin-top: 10px;
+}
+
+.evercut-landing .doc ul {
+  list-style: none;
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 0;
+}
+
+.evercut-landing .doc li {
+  padding-left: 20px;
+  position: relative;
+}
+
+.evercut-landing .doc li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.7em;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.evercut-landing .doc a {
+  color: var(--accent);
+  font-weight: 500;
+}
+
+/* Footer */
+.evercut-landing footer {
+  padding: 84px 0 44px;
+  position: relative;
+}
+
+.evercut-landing .foot {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr 1.2fr;
+  gap: 44px;
+  padding: 48px 48px 40px;
+  border-radius: 34px;
+}
+
+.evercut-landing .foot h5 {
+  font: 600 15px/1 var(--sans);
+  margin-bottom: 20px;
+}
+
+.evercut-landing .foot p,
+.evercut-landing .foot li,
+.evercut-landing .foot a {
+  font-size: 15px;
+  color: var(--muted);
+}
+
+.evercut-landing .foot ul {
+  list-style: none;
+  display: grid;
+  gap: 12px;
+  padding: 0;
+  margin: 0;
+}
+
+.evercut-landing .foot a:hover {
+  color: var(--ink);
+}
+
+.evercut-landing .foot .brand {
+  display: block;
+  color: var(--ink);
+  margin-bottom: 14px;
+}
+
+.evercut-landing .legal {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 30px 12px 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.evercut-landing .legal div {
+  display: flex;
+  gap: 26px;
+  flex-wrap: wrap;
+}
+
+/* Mobile bottom bar */
+.evercut-landing .mbar {
+  display: none;
+}
+
+/* Responsive Media Queries */
+@media (max-width: 1020px) {
+  .evercut-landing .hero,
+  .evercut-landing section.block,
+  .evercut-landing .band {
+    overflow-x: clip;
+  }
+
+  .evercut-landing .hero .wrap,
+  .evercut-landing .show,
+  .evercut-landing .dl,
+  .evercut-landing .sim,
+  .evercut-landing .calc,
+  .evercut-landing .legal-grid,
+  .evercut-landing .dl.one {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .evercut-landing .show {
+    gap: 28px;
+  }
+
+  .evercut-landing .show-left {
+    display: contents;
+  }
+
+  .evercut-landing .tabs {
+    order: 1;
+    flex-direction: row;
+    overflow-x: auto;
+    gap: 12px;
+    margin: 0 -6px;
+    padding: 6px 6px 22px;
+    scrollbar-width: none;
+  }
+
+  .evercut-landing .tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .evercut-landing .tab {
+    white-space: nowrap;
+    flex: 0 0 auto;
+  }
+
+  .evercut-landing .show-stage {
+    order: 2;
+    justify-self: stretch;
+  }
+
+  .evercut-landing .copy {
+    order: 3;
+    min-height: 0;
+  }
+
+  .evercut-landing .receipt {
+    position: static;
+  }
+
+  .evercut-landing .flow {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .evercut-landing .foot {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .evercut-landing .links {
+    display: none;
+  }
+
+  .evercut-landing .dl.one .card {
+    display: flex;
+    flex-direction: column;
+    padding: 40px 32px;
+  }
+
+  .evercut-landing .dl.one .card > ul {
+    margin: 28px 0 36px;
+  }
+
+  .evercut-landing .dl.one .card > .getrow {
+    margin-top: auto;
+  }
+
+  .evercut-landing .bandbox {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 34px 30px;
+  }
+
+  .evercut-landing .ltabs {
+    position: static;
+    flex-direction: row;
+    overflow-x: auto;
+    padding: 6px 6px 22px;
+    margin: 0 -6px;
+    scrollbar-width: none;
+  }
+
+  .evercut-landing .ltabs .tab {
+    white-space: nowrap;
+    flex: 0 0 auto;
+  }
+}
+
+@media (max-width: 640px) {
+  .evercut-landing {
+    font-size: 16px;
+  }
+
+  .evercut-landing .wrap {
+    width: calc(100% - 32px);
+  }
+
+  .evercut-landing .facts-grid,
+  .evercut-landing .flow,
+  .evercut-landing .foot {
+    grid-template-columns: 1fr;
+  }
+
+  .evercut-landing .hero {
+    padding-top: 48px;
+  }
+
+  .evercut-landing .chip.c1 {
+    left: -8px;
+  }
+
+  .evercut-landing .chip.c2 {
+    right: -8px;
+  }
+
+  .evercut-landing .chip.c3 {
+    display: none;
+  }
+
+  .evercut-landing .card,
+  .evercut-landing .foot,
+  .evercut-landing .panel,
+  .evercut-landing .board,
+  .evercut-landing .receipt {
+    padding: 36px 28px;
+  }
+
+  .evercut-landing .calc {
+    padding: 26px 22px;
+  }
+
+  .evercut-landing .res {
+    padding: 30px 24px;
+  }
+
+  .evercut-landing .slotgrid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .evercut-landing .qr {
+    display: none;
+  }
+
+  .evercut-landing .navr .btn.solid {
+    display: none;
+  }
+
+  .evercut-landing .mbar {
+    display: block;
+    position: fixed;
+    left: 16px;
+    right: 16px;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+    z-index: 55;
+    padding: 8px;
+    border-radius: 999px;
+  }
+
+  .evercut-landing .mbar .btn {
+    width: 100%;
+  }
+
+  .evercut-landing footer {
+    padding-bottom: 110px;
+  }
+
+  .evercut-landing .faq summary {
+    padding: 20px 22px;
+    font-size: 16.5px;
+  }
+
+  .evercut-landing .faq details p {
+    padding: 0 22px 22px;
+  }
+
+  .evercut-landing .reader {
+    padding: 30px 22px;
+    max-height: 72vh;
+  }
+
+  .evercut-landing .fact {
+    padding: 26px 24px;
+  }
+
+  .evercut-landing .fact strong {
+    font-size: 40px;
+  }
+
+  .evercut-landing .cta .btn {
+    flex: 1 1 100%;
+  }
+
+  .evercut-landing .status {
+    border-radius: 22px;
+    line-height: 1.45;
+  }
+
+  .evercut-landing .util {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .evercut-landing .util .bar {
+    flex: 1 1 100%;
+    order: 3;
+  }
+
+  .evercut-landing .getrow .btn {
+    width: 100%;
+  }
+
+  .evercut-landing .bandbox {
+    padding: 28px 24px;
+  }
+
+  .evercut-landing .bandbox .btn {
+    width: 100%;
+  }
+
+  .evercut-landing .head {
+    margin-bottom: 32px;
+  }
+
+  .evercut-landing .step {
+    padding: 28px 24px;
+  }
+
+  .evercut-landing .receipt h3 {
+    font-size: 28px;
+  }
+
+  .evercut-landing .rtotal strong {
+    font-size: 40px;
+  }
+
+  .evercut-landing .dl.one .card {
+    padding: 32px 24px;
+  }
+
+  .evercut-landing .card h3 {
+    font-size: 32px;
+  }
+
+  .evercut-landing .foot h5 {
+    margin-bottom: 14px;
+  }
+
+  .evercut-landing .legal {
+    padding: 24px 4px 0;
+  }
+
+  .evercut-landing .brand {
+    font-size: 24px;
+  }
+
+  .evercut-landing .stage {
+    min-height: 620px;
+  }
+
+  .evercut-landing .show-stage {
+    padding: 36px 0 28px;
+  }
+}
+
+@media (max-width: 380px) {
+  .evercut-landing .nav-in {
+    padding: 10px 10px 10px 16px;
+    gap: 10px;
+  }
+
+  .evercut-landing .themes button {
+    padding: 8px 9px;
+    font-size: 12px;
+  }
+
+  .evercut-landing .brand {
+    font-size: 22px;
+  }
+
+  .evercut-landing h1 {
+    font-size: 40px;
+  }
+
+  .evercut-landing .phone {
+    zoom: 0.92;
+  }
+}

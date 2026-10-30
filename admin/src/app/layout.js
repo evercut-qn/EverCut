@@ -1,4 +1,4 @@
-import { Inter, Outfit } from 'next/font/google';
+import { Inter, Outfit, Hanken_Grotesk, Newsreader } from 'next/font/google';
 import { Providers } from './providers';
 import './globals.css';
 
@@ -10,6 +10,20 @@ const inter = Inter({
 const outfit = Outfit({
   variable: '--font-display',
   subsets: ['latin'],
+});
+
+const hankenGrotesk = Hanken_Grotesk({
+  variable: '--font-hanken',
+  subsets: ['latin'],
+  weight: ['400', '500', '600'],
+  display: 'swap',
+});
+
+const newsreader = Newsreader({
+  variable: '--font-newsreader',
+  subsets: ['latin'],
+  weight: ['300', '400', '500'],
+  display: 'swap',
 });
 
 /** @type {import('next').Metadata} */
@@ -31,7 +45,7 @@ export default function RootLayout({ children }) {
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${outfit.variable} h-full antialiased`}
+      className={`${inter.variable} ${outfit.variable} ${hankenGrotesk.variable} ${newsreader.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col bg-background text-foreground transition-colors duration-200">
