@@ -42,7 +42,7 @@ export const createCorsOptions = () => {
             callback(new Error('Origin not allowed by CORS'));
         },
         methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-        allowedHeaders: ['Content-Type', 'Authorization'],
+        allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Requested-With'],
         credentials: false,
         maxAge: 600,
     };

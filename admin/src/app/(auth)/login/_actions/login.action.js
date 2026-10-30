@@ -1,9 +1,40 @@
 'use server';
 
 import { cookies } from 'next/headers';
-import { verifyOTP } from '@/lib/services/auth.service';
-import { verifyOTPSchema } from '@/lib/schemas/auth.schema';
+import { requestOTP, verifyOTP } from '@/lib/services/auth.service';
+import { requestOTPSchema, verifyOTPSchema } from '@/lib/schemas/auth.schema';
 import { decodeJWTPayload } from '@/lib/jwt';
+
+/**
+ * Server Action to request an OTP code for administrative login.
+ * Executed server-side from Next.js server to backend API.
+ *
+ * @param {Object} payload
+ * @param {string} payload.phone - 10-digit Indian mobile number
+ * @returns {Promise<{success: boolean, message: string, errors?: Array}>}
+ */
+export async function handleRequestOtpAction({ phone }) {
+  try {
+    const validation = requestOTPSchema.safeParse({ phone });
+    if (!validation.success) {
+      return {
+        success: false,
+        message: 'Invalid phone number format.',
+        errors: validation.error.errors.map((err) => ({
+          field: err.path.join('.'),
+          message: err.message,
+        })),
+      };
+    }
+
+    return await requestOTP(phone);
+  } catch (error) {
+    return {
+      success: false,
+      message: error?.message || 'Failed to contact authentication service. Please try again.',
+    };
+  }
+}
 
 /**
  * Server Action to check the OTP verification code and create the session cookie.

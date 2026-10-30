@@ -10,8 +10,7 @@ import { Logo } from '@/components/ui/Logo';
 
 import { FormInput } from '@/components/forms';
 import { requestOTPSchema, verifyOTPSchema } from '@/lib/schemas/auth.schema';
-import { requestOTP } from '@/lib/services/auth.service';
-import { handleLoginAction } from '../_actions/login.action';
+import { handleLoginAction, handleRequestOtpAction } from '../_actions/login.action';
 
 /**
  * OTP Login Form Component.
@@ -54,7 +53,7 @@ export function LoginForm() {
   async function onPhoneSubmit(data) {
     startTransition(async () => {
       try {
-        const result = await requestOTP(data.phone);
+        const result = await handleRequestOtpAction({ phone: data.phone });
 
         if (!result.success) {
           phoneForm.setError('phone', { type: 'server', message: result.message || 'Phone number not recognized.' });
@@ -100,7 +99,7 @@ export function LoginForm() {
     if (resendTimer > 0) return;
     startTransition(async () => {
       try {
-        const result = await requestOTP(phoneVal);
+        const result = await handleRequestOtpAction({ phone: phoneVal });
         if (result.success) {
           toast.success('Code re-sent successfully.');
           setResendTimer(60);
@@ -206,3 +205,4 @@ export function LoginForm() {
   );
 }
 export default LoginForm;
+

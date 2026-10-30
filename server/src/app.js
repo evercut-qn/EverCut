@@ -22,6 +22,9 @@ import { ApiResponse } from './utils/api-response.js';
 const createApp = () => {
     const app = express();
 
+    // Trust first proxy (Traefik) for correct req.ip and req.protocol
+    app.set('trust proxy', 1);
+
     // ── 1. Request logging ─────────────────────────────────────────────────
     app.use(requestLogger);
 
@@ -35,7 +38,10 @@ const createApp = () => {
     app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
     // ── 4. API routes ──────────────────────────────────────────────────────
-    app.use(config.apiPrefix, routes);
+    app.use('/v1', routes);
+    if (config.apiPrefix !== '/v1') {
+        app.use(config.apiPrefix, routes);
+    }
 
     // ── 5. 404 catch-all ───────────────────────────────────────────────────
     app.use((_req, res) => {
